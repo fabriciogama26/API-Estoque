@@ -21,13 +21,9 @@ function formatCurrency(value) {
 }
 
 function formatPeriodoLabel(periodo) {
-  if (!periodo) {
-    return ''
-  }
+  if (!periodo) return ''
   const [ano, mes] = periodo.split('-')
-  if (!mes) {
-    return ano
-  }
+  if (!mes) return ano
   return `${mes.padStart(2, '0')}/${ano}`
 }
 
@@ -36,9 +32,7 @@ function normalizarTermo(termo) {
 }
 
 function combinaComTermo(material = {}, termoNormalizado = '') {
-  if (!termoNormalizado) {
-    return true
-  }
+  if (!termoNormalizado) return true
   const alvo = `${material.nome || ''} ${material.fabricante || ''}`.toLowerCase()
   return alvo.includes(termoNormalizado)
 }
@@ -48,21 +42,13 @@ function agruparPorPeriodo(entradas = [], saidas = []) {
 
   entradas.forEach((item) => {
     const data = new Date(item.dataEntrada)
-    if (Number.isNaN(data.getTime())) {
-      return
-    }
+    if (Number.isNaN(data.getTime())) return
     const ano = data.getUTCFullYear()
     const mes = data.getUTCMonth() + 1
     const key = `${ano}-${String(mes).padStart(2, '0')}`
 
     if (!mapa.has(key)) {
-      mapa.set(key, {
-        periodo: key,
-        entradas: 0,
-        valorEntradas: 0,
-        saidas: 0,
-        valorSaidas: 0,
-      })
+      mapa.set(key, { periodo: key, entradas: 0, valorEntradas: 0, saidas: 0, valorSaidas: 0 })
     }
 
     const atual = mapa.get(key)
@@ -75,21 +61,13 @@ function agruparPorPeriodo(entradas = [], saidas = []) {
 
   saidas.forEach((item) => {
     const data = new Date(item.dataEntrega)
-    if (Number.isNaN(data.getTime())) {
-      return
-    }
+    if (Number.isNaN(data.getTime())) return
     const ano = data.getUTCFullYear()
     const mes = data.getUTCMonth() + 1
     const key = `${ano}-${String(mes).padStart(2, '0')}`
 
     if (!mapa.has(key)) {
-      mapa.set(key, {
-        periodo: key,
-        entradas: 0,
-        valorEntradas: 0,
-        saidas: 0,
-        valorSaidas: 0,
-      })
+      mapa.set(key, { periodo: key, entradas: 0, valorEntradas: 0, saidas: 0, valorSaidas: 0 })
     }
 
     const atual = mapa.get(key)
@@ -104,9 +82,7 @@ function agruparPorPeriodo(entradas = [], saidas = []) {
 }
 
 function filtrarPorTermo(lista = [], termoNormalizado) {
-  if (!termoNormalizado) {
-    return lista
-  }
+  if (!termoNormalizado) return lista
   return lista.filter((item) => combinaComTermo(item.material, termoNormalizado))
 }
 
@@ -124,9 +100,7 @@ function montarEstoquePorMaterial(itens = [], termoNormalizado) {
 function montarCategorias(itens = [], termoNormalizado) {
   const categorias = new Map()
   itens.forEach((item) => {
-    if (!combinaComTermo(item, termoNormalizado)) {
-      return
-    }
+    if (!combinaComTermo(item, termoNormalizado)) return
     const categoria = item.nome?.split(' ')[0] || 'Nao classificado'
     const atual = categorias.get(categoria) ?? { categoria, quantidade: 0 }
     atual.quantidade += Number(item.quantidade ?? 0)
@@ -281,26 +255,32 @@ export function DashboardPage() {
           <span className="metric__description">Valor total: {formatCurrency(resumoEntradas.valor)}</span>
         </section>
         <section className="metric metric--compact">
-          <span className="metric__label">Saidas</span>
+          <span className="metric__label">Saídas</span>
           <strong className="metric__value">{resumoSaidas.quantidade}</strong>
           <span className="metric__description">Valor total: {formatCurrency(resumoSaidas.valor)}</span>
         </section>
-        
       </div>
 
       <div className="dashboard-grid dashboard-grid--two">
         <section className="card card--chart card--chart-lg">
           <header className="card__header">
-            <h2>Entradas x Saidas</h2>
+            <h2>Entradas x Saídas</h2>
           </header>
-          <EntradasSaidasChart data={seriesHistorica} labelFormatter={formatPeriodoLabel} />
+          <div className="chart-container">
+            <EntradasSaidasChart data={seriesHistorica} labelFormatter={formatPeriodoLabel} />
+          </div>
         </section>
 
         <section className="card card--chart card--chart-lg">
           <header className="card__header">
             <h2>Valor movimentado</h2>
           </header>
-          <ValorMovimentadoChart data={seriesHistorica.map(({ periodo, valorEntradas, valorSaidas }) => ({ periodo, valorEntradas, valorSaidas }))} valueFormatter={formatCurrency} />
+          <div className="chart-container">
+            <ValorMovimentadoChart
+              data={seriesHistorica.map(({ periodo, valorEntradas, valorSaidas }) => ({ periodo, valorEntradas, valorSaidas }))}
+              valueFormatter={formatCurrency}
+            />
+          </div>
         </section>
       </div>
 
@@ -309,13 +289,18 @@ export function DashboardPage() {
           <header className="card__header">
             <h2>Estoque por material</h2>
           </header>
-          <EstoquePorMaterialChart data={estoquePorMaterial.slice(0, 8)} />
+          <div className="chart-container">
+            <EstoquePorMaterialChart data={estoquePorMaterial.slice(0, 8)} />
+          </div>
         </section>
+
         <section className="card card--chart card--chart-lg">
           <header className="card__header">
             <h2>Estoque por categoria</h2>
           </header>
-          <EstoquePorCategoriaChart data={estoquePorCategoria} />
+          <div className="chart-container">
+            <EstoquePorCategoriaChart data={estoquePorCategoria} />
+          </div>
         </section>
       </div>
 
@@ -323,9 +308,10 @@ export function DashboardPage() {
         <header className="card__header">
           <h2>Top materiais movimentados</h2>
         </header>
-        <MateriaisMaisUsadosChart data={rankingMateriais.slice(0, 8)} />
+        <div className="chart-container">
+          <MateriaisMaisUsadosChart data={rankingMateriais.slice(0, 8)} />
+        </div>
       </section>
     </div>
   )
 }
-

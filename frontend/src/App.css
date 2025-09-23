@@ -131,9 +131,9 @@
 }
 
 .layout__brand-image {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
+  width: 64px;   /* aumenta o comprimento */
+  height: 64px;   /* mantém altura fixa */
+  object-fit: fill; /* força preencher, mesmo que deforme */
 }
 
 .layout__brand-text {
