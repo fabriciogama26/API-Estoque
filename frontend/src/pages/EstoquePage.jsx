@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { api } from '../services/api.js'
+import './EstoquePage.css'
 
 const initialFilters = {
   ano: '',

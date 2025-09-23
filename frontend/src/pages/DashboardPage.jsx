@@ -4,6 +4,7 @@ import { api } from '../services/api.js'
 import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts/EntradasSaidasChart.jsx'
 import { EstoquePorMaterialChart, MateriaisMaisUsadosChart } from '../components/charts/EstoqueCharts.jsx'
 import { EstoquePorCategoriaChart } from '../components/charts/EstoqueCategoriaChart.jsx'
+import './DashboardPage.css'
 
 const initialFilters = {
   ano: new Date().getFullYear(),
@@ -235,8 +236,6 @@ export function DashboardPage() {
     () => montarRanking(data?.materiaisMaisMovimentados ?? [], termoNormalizado),
     [data, termoNormalizado],
   )
-
-  const alertasQtd = data?.estoqueAtual?.alertas?.length ?? 0
 
   return (
     <div className="stack">
