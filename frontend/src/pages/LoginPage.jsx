@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import './LoginPage.css'
 
 const logoSrc = '/logo_epicontrol.png'
 
