@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types'
-import './charts.css'
+import '../../styles/charts.css'
 import {
   ResponsiveContainer,
   LineChart,

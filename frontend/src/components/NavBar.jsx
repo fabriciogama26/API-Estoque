@@ -1,8 +1,9 @@
+import '../styles/NavBar.css'
 import { NavLink } from 'react-router-dom'
 
 const navItems = [
   {
-    title: 'Visao geral',
+    title: 'Visão Geral',
     items: [
       { to: '/', label: 'Dashboard principal', end: true },
       { to: '/estoque', label: 'Estoque Atual' },
@@ -12,14 +13,14 @@ const navItems = [
     title: 'Cadastros',
     items: [
       { to: '/cadastros/pessoas', label: 'Pessoas' },
-      { to: '/cadastros/materiais', label: 'Materiais' },
+      { to: '/cadastros/materiais', label: "EPI's" },
     ],
   },
   {
-    title: 'Movimentacoes',
+    title: 'Movimentações',
     items: [
       { to: '/movimentacoes/entradas', label: 'Entradas' },
-      { to: '/movimentacoes/saidas', label: 'Saidas' },
+      { to: '/movimentacoes/saidas', label: 'Saídas' },
     ],
   },
 ]

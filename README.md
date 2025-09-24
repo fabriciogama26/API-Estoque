@@ -125,3 +125,15 @@ O Vite sobe em `http://localhost:5173` e encaminha chamadas `/api` para o backen
 
 
 
+## Documentação de Telas
+- A pasta `docs/` contém um arquivo `.txt` por tela com o detalhamento completo de fluxos, campos, validações, contratos de API, regras de negócio e referências às entidades persistidas.
+- Arquivos disponíveis:
+  - `docs/Login.txt`
+  - `docs/Dashboard.txt`
+  - `docs/Estoque.txt`
+  - `docs/Materiais.txt`
+  - `docs/Pessoas.txt`
+  - `docs/Entradas.txt`
+  - `docs/Saidas.txt`
+
+Consulte esses arquivos para alinhar comportamento esperado entre desenvolvimento, QA e análise de requisitos.

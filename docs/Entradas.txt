@@ -1,0 +1,46 @@
+Tela: Entradas de Materiais
+------------------------------
+Finalidade
+- Registrar abastecimentos de estoque (entradas de EPI) e fornecer histórico com cálculo de valor total por lançamento.
+
+Campos do Formulário
+- Material* (`materialId`, select): obrigatório; lista derivada de `/api/materiais` (id, nome, fabricante).
+- Quantidade* (`quantidade`, número >= 1): obrigatório.
+- Data da entrada (`dataEntrada`, date): opcional; se vazio o backend atribui `new Date().toISOString()`.
+
+Validações
+- Front-end: `required` em material e quantidade; input numérico com `min="1"`.
+- Backend (`entradaRules.validarEntrada`):
+  * Exige material válido (obtido via `MaterialRepository`).
+  * Quantidade numérica > 0.
+  * Data válida quando informada.
+- `EntradaService.obterMaterial` garante que `materialId` exista; sem isso retorna erro “Material nao encontrado”.
+
+APIs e Ações
+1. GET `/api/materiais` + GET `/api/entradas` (Promise.all em `load`) para preencher selects e tabela.
+2. POST `/api/entradas` (`api.entradas.create`)
+   - Payload: `{ materialId, quantidade, dataEntrada?, usuarioResponsavel }`.
+   - Response: objeto formatado com material agregado (quando criação) mas a tela usa `load()` para sincronizar.
+
+Dados Enviados/Recebidos
+- Envia IDs dos materiais e usuário logado (`usuarioResponsavel`).
+- Recebe lista de entradas brutas (`EntradaMaterial`): `id`, `materialId`, `quantidade`, `dataEntrada`, `usuarioResponsavel`.
+- Valor total exibido é calculado client-side multiplicando quantidade pelo `valorUnitario` do material carregado.
+
+Regras de Negócio
+- Cadastro válido exige existência prévia do material.
+- Não há atualização/remoção; histórico é apenas leitura.
+- Nenhum impacto direto sobre estoque mínimo, mas o saldo geral é usado por `EstoqueService` para compor estoque atual e dashboard.
+
+Comportamentos de UI
+- Botão “Registrar entrada” mostra “Registrando...” enquanto a requisição está em andamento.
+- Selects são desabilitados? (não explicitamente) mas `isLoading` controla mensagem “Carregando…”.
+- Haverá mensagens padrão quando não existirem entradas (“Nenhuma entrada registrada.”).
+
+Dependências
+- Requer materiais carregados; sem materiais o select fica vazio impossibilitando submissão.
+- O histórico mostrado depende de `materialsMap` para complementar nome e fabricante.
+
+Persistência / Banco
+- Entidade `EntradaMaterial` é escrita no repositório `entradas` (campos: id, materialId, quantidade, dataEntrada, usuarioResponsavel).
+- Repositório de materiais fornece metadados utilizados pelo serviço tanto para validação quanto para enriquecer resposta.

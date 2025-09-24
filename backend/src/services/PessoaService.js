@@ -10,8 +10,10 @@ class PessoaService {
     const pessoa = new Pessoa({
       id: uuid(),
       nome: payload.nome.trim(),
+      matricula: payload.matricula.trim(),
       local: payload.local.trim(),
-      cargo: payload.cargo.trim()
+      cargo: payload.cargo.trim(),
+      usuarioCadastro: payload.usuarioCadastro || 'sistema'
     });
 
     repositories.pessoas.create(pessoa);

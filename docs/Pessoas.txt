@@ -1,0 +1,43 @@
+Tela: Cadastro de Pessoas
+------------------------------
+Finalidade
+- Registrar colaboradores que receberão EPIs, permitindo sua seleção na tela de saídas e mantendo trilha de quem cadastrou cada registro.
+
+Campos do Formulário
+- Nome* (`nome`, texto): obrigatório.
+- Matrícula* (`matricula`, texto): obrigatório, identifica colaborador.
+- Local* (`local`, texto): obrigatório, unidade/ setor.
+- Cargo* (`cargo`, texto): obrigatório.
+
+Validações
+- Front-end: todos os inputs possuem `required`.
+- Backend (`pessoaRules.validarPessoa`) garante que todos os campos existam e estejam com trim não vazio.
+
+APIs e Ações
+1. GET `/api/pessoas` (`api.pessoas.list`): carrega listagem exibida.
+2. POST `/api/pessoas` (`api.pessoas.create`): payload `{ nome, matricula, local, cargo, usuarioCadastro }`.
+3. GET `/api/pessoas/:id` (não usada na tela, mas disponível via serviço para detalhes).
+
+Dados Enviados/Recebidos
+- Payload inclui `usuarioCadastro` preenchido com `useAuth().user` ou fallback `'sistema'`.
+- Response do POST retorna o objeto `Pessoa` recém inserido (id, nome, matricula, local, cargo, usuarioCadastro, criadoEm).
+- Listagem mostra campos persistidos e data formatada.
+
+Regras de Negócio
+- Nenhuma verificação de duplicidade de matrícula é aplicada; responsabilidade do operador.
+- Pessoas podem ter nomes duplicados; identificação formal ocorre via ID interno.
+- Outras telas (Saídas) dependem destas pessoas para registrar entregas de EPIs.
+
+Comportamentos de UI
+- Botão “Salvar pessoa” alterna label para “Salvando...” durante requisições.
+- Botão “Atualizar” refaz GET `/api/pessoas` manualmente.
+- Mensagem de erro global é renderizada acima dos botões ao receber mensagens do backend.
+
+Dependências
+- Depende do contexto de autenticação para registrar `usuarioCadastro`.
+- Tela de Saídas exige que haja pessoas cadastradas; caso contrário o select fica vazio.
+
+Persistência / Banco
+- Entidade `Pessoa` armazenada via `PessoaRepository` (campos: id, nome, matricula, local, cargo, usuarioCadastro, criadoEm).
+- `PessoaService` escreve na coleção in-memory com IDs UUID.
+- Não há relacionamentos diretos além do uso de `pessoaId` pela entidade `SaidaMaterial`.

@@ -1,0 +1,47 @@
+Tela: Saídas de Materiais
+------------------------------
+Finalidade
+- Registrar entregas de EPIs a colaboradores, calcular automaticamente a data de troca prevista e manter histórico completo de saídas, incluindo status e valores financeiros.
+
+Campos do Formulário
+- Pessoa* (`pessoaId`, select): obrigatório; opções carregadas de `/api/pessoas`.
+- Material* (`materialId`, select): obrigatório; opções carregadas de `/api/materiais`.
+- Quantidade* (`quantidade`, número >= 1): obrigatório.
+- Data de entrega (`dataEntrega`, date): opcional; quando ausente o backend define data atual.
+
+Validações
+- Front-end: `required` em pessoa, material e quantidade; input numérico com mínimo 1.
+- Backend (`saidaRules.validarSaida`):
+  * Pessoa e material devem existir (via `SaidaService.obterPessoa`/`obterMaterial`).
+  * Quantidade numérica > 0 e não exceder `estoqueDisponivel` calculado por `EstoqueService.calcularSaldoMaterial`.
+  * Data, se informada, precisa ser válida.
+
+APIs e Ações
+1. GET `/api/pessoas`, `/api/materiais`, `/api/saidas` (carregamento inicial).
+2. POST `/api/saidas` (`api.saidas.create`)
+   - Payload: `{ pessoaId, materialId, quantidade, dataEntrega?, usuarioResponsavel }`.
+   - Backend calcula `dataTroca` somando `validadeDias` do material, define `status` (default `entregue`) e retorna objeto enriquecido.
+
+Dados Enviados/Recebidos
+- Envia IDs das pessoas e materiais selecionados, quantidade e (opcionalmente) data de entrega; inclui usuário responsável.
+- Recebe lista de saídas (repositório bruto) contendo `status`, `dataTroca`, `usuarioResponsavel`.
+- A tela faz join client-side com `pessoas` e `materiais` para exibir nomes e calcular valor total (`valorUnitario * quantidade`).
+
+Regras de Negócio
+- Impede saída se não houver estoque suficiente do material (verificação no backend).
+- Calcula `dataTroca` automática baseando-se em `validadeDias` para acompanhamento de substituição de EPIs.
+- Permite registros com pessoas ou materiais que futuramente sejam removidos; nesses casos a interface exibe fallback “removido”.
+
+Comportamentos de UI
+- Botão “Registrar saída” exibe “Registrando…” durante POST.
+- Texto “Atualizar” recarrega listagem completa.
+- Feedbacks: mensagens “Nenhuma saída registrada” ou “Carregando…” conforme estado.
+
+Dependências
+- Necessário ter pessoas e materiais cadastrados; sem eles os selects permanecem vazios.
+- Consome estado do usuário autenticado para preencher `usuarioResponsavel`.
+- Saldo atualizado afeta cálculos do Dashboard e Estoque.
+
+Persistência / Banco
+- Entidade `SaidaMaterial` armazenada com campos: id, materialId, pessoaId, quantidade, dataEntrega, dataTroca, status, usuarioResponsavel.
+- Regras de estoque usam `Material` (valor unitário, validadeDias) e `EntradaMaterial`/`SaidaMaterial` para calcular disponibilidade.

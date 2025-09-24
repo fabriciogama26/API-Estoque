@@ -4,14 +4,15 @@ import { api } from '../services/api.js'
 import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts/EntradasSaidasChart.jsx'
 import { EstoquePorMaterialChart, MateriaisMaisUsadosChart } from '../components/charts/EstoqueCharts.jsx'
 import { EstoquePorCategoriaChart } from '../components/charts/EstoqueCategoriaChart.jsx'
-import './DashboardPage.css'
+import '../styles/DashboardPage.css'
+
+const currentYear = new Date().getFullYear()
 
 const initialFilters = {
-  ano: new Date().getFullYear(),
-  mes: '',
+  periodoInicio: `${currentYear}-01`,
+  periodoFim: `${currentYear}-12`,
   termo: '',
 }
-
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -132,8 +133,8 @@ export function DashboardPage() {
     setError(null)
     try {
       const response = await api.estoque.dashboard({
-        ano: params.ano || undefined,
-        mes: params.mes || undefined,
+        periodoInicio: params.periodoInicio || undefined,
+        periodoFim: params.periodoFim || undefined,
       })
       setData(response)
     } catch (err) {
@@ -155,12 +156,18 @@ export function DashboardPage() {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    setError(null)
+    if (filters.periodoInicio && filters.periodoFim && filters.periodoInicio > filters.periodoFim) {
+      setError('Periodo inicial deve ser anterior ou igual ao final')
+      return
+    }
     load(filters)
   }
 
   const handleClear = () => {
-    setFilters(initialFilters)
-    load(initialFilters)
+    setError(null)
+    setFilters({ ...initialFilters })
+    load({ ...initialFilters })
   }
 
   const termoNormalizado = useMemo(() => normalizarTermo(filters.termo), [filters.termo])
@@ -220,12 +227,18 @@ export function DashboardPage() {
 
       <form className="form form--inline" onSubmit={handleSubmit}>
         <label className="field">
-          <span>Ano</span>
-          <input type="number" name="ano" value={filters.ano} onChange={handleChange} placeholder="2025" />
+          <span>Periodo inicial</span>
+          <input type="month" name="periodoInicio" value={filters.periodoInicio} onChange={handleChange} />
         </label>
         <label className="field">
-          <span>Mes</span>
-          <input type="number" min="1" max="12" name="mes" value={filters.mes} onChange={handleChange} placeholder="1" />
+          <span>Periodo final</span>
+          <input
+            type="month"
+            name="periodoFim"
+            value={filters.periodoFim}
+            onChange={handleChange}
+            min={filters.periodoInicio || undefined}
+          />
         </label>
         <label className="field">
           <span>Material ou fabricante</span>
@@ -315,3 +328,5 @@ export function DashboardPage() {
     </div>
   )
 }
+
+

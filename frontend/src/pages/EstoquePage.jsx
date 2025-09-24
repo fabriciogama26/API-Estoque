@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { api } from '../services/api.js'
-import './EstoquePage.css'
+import { useAuth } from '../context/AuthContext.jsx'
+import '../styles/EstoquePage.css'
 
 const initialFilters = {
   ano: '',
@@ -30,10 +31,14 @@ function combinaComTermo(material = {}, termoNormalizado = '') {
 }
 
 export function EstoquePage() {
+  const { user } = useAuth()
   const [filters, setFilters] = useState(initialFilters)
   const [estoque, setEstoque] = useState({ itens: [], alertas: [] })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [minStockDrafts, setMinStockDrafts] = useState({})
+  const [savingMinStock, setSavingMinStock] = useState({})
+  const [minStockErrors, setMinStockErrors] = useState({})
 
   const load = async (params = filters) => {
     setIsLoading(true)
@@ -44,6 +49,17 @@ export function EstoquePage() {
         mes: params.mes || undefined,
       })
       setEstoque({ itens: data?.itens ?? [], alertas: data?.alertas ?? [] })
+      setMinStockDrafts(() => {
+        const drafts = {}
+        ;(data?.itens ?? []).forEach((item) => {
+          drafts[item.materialId] =
+            item.estoqueMinimo !== undefined && item.estoqueMinimo !== null
+              ? String(item.estoqueMinimo)
+              : ''
+        })
+        return drafts
+      })
+      setMinStockErrors({})
     } catch (err) {
       setError(err.message)
     } finally {
@@ -69,6 +85,57 @@ export function EstoquePage() {
   const handleClear = () => {
     setFilters(initialFilters)
     load(initialFilters)
+  }
+
+  const handleMinStockChange = (materialId, value) => {
+    setMinStockDrafts((prev) => ({ ...prev, [materialId]: value }))
+  }
+
+  const handleMinStockSave = async (item) => {
+    const draftValue = (minStockDrafts[item.materialId] ?? '').trim()
+    if (draftValue === '') {
+      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Informe um valor' }))
+      return
+    }
+
+    const parsed = Number(draftValue)
+    if (Number.isNaN(parsed) || parsed < 0) {
+      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor inválido' }))
+      return
+    }
+
+    if (Number(item.estoqueMinimo ?? 0) === parsed) {
+      setMinStockErrors((prev) => {
+        const next = { ...prev }
+        delete next[item.materialId]
+        return next
+      })
+      return
+    }
+
+    setMinStockErrors((prev) => {
+      const next = { ...prev }
+      delete next[item.materialId]
+      return next
+    })
+
+    setSavingMinStock((prev) => ({ ...prev, [item.materialId]: true }))
+    try {
+      const usuario = user?.name || user?.username || 'sistema'
+      await api.materiais.update(item.materialId, {
+        estoqueMinimo: parsed,
+        usuarioResponsavel: usuario,
+      })
+      await load({ ...filters })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSavingMinStock((prev) => {
+        const next = { ...prev }
+        delete next[item.materialId]
+        return next
+      })
+    }
   }
 
   const termoNormalizado = useMemo(() => normalizarTermo(filters.termo), [filters.termo])
@@ -161,29 +228,56 @@ export function EstoquePage() {
         </header>
         {itensFiltrados.length === 0 ? <p className="feedback">Sem materiais cadastrados ou filtrados.</p> : null}
         <div className="list">
-          {itensFiltrados.map((item) => (
-            <article key={item.materialId} className={`list__item${item.alerta ? ' list__item--alert' : ''}`}>
-              <header className="list__item-header">
-                <div>
-                  <h3>{item.nome}</h3>
-                  <p>{item.fabricante}</p>
+          {itensFiltrados.map((item) => {
+            const draftValue = minStockDrafts[item.materialId] ?? ''
+            const isSavingMin = Boolean(savingMinStock[item.materialId])
+            const fieldError = minStockErrors[item.materialId]
+            return (
+              <article key={item.materialId} className={`list__item${item.alerta ? ' list__item--alert' : ''}`}>
+                <header className="list__item-header">
+                  <div>
+                    <h3>{item.nome}</h3>
+                    <p>{item.fabricante}</p>
+                  </div>
+                  <div className="list__item-meta">
+                    <span>Quantidade: {item.quantidade}</span>
+                    <span>Valor unitario: {formatCurrency(item.valorUnitario)}</span>
+                    <span>Valor total: {formatCurrency(item.valorTotal)}</span>
+                    <div className="list__item-min-stock">
+                      <label>
+                        <span>Estoque minimo</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={draftValue}
+                          onChange={(event) => handleMinStockChange(item.materialId, event.target.value)}
+                          disabled={isSavingMin}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="button button--ghost"
+                        onClick={() => handleMinStockSave(item)}
+                        disabled={isSavingMin}
+                      >
+                        {isSavingMin ? 'Salvando...' : 'Salvar'}
+                      </button>
+                    </div>
+                    {fieldError ? <span className="list__item-error">{fieldError}</span> : null}
+                  </div>
+                </header>
+                <div className="list__item-body">
+                  <span>Validade (dias): {item.validadeDias}</span>
+                  <span>CA: {item.ca}</span>
                 </div>
-                <div className="list__item-meta">
-                  <span>Quantidade: {item.quantidade}</span>
-                  <span>Valor unitario: {formatCurrency(item.valorUnitario)}</span>
-                  <span>Valor total: {formatCurrency(item.valorTotal)}</span>
-                  <span>Estoque minimo: {item.estoqueMinimo}</span>
-                </div>
-              </header>
-              <div className="list__item-body">
-                <span>Validade (dias): {item.validadeDias}</span>
-                <span>CA: {item.ca}</span>
-              </div>
-            </article>
-          ))}
+              </article>
+            )
+          })}
         </div>
       </section>
     </div>
   )
 }
+
+
 

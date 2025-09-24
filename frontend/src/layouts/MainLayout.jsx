@@ -1,6 +1,8 @@
 import { Outlet } from 'react-router-dom'
 import { NavBar } from '../components/NavBar.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import '../styles/MainLayout.css'
+
 
 const logoSrc = '/logo_epicontrol.png'
 

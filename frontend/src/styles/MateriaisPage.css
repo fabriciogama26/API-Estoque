@@ -18,3 +18,11 @@
   color: rgba(71, 85, 105, 0.9);
   flex-wrap: wrap;
 }
+
+.data-table__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+

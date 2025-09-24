@@ -1,0 +1,117 @@
+/* Layout geral */
+.layout {
+  display: flex;
+  height: 100vh;
+  background: #f9fafb;
+  color: #111827;
+  font-family: Arial, sans-serif;
+}
+
+/* Sidebar */
+.layout__sidebar {
+  width: 260px;
+  background: linear-gradient(to bottom, #1e1b4b, #111827);
+  color: #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+/* Logo e título */
+.layout__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2rem;
+}
+
+.layout__brand-image {
+  width: 40px;
+  height: 40px;
+}
+
+.layout__brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.layout__brand-subtitle {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #f3f4f6;
+}
+
+/* Conteúdo */
+.layout__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Topbar */
+.layout__topbar {
+  height: 70px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layout__topbar-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.layout__topbar-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #111827;
+}
+
+.layout__topbar-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.layout__topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.layout__topbar-user span {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Botão sair */
+.button {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.button--ghost {
+  background: transparent;
+  color: #4338ca;
+  border: 1px solid #4338ca;
+}
+
+.button--ghost:hover {
+  background: #4338ca;
+  color: #fff;
+}
+
+/* Conteúdo principal */
+.layout__main {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  background: #f3f4f6;
+}

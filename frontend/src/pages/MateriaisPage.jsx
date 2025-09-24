@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+﻿import { Fragment, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { api } from '../services/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import './MateriaisPage.css'
+import '../styles/MateriaisPage.css'
 
 const initialForm = {
   nome: '',
@@ -10,7 +10,6 @@ const initialForm = {
   validadeDias: '',
   ca: '',
   valorUnitario: '',
-  estoqueMinimo: '',
 }
 
 function formatCurrency(value) {
@@ -29,6 +28,7 @@ export function MateriaisPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [editingMaterial, setEditingMaterial] = useState(null)
 
   const load = async () => {
     setIsLoading(true)
@@ -74,17 +74,26 @@ export function MateriaisPage() {
     setError(null)
     try {
       const valorUnitarioNumber = Number(form.valorUnitario.replace(/\D/g, '')) / 100 || 0
-      const payload = {
+      const basePayload = {
         nome: form.nome.trim(),
         fabricante: form.fabricante.trim(),
         validadeDias: Number(form.validadeDias),
         ca: form.ca,
         valorUnitario: valorUnitarioNumber,
-        estoqueMinimo: form.estoqueMinimo ? Number(form.estoqueMinimo) : undefined,
-        usuarioCadastro: user?.name || user?.username || 'sistema',
       }
-      await api.materiais.create(payload)
-      setForm(initialForm)
+      const usuario = user?.name || user?.username || 'sistema'
+      if (editingMaterial) {
+        await api.materiais.update(editingMaterial.id, {
+          ...basePayload,
+          usuarioResponsavel: usuario,
+        })
+      } else {
+        await api.materiais.create({
+          ...basePayload,
+          usuarioCadastro: usuario,
+        })
+      }
+      cancelEdit()
       setHistories({})
       await load()
     } catch (err) {
@@ -109,6 +118,22 @@ export function MateriaisPage() {
         return next
       })
     }
+  }
+
+  const startEdit = (material) => {
+    setEditingMaterial(material)
+    setForm({
+      nome: material.nome,
+      fabricante: material.fabricante,
+      validadeDias: String(material.validadeDias ?? ''),
+      ca: material.ca || '',
+      valorUnitario: formatCurrency(material.valorUnitario),
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingMaterial(null)
+    setForm(initialForm)
   }
 
   const materiaisOrdenados = useMemo(() => (
@@ -137,8 +162,8 @@ export function MateriaisPage() {
             <input type="number" min="1" name="validadeDias" value={form.validadeDias} onChange={handleChange} required />
           </label>
           <label className="field">
-            <span>CA*</span>
-            <input name="ca" value={form.ca} onChange={handleChange} required placeholder="12345" inputMode="numeric" />
+            <span>CA</span>
+            <input name="ca" value={form.ca} onChange={handleChange} placeholder="12345" inputMode="numeric" />
           </label>
           <label className="field">
             <span>Valor unitario*</span>
@@ -151,16 +176,17 @@ export function MateriaisPage() {
               required
             />
           </label>
-          <label className="field">
-            <span>Estoque minimo</span>
-            <input type="number" min="0" name="estoqueMinimo" value={form.estoqueMinimo} onChange={handleChange} placeholder="0" />
-          </label>
         </div>
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
           <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? 'Salvando...' : 'Salvar material'}
+            {isSaving ? 'Salvando...' : editingMaterial ? 'Salvar alterações' : 'Salvar material'}
           </button>
+          {editingMaterial ? (
+            <button type="button" className="button button--ghost" onClick={cancelEdit} disabled={isSaving}>
+              Cancelar edição
+            </button>
+          ) : null}
         </div>
       </form>
 
@@ -203,13 +229,23 @@ export function MateriaisPage() {
                         <td>{material.estoqueMinimo}</td>
                         <td>{material.usuarioCadastro || '-'}</td>
                         <td>
-                          <button
-                            type="button"
-                            className="link-button"
-                            onClick={() => toggleHistory(material.id)}
-                          >
-                            {historyOpen ? 'Ocultar historico' : 'Ver historico'}
-                          </button>
+                          <div className="data-table__actions">
+                            <button
+                              type="button"
+                              className="link-button"
+                              onClick={() => startEdit(material)}
+                              disabled={editingMaterial?.id === material.id || isSaving}
+                            >
+                              {editingMaterial?.id === material.id ? 'Editando' : 'Editar'}
+                            </button>
+                            <button
+                              type="button"
+                              className="link-button"
+                              onClick={() => toggleHistory(material.id)}
+                            >
+                              {historyOpen ? 'Ocultar historico' : 'Ver historico'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                       {historyOpen ? (
@@ -242,3 +278,6 @@ export function MateriaisPage() {
     </div>
   )
 }
+
+
+

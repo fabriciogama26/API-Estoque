@@ -1,6 +1,9 @@
-function validarPessoa({ nome, local, cargo }) {
+function validarPessoa({ nome, matricula, local, cargo }) {
   if (!nome || !nome.trim()) {
     throw new Error('Nome obrigatorio');
+  }
+  if (!matricula || !matricula.trim()) {
+    throw new Error('Matricula obrigatoria');
   }
   if (!local || !local.trim()) {
     throw new Error('Local obrigatorio');
@@ -13,6 +16,3 @@ function validarPessoa({ nome, local, cargo }) {
 module.exports = {
   validarPessoa
 };
-
-
-

@@ -1,0 +1,51 @@
+Tela: Dashboard
+------------------------------
+Finalidade
+- Fornecer uma visão executiva do estoque de EPIs, consolidando entradas, saídas, alertas e ranking de movimentação. A tela é a home autenticada do sistema e prioriza acompanhamentos rápidos para tomada de decisão.
+
+Campos e Filtros
+- Ano (`ano`, numérico, opcional): restringe os dados retornados pelo backend ao ano especificado.
+- Mês (`mes`, numérico 1-12, opcional): combinado ao ano forma um filtro pontual de período.
+- Material ou fabricante (`termo`, texto, opcional): filtro cliente aplicado a todas as coleções exibidas (charts e rankings).
+
+Validações
+- Inputs HTML validam tipos e faixas (`type="number"`, `min`, `max`).
+- Não há validação adicional no front; filtros vazios são permitidos.
+- Backend (`EstoqueService.obterDashboard`) filtra datas com `filtrarPorPeriodo`, garantindo compatibilidade de ano/mês.
+
+APIs Utilizadas
+- GET `/api/estoque/dashboard?ano=&mes=` (`api.estoque.dashboard`).
+  * Query strings opcionais: `ano`, `mes`. Outros filtros são ignorados pelo backend.
+  * Response: objeto com estrutura `{ periodo, entradas, saidas, entradasDetalhadas[], saidasDetalhadas[], entradasHistoricas[], saidasHistoricas[], materiaisMaisMovimentados[], estoqueAtual }`.
+    - `entradas/saidas` agregam `quantidade` e `valorTotal`.
+    - `estoqueAtual` replica o formato de `/api/estoque` com `{ itens, alertas }`.
+
+Dados Enviados/Recebidos
+- Envio: parâmetros de filtro (`ano`, `mes`). Submissão do formulário reaproveita o estado `filters`.
+- Recebimento: coleção completa com dados crus (entradas, saídas, materiais) usados para construir:
+  * `seriesHistorica` para gráficos de linha/área.
+  * `rankingMateriais` para top movimentados.
+  * `estoquePorMaterial` e `estoquePorCategoria` para charts de barras/pizza.
+
+Regras de Negócio
+- Backend aplica filtros por período tanto para entradas quanto saídas via função `filtrarPorPeriodo` (com suporte a ano/mês simples).
+- Valores financeiros são calculados no backend (valor total) e complementados no front para rankings.
+- O front recalcula totais em `resumoEntradas`/`resumoSaidas` garantindo consistência visual.
+- Termos de busca (`termoNormalizado`) são aplicados apenas client-side, permitindo refinar sem nova chamada.
+
+Comportamentos de UI
+- Botões “Aplicar filtros” e “Limpar filtros” controlam carregamento (`isLoading`) e exibem spinner textual.
+- Feedback de erro (`error`) mostra mensagem retornada pelo backend.
+- Métricas e charts são ocultados somente quando coleções estão vazias, exibindo mensagens como “Sem materiais cadastrados”.
+
+Dependências
+- Requer o backend ter registros de Materiais, Entradas e Saídas; os rankings e alertas dependem dessas entidades.
+- Usa componentes de chart (`EntradasSaidasChart`, `ValorMovimentadoChart`, `EstoquePorMaterialChart`, `EstoquePorCategoriaChart`, `MateriaisMaisUsadosChart`).
+- Depende do contexto de autenticação apenas para manter o usuário (não envia dados sensíveis neste fluxo).
+
+Persistência / Banco de Dados
+- Endpoint `obterDashboard` consulta repositórios em memória:
+  * `materiais` (tabela/coleção Material): campos id, nome, fabricante, validadeDias, valorUnitario, estoqueMinimo, ativo.
+  * `entradas` (`EntradaMaterial`): id, materialId, quantidade, dataEntrada, usuarioResponsavel.
+  * `saidas` (`SaidaMaterial`): id, materialId, pessoaId, quantidade, dataEntrega, dataTroca, status, usuarioResponsavel.
+- Não grava dados; apenas leitura agregada.

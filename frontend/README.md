@@ -18,7 +18,6 @@ src/
 +- components/ProtectedRoute.jsx, NavBar.jsx, PageHeader.jsx, charts/* (Recharts)
 +- pages/
    +- LoginPage.jsx
-   +- HomePage.jsx
    +- PessoasPage.jsx
    +- MateriaisPage.jsx
    +- EntradasPage.jsx

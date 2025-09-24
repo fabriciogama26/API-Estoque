@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../services/api.js'
 
 const initialForm = {
   nome: '',
+  matricula: '',
   local: '',
   cargo: '',
 }
 
 export function PessoasPage() {
+  const { user } = useAuth()
   const [form, setForm] = useState(initialForm)
   const [data, setData] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -42,7 +45,11 @@ export function PessoasPage() {
     setIsSaving(true)
     setError(null)
     try {
-      await api.pessoas.create(form)
+      const usuario = user?.name || user?.username || 'sistema'
+      await api.pessoas.create({
+        ...form,
+        usuarioCadastro: usuario,
+      })
       setForm(initialForm)
       await load()
     } catch (err) {
@@ -64,6 +71,10 @@ export function PessoasPage() {
           <label className="field">
             <span>Nome*</span>
             <input name="nome" value={form.nome} onChange={handleChange} required placeholder="Joao Silva" />
+          </label>
+          <label className="field">
+            <span>Matricula*</span>
+            <input name="matricula" value={form.matricula} onChange={handleChange} required placeholder="12345" />
           </label>
           <label className="field">
             <span>Local*</span>
@@ -97,7 +108,9 @@ export function PessoasPage() {
               <thead>
                 <tr>
                   <th>Nome</th>
+                  <th>Matricula</th>
                   <th>Local</th>
+                  <th>Registrado por</th>
                   <th>Cargo</th>
                   <th>Cadastrado em</th>
                 </tr>
@@ -106,9 +119,11 @@ export function PessoasPage() {
                 {data.map((pessoa) => (
                   <tr key={pessoa.id}>
                     <td>{pessoa.nome}</td>
+                    <td>{pessoa.matricula || '-'}</td>
                     <td>{pessoa.local}</td>
+                    <td>{pessoa.usuarioCadastro || '-'}</td>
                     <td>{pessoa.cargo}</td>
-                    <td>{pessoa.criadoEm ? new Date(pessoa.criadoEm).toLocaleDateString('pt-BR') : '—'}</td>
+                    <td>{pessoa.criadoEm ? new Date(pessoa.criadoEm).toLocaleDateString('pt-BR') : '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -119,3 +134,10 @@ export function PessoasPage() {
     </div>
   )
 }
+
+
+
+
+
+
+

@@ -1,0 +1,52 @@
+Tela: Cadastro de Materiais
+------------------------------
+Finalidade
+- Cadastrar novos EPIs com seus atributos de controle (validade, CA, valor unitário) e permitir manutenção de registros existentes (edição inline) além de consultar histórico de reajustes de preço.
+
+Campos de Formulário
+- EPI* (`nome`, texto): obrigatório. Trim aplicado antes do envio.
+- Fabricante* (`fabricante`, texto): obrigatório, trim aplicado.
+- Validade (dias)* (`validadeDias`, número): obrigatório, mínimo 1.
+- C.A (`ca`, texto numérico): opcional no front, mas a criação exige string não vazia; input limpa caracteres não numéricos.
+- Valor unitário* (`valorUnitario`, texto formatado moeda): obrigatório; máscara local converte para centavos.
+
+Validações
+- Front: atributos `required` em campos marcados com *; `handleChange` força somente dígitos em CA e valor.
+- Submissão converte `valorUnitario` para número e `validadeDias` para Number.
+- Backend (`materialRules`):
+  * `validarDadosObrigatorios` exige nome/fabricante/validade > 0/valor > 0 (também demanda `ca.trim()`, tornando CA efetivamente obrigatório ao criar ou atualizar).
+  * `validarEstoqueMinimo` garante mínimo >= 0 quando informado.
+- `MaterialService.criarMaterial` rejeita duplicidade nome+fabricante.
+
+Ações e APIs
+1. GET `/api/materiais` (`api.materiais.list`): carrega tabela ordenada.
+2. POST `/api/materiais` (`api.materiais.create`): payload `{ nome, fabricante, validadeDias, ca, valorUnitario, usuarioCadastro }`.
+3. PUT `/api/materiais/:id` (`api.materiais.update`): payload dinâmico com campos editados; esta tela envia `{ nome, fabricante, validadeDias, ca, valorUnitario, usuarioResponsavel }` quando em modo edição.
+4. GET `/api/materiais/:id/historico-precos` (`api.materiais.priceHistory`): retorna array com `{ id, materialId, valorUnitario, dataRegistro, usuarioResponsavel }`.
+
+Dados Enviados/Recebidos
+- Envia dados do formulário convertidos para números e strings trimadas; inclui `usuarioCadastro`/`usuarioResponsavel` do contexto de autenticação.
+- Recebe lista de materiais com campos do modelo (`Material`) incluindo `estoqueMinimo`, `usuarioCadastro`, `dataCadastro`.
+- Histórico de preços alimenta lista expandida por material.
+
+Regras de Negócio
+- Cada criação gera automaticamente registro em `PrecoHistorico` com usuário responsável.
+- Ao editar, se o valor unitário mudar, novo histórico é registrado; outras alterações apenas atualizam o material.
+- A tabela mostra coluna “Estoque mínimo” herdada de atualizações feitas na tela de Estoque.
+- Botão “Ver histórico” alterna `histories[materialId]`, acionando chamada lazy.
+
+Comportamentos de UI
+- Form alterna entre modo criação e edição com botão “Editar/Salvar alterações” e ação “Cancelar edição”.
+- Valor unitário usa máscara de moeda brasileira; conversão ocorre na submissão.
+- Mensagens de erro globais aparecem acima das ações.
+- Histórico exibe lista com data formatada `toLocaleString` e valor em moeda.
+
+Dependências
+- Depende do contexto de autenticação para preencher `usuarioCadastro`/`usuarioResponsavel`.
+- Historicamente laços com estoque: alteração de estoque mínimo pode vir da tela de Estoque (PUT via outra tela) mas é exibida aqui.
+- Exige que a coleção esteja disponível via `MaterialRepository` para operações de leitura/edição.
+
+Persistência / Banco
+- Entidade principal: `Material` (campos: id, nome, fabricante, validadeDias, ca, valorUnitario, usuarioCadastro, dataCadastro, estoqueMinimo, ativo).
+- Histórico de preço: `PrecoHistorico` (id, materialId, valorUnitario, dataRegistro, usuarioResponsavel).
+- Repositórios são baseados em `Map`, simulando tabelas in-memory; `MaterialService` é responsável por regras de integridade.

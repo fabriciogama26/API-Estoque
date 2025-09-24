@@ -6,16 +6,52 @@ function filtrarPorPeriodo(registro, campoData, periodo) {
     return true;
   }
 
-  const data = new Date(registro[campoData]);
+  const rawValue = registro[campoData];
+  if (!rawValue) {
+    return false;
+  }
+
+  const data = new Date(rawValue);
   if (Number.isNaN(data.getTime())) {
     return false;
   }
 
-  if (periodo.ano && data.getUTCFullYear() !== Number(periodo.ano)) {
+  const ano = data.getUTCFullYear();
+  const mes = data.getUTCMonth() + 1;
+
+  if (periodo.inicio || periodo.fim) {
+    const indice = ano * 12 + (mes - 1);
+
+    if (periodo.inicio) {
+      const inicioAno = Number(periodo.inicio.ano);
+      const inicioMes = periodo.inicio.mes ? Number(periodo.inicio.mes) - 1 : 0;
+      if (!Number.isNaN(inicioAno)) {
+        const inicioIndice = inicioAno * 12 + inicioMes;
+        if (indice < inicioIndice) {
+          return false;
+        }
+      }
+    }
+
+    if (periodo.fim) {
+      const fimAno = Number(periodo.fim.ano);
+      const fimMes = periodo.fim.mes ? Number(periodo.fim.mes) - 1 : 11;
+      if (!Number.isNaN(fimAno)) {
+        const fimIndice = fimAno * 12 + fimMes;
+        if (indice > fimIndice) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  if (periodo.ano && ano !== Number(periodo.ano)) {
     return false;
   }
 
-  if (periodo.mes && data.getUTCMonth() + 1 !== Number(periodo.mes)) {
+  if (periodo.mes && mes !== Number(periodo.mes)) {
     return false;
   }
 
@@ -92,6 +128,7 @@ class EstoqueService {
         ca: material.ca,
         valorUnitario: material.valorUnitario,
         quantidade: saldo,
+        estoqueAtual: saldo,
         valorTotal: Number((saldo * material.valorUnitario).toFixed(2)),
         estoqueMinimo: material.estoqueMinimo,
         alerta,
