@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
+import { InventoryIcon } from '../components/icons.jsx'
 import { api } from '../services/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import '../styles/EstoquePage.css'
@@ -100,7 +101,7 @@ export function EstoquePage() {
 
     const parsed = Number(draftValue)
     if (Number.isNaN(parsed) || parsed < 0) {
-      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor inválido' }))
+      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor inv�lido' }))
       return
     }
 
@@ -155,6 +156,7 @@ export function EstoquePage() {
   return (
     <div className="stack">
       <PageHeader
+        icon={<InventoryIcon size={28} />}
         title="Estoque atual"
         subtitle="Consulte saldo por material, valor total e alertas de estoque minimo."
       />
@@ -278,6 +280,7 @@ export function EstoquePage() {
     </div>
   )
 }
+
 
 
 

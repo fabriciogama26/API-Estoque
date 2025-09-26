@@ -1,47 +1,92 @@
 # Frontend - API Estoque
 
-Frontend React criado com Vite para consumir a API de estoque. Agora inclui Recharts para visualizacao dos indicadores. O projeto possui roteamento completo, autenticacao basica (via endpoint dedicado) e todas as telas principais do fluxo descrito no README raiz.
+Aplicacao React 19 criada com Vite 7 para consumir a API de estoque e entregar dashboards, cadastros e controles de EPI. O projeto faz parte do monorepo `API Estoque` e herda dependencias via npm workspaces.
 
-## Scripts uteis
-- `npm run dev`: inicia o servidor de desenvolvimento em `http://localhost:5173` com proxy para `/api`.
+## Visao geral
+- Navegacao protegida com React Router 7 e `ProtectedRoute`, exibindo layout principal (`MainLayout`) apenas para usuarios autenticados.
+- Contexto de autenticacao (`AuthContext`) armazena o usuario logado no `localStorage` e expira a sessao via logout manual.
+- Conjunto completo de telas: login, pessoas, materiais, entradas, saidas, estoque atual e dashboard.
+- Graficos interativos com Recharts (linhas, barras, pizza) usando dados agregados do endpoint `/api/estoque/dashboard`.
+- Estilos modulares em `src/styles/` com base responsiva e arquivos por pagina/componente.
+
+## Requisitos
+- Node.js 20 ou superior.
+- Backend rodando em `http://localhost:3000` (ou configure `VITE_API_URL`).
+
+## Instalacao e execucao
+1. `npm install`
+2. `npm run dev`
+3. Abra `http://localhost:5173`
+4. Acesse com as credenciais padrao definidas no backend (`admin` / `admin123`).
+
+## Scripts
+- `npm run dev`: inicia o servidor Vite com HMR e proxy para `/api`.
 - `npm run build`: gera a build de producao na pasta `dist/`.
-- `npm run preview`: serve a build gerada.
-- `npm run lint`: executa as verificacoes de lint padrao.
+- `npm run preview`: serve a build gerada localmente (use apos `npm run build`).
+- `npm run lint`: executa ESLint com a configuracao padrao do projeto.
 
 ## Estrutura principal
 ```
 src/
-+- App.jsx (definicao de rotas)
-+- App.css / index.css (estilos globais)
-+- context/AuthContext.jsx (estado de autenticacao)
-+- layouts/MainLayout.jsx (shell com menu lateral)
-+- components/ProtectedRoute.jsx, NavBar.jsx, PageHeader.jsx, charts/* (Recharts)
-+- pages/
-   +- LoginPage.jsx
-   +- PessoasPage.jsx
-   +- MateriaisPage.jsx
-   +- EntradasPage.jsx
-   +- SaidasPage.jsx
-   +- EstoquePage.jsx
-   +- DashboardPage.jsx
-+- services/api.js (cliente fetch para a API)
+|- App.jsx              # Define rotas protegidas e layout principal
+|- main.jsx             # Ponto de entrada e providers globais
+|- context/
+|  |- AuthContext.jsx
+|- layouts/
+|  |- MainLayout.jsx
+|- components/
+|  |- ProtectedRoute.jsx
+|  |- NavBar.jsx
+|  |- PageHeader.jsx
+|  |- charts/
+|     |- EntradasSaidasChart.jsx
+|     |- ValorMovimentadoChart.jsx
+|     |- EstoqueCharts.jsx
+|     |- EstoqueCategoriaChart.jsx
+|- pages/
+|  |- LoginPage.jsx
+|  |- PessoasPage.jsx
+|  |- MateriaisPage.jsx
+|  |- EntradasPage.jsx
+|  |- SaidasPage.jsx
+|  |- EstoquePage.jsx
+|  |- DashboardPage.jsx
+|- services/
+|  |- api.js            # Cliente fetch com headers padrao e helpers
+|- styles/
+   |- base.css
+   |- charts.css
+   |- App.css
+   |- index.css
+   |- *Page.css         # Arquivos especificos por tela
 ```
 
-## Telas disponiveis
-- **Login:** valida credenciais via `POST /api/auth/login` e salva o usuario no `localStorage`.
-- **Pessoas:** formulario + listagem consumindo `/api/pessoas`.
-- **Materiais:** cadastro completo e historico de precos on-demand.
-- **Entradas/Saidas:** registram movimentacoes com selects dinamicos.
-- **Estoque Atual:** filtros por ano/mes e alertas de minimo.
-- **Dashboard:** metricas de entradas/saidas, top materiais e alertas de estoque com graficos (linhas, barras, pizza).
+## Autenticacao e autorizacao
+- O login realiza `POST /api/auth/login` e salva o usuario retornado no contexto global.
+- `ProtectedRoute` bloqueia acesso a rotas privadas redirecionando para `/login` quando nao ha usuario ativo.
+- O menu lateral inclui opcao de logout que limpa o estado e o `localStorage`.
 
-## Configuracao
-- Ajuste `VITE_API_URL` em `.env.local` caso o backend rode em outra origem.
-- Credenciais padrao (definidas no backend): `admin` / `admin123`.
+## Comunicacao com o backend
+- `services/api.js` centraliza chamadas via `fetch`, tratando base URL, cabecalhos JSON e helpers para parse de resposta.
+- Todos os formularios usam funcoes do service para listar, criar e atualizar dados de materiais, pessoas, entradas e saidas.
+- Filtros de dashboard e estoque aceitam periodo (ano/mes ou intervalo) replicando os parametros do backend.
 
-## Proximos passos sugeridos
-- Substituir a autenticacao basica por um fluxo com tokens (ex.: JWT) e expirar sessao automaticamente.
-- Adicionar componentes de tabela/visualizacao (ex.: TanStack Table) para complementar os graficos ja implementados.
-- Evoluir feedback visual (toasts, skeletons) e tratar estados de erro/carregamento por pagina.
+## Estilos e UI
+- `src/styles/base.css` define tipografia, reset e tokens de cor.
+- Layout responsivo com menu lateral colapsavel e componentes reutilizaveis (`PageHeader`, cards, tabelas).
+- Paginas apresentam estados de carregamento, vazios e mensagens de erro basicas.
 
+## Configuracoes
+- Crie `frontend/.env.local` com `VITE_API_URL=<url>` quando o backend estiver em outra origem.
+- O proxy Vite (`vite.config.js`) encaminha `/api` para `http://localhost:3000` durante o desenvolvimento.
+
+## Qualidade e manutencao
+- Utilize `npm run lint` antes de enviar alteracoes para garantir padrao de codigo.
+- Recomenda-se adicionar testes de integracao (ex.: React Testing Library) e mocks de API futuros.
+
+## Roadmap sugerido
+- Implementar controle de expiracao automatica da sessao (timeout ou refresh).
+- Integrar componentes de tabela (ex.: TanStack Table) para melhorar listagens extensas.
+- Adicionar feedback visual (toasts, skeletons, loaders) padronizado.
+- Criar camada de internacionalizacao para mensagens e labels.
 

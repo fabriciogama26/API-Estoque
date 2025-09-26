@@ -1,14 +1,11 @@
 import { Outlet } from 'react-router-dom'
 import { NavBar } from '../components/NavBar.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
+import { SystemStatus } from '../components/SystemStatus.jsx'
 import '../styles/MainLayout.css'
-
 
 const logoSrc = '/logo_epicontrol.png'
 
 export function MainLayout() {
-  const { user, logout } = useAuth()
-
   return (
     <div className="layout">
       <aside className="layout__sidebar">
@@ -19,18 +16,13 @@ export function MainLayout() {
           </div>
         </div>
         <NavBar />
+        <SystemStatus className="layout__system-status" />
       </aside>
       <div className="layout__content">
         <header className="layout__topbar">
           <div className="layout__topbar-info">
             <p className="layout__topbar-title">Centro de Controle</p>
             <p className="layout__topbar-subtitle">Gerencie cadastros, estoque e movimentacoes.</p>
-          </div>
-          <div className="layout__topbar-user">
-            <span>{user?.name ?? user?.username}</span>
-            <button type="button" onClick={logout} className="button button--ghost">
-              Sair
-            </button>
           </div>
         </header>
         <main className="layout__main">

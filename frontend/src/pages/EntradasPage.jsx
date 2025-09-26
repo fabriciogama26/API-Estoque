@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
+import { EntryIcon } from '../components/icons.jsx'
 import { api } from '../services/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -7,6 +8,13 @@ const initialForm = {
   materialId: '',
   quantidade: '',
   dataEntrada: '',
+}
+
+const filterInitial = {
+  termo: '',
+  materialId: '',
+  dataInicio: '',
+  dataFim: '',
 }
 
 function formatCurrency(value) {
@@ -22,6 +30,7 @@ export function EntradasPage() {
   const [materiais, setMateriais] = useState([])
   const [entradas, setEntradas] = useState([])
   const [form, setForm] = useState(initialForm)
+  const [filters, setFilters] = useState(filterInitial)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -73,6 +82,19 @@ export function EntradasPage() {
     }
   }
 
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target
+    setFilters((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleFilterSubmit = (event) => {
+    event.preventDefault()
+  }
+
+  const handleFilterClear = () => {
+    setFilters(filterInitial)
+  }
+
   const materiaisMap = useMemo(() => {
     const map = new Map()
     materiais.forEach((item) => {
@@ -81,10 +103,55 @@ export function EntradasPage() {
     return map
   }, [materiais])
 
+  const filteredEntradas = useMemo(() => {
+    const termo = filters.termo.trim().toLowerCase()
+
+    return entradas.filter((entrada) => {
+      const material = materiaisMap.get(entrada.materialId)
+
+      if (filters.materialId && entrada.materialId !== filters.materialId) {
+        return false
+      }
+
+      if (filters.dataInicio) {
+        const data = entrada.dataEntrada ? new Date(entrada.dataEntrada) : null
+        const inicio = new Date(filters.dataInicio)
+        inicio.setHours(0, 0, 0, 0)
+        if (!data || data < inicio) {
+          return false
+        }
+      }
+
+      if (filters.dataFim) {
+        const data = entrada.dataEntrada ? new Date(entrada.dataEntrada) : null
+        const fim = new Date(filters.dataFim)
+        fim.setHours(23, 59, 59, 999)
+        if (!data || data > fim) {
+          return false
+        }
+      }
+
+      if (!termo) {
+        return true
+      }
+
+      const alvo = [
+        material?.nome || '',
+        material?.fabricante || '',
+        entrada.usuarioResponsavel || '',
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return alvo.includes(termo)
+    })
+  }, [entradas, filters, materiaisMap])
+
   return (
     <div className="stack">
       <PageHeader
-        title="Entradas de materiais"
+        icon={<EntryIcon size={28} />}
+        title="Entradas"
         subtitle="Registre novas entradas e mantenha rastreabilidade do estoque."
       />
 
@@ -118,6 +185,41 @@ export function EntradasPage() {
         </div>
       </form>
 
+      <form className="form form--inline" onSubmit={handleFilterSubmit}>
+        <label className="field">
+          <span>Buscar</span>
+          <input
+            name="termo"
+            value={filters.termo}
+            onChange={handleFilterChange}
+            placeholder="Material, fabricante ou usuario"
+          />
+        </label>
+        <label className="field">
+          <span>Material</span>
+          <select name="materialId" value={filters.materialId} onChange={handleFilterChange}>
+            <option value="">Todos</option>
+            {materiais.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.nome} - {item.fabricante}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Data inicial</span>
+          <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
+        </label>
+        <label className="field">
+          <span>Data final</span>
+          <input type="date" name="dataFim" value={filters.dataFim} onChange={handleFilterChange} />
+        </label>
+        <div className="form__actions">
+          <button type="submit" className="button button--ghost">Aplicar</button>
+          <button type="button" className="button button--ghost" onClick={handleFilterClear}>Limpar</button>
+        </div>
+      </form>
+
       <section className="card">
         <header className="card__header">
           <h2>Historico de entradas</h2>
@@ -126,8 +228,8 @@ export function EntradasPage() {
           </button>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
-        {!isLoading && entradas.length === 0 ? <p className="feedback">Nenhuma entrada registrada.</p> : null}
-        {entradas.length > 0 ? (
+        {!isLoading && filteredEntradas.length === 0 ? <p className="feedback">Nenhuma entrada registrada.</p> : null}
+        {filteredEntradas.length > 0 ? (
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -140,7 +242,7 @@ export function EntradasPage() {
                 </tr>
               </thead>
               <tbody>
-                {entradas.map((entrada) => {
+                {filteredEntradas.map((entrada) => {
                   const material = materiaisMap.get(entrada.materialId)
                   const valorUnitario = Number(material?.valorUnitario ?? 0)
                   const total = valorUnitario * Number(entrada.quantidade ?? 0)
@@ -165,8 +267,3 @@ export function EntradasPage() {
     </div>
   )
 }
-
-
-
-
-

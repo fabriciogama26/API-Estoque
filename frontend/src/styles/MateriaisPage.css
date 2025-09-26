@@ -1,5 +1,18 @@
+:root {
+  --color-primary: #16a34a;       /* verde segurança */
+  --color-primary-dark: #065f46;  /* verde institucional */
+  --color-accent: #2563eb;        /* azul ações */
+  --color-warning: #facc15;       /* amarelo alerta */
+  --color-danger: #dc2626;        /* vermelho crítico */
+  --color-muted: #6b7280;         /* cinza secundário */
+  --color-history-bg: rgba(148, 163, 184, 0.08);
+}
+
+/* Histórico */
 .data-table__history {
-  background: rgba(148, 163, 184, 0.08);
+  background: var(--color-history-bg);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
 }
 
 .history-list {
@@ -15,10 +28,27 @@
   display: flex;
   gap: 1.25rem;
   font-size: 0.85rem;
-  color: rgba(71, 85, 105, 0.9);
+  color: var(--color-muted);
   flex-wrap: wrap;
 }
 
+/* Variantes para destacar status no histórico */
+.history-list li.ok {
+  color: var(--color-primary-dark); /* estoque normal */
+  font-weight: 600;
+}
+
+.history-list li.warning {
+  color: var(--color-warning); /* estoque baixo */
+  font-weight: 600;
+}
+
+.history-list li.danger {
+  color: var(--color-danger); /* crítico */
+  font-weight: 600;
+}
+
+/* Ações */
 .data-table__actions {
   display: flex;
   flex-direction: column;
@@ -26,3 +56,18 @@
   gap: 0.25rem;
 }
 
+.data-table__actions button {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-accent);
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.data-table__actions button:hover {
+  background: var(--color-accent);
+  color: #fff;
+}

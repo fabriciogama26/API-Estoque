@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
+import { DashboardIcon, MovementIcon, RevenueIcon, StockIcon, AlertIcon, BarsIcon, PieIcon, TrendIcon } from '../components/icons.jsx'
 import { api } from '../services/api.js'
 import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts/EntradasSaidasChart.jsx'
 import { EstoquePorMaterialChart, MateriaisMaisUsadosChart } from '../components/charts/EstoqueCharts.jsx'
@@ -132,11 +133,11 @@ export function DashboardPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await api.estoque.dashboard({
+      const dashboard = await api.estoque.dashboard({
         periodoInicio: params.periodoInicio || undefined,
         periodoFim: params.periodoFim || undefined,
       })
-      setData(response)
+      setData(dashboard)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -156,52 +157,31 @@ export function DashboardPage() {
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    setError(null)
-    if (filters.periodoInicio && filters.periodoFim && filters.periodoInicio > filters.periodoFim) {
-      setError('Periodo inicial deve ser anterior ou igual ao final')
-      return
-    }
     load(filters)
   }
 
   const handleClear = () => {
-    setError(null)
-    setFilters({ ...initialFilters })
-    load({ ...initialFilters })
+    setFilters(initialFilters)
+    load(initialFilters)
   }
 
-  const termoNormalizado = useMemo(() => normalizarTermo(filters.termo), [filters.termo])
-
-  const entradasFiltradas = useMemo(
-    () => filtrarPorTermo(data?.entradasDetalhadas ?? [], termoNormalizado),
-    [data, termoNormalizado],
-  )
-
-  const saidasFiltradas = useMemo(
-    () => filtrarPorTermo(data?.saidasDetalhadas ?? [], termoNormalizado),
-    [data, termoNormalizado],
-  )
-
-  const seriesHistorica = useMemo(
-    () => agruparPorPeriodo(entradasFiltradas, saidasFiltradas),
-    [entradasFiltradas, saidasFiltradas],
-  )
+  const termoNormalizado = normalizarTermo(filters.termo)
 
   const resumoEntradas = useMemo(() => ({
-    quantidade: entradasFiltradas.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0),
-    valor: entradasFiltradas.reduce(
-      (acc, item) => acc + Number(item.quantidade ?? 0) * Number(item.material?.valorUnitario ?? 0),
-      0,
-    ),
-  }), [entradasFiltradas])
+    quantidade: data?.entradas?.quantidade ?? 0,
+    valor: data?.entradas?.valorTotal ?? 0,
+  }), [data])
 
   const resumoSaidas = useMemo(() => ({
-    quantidade: saidasFiltradas.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0),
-    valor: saidasFiltradas.reduce(
-      (acc, item) => acc + Number(item.quantidade ?? 0) * Number(item.material?.valorUnitario ?? 0),
-      0,
-    ),
-  }), [saidasFiltradas])
+    quantidade: data?.saidas?.quantidade ?? 0,
+    valor: data?.saidas?.valorTotal ?? 0,
+  }), [data])
+
+  const seriesHistorica = useMemo(() => {
+    const entradasDetalhadas = filtrarPorTermo(data?.entradasDetalhadas ?? [], termoNormalizado)
+    const saidasDetalhadas = filtrarPorTermo(data?.saidasDetalhadas ?? [], termoNormalizado)
+    return agruparPorPeriodo(entradasDetalhadas, saidasDetalhadas)
+  }, [data, termoNormalizado])
 
   const estoquePorMaterial = useMemo(
     () => montarEstoquePorMaterial(data?.estoqueAtual?.itens ?? [], termoNormalizado),
@@ -218,9 +198,53 @@ export function DashboardPage() {
     [data, termoNormalizado],
   )
 
+  const totalMovimentacoes = resumoEntradas.quantidade + resumoSaidas.quantidade
+  const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
+  const totalMateriais = data?.estoqueAtual?.itens?.length ?? 0
+  const totalItensEstoque = useMemo(() => (
+    (data?.estoqueAtual?.itens ?? []).reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+  ), [data])
+  const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
+
+  const highlightCards = [
+    {
+      id: 'movimentacoes',
+      title: 'Movimentacoes',
+      value: totalMovimentacoes,
+      helper: `${resumoEntradas.quantidade} entradas / ${resumoSaidas.quantidade} saidas`,
+      icon: MovementIcon,
+      tone: 'blue',
+    },
+    {
+      id: 'valor',
+      title: 'Valor movimentado',
+      value: formatCurrency(totalValorMovimentado),
+      helper: `${formatCurrency(resumoEntradas.valor)} em entradas`,
+      icon: RevenueIcon,
+      tone: 'green',
+    },
+    {
+      id: 'estoque',
+      title: 'Itens em estoque',
+      value: totalItensEstoque,
+      helper: `${totalMateriais} materiais rastreados`,
+      icon: StockIcon,
+      tone: 'purple',
+    },
+    {
+      id: 'alertas',
+      title: 'Alertas ativos',
+      value: materiaisEmAlerta,
+      helper: materiaisEmAlerta ? 'Atencao: revisar estoque minimo' : 'Tudo dentro do esperado',
+      icon: AlertIcon,
+      tone: materiaisEmAlerta ? 'orange' : 'slate',
+    },
+  ]
+
   return (
     <div className="stack">
       <PageHeader
+        icon={<DashboardIcon size={28} />}
         title="Dashboard"
         subtitle="Monitore indicadores de movimentacao e estoque para agir rapidamente."
       />
@@ -261,23 +285,25 @@ export function DashboardPage() {
 
       {error ? <p className="feedback feedback--error">{error}</p> : null}
 
-      <div className="dashboard-metrics">
-        <section className="metric metric--compact">
-          <span className="metric__label">Entradas</span>
-          <strong className="metric__value">{resumoEntradas.quantidade}</strong>
-          <span className="metric__description">Valor total: {formatCurrency(resumoEntradas.valor)}</span>
-        </section>
-        <section className="metric metric--compact">
-          <span className="metric__label">Saídas</span>
-          <strong className="metric__value">{resumoSaidas.quantidade}</strong>
-          <span className="metric__description">Valor total: {formatCurrency(resumoSaidas.valor)}</span>
-        </section>
+      <div className="dashboard-highlights">
+        {highlightCards.map(({ id, title, value, helper, icon: IconComponent, tone }) => (
+          <article key={id} className={`insight-card insight-card--${tone}`}>
+            <header className="insight-card__header">
+              <p className="insight-card__title">{title}</p>
+              <span className="insight-card__avatar">
+                <IconComponent size={22} />
+              </span>
+            </header>
+            <strong className="insight-card__value">{value}</strong>
+            <span className="insight-card__helper">{helper}</span>
+          </article>
+        ))}
       </div>
 
       <div className="dashboard-grid dashboard-grid--two">
         <section className="card card--chart card--chart-lg">
           <header className="card__header">
-            <h2>Entradas x Saídas</h2>
+            <h2 className="card__title"><BarsIcon size={20} /> <span>Entradas x Saidas</span></h2>
           </header>
           <div className="chart-container">
             <EntradasSaidasChart data={seriesHistorica} labelFormatter={formatPeriodoLabel} />
@@ -286,7 +312,7 @@ export function DashboardPage() {
 
         <section className="card card--chart card--chart-lg">
           <header className="card__header">
-            <h2>Valor movimentado</h2>
+            <h2 className="card__title"><RevenueIcon size={20} /> <span>Valor movimentado</span></h2>
           </header>
           <div className="chart-container">
             <ValorMovimentadoChart
@@ -300,7 +326,7 @@ export function DashboardPage() {
       <div className="dashboard-grid dashboard-grid--two">
         <section className="card card--chart card--chart-lg">
           <header className="card__header">
-            <h2>Estoque por material</h2>
+            <h2 className="card__title"><StockIcon size={20} /> <span>Estoque por material</span></h2>
           </header>
           <div className="chart-container">
             <EstoquePorMaterialChart data={estoquePorMaterial.slice(0, 8)} />
@@ -309,7 +335,7 @@ export function DashboardPage() {
 
         <section className="card card--chart card--chart-lg">
           <header className="card__header">
-            <h2>Estoque por categoria</h2>
+            <h2 className="card__title"><PieIcon size={20} /> <span>Estoque por categoria</span></h2>
           </header>
           <div className="chart-container">
             <EstoquePorCategoriaChart data={estoquePorCategoria} />
@@ -319,7 +345,7 @@ export function DashboardPage() {
 
       <section className="card card--wide">
         <header className="card__header">
-          <h2>Top materiais movimentados</h2>
+          <h2 className="card__title"><TrendIcon size={20} /> <span>Top materiais movimentados</span></h2>
         </header>
         <div className="chart-container">
           <MateriaisMaisUsadosChart data={rankingMateriais.slice(0, 8)} />
@@ -328,5 +354,6 @@ export function DashboardPage() {
     </div>
   )
 }
+
 
 

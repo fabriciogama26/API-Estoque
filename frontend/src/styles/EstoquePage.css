@@ -1,3 +1,14 @@
+:root {
+  --color-primary: #16a34a;       /* verde segurança */
+  --color-primary-dark: #065f46;  /* verde institucional */
+  --color-accent: #2563eb;        /* azul ações */
+  --color-warning: #facc15;       /* amarelo alerta */
+  --color-danger: #dc2626;        /* vermelho crítico */
+  --color-muted: #6b7280;         /* cinza secundário */
+  --color-text: #0f172a;          /* texto padrão */
+}
+
+/* Lista de alertas */
 .alert-list {
   list-style: none;
   margin: 0;
@@ -13,8 +24,8 @@
   gap: 0.25rem;
   padding: 0.9rem 1.1rem;
   border-radius: 1rem;
-  background: rgba(248, 113, 113, 0.08);
-  border: 1px solid rgba(248, 113, 113, 0.25);
+  background: rgba(220, 38, 38, 0.08); /* vermelho crítico */
+  border: 1px solid rgba(220, 38, 38, 0.25);
 }
 
 .alert-list__material {
@@ -27,6 +38,7 @@
   font-weight: 600;
 }
 
+/* Badge */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -37,16 +49,23 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  background: rgba(37, 99, 235, 0.1);
+  background: rgba(37, 99, 235, 0.1); /* azul neutro */
   color: var(--color-primary-dark);
 }
 
 .badge--alert {
-  background: rgba(248, 113, 113, 0.2);
-  color: #b91c1c;
-  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(250, 204, 21, 0.25); /* amarelo alerta */
+  color: #92400e;
+  border: 1px solid rgba(250, 204, 21, 0.6);
 }
 
+.badge--critical {
+  background: rgba(220, 38, 38, 0.2); /* vermelho crítico */
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+}
+
+/* Lista genérica */
 .list {
   display: flex;
   flex-direction: column;
@@ -64,8 +83,13 @@
 }
 
 .list__item--alert {
-  border-color: rgba(202, 138, 4, 0.6);
-  box-shadow: 0 0 0 2px rgba(202, 138, 4, 0.2);
+  border-color: rgba(250, 204, 21, 0.6); /* amarelo */
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
+}
+
+.list__item--critical {
+  border-color: rgba(220, 38, 38, 0.6); /* vermelho crítico */
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
 }
 
 .list__item-header {
@@ -77,6 +101,7 @@
 
 .list__item-header h3 {
   font-size: 1.1rem;
+  color: var(--color-text);
 }
 
 .list__item-header p {
@@ -127,4 +152,7 @@
   color: var(--color-danger);
   font-size: 0.8rem;
 }
-
+.list__item-error::before {
+  content: '⚠️';
+  margin-right: 0.25rem;
+}

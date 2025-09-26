@@ -60,13 +60,11 @@ export function LoginPage() {
         </div>
 
         <header className="auth-card__titles">
-          <p className="auth-card__kicker">Seguranca em Primeiro Lugar</p>
-          <h1>Controle de EPIs com Facilidade</h1>
           <p className="auth-card__subtitle">Bem-vindo de volta. Acesse o sistema para registrar entrega ou devolucao de EPI.</p>
         </header>
 
         <label className="field field--panel">
-          <span>Matricula / CPF</span>
+          <span>Email</span>
           <div className="field__panel">
             <BadgeIcon />
             <input
@@ -74,7 +72,7 @@ export function LoginPage() {
               name="username"
               value={form.username}
               onChange={handleChange}
-              placeholder="Digite sua matricula ou CPF"
+              placeholder="Digite seu email"
               autoComplete="username"
               required
             />
@@ -112,10 +110,10 @@ export function LoginPage() {
         </button>
 
         <footer className="auth-card__footer">
-          <button type="button" className="link-button link-button--muted">Registrar novo colaborador</button>
           <p>Seu EPI e sua protecao. Registre corretamente cada movimentacao.</p>
         </footer>
       </form>
     </div>
   )
 }
+

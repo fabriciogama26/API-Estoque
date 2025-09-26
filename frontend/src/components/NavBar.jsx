@@ -1,26 +1,34 @@
 import '../styles/NavBar.css'
 import { NavLink } from 'react-router-dom'
+import {
+  DashboardIcon,
+  InventoryIcon,
+  PeopleIcon,
+  MaterialIcon,
+  EntryIcon,
+  ExitIcon,
+} from './icons.jsx'
 
 const navItems = [
   {
-    title: 'Visão Geral',
+    title: 'Visao Geral',
     items: [
-      { to: '/', label: 'Dashboard principal', end: true },
-      { to: '/estoque', label: 'Estoque Atual' },
+      { to: '/', label: 'Dashboard principal', end: true, icon: DashboardIcon },
+      { to: '/estoque', label: 'Estoque Atual', icon: InventoryIcon },
     ],
   },
   {
     title: 'Cadastros',
     items: [
-      { to: '/cadastros/pessoas', label: 'Pessoas' },
-      { to: '/cadastros/materiais', label: "EPI's" },
+      { to: '/cadastros/pessoas', label: 'Pessoas', icon: PeopleIcon },
+      { to: '/cadastros/materiais', label: "EPI's", icon: MaterialIcon },
     ],
   },
   {
-    title: 'Movimentações',
+    title: 'Movimentacoes',
     items: [
-      { to: '/movimentacoes/entradas', label: 'Entradas' },
-      { to: '/movimentacoes/saidas', label: 'Saídas' },
+      { to: '/movimentacoes/entradas', label: 'Entradas', icon: EntryIcon },
+      { to: '/movimentacoes/saidas', label: 'Saidas', icon: ExitIcon },
     ],
   },
 ]
@@ -32,19 +40,27 @@ export function NavBar() {
         <div key={section.title} className="sidebar__section">
           <p className="sidebar__section-title">{section.title}</p>
           <ul className="sidebar__list">
-            {section.items.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
+            {section.items.map((item) => {
+              const Icon = item.icon
+              return (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                    }
+                  >
+                    {Icon ? (
+                      <span className="sidebar__icon" aria-hidden="true">
+                        <Icon />
+                      </span>
+                    ) : null}
+                    <span className="sidebar__label">{item.label}</span>
+                  </NavLink>
+                </li>
+              )
+            })}
           </ul>
         </div>
       ))}

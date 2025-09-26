@@ -43,7 +43,7 @@ async function extractErrorMessage(response) {
   try {
     const data = await response.json()
     return data?.error || data?.message || response.statusText
-  } catch (error) {
+  } catch {
     return response.statusText
   }
 }
@@ -95,3 +95,6 @@ function buildQuery(params) {
   })
   return `?${search.toString()}`
 }
+
+
+

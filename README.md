@@ -1,139 +1,114 @@
 # API Estoque
 
-Projeto full stack para controle de EPIs, composto por um backend em Node.js/Express e um frontend React criado com Vite.
+Projeto full stack para controle de estoque de EPIs (Equipamentos de Protecao Individual). O repositorio usa npm workspaces para agrupar um backend em Node.js/Express e um frontend em React 19 + Vite, compartilhando scripts e dependencias.
 
-## Tecnologias principais
-- Node.js 20+
-- Express 4
-- uuid para identificadores unicos
-- Vite 7 + React 19
-- ESLint para padronizacao de codigo
+## Visao geral
+- Backend em Node.js 20 com Express, validacoes em camadas (controllers, services, rules) e persistencia em memoria via repositories baseados em Map.
+- Frontend em React 19 criado com Vite 7, React Router 7 e context de autenticacao, focado em dashboards e cadastros de estoque.
+- Comunicacao via API REST em `/api`, com endpoints para materiais, pessoas, entradas, saidas, consulta de estoque e painel de dashboard.
+- Documentos funcionais em `docs/` detalham fluxos, campos e regras para cada tela.
 
-## Estrutura de pastas
+## Requisitos
+- Node.js 20 ou superior
+- npm 10 ou superior
+
+## Configuracao rapida
+1. Instale as dependencias na raiz: `npm install`.
+2. Copie `backend/.env.example` para `backend/.env` e ajuste as variaveis conforme necessario.
+3. Inicie backend e frontend em paralelo: 
+pm run dev.
+4. Configure as variáveis Supabase (opcionais) em rontend/.env.local e ackend/.env.supabase conforme necessidade.
+5. Acesse o frontend em http://localhost:5173 (proxy para http://localhost:3000/api).
+
+## Scripts npm
+- `npm run dev`: inicia backend (porta 3000) e frontend (porta 5173) em paralelo.
+- `npm run backend:dev`: sobe apenas o backend com nodemon.
+- `npm run backend:start`: executa o backend em modo producao.
+- `npm run backend:lint`: roda ESLint no backend.
+- `npm run frontend:dev`: inicia apenas o frontend Vite.
+- `npm run frontend:build`: gera build de producao do frontend.
+- `npm run frontend:lint`: roda ESLint no frontend.
+- `npm run preview -w frontend`: serve a build gerada (executar apos `frontend:build`).
+
+## Estrutura principal
 ```
-/
-+- backend/
-¦  +- package.json
-¦  +- .env.example
-¦  +- src/
-¦     +- app.js
-¦     +- config/
-¦     +- controllers/
-¦     +- models/
-¦     +- repositories/
-¦     +- routes/
-¦     +- rules/
-¦     +- services/
-+- frontend/
-¦  +- package.json
-¦  +- vite.config.js
-¦  +- src/
-¦     +- App.jsx
-¦     +- App.css
-¦     +- index.css
-¦     +- main.jsx
-+- README.md
+.
+|- backend/
+|  |- src/
+|  |- package.json
+|  |- .env.example
+|- frontend/
+|  |- src/
+|  |- package.json
+|  |- vite.config.js
+|- docs/
+|  |- Login.txt
+|  |- ...
+|- README.md
 ```
 
-## Como executar rapidamente
+## Backend
+### Principais recursos
+- Organizacao em camadas: controllers -> services -> repositories -> rules, facilitando manutencao e evolucao.
+- Persistencia em memoria com objetos Map, permitindo troca posterior por banco relacional ou NoSQL.
+- Historico de precos para cada material, evitando sobrescrita de valores.
+- Regras de negocio centralizadas em `src/rules/` para validar cadastros, movimentacoes e alertas de estoque minimo.
+- Calculo de saldo atual de estoque, agregacao historica de movimentacoes e lista de materiais mais movimentados para o dashboard.
+- Autenticacao basica baseada em credenciais configuradas via variaveis de ambiente.
 
-1. `npm install` (raiz). As dependencias de `backend/` e `frontend/` sao instaladas automaticamente via npm workspaces.
-2. `npm run dev` para iniciar backend (porta 3000) e frontend (porta 5173) em paralelo.
-
-Scripts uteis:
-- `npm run backend:dev` para subir apenas o backend com nodemon.
-- `npm run backend:start` para rodar o backend sem nodemon.
-- `npm run frontend:dev` para subir apenas o frontend Vite.
-- `npm run frontend:build` para gerar a build de producao.
-## Backend (Node.js)
-- Arquitetura modular separando controllers, services, repositories, models e regras de validacao.
-- Persistencia em memoria por meio de repositories baseados em Map (facil de substituir por banco real).
-- Regras de negocio centralizadas em `src/rules/` para entrada, saida, estoque, materiais e pessoas.
-- Historico de precos por material sem sobrescrita de valores anteriores.
-- Calculo de estoque atual, alertas de estoque minimo e dashboard de movimentacoes.
-- Endpoints principais expostos em `/api`:
-  - `GET /api/health`
-  - CRUD de materiais, pessoas, entradas e saidas
-  - Relatorios de estoque e dashboard
+### Endpoints principais (`/api`)
+- `GET /health` — status da API.
+- `POST /auth/login` — autentica usuario (credenciais definidas nas variaveis).
+- `GET /materiais` — lista materiais cadastrados.
+- `POST /materiais` — cadastra material (valida CA, validade, estoque minimo e duplicidade por fabricante).
+- `GET /materiais/:id` — consulta material pelo identificador.
+- `PUT /materiais/:id` — atualiza dados e registra historico de preco quando o valor muda.
+- `GET /materiais/:id/historico-precos` — retorna historico de alteracoes de preco.
+- `GET /pessoas` / `POST /pessoas` / `GET /pessoas/:id` — gerenciamento de pessoas.
+- `GET /entradas` / `POST /entradas` — movimentacoes de entrada (valida material, datas e quantidade).
+- `GET /saidas` / `POST /saidas` — movimentacoes de saida com bloqueio de estoque negativo e calculo de validade do EPI.
+- `GET /estoque` — resumo de estoque atual com alertas de minimo (aceita filtros de periodo).
+- `GET /estoque/dashboard` — indicadores consolidados para graficos (movimentacao, valores e alertas).
 
 ### Variaveis de ambiente
-Copie `backend/.env.example` para `backend/.env` e ajuste conforme necessario:
+Arquivo `backend/.env`:
 ```
 PORT=3000
 APP_USERNAME=admin
 APP_PASSWORD=admin123
 APP_DISPLAY_NAME=Administrador
 ```
-As credenciais padrao sao usadas na tela de login, mas devem ser alteradas para producao.
+Adapte as credenciais e a porta conforme ambiente.
 
-### Executar o backend
-```
-cd backend
-npm install
-npm run dev
-```
-O servidor inicia em `http://localhost:3000`.
+### Testes e validacoes
+Ainda nao ha testes automatizados, mas a camada `rules/` concentra validacoes obrigatorias. Sugestao: adicionar testes unitarios para regras criticas e integracao dos endpoints.
 
-## Frontend (Vite + React)
-- Aplicacao criada com Vite, conectada ao backend via proxy de desenvolvimento (`/api`).
-- Tela inicial monitora o endpoint de health check e lista proximos passos para evolucao do painel.
-- Estilos basicos responsivos em `App.css` e `index.css`.
+## Frontend
+### Principais recursos
+- React 19 com Vite 7, React Router 7 e Context API para controle de autenticacao.
+- Layout responsivo com menu lateral (`MainLayout`), cabecalho de pagina e navegacao protegida por `ProtectedRoute`.
+- Telas para login, cadastros (pessoas e materiais), entradas, saidas, estoque atual e dashboard.
+- Integracao com backend via `services/api.js`, incluindo armazenamento de token basico no `localStorage`.
+- Graficos com Recharts (linhas, barras e pizza) para exibir movimentacao, valores e alertas do estoque.
 
-### Configuracoes uteis
-- `frontend/vite.config.js` aceita variaveis `VITE_PORT` e `VITE_API_URL` para ajustar porta e origem do backend.
-- Crie `.env.local` dentro de `frontend/` caso precise sobrescrever valores padrao.
+### Configuracoes
+- Ajuste `VITE_API_URL` em `frontend/.env.local` para apontar para outro backend.
+- O proxy de desenvolvimento (`vite.config.js`) encaminha chamadas `/api` para `http://localhost:3000`.
+- Credenciais padrao: `admin` / `admin123`.
 
-### Executar o frontend
-```
-cd frontend
-npm install
-npm run dev
-```
-O Vite sobe em `http://localhost:5173` e encaminha chamadas `/api` para o backend.
+### Estilos
+- Estilos globais em `src/styles/base.css` e `index.css`.
+- Cada pagina possui CSS dedicado em `src/styles/*Page.css`.
+- Componentes de graficos usam `src/styles/charts.css` para manter padronizacao visual.
 
-### Telas implementadas
-- Login validando credenciais via `POST /api/auth/login` e armazenando usuario no `localStorage`.
-- Home com atalhos para cadastros, movimentacoes e monitoramento.
-- Pessoas: formulario + listagem consumindo `/api/pessoas`.
-- Materiais: cadastro completo e historico de precos sob demanda.
-- Entradas e Saidas: formularios com selects dinamicos usando dados cadastrados.
-- Estoque atual: filtros por periodo, alertas e resumo de valores.
-- Dashboard: indicadores de movimentacao, materiais mais movimentados e alertas de estoque.
-## Regras de negocio principais
-1. Material precisa estar cadastrado para permitir entradas e saidas.
-2. Alteracao de valor unitario gera novo registro no historico, sem sobrescrever.
-3. Estoque minimo configuravel por material com alerta quando atingido.
-4. Validade do EPI (em dias) calcula a data de troca na saida.
-5. Saidas bloqueiam estoque negativo; quantidade precisa estar disponivel.
-6. Pessoas podem ter nomes duplicados, mas devem ser diferenciadas por ID.
-7. Campos como CA, validade e valor sao preenchidos automaticamente a partir do material selecionado.
+## Documentacao complementar
+- A pasta `docs/` traz um arquivo `.txt` por tela (Login, Dashboard, Estoque, Materiais, Pessoas, Entradas, Saidas) com fluxos esperados, contratos de API e regras de negocio detalhadas.
+- Planilhas (`Estoque.xlsx`, `Pessoas.xlsx`) podem ser usadas como referencia de dados de exemplo e relatorios.
 
 ## Roadmap sugerido
-- Integrar banco de dados relacional ou NoSQL para persistencia definitiva.
-- Implementar autenticacao e autorizacao nas rotas sensiveis.
-- Criar telas completas de cadastro, movimentacao e dashboard no frontend.
-- Adicionar testes automatizados (unitarios e integrados) para regras criticas.
+- Substituir armazenamento em memoria por banco de dados e camada de persistencia dedicada.
+- Evoluir autenticacao para fluxo com tokens (ex.: JWT) e controle de expiracao.
+- Implementar suite de testes automatizados (unitarios, integracao e e2e).
+- Adicionar migracoes de dados ou seed inicial para ambientes de teste.
+- Melhorar feedback visual no frontend (toasts, skeletons, estados de erro) e adicionar componentes de tabela.
 
-
-
-
-
-
-
-
-
-
-
-
-## Documentação de Telas
-- A pasta `docs/` contém um arquivo `.txt` por tela com o detalhamento completo de fluxos, campos, validações, contratos de API, regras de negócio e referências às entidades persistidas.
-- Arquivos disponíveis:
-  - `docs/Login.txt`
-  - `docs/Dashboard.txt`
-  - `docs/Estoque.txt`
-  - `docs/Materiais.txt`
-  - `docs/Pessoas.txt`
-  - `docs/Entradas.txt`
-  - `docs/Saidas.txt`
-
-Consulte esses arquivos para alinhar comportamento esperado entre desenvolvimento, QA e análise de requisitos.

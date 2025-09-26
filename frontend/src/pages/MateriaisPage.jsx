@@ -1,5 +1,6 @@
-﻿import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
+import { MaterialIcon } from '../components/icons.jsx'
 import { api } from '../services/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import '../styles/MateriaisPage.css'
@@ -10,6 +11,11 @@ const initialForm = {
   validadeDias: '',
   ca: '',
   valorUnitario: '',
+}
+
+const filterInitial = {
+  termo: '',
+  status: 'todos',
 }
 
 function formatCurrency(value) {
@@ -23,6 +29,7 @@ function formatCurrency(value) {
 export function MateriaisPage() {
   const { user } = useAuth()
   const [form, setForm] = useState(initialForm)
+  const [filters, setFilters] = useState(filterInitial)
   const [materiais, setMateriais] = useState([])
   const [histories, setHistories] = useState({})
   const [isLoading, setIsLoading] = useState(false)
@@ -66,6 +73,19 @@ export function MateriaisPage() {
     }
 
     setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target
+    setFilters((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleFilterSubmit = (event) => {
+    event.preventDefault()
+  }
+
+  const handleFilterClear = () => {
+    setFilters(filterInitial)
   }
 
   const handleSubmit = async (event) => {
@@ -136,14 +156,44 @@ export function MateriaisPage() {
     setForm(initialForm)
   }
 
-  const materiaisOrdenados = useMemo(() => (
-    materiais.slice().sort((a, b) => a.nome.localeCompare(b.nome))
-  ), [materiais])
+  const materiaisFiltrados = useMemo(() => {
+    const termo = filters.termo.trim().toLowerCase()
+
+    return materiais.filter((material) => {
+      if (filters.status === 'ativos' && material.ativo === false) {
+        return false
+      }
+
+      if (filters.status === 'inativos' && material.ativo !== false) {
+        return false
+      }
+
+      if (!termo) {
+        return true
+      }
+
+      const alvo = [
+        material.nome || '',
+        material.fabricante || '',
+        material.ca || '',
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return alvo.includes(termo)
+    })
+  }, [materiais, filters])
+
+  const materiaisOrdenados = useMemo(
+    () => materiaisFiltrados.slice().sort((a, b) => a.nome.localeCompare(b.nome)),
+    [materiaisFiltrados],
+  )
 
   return (
     <div className="stack">
       <PageHeader
-        title="Cadastro de materiais"
+        icon={<MaterialIcon size={28} />}
+        title="Materiais"
         subtitle="Cadastre EPIs com validade, CA e mantenha historico de precos."
       />
 
@@ -180,13 +230,37 @@ export function MateriaisPage() {
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
           <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? 'Salvando...' : editingMaterial ? 'Salvar alterações' : 'Salvar material'}
+            {isSaving ? 'Salvando...' : editingMaterial ? 'Salvar alteracoes' : 'Salvar material'}
           </button>
           {editingMaterial ? (
             <button type="button" className="button button--ghost" onClick={cancelEdit} disabled={isSaving}>
-              Cancelar edição
+              Cancelar edicao
             </button>
           ) : null}
+        </div>
+      </form>
+
+      <form className="form form--inline" onSubmit={handleFilterSubmit}>
+        <label className="field">
+          <span>Buscar</span>
+          <input
+            name="termo"
+            value={filters.termo}
+            onChange={handleFilterChange}
+            placeholder="EPI, fabricante ou CA"
+          />
+        </label>
+        <label className="field">
+          <span>Status</span>
+          <select name="status" value={filters.status} onChange={handleFilterChange}>
+            <option value="todos">Todos</option>
+            <option value="ativos">Ativos</option>
+            <option value="inativos">Inativos</option>
+          </select>
+        </label>
+        <div className="form__actions">
+          <button type="submit" className="button button--ghost">Aplicar</button>
+          <button type="button" className="button button--ghost" onClick={handleFilterClear}>Limpar</button>
         </div>
       </form>
 
@@ -278,6 +352,4 @@ export function MateriaisPage() {
     </div>
   )
 }
-
-
 

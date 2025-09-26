@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
+import { ExitIcon } from '../components/icons.jsx'
 import { api } from '../services/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -8,6 +9,15 @@ const initialForm = {
   materialId: '',
   quantidade: '',
   dataEntrega: '',
+}
+
+const filterInitial = {
+  termo: '',
+  pessoaId: '',
+  materialId: '',
+  status: '',
+  dataInicio: '',
+  dataFim: '',
 }
 
 function formatCurrency(value) {
@@ -24,6 +34,7 @@ export function SaidasPage() {
   const [materiais, setMateriais] = useState([])
   const [saidas, setSaidas] = useState([])
   const [form, setForm] = useState(initialForm)
+  const [filters, setFilters] = useState(filterInitial)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -78,6 +89,19 @@ export function SaidasPage() {
     }
   }
 
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target
+    setFilters((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleFilterSubmit = (event) => {
+    event.preventDefault()
+  }
+
+  const handleFilterClear = () => {
+    setFilters(filterInitial)
+  }
+
   const pessoasMap = useMemo(() => {
     const map = new Map()
     pessoas.forEach((item) => map.set(item.id, item))
@@ -90,10 +114,77 @@ export function SaidasPage() {
     return map
   }, [materiais])
 
+  const statusOptions = useMemo(() => {
+    const values = new Set()
+    saidas.forEach((item) => {
+      if (item?.status) {
+        values.add(item.status)
+      }
+    })
+    return Array.from(values).sort()
+  }, [saidas])
+
+  const filteredSaidas = useMemo(() => {
+    const termo = filters.termo.trim().toLowerCase()
+
+    return saidas.filter((saida) => {
+      const pessoa = pessoasMap.get(saida.pessoaId)
+      const material = materiaisMap.get(saida.materialId)
+
+      if (filters.pessoaId && saida.pessoaId !== filters.pessoaId) {
+        return false
+      }
+
+      if (filters.materialId && saida.materialId !== filters.materialId) {
+        return false
+      }
+
+      if (filters.status && saida.status !== filters.status) {
+        return false
+      }
+
+      if (filters.dataInicio) {
+        const data = saida.dataEntrega ? new Date(saida.dataEntrega) : null
+        const inicio = new Date(filters.dataInicio)
+        inicio.setHours(0, 0, 0, 0)
+        if (!data || data < inicio) {
+          return false
+        }
+      }
+
+      if (filters.dataFim) {
+        const data = saida.dataEntrega ? new Date(saida.dataEntrega) : null
+        const fim = new Date(filters.dataFim)
+        fim.setHours(23, 59, 59, 999)
+        if (!data || data > fim) {
+          return false
+        }
+      }
+
+      if (!termo) {
+        return true
+      }
+
+      const alvo = [
+        material?.nome || '',
+        material?.fabricante || '',
+        pessoa?.nome || '',
+        pessoa?.local || '',
+        saida.usuarioResponsavel || '',
+        saida.status || '',
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return alvo.includes(termo)
+    })
+  }, [saidas, filters, pessoasMap, materiaisMap])
+
   return (
     <div className="stack">
       <PageHeader
-        title="Saidas de materiais"
+        icon={<ExitIcon size={28} />}
+        title="Saidas"
         subtitle="Controle entregas de EPIs garantindo disponibilidade e rastreabilidade."
       />
 
@@ -138,6 +229,63 @@ export function SaidasPage() {
         </div>
       </form>
 
+      <form className="form form--inline" onSubmit={handleFilterSubmit}>
+        <label className="field">
+          <span>Buscar</span>
+          <input
+            name="termo"
+            value={filters.termo}
+            onChange={handleFilterChange}
+            placeholder="Pessoa, material ou responsavel"
+          />
+        </label>
+        <label className="field">
+          <span>Pessoa</span>
+          <select name="pessoaId" value={filters.pessoaId} onChange={handleFilterChange}>
+            <option value="">Todas</option>
+            {pessoas.map((pessoa) => (
+              <option key={pessoa.id} value={pessoa.id}>
+                {pessoa.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Material</span>
+          <select name="materialId" value={filters.materialId} onChange={handleFilterChange}>
+            <option value="">Todos</option>
+            {materiais.map((material) => (
+              <option key={material.id} value={material.id}>
+                {material.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Status</span>
+          <select name="status" value={filters.status} onChange={handleFilterChange}>
+            <option value="">Todos</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Data inicial</span>
+          <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
+        </label>
+        <label className="field">
+          <span>Data final</span>
+          <input type="date" name="dataFim" value={filters.dataFim} onChange={handleFilterChange} />
+        </label>
+        <div className="form__actions">
+          <button type="submit" className="button button--ghost">Aplicar</button>
+          <button type="button" className="button button--ghost" onClick={handleFilterClear}>Limpar</button>
+        </div>
+      </form>
+
       <section className="card">
         <header className="card__header">
           <h2>Historico de saidas</h2>
@@ -146,8 +294,8 @@ export function SaidasPage() {
           </button>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
-        {!isLoading && saidas.length === 0 ? <p className="feedback">Nenhuma saida registrada.</p> : null}
-        {saidas.length > 0 ? (
+        {!isLoading && filteredSaidas.length === 0 ? <p className="feedback">Nenhuma saida registrada.</p> : null}
+        {filteredSaidas.length > 0 ? (
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -163,7 +311,7 @@ export function SaidasPage() {
                 </tr>
               </thead>
               <tbody>
-                {saidas.map((saida) => {
+                {filteredSaidas.map((saida) => {
                   const pessoa = pessoasMap.get(saida.pessoaId)
                   const material = materiaisMap.get(saida.materialId)
                   const total = (material?.valorUnitario ?? 0) * Number(saida.quantidade ?? 0)
@@ -179,7 +327,7 @@ export function SaidasPage() {
                         <p className="data-table__muted">{pessoa?.local || 'Nao informado'}</p>
                       </td>
                       <td>{saida.quantidade}</td>
-                      <td>{saida.status}</td>
+                      <td>{saida.status || '-'}</td>
                       <td>{saida.dataEntrega ? new Date(saida.dataEntrega).toLocaleString('pt-BR') : 'Nao informado'}</td>
                       <td>{saida.dataTroca ? new Date(saida.dataTroca).toLocaleDateString('pt-BR') : 'Nao informado'}</td>
                       <td>{formatCurrency(total)}</td>
@@ -195,3 +343,4 @@ export function SaidasPage() {
     </div>
   )
 }
+

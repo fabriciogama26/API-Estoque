@@ -1,95 +1,107 @@
+:root {
+  --color-primary: #16a34a;       /* verde segurança */
+  --color-primary-dark: #065f46;  /* verde institucional */
+  --color-accent: #2563eb;        /* azul para ações */
+  --color-warning: #facc15;       /* amarelo alerta */
+  --color-danger: #dc2626;        /* vermelho crítico */
+  --color-muted: #6b7280;         /* cinza secundário */
+  --color-border: #e5e7eb;
+  --color-bg: #f9fafb;
+  --color-bg-alt: #f3f4f6;
+  --color-sidebar-start: #1e1b4b; /* gradiente sidebar */
+  --color-sidebar-end: #111827;
+}
+
 /* Layout geral */
 .layout {
-  display: flex;
-  height: 100vh;
-  background: #f9fafb;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  background: var(--color-bg);
   color: #111827;
   font-family: Arial, sans-serif;
 }
 
 /* Sidebar */
 .layout__sidebar {
-  width: 260px;
-  background: linear-gradient(to bottom, #1e1b4b, #111827);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: linear-gradient(to bottom, var(--color-sidebar-start), var(--color-sidebar-end));
   color: #e5e7eb;
   display: flex;
   flex-direction: column;
-  padding: 1rem;
+  gap: 1.5rem;
+  padding: 2rem 1.5rem;
+}
+
+.layout__system-status {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  color: var(--color-muted);
 }
 
 /* Logo e título */
 .layout__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 2rem;
+  gap: 1rem;
 }
 
 .layout__brand-image {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 12px;
 }
 
 .layout__brand-text {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
 }
 
 .layout__brand-subtitle {
-  font-size: 1rem;
-  font-weight: bold;
-  color: #f3f4f6;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.85);
 }
 
 /* Conteúdo */
 .layout__content {
-  flex: 1;
   display: flex;
   flex-direction: column;
 }
 
 /* Topbar */
 .layout__topbar {
-  height: 70px;
   background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 0 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding: 1.5rem 2rem;
 }
 
 .layout__topbar-info {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
 }
 
 .layout__topbar-title {
   font-size: 1.25rem;
-  font-weight: bold;
-  color: #111827;
+  font-weight: 600;
+  color: var(--color-primary-dark);
 }
 
 .layout__topbar-subtitle {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.layout__topbar-user {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.layout__topbar-user span {
   font-size: 0.95rem;
-  font-weight: 500;
-  color: #374151;
+  color: var(--color-muted);
 }
 
-/* Botão sair */
+/* Botões genéricos */
 .button {
-  padding: 0.4rem 1rem;
+  padding: 0.45rem 1rem;
   border-radius: 6px;
   border: none;
   font-size: 0.9rem;
@@ -99,19 +111,59 @@
 
 .button--ghost {
   background: transparent;
-  color: #4338ca;
-  border: 1px solid #4338ca;
+  color: var(--color-primary);
+  border: 1px solid var(--color-accent);
 }
 
 .button--ghost:hover {
-  background: #4338ca;
+  background: var(--color-accent);
   color: #fff;
 }
 
 /* Conteúdo principal */
 .layout__main {
   flex: 1;
-  padding: 1.5rem;
+  padding: 2rem;
   overflow-y: auto;
-  background: #f3f4f6;
+  background: var(--color-bg-alt);
+}
+
+/* Responsivo */
+@media (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .layout__sidebar {
+    position: static;
+    height: auto;
+    overflow-y: visible;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .layout__system-status {
+    margin-top: 0;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .layout__content {
+    min-height: calc(100vh - 120px);
+  }
+}
+
+@media (max-width: 768px) {
+  .layout__main {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .layout__main {
+    padding: 1.25rem;
+  }
 }
