@@ -7,24 +7,20 @@
   color: var(--color-text);
 }
 
-.layout__sidebar {
+aside.sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
   overflow-y: auto;
-  background: linear-gradient(to bottom, #1e1b4b, #111827);
-  color: #e5e7eb;
+  width: 100%;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   padding: 2rem 1.75rem;
   box-sizing: border-box;
-}
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  background: linear-gradient(to bottom, #1e1b4b, #111827);
+  color: #e5e7eb;
 }
 
 .layout__system-status {
@@ -61,12 +57,14 @@
   display: flex;
   flex-direction: column;
   background: var(--color-bg-alt);
+  min-width: 0;
 }
 
 .layout__main {
   flex: 1;
   padding: 2rem;
   overflow-y: auto;
+  min-height: 0;
 }
 
 @media (max-width: 1024px) {
@@ -74,15 +72,22 @@
     grid-template-columns: 1fr;
   }
 
-  .layout__sidebar {
+  aside.sidebar {
     position: static;
     height: auto;
     overflow-y: visible;
+    max-width: 100%;
     flex-direction: row;
     align-items: flex-start;
     justify-content: space-between;
     flex-wrap: wrap;
+    gap: 1.5rem;
     padding: 1.5rem;
+  }
+
+  nav.sidebar {
+    flex: 1 1 100%;
+    max-width: 100%;
   }
 
   .layout__system-status {
@@ -103,15 +108,15 @@
 
 /* Sidebar palette overrides */
 .sidebar-theme {
-  --color-primary: #16a34a;       /* verde seguranÁa */
-  --color-primary-dark: #065f46;  /* verde institucional */
-  --color-accent: #2563eb;        /* azul aÁıes */
+/* Sidebar navigation */
+nav.sidebar {
+  --color-accent: #2563eb;        /* azul a√ß√µes */
   --color-warning: #facc15;       /* amarelo alerta */
-  --color-danger: #dc2626;        /* vermelho crÌtico */
-  --color-muted: #6b7280;         /* cinza secund·rio */
+  --color-danger: #dc2626;        /* vermelho cr√≠tico */
+  --color-muted: #6b7280;         /* cinza secund√°rio */
   --color-sidebar-text: rgba(226, 232, 240, 0.85);
   --color-sidebar-title: rgba(226, 232, 240, 0.7);
-  --color-sidebar-icon: rgba(8, 226, 255, 0.993); /* azul padr„o */
+  --color-sidebar-icon: rgba(8, 226, 255, 0.993); /* azul padr√£o */
   --color-sidebar-hover: rgba(46, 206, 255, 0.8); /* verde hover */
   --color-sidebar-active-start: rgba(34, 197, 94, 0.6); /* verde ativo */
   --color-sidebar-active-end: rgba(0, 250, 208, 0.575);   /* azul ativo */
@@ -131,7 +136,7 @@
 
 }
 
-/* SeÁ„o */
+/* Se√ß√£o */
 .sidebar__section {
   display: flex;
   flex-direction: column;
@@ -140,13 +145,13 @@
   border-top: 1px solid rgba(148, 163, 184, 0.18);
 }
 
-/* Primeira seÁ„o */
+/* Primeira se√ß√£o */
 .sidebar__section:first-child {
   border-top: none;
   padding-top: 0;
 }
 
-/* TÌtulo */
+/* T√≠tulo */
 .sidebar__section-title {
   font-size: 0.8rem;
   font-weight: 600;
@@ -179,7 +184,7 @@
   transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
 
-/* Õcone */
+/* √çcone */
 .sidebar__icon {
   display: inline-flex;
   align-items: center;
@@ -202,7 +207,7 @@
   transform: translateX(4px);
 }
 
-/* Hover Õcone */
+/* Hover √çcone */
 .sidebar__link:hover .sidebar__icon {
   display: inline-flex;
   align-items: center;
@@ -222,7 +227,7 @@
   padding-left: calc(0.7rem - 3px);
 }
 
-/* Active Õcone */
+/* Active √çcone */
 .sidebar__link--active .sidebar__icon {
   display: inline-flex;
   align-items: center;

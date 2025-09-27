@@ -8,7 +8,7 @@ const logoSrc = '/proteg.png'
 export function MainLayout() {
   return (
     <div className="layout">
-      <aside className="layout__sidebar">
+      <aside className="sidebar">
         <div className="layout__brand">
           <img src={logoSrc} alt="EpicControl" className="layout__brand-image" />
           <div className="layout__brand-text">
