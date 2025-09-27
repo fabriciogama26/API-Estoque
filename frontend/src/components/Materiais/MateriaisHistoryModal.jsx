@@ -15,25 +15,25 @@ export function MateriaisHistoryModal({ modal, onClose }) {
 
   return (
     <div
-      className="record-history__overlay"
+      className="materiais-record-history__overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="record-history-title"
       onClick={handleOverlayClick}
     >
-      <div className="record-history__modal" onClick={stopPropagation}>
-        <header className="record-history__header">
+      <div className="materiais-record-history__modal" onClick={stopPropagation}>
+        <header className="materiais-record-history__header">
           <h3 id="record-history-title">Historico de precos - {modal.material?.nome}</h3>
           <button
             type="button"
-            className="record-history__close"
+            className="materiais-record-history__close"
             onClick={onClose}
             aria-label="Fechar historico"
           >
             x
           </button>
         </header>
-        <div className="record-history__body">
+        <div className="materiais-record-history__body">
           {modal.isLoading ? (
             <p className="feedback">Carregando historico...</p>
           ) : modal.error ? (

@@ -287,34 +287,34 @@ export function DashboardPage() {
 
       <div className="dashboard-highlights">
         {highlightCards.map(({ id, title, value, helper, icon: IconComponent, tone }) => (
-          <article key={id} className={`insight-card insight-card--${tone}`}>
-            <header className="insight-card__header">
-              <p className="insight-card__title">{title}</p>
-              <span className="insight-card__avatar">
+          <article key={id} className={`dashboard-insight-card dashboard-insight-card--${tone}`}>
+            <header className="dashboard-insight-card__header">
+              <p className="dashboard-insight-card__title">{title}</p>
+              <span className="dashboard-insight-card__avatar">
                 <IconComponent size={22} />
               </span>
             </header>
-            <strong className="insight-card__value">{value}</strong>
-            <span className="insight-card__helper">{helper}</span>
+            <strong className="dashboard-insight-card__value">{value}</strong>
+            <span className="dashboard-insight-card__helper">{helper}</span>
           </article>
         ))}
       </div>
 
       <div className="dashboard-grid dashboard-grid--two">
-        <section className="card card--chart card--chart-lg">
-          <header className="card__header">
-            <h2 className="card__title"><BarsIcon size={20} /> <span>Entradas x Saidas</span></h2>
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
+          <header className="card__header dashboard-card__header">
+            <h2 className="dashboard-card__title"><BarsIcon size={20} /> <span>Entradas x Saidas</span></h2>
           </header>
-          <div className="chart-container">
+          <div className="dashboard-chart-container">
             <EntradasSaidasChart data={seriesHistorica} labelFormatter={formatPeriodoLabel} />
           </div>
         </section>
 
-        <section className="card card--chart card--chart-lg">
-          <header className="card__header">
-            <h2 className="card__title"><RevenueIcon size={20} /> <span>Valor movimentado</span></h2>
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
+          <header className="card__header dashboard-card__header">
+            <h2 className="dashboard-card__title"><RevenueIcon size={20} /> <span>Valor movimentado</span></h2>
           </header>
-          <div className="chart-container">
+          <div className="dashboard-chart-container">
             <ValorMovimentadoChart
               data={seriesHistorica.map(({ periodo, valorEntradas, valorSaidas }) => ({ periodo, valorEntradas, valorSaidas }))}
               valueFormatter={formatCurrency}
@@ -324,30 +324,30 @@ export function DashboardPage() {
       </div>
 
       <div className="dashboard-grid dashboard-grid--two">
-        <section className="card card--chart card--chart-lg">
-          <header className="card__header">
-            <h2 className="card__title"><StockIcon size={20} /> <span>Estoque por material</span></h2>
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
+          <header className="card__header dashboard-card__header">
+            <h2 className="dashboard-card__title"><StockIcon size={20} /> <span>Estoque por material</span></h2>
           </header>
-          <div className="chart-container">
+          <div className="dashboard-chart-container">
             <EstoquePorMaterialChart data={estoquePorMaterial.slice(0, 8)} />
           </div>
         </section>
 
-        <section className="card card--chart card--chart-lg">
-          <header className="card__header">
-            <h2 className="card__title"><PieIcon size={20} /> <span>Estoque por categoria</span></h2>
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
+          <header className="card__header dashboard-card__header">
+            <h2 className="dashboard-card__title"><PieIcon size={20} /> <span>Estoque por categoria</span></h2>
           </header>
-          <div className="chart-container">
+          <div className="dashboard-chart-container">
             <EstoquePorCategoriaChart data={estoquePorCategoria} />
           </div>
         </section>
       </div>
 
-      <section className="card card--wide">
-        <header className="card__header">
-          <h2 className="card__title"><TrendIcon size={20} /> <span>Top materiais movimentados</span></h2>
+      <section className="card dashboard-card--wide">
+        <header className="card__header dashboard-card__header">
+          <h2 className="dashboard-card__title"><TrendIcon size={20} /> <span>Top materiais movimentados</span></h2>
         </header>
-        <div className="chart-container">
+        <div className="dashboard-chart-container">
           <MateriaisMaisUsadosChart data={rankingMateriais.slice(0, 8)} />
         </div>
       </section>

@@ -15,7 +15,7 @@ export function PessoasHistoryTimeline({ registros }) {
   }
 
   return (
-    <ul className="history-list">
+    <ul className="materiais-history-list">
       {registros
         .slice()
         .sort((a, b) => new Date(b.dataEdicao) - new Date(a.dataEdicao))
