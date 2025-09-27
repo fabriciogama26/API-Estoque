@@ -125,7 +125,7 @@ function ChangePasswordSection({ user }) {
         </label>
 
         {feedback ? (
-          <p className={`system-status__feedback system-status__feedback--${feedback.type}`}>
+          <p className={`feedback feedback--${feedback.type}`}>
             {feedback.message}
           </p>
         ) : null}

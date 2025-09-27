@@ -203,6 +203,11 @@ ul, ol {
   font-weight: 500;
 }
 
+.feedback--success {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
