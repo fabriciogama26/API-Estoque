@@ -12,7 +12,6 @@ import {
   ChecklistIcon,
   ChevronIcon,
 } from './icons.jsx'
-import '../styles/NavBar.css'
 
 const navSections = [
   {
