@@ -161,15 +161,3 @@
   transform: translateY(-1px);
 }
 
-.system-status__feedback {
-  margin: 0;
-  font-size: 0.85rem;
-}
-
-.system-status__feedback--error {
-  color: var(--color-danger);
-}
-
-.system-status__feedback--success {
-  color: var(--color-primary);
-}
