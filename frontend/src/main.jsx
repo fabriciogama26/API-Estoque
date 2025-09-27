@@ -3,9 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
-import './styles/index.css'
+import './styles/variables.css'
 import './styles/base.css'
-import './styles/App.css'
+import './styles/layout.css'
+import './styles/index.css'
 
 const root = document.getElementById('root')
 

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Settings, UserCircle2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { LogOut, Settings, UserCircle2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
@@ -48,148 +48,11 @@ function useSystemHealth() {
   return { ...status, refresh: check }
 }
 
-function ChangePasswordModal({ open, onClose, user }) {
-  const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [feedback, setFeedback] = useState(null)
-
-  useEffect(() => {
-    if (!open) {
-      setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      setFeedback(null)
-    }
-  }, [open])
-
-  if (!open) {
-    return null
-  }
-
-  const handleChange = (event) => {
-    const { name, value } = event.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setFeedback(null)
-
-    if (!isSupabaseConfigured() || !supabase) {
-      setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
-      return
-    }
-
-    if (!form.newPassword || form.newPassword.length < 8) {
-      setFeedback({ type: 'error', message: 'A nova senha deve ter pelo menos 8 caracteres.' })
-      return
-    }
-
-    if (form.newPassword !== form.confirmPassword) {
-      setFeedback({ type: 'error', message: 'A confirmacao precisa ser igual a nova senha.' })
-      return
-    }
-
-    if (!user?.email) {
-      setFeedback({ type: 'error', message: 'Email do usuario nao encontrado para validar senha.' })
-      return
-    }
-
-    setIsSubmitting(true)
-    try {
-      const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: form.currentPassword,
-      })
-
-      if (reauthError) {
-        throw new Error('Senha atual incorreta.')
-      }
-
-      const { error } = await supabase.auth.updateUser({ password: form.newPassword })
-      if (error) {
-        throw error
-      }
-
-      setFeedback({ type: 'success', message: 'Senha atualizada com sucesso.' })
-      setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-    } catch (err) {
-      setFeedback({ type: 'error', message: err.message || 'Nao foi possivel atualizar a senha.' })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="system-status__overlay" role="dialog" aria-modal="true" aria-labelledby="change-password-title">
-      <div className="system-status__modal">
-        <header className="system-status__modal-header">
-          <h2 id="change-password-title">Trocar senha</h2>
-          <button type="button" className="system-status__icon-button" onClick={onClose} aria-label="Fechar">
-            x
-          </button>
-        </header>
-        <form className="system-status__form" onSubmit={handleSubmit}>
-          <label className="field">
-            <span>Senha atual</span>
-            <input
-              type="password"
-              name="currentPassword"
-              value={form.currentPassword}
-              onChange={handleChange}
-              required
-              autoComplete="current-password"
-            />
-          </label>
-          <label className="field">
-            <span>Nova senha</span>
-            <input
-              type="password"
-              name="newPassword"
-              value={form.newPassword}
-              onChange={handleChange}
-              required
-              autoComplete="new-password"
-            />
-          </label>
-          <label className="field">
-            <span>Confirmar nova senha</span>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              required
-              autoComplete="new-password"
-            />
-          </label>
-
-          {feedback ? (
-            <p className={`system-status__feedback system-status__feedback--${feedback.type}`}>
-              {feedback.message}
-            </p>
-          ) : null}
-
-          <div className="system-status__actions">
-            <button type="button" className="button button--ghost" onClick={onClose}>
-              Cancelar
-            </button>
-            <button type="submit" className="button button--primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Atualizando...' : 'Salvar senha'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 export function SystemStatus({ className = '' }) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const health = useSystemHealth()
   const { state, message } = health
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const menuRef = useRef(null)
 
   const version = useMemo(() => {
     const value = import.meta.env.VITE_APP_VERSION || appInfo.version || '0.0.0'
@@ -201,29 +64,15 @@ export function SystemStatus({ className = '' }) {
   const indicatorTitle = message ? `${statusLabel} - ${message}` : statusLabel
 
   const displayName = user?.name || user?.metadata?.nome || user?.email || 'Usuario'
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return () => {}
-    }
-    const handler = (event) => {
-      if (!menuRef.current || menuRef.current.contains(event.target)) {
-        return
-      }
-      setMenuOpen(false)
-    }
-    window.addEventListener('click', handler)
-    return () => window.removeEventListener('click', handler)
-  }, [menuOpen])
+  const roleLabel = user?.role || user?.metadata?.cargo || 'Admin'
 
   const handleLogout = async () => {
     await logout()
     navigate('/login', { replace: true })
   }
 
-  const handleOpenPasswordModal = () => {
-    setMenuOpen(false)
-    setShowPasswordModal(true)
+  const handleOpenSettings = () => {
+    navigate('/configuracoes')
   }
 
   return (
@@ -250,36 +99,30 @@ export function SystemStatus({ className = '' }) {
           <div className="system-status__avatar" aria-hidden="true">
             <UserCircle2 size={32} />
           </div>
-          <div>
-            <p className="system-status__user-name">{displayName}</p>
-            {user?.email ? <p className="system-status__user-meta">{user.email}</p> : null}
+          <div className="system-status__identity">
+            <p className="system-status__user-name" title={displayName}>{displayName}</p>
+            <p className="system-status__user-role" title={roleLabel}>{roleLabel}</p>
           </div>
         </div>
-        <div className="system-status__user-actions" ref={menuRef}>
+        <div className="system-status__actions" role="group" aria-label="Ações rápidas">
           <button
             type="button"
             className="system-status__icon-button"
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-haspopup="true"
-            aria-expanded={menuOpen}
+            onClick={handleOpenSettings}
             aria-label="Abrir configuracoes"
           >
             <Settings size={18} />
           </button>
-          {menuOpen ? (
-            <div className="system-status__menu" role="menu">
-              <button type="button" role="menuitem" onClick={handleOpenPasswordModal}>
-                Trocar senha
-              </button>
-              <button type="button" role="menuitem" onClick={handleLogout}>
-                Sair
-              </button>
-            </div>
-          ) : null}
+          <button
+            type="button"
+            className="system-status__icon-button system-status__icon-button--logout"
+            onClick={handleLogout}
+            aria-label="Sair"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       </section>
-
-      <ChangePasswordModal open={showPasswordModal} onClose={() => setShowPasswordModal(false)} user={user} />
     </div>
   )
 }

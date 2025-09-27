@@ -2,8 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute.jsx'
 import { MainLayout } from './layouts/MainLayout.jsx'
 import { LoginPage } from './pages/LoginPage.jsx'
-import { PessoasPage } from './pages/PessoasPage.jsx'
-import { MateriaisPage } from './pages/MateriaisPage.jsx'
+import { PessoasPage } from './pages/Pessoas.jsx'
+import { ConfiguracoesPage } from './pages/Configuracoes.jsx'
+import { MateriaisPage } from './pages/Materiais.jsx'
 import { EntradasPage } from './pages/EntradasPage.jsx'
 import { SaidasPage } from './pages/SaidasPage.jsx'
 import { EstoquePage } from './pages/EstoquePage.jsx'
@@ -24,6 +25,8 @@ function App() {
             <Route path="pessoas" element={<PessoasPage />} />
             <Route path="materiais" element={<MateriaisPage />} />
           </Route>
+
+          <Route path="configuracoes" element={<ConfiguracoesPage />} />
 
           <Route path="movimentacoes">
             <Route path="entradas" element={<EntradasPage />} />

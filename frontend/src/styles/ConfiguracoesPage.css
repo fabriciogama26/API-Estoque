@@ -1,0 +1,11 @@
+.config-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.config-page__description {
+  margin: 0.35rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}

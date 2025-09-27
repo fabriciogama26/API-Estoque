@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ArrowDownUp,
   BarChart3,
+  ChevronDown,
   Boxes,
   CircleDollarSign,
   ClipboardList,
@@ -35,3 +36,4 @@ export const AlertIcon = (props) => <AlertTriangle {...withDefaultProps(props)} 
 export const TrendIcon = (props) => <TrendingUp {...withDefaultProps(props)} />
 export const PieIcon = (props) => <PieChart {...withDefaultProps(props)} />
 export const BarsIcon = (props) => <BarChart3 {...withDefaultProps(props)} />
+export const ChevronIcon = (props) => <ChevronDown {...withDefaultProps(props)} />

@@ -6,6 +6,7 @@ Aplicacao React 19 criada com Vite 7 para consumir a API de estoque e entregar d
 - Navegacao protegida com React Router 7 e `ProtectedRoute`, exibindo layout principal (`MainLayout`) apenas para usuarios autenticados.
 - Contexto de autenticacao (`AuthContext`) armazena o usuario logado no `localStorage` e expira a sessao via logout manual.
 - Conjunto completo de telas: login, pessoas, materiais, entradas, saidas, estoque atual e dashboard.
+- Paginas de materiais e pessoas modularizadas com camadas config/rules/utils e componentes de UI reutilizaveis.
 - Graficos interativos com Recharts (linhas, barras, pizza) usando dados agregados do endpoint `/api/estoque/dashboard`.
 - Estilos modulares em `src/styles/` com base responsiva e arquivos por pagina/componente.
 
@@ -26,7 +27,7 @@ Aplicacao React 19 criada com Vite 7 para consumir a API de estoque e entregar d
 - `npm run lint`: executa ESLint com a configuracao padrao do projeto.
 
 ## Estrutura principal
-```
+````
 src/
 |- App.jsx              # Define rotas protegidas e layout principal
 |- main.jsx             # Ponto de entrada e providers globais
@@ -35,18 +36,39 @@ src/
 |- layouts/
 |  |- MainLayout.jsx
 |- components/
-|  |- ProtectedRoute.jsx
-|  |- NavBar.jsx
 |  |- PageHeader.jsx
+|  |- Materiais/        # Componentes especificos da tela de materiais
+|     |- MateriaisForm.jsx
+|     |- MateriaisFilters.jsx
+|     |- MateriaisTable.jsx
+|     |- MateriaisActions.jsx
+|     |- MateriaisHistoryModal.jsx
+|     |- MateriaisHistoricoTimeline.jsx
+|  |- Pessoas/          # Componentes especificos da tela de pessoas
+|     |- PessoasForm.jsx
+|     |- PessoasFilters.jsx
+|     |- PessoasTable.jsx
+|     |- PessoasActions.jsx
+|     |- PessoasHistoryModal.jsx
+|     |- PessoasHistoryTimeline.jsx
 |  |- charts/
 |     |- EntradasSaidasChart.jsx
 |     |- ValorMovimentadoChart.jsx
 |     |- EstoqueCharts.jsx
 |     |- EstoqueCategoriaChart.jsx
+|- config/
+|  |- MateriaisConfig.js
+|  |- PessoasConfig.js
+|- rules/
+|  |- MateriaisRules.js
+|  |- PessoasRules.js
+|- utils/
+|  |- MateriaisUtils.js
+|  |- PessoasUtils.js
 |- pages/
 |  |- LoginPage.jsx
-|  |- PessoasPage.jsx
-|  |- MateriaisPage.jsx
+|  |- Pessoas.jsx
+|  |- Materiais.jsx
 |  |- EntradasPage.jsx
 |  |- SaidasPage.jsx
 |  |- EstoquePage.jsx
@@ -58,8 +80,9 @@ src/
    |- charts.css
    |- App.css
    |- index.css
-   |- *Page.css         # Arquivos especificos por tela
+   |- MateriaisPage.css # Estilos compartilhados para tabelas, historicos e pagina de materiais
 ```
+
 
 ## Autenticacao e autorizacao
 - O login realiza `POST /api/auth/login` e salva o usuario retornado no contexto global.
@@ -89,4 +112,5 @@ src/
 - Integrar componentes de tabela (ex.: TanStack Table) para melhorar listagens extensas.
 - Adicionar feedback visual (toasts, skeletons, loaders) padronizado.
 - Criar camada de internacionalizacao para mensagens e labels.
+
 

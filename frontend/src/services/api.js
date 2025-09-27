@@ -56,7 +56,9 @@ export const api = {
   pessoas: {
     list: () => request('/api/pessoas'),
     create: (payload) => request('/api/pessoas', { method: 'POST', body: payload }),
+    update: (id, payload) => request(`/api/pessoas/${id}`, { method: 'PUT', body: payload }),
     get: (id) => request(`/api/pessoas/${id}`),
+    history: (id) => request(`/api/pessoas/${id}/historico-edicoes`),
   },
   materiais: {
     list: () => request('/api/materiais'),
@@ -95,6 +97,3 @@ function buildQuery(params) {
   })
   return `?${search.toString()}`
 }
-
-
-

@@ -1,0 +1,56 @@
+VISAO GERAL
+- Tela de cadastro e manutencao de materiais (EPIs) que orquestra formularios, filtros, tabela e historico de precos.
+- Responsavel por consumir a API de materiais e delegar renderizacao para componentes reutilizaveis da pasta components/Materiais.
+
+FUNCIONALIDADES PRINCIPAIS
+- Cadastro e edicao de materiais com validacao de campos obrigatorios.
+- Filtro por termo e status (ativos/inativos) aplicado em memoria sobre a lista carregada.
+- Visualizacao de historico de precos via modal com timeline e cache local por material.
+- Acionamento de botoes de acao (editar, abrir historico) diretamente na tabela.
+
+FLUXO DE USUARIO
+1. Usuario acessa a rota /cadastros/materiais apos autenticar.
+2. Formulario inicial permite cadastrar novo material; salvar dispara POST ou PUT conforme contexto.
+3. Lista exibe materiais existentes; botoes de acao permitem editar ou abrir historico.
+4. Modal de historico mostra precos anteriores enquanto o backend retorna os registros.
+5. Filtros podem ser aplicados ou limpos para refinar a listagem sem nova requisicao.
+
+ESTADOS E PROPS
+- form: estado local com campos do formulario (nome, fabricante, validadeDias, ca, valorUnitario).
+- filters: estado local com termo e status para filtragem.
+- materiais: array carregado de api.materiais.list().
+- historyCache: objeto que guarda historicos ja consultados (id -> registros).
+- historyModal: estado composto com open, material, items, isLoading, error para controlar o modal.
+- isLoading / isSaving: flags de carregamento e salvamento.
+- error: mensagem de erro exibida em formulario e modal.
+- MateriaisForm props: form, onChange, onSubmit, isSaving, editingMaterial, onCancel, error.
+- MateriaisFilters props: filters, onChange, onSubmit, onClear.
+- MateriaisTable props: materiais, onEdit, onHistory, editingId, isSaving, historyModal.
+- MateriaisHistoryModal props: modal, onClose.
+- MateriaisActions props: material, isEditing, isSaving, onEdit, onHistory, isHistoryLoading.
+
+REGRAS DE NEGOCIO
+- Payloads de criacao/atualizacao sao derivados via createMaterialPayload e updateMaterialPayload, garantindo trims, numero para validade e limpeza do CA.
+- Valor unitario eh convertido para numero (centavos) com parseCurrencyToNumber antes de ser enviado.
+- Filtros respeitam status (ativos vs inativos) e termo aplicado sobre nome, fabricante e CA.
+- Historico de precos eh cacheado para evitar chamadas repetidas ao mesmo id.
+
+INTEGRACOES
+- api.materiais.list() para listar materiais.
+- api.materiais.create() para cadastrar novo material.
+- api.materiais.update() para editar material existente.
+- api.materiais.priceHistory() para recuperar historico de precos.
+- useAuth() fornece dados do usuario autenticado para registrar usuarioCadastro ou usuarioResponsavel.
+
+COMPONENTES INTERNOS
+- MateriaisForm: formulario principal de cadastro/edicao.
+- MateriaisFilters: filtro por termo e status.
+- MateriaisTable: tabela responsavel por exibir dados e acionar MateriaisActions.
+- MateriaisActions: botoes de editar e visualizar historico por linha.
+- MateriaisHistoryModal: modal sobreposto com resultado, mensagens de carregamento/erro e timeline.
+- MateriaisHistoricoTimeline: lista formatada de registros de historico.
+
+TRATAMENTO DE ERROS
+- Erros de carregamento e salvamento sao armazenados em error e exibidos no formulario.
+- Erros ao buscar historico atualizam historyModal.error e exibem mensagem dedicada no modal.
+- Estados isLoading e isSaving controlam desabilitacao de botoes e exibicao de mensagens "Carregando...".
