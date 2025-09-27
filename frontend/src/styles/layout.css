@@ -50,12 +50,6 @@ aside.sidebar {
   gap: 0.2rem;
 }
 
-.sidebar__brand-subtitle {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(226, 232, 240, 0.85);
-}
-
 .layout-content {
   display: flex;
   flex-direction: column;
@@ -117,15 +111,6 @@ nav.sidebar {
 .sidebar__section:first-child {
   border-top: none;
   padding-top: 0;
-}
-
-/* Título */
-.sidebar__section-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-sidebar-title);
 }
 
 /* Lista */
