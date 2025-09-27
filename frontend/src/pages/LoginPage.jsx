@@ -53,19 +53,19 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth auth--login">
-      <form className="auth-card auth-card--neon" onSubmit={handleSubmit}>
-        <div className="auth-card__logo">
+    <div className="login-auth login-auth--login">
+      <form className="login-auth-card login-auth-card--neon" onSubmit={handleSubmit}>
+        <div className="login-auth-card__logo">
           <img src={logoSrc} alt="EpicControl" />
         </div>
 
-        <header className="auth-card__titles">
-          <p className="auth-card__subtitle">Bem-vindo de volta. Acesse o sistema para registrar entrega ou devolucao de EPI.</p>
+        <header className="login-auth-card__titles">
+          <p className="login-auth-card__subtitle">Bem-vindo de volta. Acesse o sistema para registrar entrega ou devolucao de EPI.</p>
         </header>
 
-        <label className="field field--panel">
+        <label className="field login-field--panel">
           <span>Email</span>
-          <div className="field__panel">
+          <div className="login-field__panel">
             <BadgeIcon />
             <input
               type="text"
@@ -79,9 +79,9 @@ export function LoginPage() {
           </div>
         </label>
 
-        <label className="field field--panel">
+        <label className="field login-field--panel">
           <span>Senha</span>
-          <div className="field__panel">
+          <div className="login-field__panel">
             <LockIcon />
             <input
               type="password"
@@ -97,19 +97,19 @@ export function LoginPage() {
 
         {error ? <p className="feedback feedback--error">{error}</p> : null}
 
-        <div className="auth-card__options">
-          <label className="checkbox">
+        <div className="login-auth-card__options">
+          <label className="login-checkbox">
             <input type="checkbox" name="remember" checked={form.remember} onChange={handleChange} />
             <span>Manter conectado</span>
           </label>
           <button type="button" className="link-button">Esqueceu a senha?</button>
         </div>
 
-        <button type="submit" className="button button--neon" disabled={isSubmitting}>
+        <button type="submit" className="button login-button--neon" disabled={isSubmitting}>
           {isSubmitting ? 'Entrando...' : 'Entrar'}
         </button>
 
-        <footer className="auth-card__footer">
+        <footer className="login-auth-card__footer">
           <p>Seu EPI e sua protecao. Registre corretamente cada movimentacao.</p>
         </footer>
       </form>
