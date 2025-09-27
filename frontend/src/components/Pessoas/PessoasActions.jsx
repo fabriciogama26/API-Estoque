@@ -5,10 +5,10 @@ export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory,
   const disableHistory = isHistoryLoading || isSaving
 
   return (
-    <div className="data-table__actions">
+    <div className="materiais-data-table__actions">
       <button
         type="button"
-        className="table-action-button"
+        className="materiais-table-action-button"
         onClick={() => onEdit(pessoa)}
         disabled={disableEdit}
         aria-label={disableEdit ? 'Editando pessoa' : `Editar ${pessoa.nome}`}
@@ -17,7 +17,7 @@ export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory,
       </button>
       <button
         type="button"
-        className="table-action-button"
+        className="materiais-table-action-button"
         onClick={() => onHistory(pessoa)}
         disabled={disableHistory}
         aria-label={`Ver historico de edicao de ${pessoa.nome}`}

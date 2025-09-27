@@ -9,13 +9,13 @@
 }
 
 /* Histórico */
-.data-table__history {
+.materiais-data-table__history {
   background: var(--color-history-bg);
   border-radius: 0.75rem;
   padding: 0.75rem 1rem;
 }
 
-.history-list {
+.materiais-history-list {
   list-style: none;
   margin: 0;
   padding: 0.5rem 0;
@@ -24,7 +24,7 @@
   gap: 0.35rem;
 }
 
-.history-list li {
+.materiais-history-list li {
   display: flex;
   gap: 1.25rem;
   font-size: 0.85rem;
@@ -33,29 +33,29 @@
 }
 
 /* Variantes para destacar status no histórico */
-.history-list li.ok {
+.materiais-history-list li.materiais-history-list__item--ok {
   color: var(--color-primary-dark); /* estoque normal */
   font-weight: 600;
 }
 
-.history-list li.warning {
+.materiais-history-list li.materiais-history-list__item--warning {
   color: var(--color-warning); /* estoque baixo */
   font-weight: 600;
 }
 
-.history-list li.danger {
+.materiais-history-list li.materiais-history-list__item--danger {
   color: var(--color-danger); /* crítico */
   font-weight: 600;
 }
 
 /* Ações */
-.data-table__actions {
+.materiais-data-table__actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.table-action-button {
+.materiais-table-action-button {
   border: none;
   background: rgba(37, 99, 235, 0.12);
   color: var(--color-accent);
@@ -69,22 +69,22 @@
   transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
 
-.table-action-button:hover,
-.table-action-button:focus-visible {
+.materiais-table-action-button:hover,
+.materiais-table-action-button:focus-visible {
   background: var(--color-accent);
   color: #fff;
   transform: translateY(-1px);
   outline: none;
 }
 
-.table-action-button:disabled {
+.materiais-table-action-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
 }
 
 
-.record-history__overlay {
+.materiais-record-history__overlay {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
@@ -95,7 +95,7 @@
   z-index: 1000;
 }
 
-.record-history__modal {
+.materiais-record-history__modal {
   background: var(--color-card, #fff);
   border-radius: 1rem;
   width: min(520px, 100%);
@@ -107,19 +107,19 @@
   box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
 }
 
-.record-history__header {
+.materiais-record-history__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
 }
 
-.record-history__header h3 {
+.materiais-record-history__header h3 {
   margin: 0;
   font-size: 1.05rem;
 }
 
-.record-history__close {
+.materiais-record-history__close {
   border: none;
   background: transparent;
   color: var(--color-muted);
@@ -133,19 +133,19 @@
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-.record-history__close:hover,
-.record-history__close:focus-visible {
+.materiais-record-history__close:hover,
+.materiais-record-history__close:focus-visible {
   background: rgba(148, 163, 184, 0.2);
   color: var(--color-primary-dark);
   outline: none;
 }
 
-.record-history__body {
+.materiais-record-history__body {
   max-height: 60vh;
   overflow-y: auto;
   padding-right: 0.25rem;
 }
 
-.record-history__body .history-list {
+.materiais-record-history__body .materiais-history-list {
   gap: 0.6rem;
 }

@@ -6,7 +6,7 @@ export function MateriaisHistoricoTimeline({ registros }) {
   }
 
   return (
-    <ul className="history-list">
+    <ul className="materiais-history-list">
       {registros.map((registro) => (
         <li key={registro.id}>
           <span>{new Date(registro.dataRegistro).toLocaleString('pt-BR')}</span>

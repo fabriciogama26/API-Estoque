@@ -10,7 +10,7 @@
 }
 
 /* Container geral */
-.auth {
+.login-auth {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -20,7 +20,7 @@
 }
 
 /* Card */
-.auth-card {
+.login-auth-card {
   width: min(420px, 100%);
   background: linear-gradient(160deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
   border-radius: 1.5rem;
@@ -34,7 +34,7 @@
   position: relative;
 }
 
-.auth-card--neon::before {
+.login-auth-card--neon::before {
   content: '';
   position: absolute;
   inset: -16px;
@@ -46,13 +46,13 @@
 }
 
 /* Logo */
-.auth-card__logo {
+.login-auth-card__logo {
   display: flex;
   justify-content: center;
   margin-bottom: 0.65rem;
 }
 
-.auth-card__logo img {
+.login-auth-card__logo img {
   max-width: 140px;
   width: 100%;
   height: auto;
@@ -60,45 +60,45 @@
 }
 
 /* Títulos */
-.auth-card__titles {
+.login-auth-card__titles {
   text-align: center;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.auth-card__kicker {
+.login-auth-card__kicker {
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.2em;
   color: rgba(148, 163, 184, 0.9);
 }
 
-.auth-card__titles h1 {
+.login-auth-card__titles h1 {
   font-size: clamp(2rem, 4vw, 3rem);
   font-weight: 700;
   color: #e2f2ff;
 }
 
-.auth-card__subtitle {
+.login-auth-card__subtitle {
   color: rgba(191, 219, 254, 0.82);
   font-size: 0.9rem;
 }
 
 /* Campos */
-.field--panel {
+.login-field--panel {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
 }
 
-.field--panel span {
+.login-field--panel span {
   font-size: 0.85rem;
   font-weight: 500;
   color: rgba(226, 232, 240, 0.8);
 }
 
-.field__panel {
+.login-field__panel {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -109,13 +109,13 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.field__panel svg {
+.login-field__panel svg {
   width: 1.05rem;
   height: 1.05rem;
   color: var(--color-primary); /* ícone verde */
 }
 
-.field__panel input {
+.login-field__panel input {
   border: none;
   background: transparent;
   flex: 1;
@@ -123,17 +123,17 @@
   font-size: 0.95rem;
 }
 
-.field__panel input::placeholder {
+.login-field__panel input::placeholder {
   color: rgba(100, 116, 139, 0.65);
 }
 
-.field__panel:focus-within {
+.login-field__panel:focus-within {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
 }
 
 /* Opções */
-.auth-card__options {
+.login-auth-card__options {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -143,18 +143,18 @@
   gap: 0.5rem;
 }
 
-.checkbox {
+.login-checkbox {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
 }
 
-.checkbox input {
+.login-checkbox input {
   accent-color: var(--color-accent); /* azul */
 }
 
 /* Botão principal */
-.button--neon {
+.login-button--neon {
   width: 100%;
   border: none;
   border-radius: 0.9rem;
@@ -166,12 +166,12 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.button--neon:hover:not(:disabled) {
+.login-button--neon:hover:not(:disabled) {
   transform: translateY(-2px);
 }
 
 /* Rodapé */
-.auth-card__footer {
+.login-auth-card__footer {
   text-align: center;
   font-size: 0.82rem;
   color: rgba(226, 232, 240, 0.72);
@@ -182,12 +182,12 @@
 
 /* Responsivo */
 @media (max-width: 640px) {
-  .auth-card {
+  .login-auth-card {
     padding: 2rem 1.75rem;
     border-radius: 1.25rem;
   }
 
-  .auth-card__titles h1 {
+  .login-auth-card__titles h1 {
     font-size: 2rem;
   }
 }

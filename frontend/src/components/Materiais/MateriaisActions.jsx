@@ -14,10 +14,10 @@ export function MateriaisActions({
 
   // Evita renderizar ações para materiais inexistentes
   return (
-    <div className="data-table__actions">
+    <div className="materiais-data-table__actions">
       <button
         type="button"
-        className="table-action-button"
+        className="materiais-table-action-button"
         onClick={() => onEdit(material)}
         disabled={isEditDisabled}
         aria-label={isEditDisabled ? 'Editando material' : `Editar ${material.nome}`}
@@ -26,7 +26,7 @@ export function MateriaisActions({
       </button>
       <button
         type="button"
-        className="table-action-button"
+        className="materiais-table-action-button"
         onClick={() => onHistory(material)}
         disabled={historyDisabled}
         aria-label={`Ver historico de precos de ${material.nome}`}

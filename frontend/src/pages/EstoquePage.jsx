@@ -101,7 +101,7 @@ export function EstoquePage() {
 
     const parsed = Number(draftValue)
     if (Number.isNaN(parsed) || parsed < 0) {
-      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor inv·lido' }))
+      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor inv√°lido' }))
       return
     }
 
@@ -196,18 +196,18 @@ export function EstoquePage() {
           <h2>Alertas de estoque</h2>
         </header>
         {alertasFiltrados.length ? (
-          <ul className="alert-list">
+          <ul className="estoque-alert-list">
             {alertasFiltrados.map((alerta) => {
               const deficit = Math.max(Number(alerta.estoqueMinimo ?? 0) - Number(alerta.estoqueAtual ?? 0), 0)
               return (
-                <li key={alerta.materialId} className="alert-list__item">
-                  <span className="badge badge--alert">{alerta.nome?.split(' ')[0] || 'Material'}</span>
+                <li key={alerta.materialId} className="estoque-alert-list__item">
+                  <span className="estoque-badge estoque-badge--alert">{alerta.nome?.split(' ')[0] || 'Material'}</span>
                   <span>
                     Estoque atual: <strong>{alerta.estoqueAtual}</strong>
                     {' '}| Minimo: <strong>{alerta.estoqueMinimo}</strong>
-                    {deficit > 0 ? <span className="alert-list__deficit"> - faltam {deficit}</span> : null}
+                    {deficit > 0 ? <span className="estoque-alert-list__deficit"> - faltam {deficit}</span> : null}
                   </span>
-                  <span className="alert-list__material">{alerta.nome} - {alerta.fabricante}</span>
+                  <span className="estoque-alert-list__material">{alerta.nome} - {alerta.fabricante}</span>
                 </li>
               )
             })}
@@ -229,23 +229,23 @@ export function EstoquePage() {
           <h2>Itens</h2>
         </header>
         {itensFiltrados.length === 0 ? <p className="feedback">Sem materiais cadastrados ou filtrados.</p> : null}
-        <div className="list">
+        <div className="estoque-list">
           {itensFiltrados.map((item) => {
             const draftValue = minStockDrafts[item.materialId] ?? ''
             const isSavingMin = Boolean(savingMinStock[item.materialId])
             const fieldError = minStockErrors[item.materialId]
             return (
-              <article key={item.materialId} className={`list__item${item.alerta ? ' list__item--alert' : ''}`}>
-                <header className="list__item-header">
+              <article key={item.materialId} className={`estoque-list__item${item.alerta ? ' estoque-list__item--alert' : ''}`}>
+                <header className="estoque-list__item-header">
                   <div>
                     <h3>{item.nome}</h3>
                     <p>{item.fabricante}</p>
                   </div>
-                  <div className="list__item-meta">
+                  <div className="estoque-list__item-meta">
                     <span>Quantidade: {item.quantidade}</span>
                     <span>Valor unitario: {formatCurrency(item.valorUnitario)}</span>
                     <span>Valor total: {formatCurrency(item.valorTotal)}</span>
-                    <div className="list__item-min-stock">
+                    <div className="estoque-list__item-min-stock">
                       <label>
                         <span>Estoque minimo</span>
                         <input
@@ -265,10 +265,10 @@ export function EstoquePage() {
                         {isSavingMin ? 'Salvando...' : 'Salvar'}
                       </button>
                     </div>
-                    {fieldError ? <span className="list__item-error">{fieldError}</span> : null}
+                    {fieldError ? <span className="estoque-list__item-error">{fieldError}</span> : null}
                   </div>
                 </header>
-                <div className="list__item-body">
+                <div className="estoque-list__item-body">
                   <span>Validade (dias): {item.validadeDias}</span>
                   <span>CA: {item.ca}</span>
                 </div>
