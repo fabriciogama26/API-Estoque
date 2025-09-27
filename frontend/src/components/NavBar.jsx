@@ -90,7 +90,7 @@ export function NavBar() {
   }
 
   return (
-    <nav className="sidebar">
+    <nav className="sidebar__nav">
       {navSections.map((section) => {
         const SectionIcon = section.icon
         const isOpen = openSections[section.id]
