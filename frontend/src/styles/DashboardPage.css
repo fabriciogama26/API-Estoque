@@ -173,13 +173,3 @@
   height: 100%;
   display: flex;
 }
-
-/* RESPONSIVO */
-@media (max-width: 900px) {
-  .dashboard-grid--two { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 640px) {
-  .dashboard-highlights { grid-template-columns: 1fr; }
-  .dashboard-card--chart { min-height: 280px; }
-}

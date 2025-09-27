@@ -173,9 +173,3 @@
 .system-status__feedback--success {
   color: var(--color-primary);
 }
-
-@media (max-width: 768px) {
-  .system-status {
-    padding: 1.15rem 1.2rem;
-  }
-}

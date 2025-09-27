@@ -168,15 +168,3 @@
   flex-direction: column;
   gap: 0.4rem;
 }
-
-/* Responsivo */
-@media (max-width: 640px) {
-  .login-auth-card {
-    padding: 2rem 1.75rem;
-    border-radius: 1.25rem;
-  }
-
-  .login-auth-card__titles h1 {
-    font-size: 2rem;
-  }
-}
