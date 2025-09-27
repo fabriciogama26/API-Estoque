@@ -3,37 +3,44 @@ import { Settings, UserCircle2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
+import { api } from '../services/api.js'
 import appInfo from '../../package.json?json'
 import '../styles/SystemStatus.css'
 
 const CHECK_INTERVAL = 3 * 60 * 1000 // 3 minutos
 
-function useSupabaseHealth() {
+function useSystemHealth() {
   const [status, setStatus] = useState({ state: 'unknown', message: 'Verificando...', timestamp: null })
 
   const check = useCallback(async () => {
-    if (!isSupabaseConfigured() || !supabase) {
-      setStatus({ state: 'offline', message: 'Supabase nao configurado', timestamp: new Date() })
+    try {
+      await api.health()
+    } catch (err) {
+      console.warn('Falha ao verificar status da API', err)
+      setStatus({ state: 'offline', message: err.message || 'API indisponivel', timestamp: new Date() })
       return
     }
 
-    try {
-      const { error } = await supabase.from('materiais').select('id', { count: 'exact', head: true }).limit(1)
-      if (error) {
-        throw error
+    let message = 'API online'
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { error } = await supabase.from('materiais').select('id', { count: 'exact', head: true }).limit(1)
+        if (error) {
+          throw error
+        }
+        message = 'API e Supabase online'
+      } catch (err) {
+        console.warn('Falha ao verificar status do Supabase', err)
+        message = `API online; Supabase indisponivel: ${err.message || 'Offline'}`
       }
-      setStatus({ state: 'online', message: 'Online', timestamp: new Date() })
-    } catch (err) {
-      console.warn('Falha ao verificar status do Supabase', err)
-      setStatus({ state: 'offline', message: err.message || 'Offline', timestamp: new Date() })
     }
+
+    setStatus({ state: 'online', message, timestamp: new Date() })
   }, [])
 
   useEffect(() => {
     check()
-    if (!isSupabaseConfigured()) {
-      return () => {}
-    }
     const id = window.setInterval(check, CHECK_INTERVAL)
     return () => window.clearInterval(id)
   }, [check])
@@ -178,7 +185,7 @@ function ChangePasswordModal({ open, onClose, user }) {
 export function SystemStatus({ className = '' }) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const health = useSupabaseHealth()
+  const health = useSystemHealth()
   const { state, message } = health
   const [menuOpen, setMenuOpen] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
