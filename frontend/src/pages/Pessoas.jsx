@@ -22,7 +22,7 @@ import {
 } from '../rules/PessoasRules.js'
 import { resolveUsuarioNome } from '../utils/PessoasUtils.js'
 
-import '../styles/MateriaisPage.css'
+import '../styles/PessoasPage.css'
 
 export function PessoasPage() {
   const { user } = useAuth()
