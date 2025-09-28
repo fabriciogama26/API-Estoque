@@ -58,40 +58,56 @@ export function AcidentesForm({
           <input type="date" name="data" value={form.data} onChange={onChange} required />
         </label>
         <label className="field">
-          <span>Dias Perdidos</span>
-          <input type="number" min="0" name="diasPerdidos" value={form.diasPerdidos} onChange={onChange} placeholder="0" />
+          <span>Dias Perdidos <span className="asterisco">*</span></span>
+          <input
+            type="number"
+            min="0"
+            name="diasPerdidos"
+            value={form.diasPerdidos}
+            onChange={onChange}
+            placeholder="0"
+            required
+          />
         </label>
         <label className="field">
-          <span>Dias Debitados</span>
-          <input type="number" min="0" name="diasDebitados" value={form.diasDebitados} onChange={onChange} placeholder="0" />
+          <span>Dias Debitados <span className="asterisco">*</span></span>
+          <input
+            type="number"
+            min="0"
+            name="diasDebitados"
+            value={form.diasDebitados}
+            onChange={onChange}
+            placeholder="0"
+            required
+          />
         </label>
         <label className="field">
-          <span>Tipo</span>
-          <input name="tipo" value={form.tipo} onChange={onChange} placeholder="Queda" />
+          <span>Tipo <span className="asterisco">*</span></span>
+          <input name="tipo" value={form.tipo} onChange={onChange} placeholder="Queda" required />
         </label>
         <label className="field">
-          <span>Agente</span>
-          <input name="agente" value={form.agente} onChange={onChange} placeholder="Equipamento" />
+          <span>Agente <span className="asterisco">*</span></span>
+          <input name="agente" value={form.agente} onChange={onChange} placeholder="Equipamento" required />
         </label>
         <label className="field">
           <span>CID</span>
           <input name="cid" value={form.cid} onChange={onChange} placeholder="S93" />
         </label>
         <label className="field">
-          <span>Lesao</span>
-          <input name="lesao" value={form.lesao} onChange={onChange} placeholder="Entorse" />
+          <span>Lesao <span className="asterisco">*</span></span>
+          <input name="lesao" value={form.lesao} onChange={onChange} placeholder="Entorse" required />
         </label>
         <label className="field">
-          <span>Parte Lesionada</span>
-          <input name="parteLesionada" value={form.parteLesionada} onChange={onChange} placeholder="Tornozelo" />
+          <span>Parte Lesionada <span className="asterisco">*</span></span>
+          <input name="parteLesionada" value={form.parteLesionada} onChange={onChange} placeholder="Tornozelo" required />
         </label>
         <label className="field">
-          <span>Setor</span>
-          <input name="setor" value={form.setor} readOnly placeholder="Producao" />
+          <span>Setor <span className="asterisco">*</span></span>
+          <input name="setor" value={form.setor} readOnly placeholder="Producao" required />
         </label>
         <label className="field">
-          <span>Local</span>
-          <input name="local" value={form.local} readOnly placeholder="Linha 1" />
+          <span>Local <span className="asterisco">*</span></span>
+          <input name="local" value={form.local} readOnly placeholder="Linha 1" required />
         </label>
         <label className="field">
           <span>CAT</span>
