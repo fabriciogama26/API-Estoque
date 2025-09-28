@@ -9,6 +9,7 @@ import { EntradasPage } from './pages/EntradasPage.jsx'
 import { SaidasPage } from './pages/SaidasPage.jsx'
 import { EstoquePage } from './pages/EstoquePage.jsx'
 import { DashboardPage } from './pages/DashboardPage.jsx'
+import { AcidentesPage } from './pages/Acidentes.jsx'
 
 function App() {
   return (
@@ -19,11 +20,16 @@ function App() {
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="dashboard/acidentes" element={<AcidentesPage />} />
           <Route path="estoque" element={<EstoquePage />} />
 
           <Route path="cadastros">
             <Route path="pessoas" element={<PessoasPage />} />
             <Route path="materiais" element={<MateriaisPage />} />
+          </Route>
+
+          <Route path="acidentes">
+            <Route path="cadastro" element={<AcidentesPage />} />
           </Route>
 
           <Route path="configuracoes" element={<ConfiguracoesPage />} />
