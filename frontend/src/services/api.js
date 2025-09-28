@@ -66,6 +66,11 @@ export const api = {
     update: (id, payload) => request(`/api/materiais/${id}`, { method: 'PUT', body: payload }),
     priceHistory: (id) => request(`/api/materiais/${id}/historico-precos`),
   },
+  acidentes: {
+    list: () => request('/api/acidentes'),
+    create: (payload) => request('/api/acidentes', { method: 'POST', body: payload }),
+    update: (id, payload) => request(`/api/acidentes/${id}`, { method: 'PUT', body: payload }),
+  },
   entradas: {
     list: () => request('/api/entradas'),
     create: (payload) => request('/api/entradas', { method: 'POST', body: payload }),
