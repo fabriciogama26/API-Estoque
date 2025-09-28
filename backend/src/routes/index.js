@@ -5,6 +5,7 @@ const pessoaRoutes = require('./pessoaRoutes')
 const entradaRoutes = require('./entradaRoutes')
 const saidaRoutes = require('./saidaRoutes')
 const estoqueRoutes = require('./estoqueRoutes')
+const acidenteRoutes = require('./acidenteRoutes')
 
 const router = express.Router()
 
@@ -18,5 +19,6 @@ router.use('/pessoas', pessoaRoutes)
 router.use('/entradas', entradaRoutes)
 router.use('/saidas', saidaRoutes)
 router.use('/estoque', estoqueRoutes)
+router.use('/acidentes', acidenteRoutes)
 
 module.exports = router
