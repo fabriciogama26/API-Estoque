@@ -48,25 +48,41 @@
   color: #0f172a;
 }
 
+/* Pontos de status - adaptados SST */
 .system-status__dot {
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.7);
 }
 
 .system-status__dot--online {
-  background: var(--color-primary);
+  background: var(--color-primary); /* Verde = Ambiente Seguro */
+}
+.system-status__dot--online::after {
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .system-status__dot--offline {
-  background: var(--color-danger);
+  background: var(--color-danger); /* Vermelho = Risco Detectado */
+}
+.system-status__dot--offline::after {
+  color: var(--color-danger);
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .system-status__dot--unknown {
-  background: var(--color-warning);
+  background: var(--color-warning); /* Amarelo = Atenção */
+}
+.system-status__dot--unknown::after {
+  color: var(--color-warning);
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
+/* Usuário logado */
 .system-status__user {
   display: flex;
   align-items: center;
@@ -90,8 +106,8 @@
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.2);
-  color: var(--color-accent);
+  background: rgba(22, 163, 74, 0.15); /* Verde claro para avatar */
+  color: var(--color-primary-dark);
 }
 
 .system-status__identity {
@@ -119,6 +135,7 @@
   text-overflow: ellipsis;
 }
 
+/* Ações */
 .system-status__actions {
   display: inline-flex;
   align-items: center;
@@ -160,4 +177,3 @@
   color: #fee2e2;
   transform: translateY(-1px);
 }
-

@@ -62,11 +62,13 @@
   width: 3rem;
   height: 3rem;
   border-radius: 1rem;
-  background: rgba(37, 99, 235, 0.12); /* azul neutro */
+  background: rgba(37, 99, 235, 0.12);
   color: var(--color-accent);
 }
 
-/* VARIANTES DE CORES */
+/* VARIANTES DE CORES - Adaptadas SST */
+
+/* Azul – Ações Preventivas */
 .dashboard-insight-card--blue::after {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.6), rgba(165, 180, 252, 0.4));
 }
@@ -75,7 +77,11 @@
   color: var(--color-accent);
 }
 .dashboard-insight-card--blue .dashboard-insight-card__helper { color: var(--color-accent); }
+.dashboard-insight-card--blue .dashboard-insight-card__title::before {
+  content: "Ações Preventivas - ";
+}
 
+/* Verde – Zero Acidentes */
 .dashboard-insight-card--green::after {
   background: linear-gradient(135deg, rgba(22, 163, 74, 0.55), rgba(16, 185, 129, 0.35));
 }
@@ -84,7 +90,11 @@
   color: var(--color-primary-dark);
 }
 .dashboard-insight-card--green .dashboard-insight-card__helper { color: var(--color-primary); }
+.dashboard-insight-card--green .dashboard-insight-card__title::before {
+  content: "Zero Acidentes - ";
+}
 
+/* Laranja – Pendências de EPI */
 .dashboard-insight-card--orange::after {
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.55), rgba(251, 191, 36, 0.35));
 }
@@ -93,7 +103,11 @@
   color: #f97316;
 }
 .dashboard-insight-card--orange .dashboard-insight-card__helper { color: #f97316; }
+.dashboard-insight-card--orange .dashboard-insight-card__title::before {
+  content: "Pendências de EPI - ";
+}
 
+/* Vermelho – Acidentes/Incidentes */
 .dashboard-insight-card--red::after {
   background: linear-gradient(135deg, rgba(220, 38, 38, 0.55), rgba(239, 68, 68, 0.35));
 }
@@ -102,7 +116,11 @@
   color: var(--color-danger);
 }
 .dashboard-insight-card--red .dashboard-insight-card__helper { color: var(--color-danger); }
+.dashboard-insight-card--red .dashboard-insight-card__title::before {
+  content: "Acidentes/Incidentes - ";
+}
 
+/* Cinza – Outros indicadores */
 .dashboard-insight-card--slate::after {
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.45), rgba(226, 232, 240, 0.35));
 }
@@ -111,6 +129,9 @@
   color: #475569;
 }
 .dashboard-insight-card--slate .dashboard-insight-card__helper { color: #475569; }
+.dashboard-insight-card--slate .dashboard-insight-card__title::before {
+  content: "Outros Indicadores - ";
+}
 
 /* TITULOS */
 .dashboard-card__title {
@@ -123,6 +144,7 @@
 }
 
 .dashboard-card__title svg {
+  flex-shrink: 0; /* evita deformar */
   color: var(--color-accent);
 }
 
@@ -149,7 +171,9 @@
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
 }
 
-.dashboard-card__header { margin-bottom: 0.75rem; }
+.dashboard-card__header { 
+  margin-bottom: 0.75rem; 
+  padding: 0 0.5rem;}
 
 .dashboard-card--chart > *:last-child {
   flex: 1;

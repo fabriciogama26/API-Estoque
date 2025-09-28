@@ -1,3 +1,9 @@
 body {
-  background: var(--color-bg-gradient);
+  background: var(--color-bg-gradient, linear-gradient(135deg, #15803D 0%, #0E7490 100%));
+  color: var(--color-text, #0f172a);
+  min-height: 100vh;
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
 }

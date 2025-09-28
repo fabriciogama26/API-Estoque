@@ -22,20 +22,29 @@
   flex-wrap: wrap;
 }
 
-/* Variantes para destacar status no histórico */
+/* Variantes para destacar status no histórico - adaptadas SST */
 .materiais-history-list li.ok {
   color: var(--color-primary-dark); /* estoque normal */
   font-weight: 600;
+}
+.materiais-history-list li.ok::before {
+  content: "✅ Estoque de EPI normal - ";
 }
 
 .materiais-history-list li.warning {
   color: var(--color-warning); /* estoque baixo */
   font-weight: 600;
 }
+.materiais-history-list li.warning::before {
+  content: "⚠️ Estoque de EPI baixo - ";
+}
 
 .materiais-history-list li.danger {
   color: var(--color-danger); /* crítico */
   font-weight: 600;
+}
+.materiais-history-list li.danger::before {
+  content: "❌ Estoque crítico de EPI - ";
 }
 
 /* Ações */
@@ -72,7 +81,6 @@
   cursor: not-allowed;
   transform: none;
 }
-
 
 .materiais-record-history__overlay {
   position: fixed;

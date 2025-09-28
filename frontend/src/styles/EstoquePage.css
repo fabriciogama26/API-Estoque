@@ -27,6 +27,9 @@
   color: var(--color-danger);
   font-weight: 600;
 }
+.estoque-alert-list__deficit::before {
+  content: "❌ EPI Crítico – ";
+}
 
 /* Badge */
 .estoque-badge {
@@ -39,7 +42,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  background: rgba(37, 99, 235, 0.1); /* azul neutro */
+  background: rgba(22, 163, 74, 0.1); /* verde normal */
   color: var(--color-primary-dark);
 }
 
@@ -48,11 +51,17 @@
   color: #92400e;
   border: 1px solid rgba(250, 204, 21, 0.6);
 }
+.estoque-badge--alert::before {
+  content: "⚠️ Alerta EPI – ";
+}
 
 .estoque-badge--critical {
   background: rgba(220, 38, 38, 0.2); /* vermelho crítico */
   color: #b91c1c;
   border: 1px solid rgba(220, 38, 38, 0.4);
+}
+.estoque-badge--critical::before {
+  content: "🚨 Crítico – ";
 }
 
 /* Lista genérica */
@@ -76,10 +85,24 @@
   border-color: rgba(250, 204, 21, 0.6); /* amarelo */
   box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
 }
+.estoque-list__item--alert::before {
+  content: "⚠️ Estoque Baixo de EPI – ";
+  font-weight: 600;
+  color: var(--color-warning);
+  display: block;
+  margin-bottom: 0.35rem;
+}
 
 .estoque-list__item--critical {
   border-color: rgba(220, 38, 38, 0.6); /* vermelho crítico */
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+}
+.estoque-list__item--critical::before {
+  content: "🚨 Estoque Crítico de EPI – ";
+  font-weight: 700;
+  color: var(--color-danger);
+  display: block;
+  margin-bottom: 0.35rem;
 }
 
 .estoque-list__item-header {
@@ -143,6 +166,6 @@
   font-size: 0.8rem;
 }
 .estoque-list__item-error::before {
-  content: '⚠️';
+  content: '⚠️ Erro de Cadastro EPI – ';
   margin-right: 0.25rem;
 }

@@ -22,20 +22,29 @@
   flex-wrap: wrap;
 }
 
-/* Variantes para destacar status no histórico */
+/* Variantes para destacar status no histórico - adaptadas SST */
 .pessoas-history-list li.ok {
   color: var(--color-primary-dark);
   font-weight: 600;
+}
+.pessoas-history-list li.ok::before {
+  content: "✅ EPI em conformidade - ";
 }
 
 .pessoas-history-list li.warning {
   color: var(--color-warning);
   font-weight: 600;
 }
+.pessoas-history-list li.warning::before {
+  content: "⚠️ Treinamento pendente - ";
+}
 
 .pessoas-history-list li.danger {
   color: var(--color-danger);
   font-weight: 600;
+}
+.pessoas-history-list li.danger::before {
+  content: "❌ Não conformidade crítica - ";
 }
 
 /* Ações */

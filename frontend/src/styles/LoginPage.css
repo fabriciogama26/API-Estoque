@@ -5,7 +5,7 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background:rgb(215, 237, 245) /* fallback de fundo escuro */
+  background: var(--color-bg-gradient); /* fundo do tema SST */
 }
 
 /* Card */
@@ -14,8 +14,8 @@
   background: linear-gradient(160deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
   border-radius: 1.5rem;
   padding: 2.5rem;
-  box-shadow: 0 40px 80px rgba(15, 67, 109, 0.55);
-  border: 1px solid rgba(171, 197, 253, 0.35); /* azul borda */
+  box-shadow: 0 40px 80px rgba(15, 67, 50, 0.55);
+  border: 1px solid rgba(22, 163, 74, 0.35); /* verde borda */
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -28,7 +28,7 @@
   position: absolute;
   inset: -16px;
   border-radius: 1.8rem;
-  background: linear-gradient(160deg, rgba(34, 197, 94, 0.6), rgba(37, 99, 235, 0.6));
+  background: linear-gradient(160deg, rgba(34, 197, 94, 0.6), rgba(14, 116, 144, 0.6));
   filter: blur(30px);
   opacity: 0.6;
   z-index: -1;
@@ -60,17 +60,20 @@
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.2em;
-  color: rgba(148, 163, 184, 0.9);
+  color: rgba(226, 232, 240, 0.9);
+}
+.login-auth-card__kicker::before {
+  content: "Portal SST – Gestão de Segurança";
 }
 
 .login-auth-card__titles h1 {
   font-size: clamp(2rem, 4vw, 3rem);
   font-weight: 700;
-  color: #e2f2ff;
+  color: #f0fdf4; /* verde claro */
 }
 
 .login-auth-card__subtitle {
-  color: rgba(191, 219, 254, 0.82);
+  color: rgba(226, 232, 240, 0.82);
   font-size: 0.9rem;
 }
 
@@ -94,14 +97,14 @@
   padding: 0.65rem 0.9rem;
   border-radius: 0.95rem;
   background: rgba(248, 250, 252, 0.95);
-  border: 1px solid rgba(148, 219, 255, 0.35);
+  border: 1px solid rgba(34, 197, 94, 0.35);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .login-field__panel svg {
   width: 1.05rem;
   height: 1.05rem;
-  color: var(--color-primary); /* ícone verde */
+  color: var(--color-primary); /* ícone verde segurança */
 }
 
 .login-field__panel input {
@@ -139,7 +142,7 @@
 }
 
 .login-checkbox input {
-  accent-color: var(--color-accent); /* azul */
+  accent-color: var(--color-accent); /* azul petróleo */
 }
 
 /* Botão principal */
@@ -148,10 +151,10 @@
   border: none;
   border-radius: 0.9rem;
   background: #fff;
-  color: #000;
+  color: var(--color-primary-dark);
   font-weight: 600;
   padding: 0.95rem 1rem;
-  box-shadow: 0 24px 40px rgba(4, 120, 87, 0.35);
+  box-shadow: 0 24px 40px rgba(22, 163, 74, 0.35);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 

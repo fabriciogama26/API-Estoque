@@ -1,11 +1,24 @@
+/* Seções da página de configuração */
 .config-page__section {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  background: var(--color-card);
+  border: 1px solid rgba(34, 197, 94, 0.25); /* verde segurança */
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
+/* Descrição das opções */
 .config-page__description {
   margin: 0.35rem 0 0;
   color: var(--color-muted);
   font-size: 0.9rem;
+  line-height: 1.4;
+}
+.config-page__description::before {
+  content: "ℹ️ ";
+  color: var(--color-primary);
+  font-weight: 600;
 }
