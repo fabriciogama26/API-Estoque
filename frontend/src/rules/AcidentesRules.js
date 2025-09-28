@@ -29,13 +29,47 @@ export function validateAcidenteForm(form) {
   if (!form.data) {
     return 'Selecione a data do acidente.'
   }
+  if (!form.tipo.trim()) {
+    return 'Informe o tipo do acidente.'
+  }
+  if (!form.agente.trim()) {
+    return 'Informe o agente do acidente.'
+  }
+  if (!form.lesao.trim()) {
+    return 'Informe a lesao.'
+  }
+  if (!form.parteLesionada.trim()) {
+    return 'Informe a parte lesionada.'
+  }
+  if (!form.setor.trim()) {
+    return 'Informe o setor.'
+  }
+  if (!form.local.trim()) {
+    return 'Informe o local.'
+  }
+
+  const hasDiasPerdidos = String(form.diasPerdidos ?? '').trim() !== ''
+  if (!hasDiasPerdidos) {
+    return 'Informe os dias perdidos.'
+  }
 
   const diasPerdidos = numberOrNull(form.diasPerdidos)
+  if (diasPerdidos === null) {
+    return 'Dias perdidos deve ser um numero valido.'
+  }
   if (diasPerdidos !== null && diasPerdidos < 0) {
     return 'Dias perdidos nao pode ser negativo.'
   }
 
+  const hasDiasDebitados = String(form.diasDebitados ?? '').trim() !== ''
+  if (!hasDiasDebitados) {
+    return 'Informe os dias debitados.'
+  }
+
   const diasDebitados = numberOrNull(form.diasDebitados)
+  if (diasDebitados === null) {
+    return 'Dias debitados deve ser um numero valido.'
+  }
   if (diasDebitados !== null && diasDebitados < 0) {
     return 'Dias debitados nao pode ser negativo.'
   }

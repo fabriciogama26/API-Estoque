@@ -138,15 +138,15 @@ export function AcidentesPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    setIsSaving(true)
     setFormError(null)
 
     const validationError = validateAcidenteForm(form)
     if (validationError) {
       setFormError(validationError)
-      setIsSaving(false)
       return
     }
+
+    setIsSaving(true)
 
     try {
       const usuario = resolveUsuarioNome(user)
