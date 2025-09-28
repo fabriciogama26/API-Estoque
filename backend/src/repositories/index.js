@@ -3,7 +3,8 @@ module.exports = {
   pessoas: require('./PessoaRepository'),
   entradas: require('./EntradaRepository'),
   saidas: require('./SaidaRepository'),
-  precos: require('./PrecoHistoricoRepository')
+  precos: require('./PrecoHistoricoRepository'),
+  acidentes: require('./AcidenteRepository')
 };
 
 
