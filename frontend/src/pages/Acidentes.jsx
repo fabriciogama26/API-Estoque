@@ -45,6 +45,9 @@ export function AcidentesPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [listError, setListError] = useState(null)
   const [formError, setFormError] = useState(null)
+  const [pessoas, setPessoas] = useState([])
+  const [pessoasError, setPessoasError] = useState(null)
+  const [isLoadingPessoas, setIsLoadingPessoas] = useState(false)
 
   const loadAcidentes = useCallback(async () => {
     setIsLoading(true)
@@ -59,12 +62,59 @@ export function AcidentesPage() {
     }
   }, [])
 
+  const loadPessoas = useCallback(async () => {
+    setIsLoadingPessoas(true)
+    setPessoasError(null)
+    try {
+      const response = await api.pessoas.list()
+      setPessoas(response ?? [])
+    } catch (err) {
+      setPessoasError(err.message)
+    } finally {
+      setIsLoadingPessoas(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadAcidentes()
   }, [loadAcidentes])
 
+  useEffect(() => {
+    loadPessoas()
+  }, [loadPessoas])
+
+  const pessoasPorMatricula = useMemo(() => {
+    const map = new Map()
+    pessoas.forEach((pessoa) => {
+      if (!pessoa?.matricula) {
+        return
+      }
+      map.set(String(pessoa.matricula), pessoa)
+    })
+    return map
+  }, [pessoas])
+
   const handleFormChange = (event) => {
     const { name, value } = event.target
+    if (name === 'matricula') {
+      setForm((prev) => {
+        const next = { ...prev, matricula: value }
+        const pessoa = pessoasPorMatricula.get(value)
+        if (pessoa) {
+          next.nome = pessoa.nome ?? ''
+          next.cargo = pessoa.cargo ?? ''
+          next.setor = pessoa.setor ?? ''
+          next.local = pessoa.local ?? ''
+        } else if (!value) {
+          next.nome = ''
+          next.cargo = ''
+          next.setor = ''
+          next.local = ''
+        }
+        return next
+      })
+      return
+    }
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -166,6 +216,9 @@ export function AcidentesPage() {
         editingAcidente={editingAcidente}
         onCancel={cancelEdit}
         error={formError}
+        pessoas={pessoas}
+        pessoasError={pessoasError}
+        isLoadingPessoas={isLoadingPessoas}
       />
 
       <AcidentesFilters

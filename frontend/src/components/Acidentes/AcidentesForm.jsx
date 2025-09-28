@@ -1,18 +1,57 @@
-export function AcidentesForm({ form, onChange, onSubmit, isSaving, editingAcidente, onCancel, error }) {
+export function AcidentesForm({
+  form,
+  onChange,
+  onSubmit,
+  isSaving,
+  editingAcidente,
+  onCancel,
+  error,
+  pessoas = [],
+  pessoasError,
+  isLoadingPessoas = false,
+}) {
+  const hasMatriculaOption = pessoas.some(
+    (pessoa) => pessoa?.matricula !== undefined && String(pessoa.matricula) === form.matricula,
+  )
+
   return (
     <form className="form" onSubmit={onSubmit}>
       <div className="form__grid form__grid--two">
         <label className="field">
           <span>Matricula <span className="asterisco">*</span></span>
-          <input name="matricula" value={form.matricula} onChange={onChange} required placeholder="12345" />
+          <select
+            name="matricula"
+            value={form.matricula}
+            onChange={onChange}
+            required
+            disabled={isLoadingPessoas}
+          >
+            <option value="">Selecione uma matricula</option>
+            {pessoas.map((pessoa) => {
+              const value = pessoa?.matricula !== undefined && pessoa?.matricula !== null
+                ? String(pessoa.matricula)
+                : ''
+              if (!value) {
+                return null
+              }
+              return (
+                <option key={value} value={value}>
+                  {value} - {pessoa?.nome ?? 'Sem nome'}
+                </option>
+              )
+            })}
+            {!hasMatriculaOption && form.matricula ? (
+              <option value={form.matricula}>{form.matricula}</option>
+            ) : null}
+          </select>
         </label>
         <label className="field">
           <span>Nome <span className="asterisco">*</span></span>
-          <input name="nome" value={form.nome} onChange={onChange} required placeholder="Fulano de Tal" />
+          <input name="nome" value={form.nome} readOnly required placeholder="Fulano de Tal" />
         </label>
         <label className="field">
           <span>Cargo <span className="asterisco">*</span></span>
-          <input name="cargo" value={form.cargo} onChange={onChange} required placeholder="Operador" />
+          <input name="cargo" value={form.cargo} readOnly required placeholder="Operador" />
         </label>
         <label className="field">
           <span>Data <span className="asterisco">*</span></span>
@@ -48,17 +87,18 @@ export function AcidentesForm({ form, onChange, onSubmit, isSaving, editingAcide
         </label>
         <label className="field">
           <span>Setor</span>
-          <input name="setor" value={form.setor} onChange={onChange} placeholder="Producao" />
+          <input name="setor" value={form.setor} readOnly placeholder="Producao" />
         </label>
         <label className="field">
           <span>Local</span>
-          <input name="local" value={form.local} onChange={onChange} placeholder="Linha 1" />
+          <input name="local" value={form.local} readOnly placeholder="Linha 1" />
         </label>
         <label className="field">
           <span>CAT</span>
           <input name="cat" value={form.cat} onChange={onChange} placeholder="000000" />
         </label>
       </div>
+      {pessoasError ? <p className="feedback feedback--error">{pessoasError}</p> : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">
         <button type="submit" className="button button--primary" disabled={isSaving}>
