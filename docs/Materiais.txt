@@ -1,52 +1,75 @@
-Tela: Cadastro de Materiais
-------------------------------
+VisÃ£o geral
+========
+- Tela completa para registrar, editar, filtrar e auditar materiais EPI.
+- Integra-se com endpoints serverless suportados pelo Supabase e mantÃ©m caches locais para feedback rÃ¡pido da interface do usuÃ¡rio.
+
+Principais fluxos
+---------
+1. **Criar material**
+- Campos do formulÃ¡rio: `nome`, `fabricante`, `validadeDias`, `ca`, `valorUnitÃ¡rio`.
+- Ao enviar, chama `POST /api/materiais` com token Bearer autenticado.
+- O backend impÃµe unicidade (nome + fabricante) e validaÃ§Ãµes numÃ©ricas antes de gravar em `materiais` do Supabase.
+- Em caso de sucesso, o cache do histÃ³rico Ã© limpo e a lista Ã© recarregada.
+
+2. **Atualizar material**
+- A ediÃ§Ã£o carrega os valores atuais no formulÃ¡rio.
+- `PUT /api/materiais/:id` atualiza o Supabase e, quando `valorUnitÃ¡rio` Ã© alterado, o backend registra uma nova linha em `material_price_history`.
+- AtualizaÃ§Ãµes de estoque mÃ­nimo em linha reutilizam esta rota.
+
+3. **Visualizar HistÃ³rico de PreÃ§os**
+- `GET /api/materiais/:id/historico-precos` busca o histÃ³rico lentamente e armazena em cache por material.
+- O modal de histÃ³rico exibe registros com `valorUnitÃ¡rio`, `usuarioResponsavel` e timestamps.
+
+4. **Filtros e OrdenaÃ§Ã£o**
+- Filtragem do lado do cliente por termo e status (`ativos`, `inativos`, `todos`).
+- OrdenaÃ§Ã£o por nome via `sortMateriaisByNome` sem chamadas de rede extras.
+
+Resumo da ValidaÃ§Ã£o
+------------------
+- O frontend limpa os dÃ­gitos da CA e formata a entrada de moeda.
+
+- O auxiliar de backend `MateriaisOperations` revalida:
+* `validadeDias > 0`
+* `valorUnitÃ¡rio > 0`
+* `estoqueMinimo >= 0` quando fornecido.
+
+DependÃªncias
+------------
+- Requer sessÃ£o autenticada do Supabase (token anexado por `src/services/api.js`).
+- Utiliza regras/utilitÃ¡rios compartilhados (`MateriaisRules`, `MateriaisUtils`) para modelagem e formataÃ§Ã£o de payload.
+- AtualizaÃ§Ãµes em materiais impactam as telas de Estoque, Entradas, SaÃ­das e Painel.
+
+Tabelas do Supabase
+---------------
+- `materiais`: entidade principal com campos de auditoria (`usuarioCadastro`, `usuarioAtualizacao`, timestamps).
+- `material_price_history`: log somente para anexar alteraÃ§Ãµes de preÃ§o.
+
+Tratamento de Erros
+-------------
+- Erros de API sÃ£o exibidos perto do formulÃ¡rio ou dentro do modal do histÃ³rico.
+- RestriÃ§Ãµes duplicadas respondem com HTTP 409 e a mensagem "Material jÃ¡ cadastrado para esse fabricante".
+
 Finalidade
-- Cadastrar novos EPIs com seus atributos de controle (validade, CA, valor unitário) e permitir manutenção de registros existentes (edição inline) além de consultar histórico de reajustes de preço.
+-------
+- Interface CRUD para materiais (EPIs) com acesso e filtragem de histÃ³rico em linha.
+- Interage exclusivamente com o Supabase por meio de rotas serverless.
 
-Campos de Formulário
-- EPI* (`nome`, texto): obrigatório. Trim aplicado antes do envio.
-- Fabricante* (`fabricante`, texto): obrigatório, trim aplicado.
-- Validade (dias)* (`validadeDias`, número): obrigatório, mínimo 1.
-- C.A (`ca`, texto numérico): opcional no front, mas a criação exige string não vazia; input limpa caracteres não numéricos.
-- Valor unitário* (`valorUnitario`, texto formatado moeda): obrigatório; máscara local converte para centavos.
+APIs
+----
+- `GET /api/materiais` â€“ preenche listas e seleciona.
+- `POST /api/materiais` â€“ cria.
+- `PUT /api/materiais/:id` â€“ atualiza campos, incluindo estoque mÃ­nimo.
+- `GET /api/materiais/:id/historico-precos` â€“ obtÃ©m histÃ³rico de preÃ§os sob demanda.
 
-Validações
-- Front: atributos `required` em campos marcados com *; `handleChange` força somente dígitos em CA e valor.
-- Submissão converte `valorUnitario` para número e `validadeDias` para Number.
-- Backend (`materialRules`):
-  * `validarDadosObrigatorios` exige nome/fabricante/validade > 0/valor > 0 (também demanda `ca.trim()`, tornando CA efetivamente obrigatório ao criar ou atualizar).
-  * `validarEstoqueMinimo` garante mínimo >= 0 quando informado.
-- `MaterialService.criarMaterial` rejeita duplicidade nome+fabricante.
+Regras de NegÃ³cios
+--------------
+- O backend impÃµe unicidade (`nome` + `fabricante`) e validaÃ§Ãµes numÃ©ricas.
+- AlteraÃ§Ãµes de preÃ§o criam entradas em `material_price_history`.
+- O frontend armazena em cache o histÃ³rico por material para reduzir chamadas de rede.
 
-Ações e APIs
-1. GET `/api/materiais` (`api.materiais.list`): carrega tabela ordenada.
-2. POST `/api/materiais` (`api.materiais.create`): payload `{ nome, fabricante, validadeDias, ca, valorUnitario, usuarioCadastro }`.
-3. PUT `/api/materiais/:id` (`api.materiais.update`): payload dinâmico com campos editados; esta tela envia `{ nome, fabricante, validadeDias, ca, valorUnitario, usuarioResponsavel }` quando em modo edição.
-4. GET `/api/materiais/:id/historico-precos` (`api.materiais.priceHistory`): retorna array com `{ id, materialId, valorUnitario, dataRegistro, usuarioResponsavel }`.
+Notas da IU
+--------
+- O formulÃ¡rio utiliza o auxiliar de formataÃ§Ã£o de moeda e a sanitizaÃ§Ã£o da CA.
 
-Dados Enviados/Recebidos
-- Envia dados do formulário convertidos para números e strings trimadas; inclui `usuarioCadastro`/`usuarioResponsavel` do contexto de autenticação.
-- Recebe lista de materiais com campos do modelo (`Material`) incluindo `estoqueMinimo`, `usuarioCadastro`, `dataCadastro`.
-- Histórico de preços alimenta lista expandida por material.
-
-Regras de Negócio
-- Cada criação gera automaticamente registro em `PrecoHistorico` com usuário responsável.
-- Ao editar, se o valor unitário mudar, novo histórico é registrado; outras alterações apenas atualizam o material.
-- A tabela mostra coluna “Estoque mínimo” herdada de atualizações feitas na tela de Estoque.
-- Botão “Ver histórico” alterna `histories[materialId]`, acionando chamada lazy.
-
-Comportamentos de UI
-- Form alterna entre modo criação e edição com botão “Editar/Salvar alterações” e ação “Cancelar edição”.
-- Valor unitário usa máscara de moeda brasileira; conversão ocorre na submissão.
-- Mensagens de erro globais aparecem acima das ações.
-- Histórico exibe lista com data formatada `toLocaleString` e valor em moeda.
-
-Dependências
-- Depende do contexto de autenticação para preencher `usuarioCadastro`/`usuarioResponsavel`.
-- Historicamente laços com estoque: alteração de estoque mínimo pode vir da tela de Estoque (PUT via outra tela) mas é exibida aqui.
-- Exige que a coleção esteja disponível via `MaterialRepository` para operações de leitura/edição.
-
-Persistência / Banco
-- Entidade principal: `Material` (campos: id, nome, fabricante, validadeDias, ca, valorUnitario, usuarioCadastro, dataCadastro, estoqueMinimo, ativo).
-- Histórico de preço: `PrecoHistorico` (id, materialId, valorUnitario, dataRegistro, usuarioResponsavel).
-- Repositórios são baseados em `Map`, simulando tabelas in-memory; `MaterialService` é responsável por regras de integridade.
+- Mensagens de erro da API aparecem dentro do formulÃ¡rio e do modal.
+- A barra de filtros oferece filtragem de termos/status do lado do cliente sem solicitaÃ§Ãµes extras.

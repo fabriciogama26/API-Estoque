@@ -1,46 +1,56 @@
-Tela: Entradas de Materiais
-------------------------------
-Finalidade
-- Registrar abastecimentos de estoque (entradas de EPI) e fornecer histórico com cálculo de valor total por lançamento.
+Tela: Entradas
+================
 
-Campos do Formulário
-- Material* (`materialId`, select): obrigatório; lista derivada de `/api/materiais` (id, nome, fabricante).
-- Quantidade* (`quantidade`, número >= 1): obrigatório.
-- Data da entrada (`dataEntrada`, date): opcional; se vazio o backend atribui `new Date().toISOString()`.
+Objetivo
+-------
+- Registrar reabastecimentos de estoque (entradas EPI) e listar o histÃ³rico completo com os totais calculados.
+- Toda a persistÃªncia Ã© gerenciada pelo endpoint serverless suportado pelo Supabase.
 
-Validações
-- Front-end: `required` em material e quantidade; input numérico com `min="1"`.
-- Backend (`entradaRules.validarEntrada`):
-  * Exige material válido (obtido via `MaterialRepository`).
-  * Quantidade numérica > 0.
-  * Data válida quando informada.
-- `EntradaService.obterMaterial` garante que `materialId` exista; sem isso retorna erro “Material nao encontrado”.
+Campos do FormulÃ¡rio
+-----------
+- `materialId` (select, obrigatÃ³rio): preenchido via `GET /api/materiais`.
+- `quantidade` (nÃºmero >= 1, obrigatÃ³rio).
+- `dataEntrada` (data, opcional). Quando omitido, o backend armazena `now()` em ISO.
 
-APIs e Ações
-1. GET `/api/materiais` + GET `/api/entradas` (Promise.all em `load`) para preencher selects e tabela.
-2. POST `/api/entradas` (`api.entradas.create`)
-   - Payload: `{ materialId, quantidade, dataEntrada?, usuarioResponsavel }`.
-   - Response: objeto formatado com material agregado (quando criação) mas a tela usa `load()` para sincronizar.
+ValidaÃ§Ãµes
+-----------
+- O frontend aplica campos obrigatÃ³rios e quantidade positiva via atributos HTML.
+- O manipulador serverless valida:
+* ExistÃªncia de material no Supabase (tabela `materiais`).
+* Quantidade numÃ©rica e > 0.
+* Data opcional, analisada em um carimbo de data/hora ISO vÃ¡lido.
 
-Dados Enviados/Recebidos
-- Envia IDs dos materiais e usuário logado (`usuarioResponsavel`).
-- Recebe lista de entradas brutas (`EntradaMaterial`): `id`, `materialId`, `quantidade`, `dataEntrada`, `usuarioResponsavel`.
-- Valor total exibido é calculado client-side multiplicando quantidade pelo `valorUnitario` do material carregado.
+APIs
+----
+- `GET /api/materiais`
+- `GET /api/entradas`
+- `POST /api/entradas` (espera token Bearer do Supabase). Payload:
+```json
+{
+"materialId": "uuid",
+"quantidade": 5,
+"dataEntrada": "2025-10-06T12:00:00.000Z",
+"usuarioResponsavel": "Laura Silva"
+}
+```
 
-Regras de Negócio
-- Cadastro válido exige existência prévia do material.
-- Não há atualização/remoção; histórico é apenas leitura.
-- Nenhum impacto direto sobre estoque mínimo, mas o saldo geral é usado por `EstoqueService` para compor estoque atual e dashboard.
+Fluxo de Dados
+---------
+- ApÃ³s um POST bem-sucedido, a interface do usuÃ¡rio redefine o formulÃ¡rio e recarrega os materiais e as entradas para manter a sincronizaÃ§Ã£o.
+- As linhas da tabela incluem campos derivados (detalhes do material, valor total) calculados no lado do cliente usando a lista de materiais em cache.
 
-Comportamentos de UI
-- Botão “Registrar entrada” mostra “Registrando...” enquanto a requisição está em andamento.
-- Selects são desabilitados? (não explicitamente) mas `isLoading` controla mensagem “Carregando…”.
-- Haverá mensagens padrão quando não existirem entradas (“Nenhuma entrada registrada.”).
+Regras de NegÃ³cios
+--------------
+- O backend grava na tabela `entradas` do Supabase e registra o usuÃ¡rio autenticado.
+- Nenhum saldo de estoque Ã© computado aqui; os endpoints do painel e do estoque consomem os dados acumulados.
 
-Dependências
-- Requer materiais carregados; sem materiais o select fica vazio impossibilitando submissão.
-- O histórico mostrado depende de `materialsMap` para complementar nome e fabricante.
+Comportamento da IU
+------------
+- O botÃ£o Enviar exibe `Registrando...` â€‹â€‹enquanto aguarda a resposta.
+- Erros da API sÃ£o exibidos dentro do formulÃ¡rio por meio do estado `error`.
+- Filtros permitem buscas do lado do cliente sem chamadas HTTP extras.
 
-Persistência / Banco
-- Entidade `EntradaMaterial` é escrita no repositório `entradas` (campos: id, materialId, quantidade, dataEntrada, usuarioResponsavel).
-- Repositório de materiais fornece metadados utilizados pelo serviço tanto para validação quanto para enriquecer resposta.
+DependÃªncias
+------------
+- Requer sessÃ£o autenticada para que `src/services/api.js` possa anexar o token Supabase.
+- Depende dos dados `Materiais` para preencher a seleÃ§Ã£o e exibir nomes amigÃ¡veis.

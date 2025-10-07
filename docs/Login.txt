@@ -1,45 +1,30 @@
 Tela: Login
-------------------------------
-Finalidade
-- Garantir a autenticação inicial do usuário antes de liberar qualquer rota protegida da aplicação. A tela direciona o usuário para o caminho solicitado anteriormente ou para a home (/), estabelecendo o contexto de sessão utilizado nas páginas seguintes.
+==============
 
-Campos e Interações
-- Matricula / CPF (`username`, texto): obrigatório, usado como identificador do colaborador. Campo exibe ícone ilustrativo e aceita qualquer string; não há máscara, porém a validação exige valor não vazio.
-- Senha (`password`, senha): obrigatório, usado para validar as credenciais locais.
-- Manter conectado (`remember`, checkbox): opcional. O valor é persistido somente na memória do formulário; atualmente não altera o comportamento do backend.
-- Links auxiliares: “Esqueceu a senha?” (sem handler implementado) e “Registrar novo colaborador” (link passivo).
+Objetivo
+-------
+- Autentica usuÃ¡rios atravÃ©s do Supabase Auth antes de conceder acesso a qualquer rota protegida (`ProtectedRoute`).
+- Em caso de sucesso, redireciona para o caminho originalmente solicitado ou `/`.
 
-Validações
-- Front-end: impede submissão se `username` ou `password` estiverem vazios (atributo `required`).
-- AuthContext: lança erro “Informe usuario e senha” caso algum campo falte na chamada a `login()`.
-- Backend (`AuthService.autenticar`):
-  * Verifica presença de ambos os campos.
-  * Compara contra credenciais configuradas via variáveis de ambiente (`APP_USERNAME`, `APP_PASSWORD`).
-  * Retorna erro 401 quando não coincidem.
+Campos do FormulÃ¡rio
+-----------
+- `username` (e-mail, obrigatÃ³rio): usado como identificador do Supabase Auth.
+- `password` (senha, obrigatÃ³rio).
+- `remember` (caixa de seleÃ§Ã£o): atualmente somente na interface do usuÃ¡rio; a persistÃªncia da sessÃ£o do Supabase Ã© gerenciada pela configuraÃ§Ã£o do SDK.
 
-Ações e APIs Consumidas
-- POST `/api/auth/login` (`api.auth.login`).
-  * Payload: `{ "username": string, "password": string }`.
-  * Response: `{ "user": { "username": string, "name": string } }`.
-  * A AuthContext persiste o objeto `user` no `localStorage` sob a chave `api-estoque-auth`.
+ValidaÃ§Ãµes
+-----------
+- Atributos HTML bÃ¡sicos `required` impedem envios vazios.
+- `AuthContext.login` agora:
+* Rejeita quando um dos campos estÃ¡ ausente (`Informe usuÃ¡rio e senha`).
+* Chama `supabase.auth.signInWithPassword`; mensagens de erro do Supabase sÃ£o exibidas para o usuÃ¡rio.
 
-Dados Enviados/Recebidos
-- Envia somente usuário e senha.
-- Recebe objeto `user` com nome amigável; demais dados são guardados localmente sem token.
+Fluxo de Dados
+---------
+- Em caso de sucesso, a sessÃ£o retornada Ã© armazenada pelo Supabase; o perfil analisado Ã© armazenado em cache em `localStorage` (`api-estoque-auth`) para recarga rÃ¡pida.
+- Em caso de falha, Ã© exibido um texto de feedback abaixo do formulÃ¡rio.
 
-Regras de Negócio
-- Autenticação baseada em usuário único configurado em variáveis de ambiente.
-- Nenhum token JWT; a autenticação é mantida via estado em memória/localStorage.
-- Fluxo de redirecionamento: após sucesso, `useNavigate` envia para `location.state.from` ou `/`.
-
-Comportamentos Condicionais da Interface
-- Botão “Entrar” troca label para “Entrando...” enquanto `isSubmitting` é verdadeiro.
-- Feedback de erro exibido quando `login()` rejeita (mensagem recebida do backend).
-- Checkbox “Manter conectado” apenas altera o objeto de formulário.
-
-Dependências e Relações
-- Depende do `AuthProvider` para acessar `login()` e manter o estado de usuário.
-- Páginas seguintes (Dashboard, Estoque, etc.) assumem que `useAuth().user` está preenchido para registrar ações com `usuarioResponsavel`/`usuarioCadastro`.
-
-Persistência / Referência a Banco
-- Não consulta tabelas da aplicação. O backend valida credenciais contra valores em memória (config). As demais entidades não são acionadas.
+Notas de SeguranÃ§a
+--------------
+- Todas as solicitaÃ§Ãµes de API subsequentes dependem do token de acesso do Supabase adicionado automaticamente por `src/services/api.js`.
+- Nenhum endpoint `/api/auth/login` personalizado permanece; a autenticaÃ§Ã£o Ã© totalmente gerenciada pelo Supabase.

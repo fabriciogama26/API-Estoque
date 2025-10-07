@@ -1,0 +1,89 @@
+Guia de Configuração e Validação de RLS
+========================================
+
+Contexto
+-------
+Funções serverless em `api/` usam a chave de função de serviço do Supabase para executar a lógica de negócios. As políticas de Segurança em Nível de Linha (RLS) devem, portanto, garantir que os usuários finais, autenticados com o Supabase Auth, possam acessar apenas as linhas permitidas enquanto a função de serviço continua operando para a lógica de back-end.
+
+Permissões Recomendadas
+-----------------------
+1. `pessoas`
+- `SELECT`: permitir usuários autenticados.
+- `INSERT` / `UPDATE`: restringir a funções administrativas (por exemplo, declarar `is_admin` ou ser membro de uma tabela de permissões dedicada).
+2. `materiais`
+- `SELECT`: usuários autenticados.
+- `INSERT` / `UPDATE`: forneça políticas que verifiquem reivindicações ou associação (`usuarios_permissoes`) antes de permitir gravações.
+3. `material_price_history`
+- `INSERT`: geralmente deve ser permitido apenas para a função de serviço. Adicione uma política que verifique `current_setting('request.jwt.claim.role', true) = 'service_role'`.
+- `SELECT`: usuários autenticados podem ler para auditoria.
+4. `entradas` e `saidas`
+- `SELECT`: usuários autenticados.
+- `INSERT`: limite para operadores responsáveis ​​pelo estoque (por exemplo, associação em `operadores_estoque`).
+- Sempre registre `usuarioResponsavel` usando o e-mail autenticado para rastreabilidade.
+5. `acidentes`
+- `SELECT` / `INSERT`: pessoal de segurança autenticado.
+- `UPDATE`: restrinja ao registrante original ou funções de segurança explícitas.
+
+Criando Políticas
+-----------------
+1. Habilite o RLS:
+```sql
+alter table pessoas enable row level security;
+```
+2. Política de leitura simples:
+```sql
+create policy "authenticated read" on pessoas
+for select using (auth.role() = 'authenticated');
+```
+3. Política de gravação condicional usando declarações personalizadas:
+```sql
+create policy "admins update pessoas" on pessoas
+for update using (
+auth.role() = 'authenticated'
+and coalesce((auth.jwt()->>'is_admin')::bool, false)
+);
+```
+4. Política baseada em associação:
+```sql
+criar política "operadores estoque" em entradas
+para todos usando (
+auth.role() = 'authenticated'
+e exists (
+selecione 1 de operadores_estoque oe
+onde oe.user_id = auth.uid()
+)
+);
+```
+
+Validação Contínua
+---------------------
+- **Testes automatizados**
+- Use o Supabase CLI ou `pgTAP` para simular consultas com diferentes JWTs.
+- Adicione verificações de CI que tentem `SELECT/INSERT/UPDATE` com usuários sem permissões e garanta que falhem.
+- **Testes manuais**
+- Gere tokens de acesso via `supabase.auth.signInWithPassword` para cada função e chame os endpoints `/api/*`.
+- Confirme se chamadas não autorizadas retornam respostas 401/403.
+- **Auditorias**
+- Listar políticas ativas: `select * from pg_policies where schemaname = 'public';`
+- Garantir que as novas tabelas tenham o RLS habilitado antes da implantação em produção.
+- Registrar as alterações nesta pasta para referência futura.
+
+Integração com Rotas Serverless
+----------------------------------
+- Todas as funções usam `requireAuth` para validar o token do portador. Garantir que:
+- Os tokens emitidos pelo usuário nunca incluam o `service_role`.
+- A chave da função de serviço permaneça apenas no lado do servidor.
+- Para operações críticas (ajustes de estoque, atualizações de acidentes), verifique se as regras de negócios ainda são executadas com o RLS habilitado. Se necessário, adicione políticas explícitas concedendo acesso à função de serviço (por exemplo, `FORCE ROW LEVEL SECURITY` mais uma política de serviço).
+
+Lista de Verificação de Implantação
+--------------------
+1. Aplicar ou atualizar políticas para cada tabela acessada pelo aplicativo.
+2. Execute testes de permissão automatizados e manuais para `pessoas`, `materiais`, `entradas`, `saidas`, `estoque` e `acidentes`.
+3. Documente os resultados e atualizações em `docs/`.
+4. Revise as políticas sempre que novas rotas ou tabelas forem introduzidas.
+
+Referências
+----------
+- Guia RLS do Supabase: https://supabase.com/docs/guides/auth/row-level-security
+- Declarações personalizadas: https://supabase.com/docs/guides/auth/custom-claims
+- Testes da CLI do Supabase: https://supabase.com/docs/guides/cli/local-testing

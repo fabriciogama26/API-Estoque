@@ -1,53 +1,40 @@
-VISAO GERAL
-- Tela de cadastro e manutencao de pessoas, integrando formularios, filtros, tabela e historico de edicoes.
-- Consome a API de pessoas para criar, atualizar e recuperar registros, alem de exibir o historico de alteracoes por colaborador.
+Overview
+========
+- Comprehensive screen for managing collaborators (pessoas) including CRUD, filtering, and history timeline.
+- Uses Supabase-backed serverless endpoints guarded by Supabase Auth tokens.
 
-FUNCIONALIDADES PRINCIPAIS
-- Cadastro de novas pessoas com campos obrigatorios (nome, matricula, local, cargo).
-- Edicao de registros existentes com preenchimento automatico do formulario.
-- Filtros por termo, local e cargo aplicados em memoria.
-- Visualizacao de historico de edicoes em modal com cache local por pessoa.
+Key Operations
+--------------
+1. **Create**
+   - Form collects `nome`, `matricula`, `local`, `cargo`.
+   - Submits to `POST /api/pessoas`.
+   - Backend validates required fields, enforces unique matricula, and stores audit info (`usuarioCadastro`, timestamps) in Supabase.
 
-FLUXO DE USUARIO
-1. Usuario autenticado acessa /cadastros/pessoas.
-2. Formulario inicial permite cadastrar nova pessoa; salvar executa POST /api/pessoas.
-3. Tabela lista registros com botoes para editar ou abrir historico.
-4. Edicao preenche formulario, salva via PUT /api/pessoas/:id e registra historico.
-5. Botao de historico abre modal com linha do tempo de alteracoes (carregada da API e cacheada em memoria).
-6. Filtros opcionais refinam a listagem sem novas requisicoes.
+2. **Update**
+   - Editing pulls the selected row into the form.
+   - `PUT /api/pessoas/:id` updates the record and appends history entries (`historicoEdicao`) when values change.
+   - History captures `usuarioResponsavel`, `dataEdicao`, and before/after values.
 
-ESTADOS E PROPS
-- form: estado local com campos do formulario.
-- filters: estado local com termo/local/cargo.
-- pessoas: lista carregada da API.
-- editingPessoa: referencia da pessoa em edicao ou null.
-- historyCache: objeto id -> historico para evitar fetch repetido.
-- historyState: estado composto { open, pessoa, registros, isLoading, error } para o modal.
-- isLoading / isSaving: flags de carregamento da lista e do submit.
-- error: mensagem exibida no formulario quando requisicoes falham.
-- Componentes recebem props especificas (PessoasForm, PessoasFilters, PessoasTable, PessoasHistoryModal, PessoasActions).
+3. **History Modal**
+   - `GET /api/pessoas/:id/historico-edicoes` returns the JSON array stored in Supabase.
+   - Modal caches history per pessoa and displays a vertical timeline.
 
-REGRAS DE NEGOCIO
-- Payloads sao normalizados por createPessoaPayload/updatePessoaPayload (trim, usuario responsavel).
-- Filtros respeitam combinacoes de local/cargo e termo sobre campos relevantes.
-- Historico de edicoes guarda usuario responsavel e campos alterados (origem/destino) ordenados por data.
+4. **Filtering and Sorting**
+   - Client-side filtering by term, local, and cargo (`PessoasRules.filterPessoas`).
+   - Sorting by name for stable table ordering.
 
-INTEGRACOES
-- api.pessoas.list(): lista registros.
-- api.pessoas.create(): cria nova pessoa.
-- api.pessoas.update(): atualiza pessoa existente.
-- api.pessoas.history(): retorna historico de edicoes.
-- useAuth(): informa usuario autenticado para registrar usuarioCadastro/usuarioResponsavel.
+Validations
+-----------
+- Front-end uses required inputs while backend revalidates.
+- Duplicate matricula results in HTTP 409 from the serverless handler.
 
-COMPONENTES INTERNOS
-- PessoasForm: formulario de cadastro/edicao.
-- PessoasFilters: filtros de termo/local/cargo.
-- PessoasTable: tabela de resultados com coluna de acoes.
-- PessoasActions: botoes de editar e historico por linha.
-- PessoasHistoryModal: modal sobreposto com estado de carregamento/erro.
-- PessoasHistoryTimeline: lista formatada de registros de historico.
+Supabase Tables
+---------------
+- `pessoas`: main entity including `historicoEdicao` JSONB column.
+- Related tables (saidas, acidentes) reference `pessoas.id`.
 
-TRATAMENTO DE ERROS
-- Erros de carregamento/salvamento atualizam `error` e exibem feedback no formulario.
-- Erros ao buscar historico atualizam historyState.error e exibem mensagem dedicada no modal.
-- Flags isLoading/isSaving desabilitam botoes e exibem estados "Carregando..." quando aplicavel.
+UI Notes
+--------
+- Action column uses `PessoasActions` to trigger edit and history view.
+- Error states are displayed within the form or modal based on the failing action.
+- Manual refresh button reissues `GET /api/pessoas` for latest data.

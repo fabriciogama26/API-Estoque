@@ -1,56 +1,41 @@
 Tela: Estoque Atual
-------------------------------
-Finalidade
-- Permitir que o operador acompanhe o saldo atual de materiais, visualize alertas de estoque mínimo e ajuste rapidamente o parâmetro de estoque mínimo sem acessar a tela de cadastro de materiais.
+======================
 
-Campos e Filtros
-- Ano (`ano`, número, opcional): filtra o snapshot retornado pelo backend considerando apenas movimentações do ano informado.
-- Mês (`mes`, 1-12, opcional): refina o filtro por mês. Pode ser usado isoladamente ou com ano.
-- Material ou fabricante (`termo`, texto, opcional): filtro client-side aplicado às listas e alertas exibidos.
-- Estoque mínimo (editor inline por material): campo numérico renderizado dentro da listagem para atualização direta.
+Objetivo
+-------
+- Monitorar o estoque atual por material, visualizar alertas automÃ¡ticos e permitir atualizaÃ§Ãµes em linha para o limite mÃ­nimo de estoque.
+- Todos os dados agora fluem por rotas serverless suportadas pela Supabase.
 
-Validações
-- Filtros usam validação nativa dos inputs (`type="number"`, `min`, `max`).
-- Edição de estoque mínimo:
-  * Não aceita campo vazio (mensagem “Informe um valor”).
-  * Converte para `Number` e rejeita valores negativos ou não numéricos (mensagem “Valor inválido”).
-  * Ignora submissão se o valor não mudou em relação ao estoque atual.
-- Backend (`materialRules.validarEstoqueMinimo`) reforça que o número seja >= 0.
+Filtros
+-------
+- `ano` / `mes` (nÃºmeros, opcional): encaminhado para `GET /api/estoque` para recalcular os saldos do perÃ­odo selecionado.
+- `termo` (string, opcional): filtro do lado do cliente para listas de alertas e itens.
 
-APIs e Ações
-1. GET `/api/estoque?ano=&mes=` (`api.estoque.current`)
-   - Query strings opcionais: `ano`, `mes`.
-   - Response: `{ itens: [{ materialId, nome, fabricante, validadeDias, ca, valorUnitario, quantidade, estoqueAtual, valorTotal, estoqueMinimo, alerta }], alertas: [...] }`.
-2. PUT `/api/materiais/:id` (`api.materiais.update`)
-   - Payload enviado ao salvar estoque mínimo: `{ estoqueMinimo: number, usuarioResponsavel: string }`.
-   - Response: material atualizado (conforme `MaterialService.atualizarMaterial`).
+Editor Em Linha
+-------------
+- Cada linha expÃµe um `estoqueMinimo` editÃ¡vel.
+- Os valores devem ser numÃ©ricos e >= 0; envios vazios sÃ£o rejeitados antes de atingir a API.
+- Salvar gatilhos `PUT /api/materiais/:id` com `{ estoqueMinimo, usuarioResponsavel }`.
 
-Dados Enviados/Recebidos
-- Envia parâmetros de filtro ao carregar dados.
-- Ao salvar estoque mínimo envia o valor convertido e `usuarioResponsavel` derivado do usuário logado.
-- Recebe lista de itens com indicadores de alerta e informações financeiras (valor unitário e total) usadas para exibição e cálculo client-side (total geral, déficit em alertas).
+APIs
+----
+- `GET /api/estoque?ano=&mes=` retorna `{ itens, alertas }` apÃ³s a agregaÃ§Ã£o do Supabase.
+- `PUT /api/materiais/:id` atualiza o registro de material; o histÃ³rico do Supabase Ã© gerenciado pelo auxiliar de backend quando outros campos sÃ£o alterados.
 
-Regras de Negócio
-- Backend determina `alerta` comparando `quantidade` x `estoqueMinimo` (`estoqueRules.verificarEstoqueMinimo`).
-- A edição de estoque mínimo dispara histórico de preços apenas quando valor unitário muda (regra do MaterialService); estoque mínimo altera somente atributo `estoqueMinimo`.
-- A tela recalcula `totalValor` somando `valorTotal` de cada item filtrado.
-- `handleMinStockSave` resetará histórico de caches (`setHistories({})`) para evitar exibição defasada após edição.
+Regras de NegÃ³cios
+--------------
+- Os alertas sÃ£o produzidos no lado do servidor via `verificarEstoqueMinimo`.
+- Os saldos de estoque dependem dos dados do Supabase (`entradas`, `saidas`, `materiais`) e sÃ£o recalculados a cada solicitaÃ§Ã£o.
+- O salvamento em linha limpa o histÃ³rico em cache para que outras visualizaÃ§Ãµes busquem valores atualizados.
 
-Comportamentos de UI
-- Botões “Aplicar filtros”/“Limpar filtros” executam nova chamada ao backend.
-- Listagem de alertas exibe badges e destaca déficit calculado localmente.
-- Lista de itens usa `list__item--alert` para sinalizar materiais abaixo do mínimo.
-- Editor inline desabilita campo e botão enquanto `savingMinStock[materialId]` estiver ativo, exibindo feedback textual (“Salvando...” ).
-- Mensagens de erro específicas por item (`minStockErrors`) e gerais (`error`) são mostradas conforme validações.
+Comportamento da IU
+------------
+- Os botÃµes exibem carregadores textuais (`Filtrando...`, `Salvando...`) e desabilitam entradas enquanto aguardam respostas.
+- A lista de alertas exibe informaÃ§Ãµes de dÃ©ficit derivadas do payload no lado do cliente.
+- Erros gerais e por item sÃ£o exibidos nas respostas da API.
 
-Dependências
-- Requer que existam materiais cadastrados; alertas e edição dependem dos registros retornados por `/api/estoque`.
-- Atualizações de estoque mínimo impactam todas as telas que exibem materiais (Dashboard, Entradas/Saídas).
-- Depende de autenticação para registrar `usuarioResponsavel` no PUT.
-
-Persistência / Banco
-- GET `/api/estoque` agrega dados de:
-  * `Material` (campos: id, nome, fabricante, validadeDias, ca, valorUnitario, estoqueMinimo, ativo, usuarioCadastro).
-  * Movimentações (`EntradaMaterial`, `SaidaMaterial`) para calcular saldo e `valorTotal`.
-- PUT `/api/materiais/:id` altera registro da tabela/coleção `Material` no repositório em memória via `MaterialRepository.update`.
-- Alertas derivam do cálculo `estoqueRules.verificarEstoqueMinimo` aplicando lógica de negócio definida nos services.
+DependÃªncias
+------------
+- Requer sessÃ£o autenticada do Supabase (token gerenciado por `src/services/api.js`).
+- Impacta outras telas (Painel, SaÃ­das) apÃ³s o ajuste de `estoqueMinimo`.
+- Utiliza contexto de autenticaÃ§Ã£o compartilhado para resolver o usuÃ¡rio atual para campos de auditoria.

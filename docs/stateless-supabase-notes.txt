@@ -1,58 +1,51 @@
-Stateless migration notes for Supabase + Vercel
-===============================================
+Notas de Migração Stateless
+===========================
 
-Arquitetura geral
-- Frontend (Vite/React) roda como deploy estático na Vercel.
-- Todas as operações de dados ocorrem diretamente no Supabase via SDK JavaScript.
-- Não há servidor Node dedicado; cada ação é stateless e reavalia os dados a partir do banco.
+Visão Geral da Arquitetura
+---------------------
+- O frontend (Vite/React) é implantado como ativos estáticos no Vercel.
+- Funções serverless em `api/` expõem endpoints REST, executam validações e interagem com o Supabase usando a chave de função de serviço.
+- Cada solicitação reconstrói o estado do Supabase; nenhum processo Node de longa duração é necessário.
+- O frontend conecta os usuários via Supabase Auth e envia `Authorization: Bearer <token>` para cada chamada de API.
 
-Variáveis de ambiente necessárias
-- VITE_SUPABASE_URL: URL do projeto Supabase.
-- VITE_SUPABASE_ANON_KEY: chave pública (anon) com permissões RLS configuradas.
-- Para ambientes locais, defina estas variáveis em `.env.local`.
+Variáveis ​​de Ambiente
+---------------------
+- `VITE_SUPABASE_URL`: URL pública do Supabase para o navegador.
+- `VITE_SUPABASE_ANON_KEY`: chave anônima com políticas RLS para o frontend.
+- `SUPABASE_URL`: mesma URL, disponível para as funções serverless.
 
-Modelagem esperada no Supabase
-- pessoas(id uuid pk, nome text, matricula text unique, local text, cargo text, usuarioCadastro text,
-  usuarioEdicao text, criadoEm timestamp, atualizadoEm timestamp, historicoEdicao jsonb).
-- materiais(id uuid pk, nome text, fabricante text, validadeDias int, ca text, valorUnitario numeric,
-  estoqueMinimo numeric, ativo boolean, usuarioCadastro text, usuarioAtualizacao text, dataCadastro timestamp,
-  atualizadoEm timestamp).
-- material_price_history(id uuid pk, materialId uuid fk, valorUnitario numeric,
-  usuarioResponsavel text, criadoEm timestamp).
-- entradas(id uuid pk, materialId uuid fk, quantidade numeric, dataEntrada timestamp,
-  usuarioResponsavel text).
-- saidas(id uuid pk, materialId uuid fk, pessoaId uuid fk, quantidade numeric,
-  dataEntrega timestamp, dataTroca timestamp, status text, usuarioResponsavel text).
-- acidentes(id uuid pk, matricula text, nome text, cargo text, data timestamp,
-  diasPerdidos numeric, diasDebitados numeric, tipo text, agente text, cid text,
-  lesao text, parteLesionada text, setor text, local text, cat text, observacao text,
-  criadoEm timestamp, atualizadoEm timestamp).
-- Ajuste nomes/colunas se necessário, mantendo correspondência com o código.
+- `SUPABASE_SERVICE_ROLE_KEY`: chave de função de serviço usada apenas por código serverless.
+- Defina valores localmente em `.env.local` e implante-os com `vercel env`.
 
-Regras de negócio implementadas no client
-- Pessoas: valida campos obrigatórios e impede matrícula duplicada antes de gravar. Atualizações
-  registram histórico de edições (json) com os campos alterados e usuário responsável.
-- Materiais: valida dados obrigatórios, evita duplicidades por nome+fabricante e registra
-  histórico de preço em `material_price_history` sempre que o valor unitário for alterado.
-- Entradas: exige material válido, quantidade positiva e normaliza data; salva usuário responsável.
-- Saídas: valida pessoa e material, recalcula saldo atual somando entradas - saídas no Supabase,
-  bloqueia operação quando não há estoque e calcula `dataTroca` com base em validade em dias.
-- Estoque/Dashboard: monta visão agregada lendo materiais, entradas, saídas (e pessoas para
-  enriquecimento), filtrando por período (ano/mês ou intervalo) e recalculando saldos,
-  históricos e alertas a cada requisição, mantendo comportamento estateless.
-- Acidentes: normaliza strings, garante presença de dados obrigatórios, busca pessoa por
-  matrícula para preencher dados faltantes e mantém campos numéricos não negativos.
+Expectativas do esquema Supabase
+----------------------------
+- `pessoas(id uuid pk, nome text, matricula text unique, local text, cargo text, usuarioCadastro text, usuarioEdicao text, criadoEm timestamp, atualizarEm timestamp, historicoEdicao jsonb)`
+- `materiais(id uuid pk, nome text, fabricante text, validadeDias int, ca text, valorUnitario numeric, estoqueMinimo numeric, ativo boolean, usuarioCadastro text, usuarioAtualizacao text, dataCadastro timestamp, atualizarEm timestamp)`
+- `material_price_history(id uuid pk, materialId uuid fk, valorUnitario numérico, usuarioResponsavel text, criadoEm timestamp)`
+- `entradas(id uuid pk, materialId uuid fk, quantidade numérica, dataEntrada timestamp, usuarioResponsavel texto)`
+- `saidas(id uuid pk, materialId uuid fk, pessoaId uuid fk, quantidade numérica, dataEntrega timestamp, dataTroca timestamp, status text, usuarioResponsavel text)`
+- `acidentes(id uuid pk, matricula text, nome text, cargo text, data timestamp, diasPerdidos numeric, diasDebitados numeric, tipo text, agente text, cid text, lesao text, parteLesionada text, setor text, local text, cat text, observacao text, criadoEm timestamp, atualizadoEm timestamp)`
+
+Destaques da lógica de negócios
+-------------------------
+- O middleware `withAuth` valida o token Supabase e injeta o usuário autenticado em cada manipulador.
+- Pessoas: campos obrigatórios, matrícula única, histórico de edições armazenado em `historicoEdicao`.
+- Materiais: valida insumos, evita duplicatas, registra histórico de preços quando o valor muda.
+- Entradas: garante a existência de material, a quantidade é positiva e captura o usuário responsável.
+- Saídas: verifica pessoa/material, valida o estoque disponível, calcula `dataTroca`.
+- Estoque/Painel: auxiliares sem estado recalculam saldos, alertas e agregações para cada solicitação.
+- Acidentes: limpa entradas, garante campos obrigatórios, busca pessoa por matrícula e previne contadores negativos.
 
 Recomendações de RLS
-- Pessoas, materiais, entradas, saídas e acidentes devem ter políticas permitindo acesso somente
-  a usuários autenticados (`auth.uid()`).
-- Para tabelas de histórico, permita insert/read conforme necessidade administrativa.
-- Opcionalmente crie views ou stored procedures para agregações se o volume crescer.
+-------------------
+- Habilite o RLS em todas as tabelas e permita acesso somente quando `auth.uid()` estiver presente.
+- Como o código serverless usa a função de serviço, adicione proteções adicionais (reivindicações, tabelas de referência) ao restringir por usuário ou equipe.
+- Considere visualizações ou procedimentos armazenados para relatórios pesados.
 
-Próximos passos sugeridos
-- Configurar Supabase Auth com provedores desejados e garantir que o usuário usado na aplicação
-  possa executar os CRUDs sob as regras RLS.
-- Popular tabelas iniciais (materiais/pessoas) para validar cálculos.
-- Automatizar migração dos dados anteriores (se existirem) usando scripts ou `.sql`.
-- Monitorar limites de tempo das consultas no browser e considerar rotinas serverless se a lógica
-  ficar pesada ou exigir chaves de serviço.
+Próximos Passos
+----------
+- Configure os provedores de Autenticação do Supabase e alinhe as políticas de RLS com as funções do aplicativo.
+- Crie tabelas base (pessoas, materiais) para exercitar os fluxos.
+- Versione o esquema usando migrações do Supabase ou arquivos SQL.
+- Monitorar o tempo das funções do Vercel e otimizar ou armazenar em cache quando necessário.
+- Auditar as políticas de RLS periodicamente e documentar as alterações em `docs/`.

@@ -1,43 +1,65 @@
-Tela: Cadastro de Pessoas
-------------------------------
-Finalidade
-- Registrar colaboradores que receber„o EPIs, permitindo sua seleÁ„o na tela de saÌdas e mantendo trilha de quem cadastrou cada registro.
+Tela: Pessoas
+=================
 
-Campos do Formul·rio
-- Nome* (`nome`, texto): obrigatÛrio.
-- MatrÌcula* (`matricula`, texto): obrigatÛrio, identifica colaborador.
-- Local* (`local`, texto): obrigatÛrio, unidade/ setor.
-- Cargo* (`cargo`, texto): obrigatÛrio.
+Objetivo
+-------
+- Gerenciar colaboradores para distribui√ß√£o de EPI e manter um registro de auditoria das edi√ß√µes.
 
-ValidaÁıes
-- Front-end: todos os inputs possuem `required`.
-- Backend (`pessoaRules.validarPessoa`) garante que todos os campos existam e estejam com trim n„o vazio.
+APIs
+----
+- `GET /api/pessoas`
+- `POST /api/pessoas`
+- `PUT /api/pessoas/:id`
+- `GET /api/pessoas/:id/historico-edicoes`
 
-APIs e AÁıes
-1. GET `/api/pessoas` (`api.pessoas.list`): carrega listagem exibida.
-2. POST `/api/pessoas` (`api.pessoas.create`): payload `{ nome, matricula, local, cargo, usuarioCadastro }`.
-3. GET `/api/pessoas/:id` (n„o usada na tela, mas disponÌvel via serviÁo para detalhes).
+Regras
+-----
+- O backend serverless imp√µe campos obrigat√≥rios e matr√≠cula √∫nica.
+- As entradas do hist√≥rico s√£o anexadas automaticamente quando os dados s√£o alterados.
 
-Dados Enviados/Recebidos
-- Payload inclui `usuarioCadastro` preenchido com `useAuth().user` ou fallback `'sistema'`.
-- Response do POST retorna o objeto `Pessoa` recÈm inserido (id, nome, matricula, local, cargo, usuarioCadastro, criadoEm).
-- Listagem mostra campos persistidos e data formatada.
+Destaques da IU
+-------------
+- Os filtros para termo/local/carga s√£o executados no lado do cliente.
+- O modal de hist√≥rico armazena em cache as respostas por pessoa para reaberturas mais r√°pidas.
+- O bot√£o Atualizar consulta novamente o Supabase pela rota serverless.
 
-Regras de NegÛcio
-- Nenhuma verificaÁ„o de duplicidade de matrÌcula È aplicada; responsabilidade do operador.
-- Pessoas podem ter nomes duplicados; identificaÁ„o formal ocorre via ID interno.
-- Outras telas (SaÌdas) dependem destas pessoas para registrar entregas de EPIs.
+Vis√£o geral
+========
+- Tela abrangente para gerenciar colaboradores (pessoas), incluindo CRUD, filtragem e linha do tempo do hist√≥rico.
+- Utiliza endpoints serverless suportados pelo Supabase e protegidos por tokens de autentica√ß√£o do Supabase.
 
-Comportamentos de UI
-- Bot„o ìSalvar pessoaî alterna label para ìSalvando...î durante requisiÁıes.
-- Bot„o ìAtualizarî refaz GET `/api/pessoas` manualmente.
-- Mensagem de erro global È renderizada acima dos botıes ao receber mensagens do backend.
+Opera√ß√µes principais
+--------------
+1. **Criar**
+- O formul√°rio coleta `nome`, `matricula`, `local` e `cargo`.
+- Envia para `POST /api/pessoas`.
+- O backend valida os campos obrigat√≥rios, aplica matr√≠cula exclusiva e armazena informa√ß√µes de auditoria (`usuarioCadastro`, registros de data e hora) no Supabase.
 
-DependÍncias
-- Depende do contexto de autenticaÁ„o para registrar `usuarioCadastro`.
-- Tela de SaÌdas exige que haja pessoas cadastradas; caso contr·rio o select fica vazio.
+2. **Atualizar**
+- A edi√ß√£o puxa a linha selecionada para o formul√°rio.
+- `PUT /api/pessoas/:id` atualiza o registro e adiciona entradas de hist√≥rico (`historicoEdicao`) quando os valores s√£o alterados.
+- O hist√≥rico captura `usuarioResponsavel`, `dataEdicao` e valores antes/depois.
 
-PersistÍncia / Banco
-- Entidade `Pessoa` armazenada via `PessoaRepository` (campos: id, nome, matricula, local, cargo, usuarioCadastro, criadoEm).
-- `PessoaService` escreve na coleÁ„o in-memory com IDs UUID.
-- N„o h· relacionamentos diretos alÈm do uso de `pessoaId` pela entidade `SaidaMaterial`.
+3. **Modal de Hist√≥rico**
+- `GET /api/pessoas/:id/historico-edicoes` retorna o array JSON armazenado no Supabase.
+- O modal armazena em cache o hist√≥rico por pessoa e exibe uma linha do tempo vertical.
+
+4. **Filtragem e Classifica√ß√£o**
+- Filtragem do lado do cliente por termo, local e cargo (`PessoasRules.filterPessoas`).
+- Classifica√ß√£o por nome para uma ordena√ß√£o est√°vel das tabelas.
+
+Valida√ß√µes
+-----------
+- O frontend usa as entradas necess√°rias enquanto o backend revalida.
+- Resultados de matr√≠cula duplicados em HTTP 409 do manipulador serverless.
+
+Tabelas do Supabase
+---------------
+- `pessoas`: entidade principal incluindo a coluna JSONB `historicoEdicao`.
+- Tabelas relacionadas (saidas, acidentes) referenciam `pessoas.id`.
+
+Notas da IU
+--------
+- A coluna A√ß√£o usa `PessoasActions` para acionar a edi√ß√£o e a visualiza√ß√£o do hist√≥rico.
+- Os estados de erro s√£o exibidos no formul√°rio ou modal com base na a√ß√£o com falha.
+- O bot√£o de atualiza√ß√£o manual emite novamente `GET /api/pessoas` para os dados mais recentes.
