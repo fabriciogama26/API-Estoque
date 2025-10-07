@@ -1,0 +1,173 @@
+/* Container geral */
+.login-auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--color-bg-gradient); /* fundo do tema SST */
+}
+
+/* Card */
+.login-auth-card {
+  width: min(420px, 100%);
+  background: linear-gradient(160deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  border-radius: 1.5rem;
+  padding: 2.5rem;
+  box-shadow: 0 40px 80px rgba(15, 67, 50, 0.55);
+  border: 1px solid rgba(22, 163, 74, 0.35); /* verde borda */
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  color: #f8fafc;
+  position: relative;
+}
+
+.login-auth-card--neon::before {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border-radius: 1.8rem;
+  background: linear-gradient(160deg, rgba(34, 197, 94, 0.6), rgba(14, 116, 144, 0.6));
+  filter: blur(30px);
+  opacity: 0.6;
+  z-index: -1;
+}
+
+/* Logo */
+.login-auth-card__logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.65rem;
+}
+
+.login-auth-card__logo img {
+  max-width: 140px;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Títulos */
+.login-auth-card__titles {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.login-auth-card__kicker {
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(226, 232, 240, 0.9);
+}
+.login-auth-card__kicker::before {
+  content: "Portal SST – Gestão de Segurança";
+}
+
+.login-auth-card__titles h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  color: #f0fdf4; /* verde claro */
+}
+
+.login-auth-card__subtitle {
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 0.9rem;
+}
+
+/* Campos */
+.login-field--panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.login-field--panel span {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.login-field__panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.95rem;
+  background: rgba(248, 250, 252, 0.95);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-field__panel svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--color-primary); /* ícone verde segurança */
+}
+
+.login-field__panel input {
+  border: none;
+  background: transparent;
+  flex: 1;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.login-field__panel input::placeholder {
+  color: rgba(100, 116, 139, 0.65);
+}
+
+.login-field__panel:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+}
+
+/* Opções */
+.login-auth-card__options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.85);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.login-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.login-checkbox input {
+  accent-color: var(--color-accent); /* azul petróleo */
+}
+
+/* Botão principal */
+.login-button--neon {
+  width: 100%;
+  border: none;
+  border-radius: 0.9rem;
+  background: #fff;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  padding: 0.95rem 1rem;
+  box-shadow: 0 24px 40px rgba(22, 163, 74, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login-button--neon:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+/* Rodapé */
+.login-auth-card__footer {
+  text-align: center;
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.72);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}

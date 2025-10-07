@@ -1,0 +1,24 @@
+﻿:root {
+  --color-primary: #16a34a;
+  --color-primary-dark: #15803D;
+  --color-accent: #0E7490;    
+  --color-warning: #facc15;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-muted: #64748B;
+  --color-text: #1E293B;
+  --color-border: #e2e8f0;
+  --color-card: #ffffff;
+  --color-bg: #f9fafb;
+  --color-bg-alt: #f3f4f6;
+  --color-bg-light: #eef2ff;
+  --color-bg-gradient: radial-gradient(circle at top, #e6f9f0, #dbeafe 100%);
+  --color-bg-dark: rgba(15, 23, 42, 0.12);
+  --color-sidebar-text: rgba(226, 232, 240, 0.85);
+  --color-sidebar-title: rgba(226, 232, 240, 0.7);
+  --color-sidebar-icon: rgba(8, 226, 255, 0.9);
+  --color-sidebar-hover: rgba(37, 99, 235, 0.18);
+  --color-sidebar-active-start: rgba(37, 99, 235, 0.9);
+  --color-sidebar-active-end: rgba(59, 130, 246, 0.75);
+  --color-sidebar-border: rgba(37, 99, 235, 0.9);
+}

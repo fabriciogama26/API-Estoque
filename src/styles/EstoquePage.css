@@ -1,0 +1,171 @@
+/* Lista de alertas */
+.estoque-alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.estoque-alert-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 1rem;
+  background: rgba(220, 38, 38, 0.08); /* vermelho crítico */
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+.estoque-alert-list__material {
+  font-size: 0.85rem;
+  color: rgba(71, 85, 105, 0.85);
+}
+
+.estoque-alert-list__deficit {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+.estoque-alert-list__deficit::before {
+  content: "❌ EPI Crítico – ";
+}
+
+/* Badge */
+.estoque-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(22, 163, 74, 0.1); /* verde normal */
+  color: var(--color-primary-dark);
+}
+
+.estoque-badge--alert {
+  background: rgba(250, 204, 21, 0.25); /* amarelo alerta */
+  color: #92400e;
+  border: 1px solid rgba(250, 204, 21, 0.6);
+}
+.estoque-badge--alert::before {
+  content: "⚠️ Alerta EPI – ";
+}
+
+.estoque-badge--critical {
+  background: rgba(220, 38, 38, 0.2); /* vermelho crítico */
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+}
+.estoque-badge--critical::before {
+  content: "🚨 Crítico – ";
+}
+
+/* Lista genérica */
+.estoque-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.estoque-list__item {
+  background: rgba(248, 250, 252, 0.95);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.estoque-list__item--alert {
+  border-color: rgba(250, 204, 21, 0.6); /* amarelo */
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
+}
+.estoque-list__item--alert::before {
+  content: "⚠️ Estoque Baixo de EPI – ";
+  font-weight: 600;
+  color: var(--color-warning);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.estoque-list__item--critical {
+  border-color: rgba(220, 38, 38, 0.6); /* vermelho crítico */
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
+}
+.estoque-list__item--critical::before {
+  content: "🚨 Estoque Crítico de EPI – ";
+  font-weight: 700;
+  color: var(--color-danger);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.estoque-list__item-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.estoque-list__item-header h3 {
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.estoque-list__item-header p {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.estoque-list__item-meta {
+  display: flex;
+  gap: 0.5rem 1.5rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.estoque-list__item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.estoque-list__item-min-stock {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.estoque-list__item-min-stock label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.estoque-list__item-min-stock input {
+  width: 6rem;
+}
+
+.estoque-list__item-min-stock button {
+  padding: 0.35rem 0.75rem;
+}
+
+.estoque-list__item-error {
+  color: var(--color-danger);
+  font-size: 0.8rem;
+}
+.estoque-list__item-error::before {
+  content: '⚠️ Erro de Cadastro EPI – ';
+  margin-right: 0.25rem;
+}

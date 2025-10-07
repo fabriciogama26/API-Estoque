@@ -1,0 +1,149 @@
+/* Histórico */
+.materiais-data-table__history {
+  background: var(--color-bg-alt);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.materiais-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.materiais-history-list li {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  flex-wrap: wrap;
+}
+
+/* Variantes para destacar status no histórico - adaptadas SST */
+.materiais-history-list li.ok {
+  color: var(--color-primary-dark); /* estoque normal */
+  font-weight: 600;
+}
+.materiais-history-list li.ok::before {
+  content: "✅ Estoque de EPI normal - ";
+}
+
+.materiais-history-list li.warning {
+  color: var(--color-warning); /* estoque baixo */
+  font-weight: 600;
+}
+.materiais-history-list li.warning::before {
+  content: "⚠️ Estoque de EPI baixo - ";
+}
+
+.materiais-history-list li.danger {
+  color: var(--color-danger); /* crítico */
+  font-weight: 600;
+}
+.materiais-history-list li.danger::before {
+  content: "❌ Estoque crítico de EPI - ";
+}
+
+/* Ações */
+.materiais-data-table__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.materiais-table-action-button {
+  border: none;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--color-accent);
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.materiais-table-action-button:hover,
+.materiais-table-action-button:focus-visible {
+  background: var(--color-accent);
+  color: #fff;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.materiais-table-action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.materiais-record-history__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 1000;
+}
+
+.materiais-record-history__modal {
+  background: var(--color-card, #fff);
+  border-radius: 1rem;
+  width: min(520px, 100%);
+  max-height: 80vh;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
+}
+
+.materiais-record-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.materiais-record-history__header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.materiais-record-history__close {
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.materiais-record-history__close:hover,
+.materiais-record-history__close:focus-visible {
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--color-primary-dark);
+  outline: none;
+}
+
+.materiais-record-history__body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.materiais-record-history__body .materiais-history-list {
+  gap: 0.6rem;
+}
