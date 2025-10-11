@@ -5,6 +5,9 @@
   --color-warning: #facc15;
   --color-danger: #dc2626;
   --color-success: #16a34a;
+  --color-info: #3b82f6;
+  --color-muted-dark: #475569;
+  --color-muted-light: #94a3b8;
   --color-muted: #64748B;
   --color-text: #1E293B;
   --color-border: #e2e8f0;
@@ -21,4 +24,6 @@
   --color-sidebar-active-start: rgba(37, 99, 235, 0.9);
   --color-sidebar-active-end: rgba(59, 130, 246, 0.75);
   --color-sidebar-border: rgba(37, 99, 235, 0.9);
+  --color-sidebar-border-hover: rgba(37, 99, 235, 0.75);
+  --color-border-left: rgba(5, 245, 213, 0.75);
 }

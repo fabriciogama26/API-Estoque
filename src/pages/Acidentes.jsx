@@ -4,7 +4,7 @@ import { AlertIcon } from '../components/icons.jsx'
 import { AcidentesForm } from '../components/Acidentes/AcidentesForm.jsx'
 import { AcidentesFilters } from '../components/Acidentes/AcidentesFilters.jsx'
 import { AcidentesTable } from '../components/Acidentes/AcidentesTable.jsx'
-import { api } from '../services/api.js'
+import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ACIDENTES_FORM_DEFAULT, ACIDENTES_FILTER_DEFAULT } from '../config/AcidentesConfig.js'
 import {
@@ -14,7 +14,7 @@ import {
   updateAcidentePayload,
   filterAcidentes,
   extractAgentes,
-  extractSetores,
+  extractCentrosServico,
   extractTipos,
 } from '../rules/AcidentesRules.js'
 
@@ -103,11 +103,14 @@ export function AcidentesPage() {
         if (pessoa) {
           next.nome = pessoa.nome ?? ''
           next.cargo = pessoa.cargo ?? ''
-          next.setor = pessoa.setor ?? ''
-          next.local = pessoa.local ?? ''
+          const centroServico = pessoa.centroServico ?? pessoa.setor ?? pessoa.local ?? ''
+          next.centroServico = centroServico
+          next.setor = centroServico
+          next.local = pessoa.local ?? centroServico
         } else if (!value) {
           next.nome = ''
           next.cargo = ''
+          next.centroServico = ''
           next.setor = ''
           next.local = ''
         }
@@ -115,11 +118,19 @@ export function AcidentesPage() {
       })
       return
     }
+    if (name === 'centroServico') {
+      setForm((prev) => ({ ...prev, centroServico: value, setor: value }))
+      return
+    }
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target
+    if (name === "centroServico") {
+      setFilters((prev) => ({ ...prev, centroServico: value, setor: value }))
+      return
+    }
     setFilters((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -181,8 +192,9 @@ export function AcidentesPage() {
       cid: acidente.cid || '',
       lesao: acidente.lesao || '',
       parteLesionada: acidente.parteLesionada || '',
-      setor: acidente.setor || '',
-      local: acidente.local || '',
+      centroServico: acidente.centroServico || acidente.setor || '',
+      setor: acidente.centroServico || acidente.setor || '',
+      local: acidente.local || acidente.centroServico || '',
       cat: acidente.cat || '',
     })
   }
@@ -197,7 +209,7 @@ export function AcidentesPage() {
   )
 
   const tipos = useMemo(() => extractTipos(acidentes), [acidentes])
-  const setores = useMemo(() => extractSetores(acidentes), [acidentes])
+  const centrosServico = useMemo(() => extractCentrosServico(acidentes), [acidentes])
   const agentes = useMemo(() => extractAgentes(acidentes), [acidentes])
 
   return (
@@ -224,7 +236,7 @@ export function AcidentesPage() {
       <AcidentesFilters
         filters={filters}
         tipos={tipos}
-        setores={setores}
+        centrosServico={centrosServico}
         agentes={agentes}
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}

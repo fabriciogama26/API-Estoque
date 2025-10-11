@@ -1,12 +1,12 @@
-function validarPessoa({ nome, matricula, local, cargo }) {
+function validarPessoa({ nome, matricula, centroServico, cargo }) {
   if (!nome || !nome.trim()) {
     throw new Error('Nome obrigatorio');
   }
   if (!matricula || !matricula.trim()) {
     throw new Error('Matricula obrigatoria');
   }
-  if (!local || !local.trim()) {
-    throw new Error('Local obrigatorio');
+  if (!centroServico || !centroServico.trim()) {
+    throw new Error('Centro de servico obrigatorio');
   }
   if (!cargo || !cargo.trim()) {
     throw new Error('Cargo obrigatorio');

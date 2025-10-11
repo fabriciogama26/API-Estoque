@@ -62,19 +62,81 @@ const trim = (value) => {
 }
 
 function sanitizePessoaPayload(payload = {}) {
+  const centroServico = trim(payload.centroServico ?? payload.local)
   return {
     nome: trim(payload.nome),
     matricula: trim(payload.matricula),
-    local: trim(payload.local),
     cargo: trim(payload.cargo),
+    centroServico,
   }
 }
 
 function validatePessoaPayload(payload) {
-  if (!payload.nome) throw createHttpError(400, 'Nome obrigatório.')
-  if (!payload.matricula) throw createHttpError(400, 'Matrícula obrigatória.')
-  if (!payload.local) throw createHttpError(400, 'Local obrigatório.')
-  if (!payload.cargo) throw createHttpError(400, 'Cargo obrigatório.')
+  if (!payload.nome) throw createHttpError(400, 'Nome obrigat?rio.')
+  if (!payload.matricula) throw createHttpError(400, 'Matr?cula obrigat?ria.')
+  if (!payload.centroServico) throw createHttpError(400, 'Centro de servi?o obrigat?rio.')
+  if (!payload.cargo) throw createHttpError(400, 'Cargo obrigat?rio.')
+}
+
+function mapPessoaRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+  const centroServico = record.centroServico ?? record.local ?? ''
+  return {
+    ...record,
+    centroServico,
+    local: record.local ?? centroServico,
+  }
+}
+
+function mapEntradaRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+  return {
+    ...record,
+    centroCusto: record.centroCusto ?? '',
+    centroServico: record.centroServico ?? '',
+  }
+}
+
+function mapSaidaRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+  return {
+    ...record,
+    centroCusto: record.centroCusto ?? '',
+    centroServico: record.centroServico ?? '',
+  }
+}
+
+function mapAcidenteRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+  const centroServico = record.centroServico ?? record.setor ?? ''
+  return {
+    ...record,
+    centroServico,
+    setor: record.setor ?? centroServico,
+    local: record.local ?? centroServico,
+  }
+}
+
+function normalizePessoaHistorico(lista) {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  return lista.map((registro) => ({
+    ...registro,
+    camposAlterados: Array.isArray(registro.camposAlterados)
+      ? registro.camposAlterados.map((campo) =>
+          campo?.campo === 'local' ? { ...campo, campo: 'centroServico' } : campo
+        )
+      : [],
+  }))
 }
 
 async function ensureMatriculaDisponivel(matricula, ignoreId) {
@@ -152,6 +214,8 @@ function sanitizeEntradaPayload(payload = {}) {
   return {
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
+    centroCusto: trim(payload.centroCusto),
+    centroServico: trim(payload.centroServico),
     dataEntrada: payload.dataEntrada ? new Date(payload.dataEntrada).toISOString() : nowIso(),
     usuarioResponsavel: trim(payload.usuarioResponsavel) || null,
   }
@@ -162,6 +226,8 @@ function validateEntradaPayload(payload) {
   if (Number.isNaN(Number(payload.quantidade)) || Number(payload.quantidade) <= 0) {
     throw createHttpError(400, 'Quantidade deve ser maior que zero.')
   }
+  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatório.')
+  if (!payload.centroServico) throw createHttpError(400, 'Centro de serviço obrigatório.')
   if (payload.dataEntrada && Number.isNaN(Date.parse(payload.dataEntrada))) {
     throw createHttpError(400, 'Data de entrada inválida.')
   }
@@ -172,6 +238,8 @@ function sanitizeSaidaPayload(payload = {}) {
     pessoaId: trim(payload.pessoaId),
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
+    centroCusto: trim(payload.centroCusto),
+    centroServico: trim(payload.centroServico),
     dataEntrega: payload.dataEntrega ? new Date(payload.dataEntrega).toISOString() : nowIso(),
     usuarioResponsavel: trim(payload.usuarioResponsavel) || null,
     status: trim(payload.status) || 'entregue',
@@ -184,6 +252,8 @@ function validateSaidaPayload(payload) {
   if (Number.isNaN(Number(payload.quantidade)) || Number(payload.quantidade) <= 0) {
     throw createHttpError(400, 'Quantidade deve ser maior que zero.')
   }
+  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatório.')
+  if (!payload.centroServico) throw createHttpError(400, 'Centro de serviço obrigatório.')
   if (payload.dataEntrega && Number.isNaN(Date.parse(payload.dataEntrega))) {
     throw createHttpError(400, 'Data de entrega inválida.')
   }
@@ -197,6 +267,8 @@ const sanitizeOptional = (value) => {
 }
 
 function sanitizeAcidentePayload(payload = {}) {
+  const centroServico = trim(payload.centroServico ?? payload.setor)
+  const local = trim(payload.local)
   return {
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
@@ -206,8 +278,8 @@ function sanitizeAcidentePayload(payload = {}) {
     agente: trim(payload.agente),
     lesao: trim(payload.lesao),
     parteLesionada: trim(payload.parteLesionada),
-    setor: trim(payload.setor),
-    local: trim(payload.local),
+    centroServico,
+    local: local || centroServico,
     diasPerdidos:
       payload.diasPerdidos !== undefined && payload.diasPerdidos !== null
         ? Number(payload.diasPerdidos)
@@ -223,18 +295,25 @@ function sanitizeAcidentePayload(payload = {}) {
 }
 
 function validateAcidentePayload(payload) {
-  if (!payload.matricula) throw createHttpError(400, 'Matrícula obrigatória.')
-  if (!payload.nome) throw createHttpError(400, 'Nome obrigatório.')
-  if (!payload.cargo) throw createHttpError(400, 'Cargo obrigatório.')
-  if (!payload.tipo) throw createHttpError(400, 'Tipo de acidente obrigatório.')
-  if (!payload.agente) throw createHttpError(400, 'Agente causador obrigatório.')
-  if (!payload.lesao) throw createHttpError(400, 'Lesão obrigatória.')
-  if (!payload.parteLesionada) throw createHttpError(400, 'Parte lesionada obrigatória.')
-  if (!payload.setor) throw createHttpError(400, 'Setor obrigatório.')
-  if (!payload.local) throw createHttpError(400, 'Local obrigatório.')
+  if (!payload.matricula) throw createHttpError(400, 'Matr�cula obrigat�ria.')
+  if (!payload.nome) throw createHttpError(400, 'Nome obrigat�rio.')
+  if (!payload.cargo) throw createHttpError(400, 'Cargo obrigat�rio.')
+  if (!payload.tipo) throw createHttpError(400, 'Tipo de acidente obrigat�rio.')
+  if (!payload.agente) throw createHttpError(400, 'Agente causador obrigat�rio.')
+  if (!payload.lesao) throw createHttpError(400, 'Les�o obrigat�ria.')
+  if (!payload.parteLesionada) throw createHttpError(400, 'Parte lesionada obrigat�ria.')
+  if (!payload.centroServico) throw createHttpError(400, 'Centro de servi�o obrigat�rio.')
+  if (!payload.local) throw createHttpError(400, 'Local obrigat�rio.')
   if (!payload.data || Number.isNaN(Date.parse(payload.data))) {
-    throw createHttpError(400, 'Data do acidente obrigatória.')
+    throw createHttpError(400, 'Data do acidente obrigat�ria.')
   }
+  if (Number.isNaN(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
+    throw createHttpError(400, 'Dias perdidos deve ser zero ou positivo.')
+  }
+  if (Number.isNaN(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
+    throw createHttpError(400, 'Dias debitados deve ser zero ou positivo.')
+  }
+}
   if (Number.isNaN(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
     throw createHttpError(400, 'Dias perdidos deve ser zero ou positivo.')
   }
@@ -254,13 +333,14 @@ async function obterPessoaPorMatricula(matricula) {
   if (!matricula) {
     return null
   }
-  return executeMaybeSingle(
+  const pessoa = await executeMaybeSingle(
     supabaseAdmin.from('pessoas').select('*').eq('matricula', matricula).limit(1),
-    'Falha ao consultar pessoa por matrícula.'
+    'Falha ao consultar pessoa por matr�cula.'
   )
+  return mapPessoaRecord(pessoa)
 }
 
-async function obterMaterialPorId(id) {
+async function obterMaterialPorId(id)(id) {
   if (!id) {
     return null
   }
@@ -336,7 +416,12 @@ async function carregarMovimentacoes(params) {
     execute(saidasFiltered, 'Falha ao listar saídas.'),
   ])
 
-  return { materiais, entradas, saidas, periodo }
+  return {
+    materiais,
+    entradas: (entradas ?? []).map(mapEntradaRecord),
+    saidas: (saidas ?? []).map(mapSaidaRecord),
+    periodo,
+  }
 }
 
 async function calcularSaldoMaterialAtual(materialId) {
@@ -356,12 +441,12 @@ async function calcularSaldoMaterialAtual(materialId) {
 
 export const PessoasOperations = {
   async list() {
-    return (
+    const pessoas =
       (await execute(
         supabaseAdmin.from('pessoas').select('*').order('nome'),
         'Falha ao listar pessoas.'
       )) ?? []
-    )
+    return pessoas.map(mapPessoaRecord)
   },
   async create(payload, user) {
     const dados = sanitizePessoaPayload(payload)
@@ -376,7 +461,10 @@ export const PessoasOperations = {
         .from('pessoas')
         .insert({
           id: randomId(),
-          ...dados,
+          nome: dados.nome,
+          matricula: dados.matricula,
+          local: dados.centroServico,
+          cargo: dados.cargo,
           usuarioCadastro: usuario,
           criadoEm: agora,
           atualizadoEm: null,
@@ -387,7 +475,7 @@ export const PessoasOperations = {
       'Falha ao criar pessoa.'
     )
 
-    return pessoa
+    return mapPessoaRecord(pessoa)
   },
   async update(id, payload, user) {
     const atual = await executeMaybeSingle(
@@ -403,12 +491,21 @@ export const PessoasOperations = {
     await ensureMatriculaDisponivel(dados.matricula, id)
 
     const camposAlterados = []
-    ;['nome', 'matricula', 'local', 'cargo'].forEach((campo) => {
-      if (atual[campo] !== dados[campo]) {
+    const comparacoes = [
+      { campo: 'nome' },
+      { campo: 'matricula' },
+      { campo: 'centroServico', atualKey: 'local' },
+      { campo: 'cargo' },
+    ]
+
+    comparacoes.forEach(({ campo, atualKey }) => {
+      const valorAtual = atual[atualKey ?? campo] || ''
+      const valorNovo = campo === 'centroServico' ? dados.centroServico : dados[campo]
+      if (valorAtual !== valorNovo) {
         camposAlterados.push({
           campo,
-          de: atual[campo] || '',
-          para: dados[campo],
+          de: valorAtual,
+          para: valorNovo,
         })
       }
     })
@@ -430,7 +527,10 @@ export const PessoasOperations = {
       supabaseAdmin
         .from('pessoas')
         .update({
-          ...dados,
+          nome: dados.nome,
+          matricula: dados.matricula,
+          local: dados.centroServico,
+          cargo: dados.cargo,
           atualizadoEm: agora,
           usuarioEdicao: usuario,
           historicoEdicao: historicoAtual,
@@ -440,20 +540,21 @@ export const PessoasOperations = {
       'Falha ao atualizar pessoa.'
     )
 
-    return pessoaAtualizada
+    return mapPessoaRecord(pessoaAtualizada)
   },
   async get(id) {
-    return executeMaybeSingle(
+    const pessoa = await executeMaybeSingle(
       supabaseAdmin.from('pessoas').select('*').eq('id', id),
       'Falha ao obter pessoa.'
     )
+    return mapPessoaRecord(pessoa)
   },
   async history(id) {
     const pessoa = await executeMaybeSingle(
       supabaseAdmin.from('pessoas').select('historicoEdicao').eq('id', id),
-      'Falha ao obter histórico.'
+      'Falha ao obter hist?rico.'
     )
-    return pessoa?.historicoEdicao ?? []
+    return normalizePessoaHistorico(pessoa?.historicoEdicao ?? [])
   },
 }
 
@@ -555,12 +656,12 @@ export const MateriaisOperations = {
 
 export const EntradasOperations = {
   async list() {
-    return (
+    const entradas =
       (await execute(
         supabaseAdmin.from('entradas').select('*').order('dataEntrada', { ascending: false }),
         'Falha ao listar entradas.'
       )) ?? []
-    )
+    return entradas.map(mapEntradaRecord)
   },
   async create(payload, user) {
     const dados = sanitizeEntradaPayload(payload)
@@ -574,18 +675,22 @@ export const EntradasOperations = {
     const usuario = resolveUsuarioNome(user)
 
     const entrada = await executeSingle(
-      supabaseAdmin
-        .from('entradas')
-        .insert({
-          id: randomId(),
-          ...dados,
-          usuarioResponsavel: usuario,
-        })
+        supabaseAdmin
+          .from('entradas')
+          .insert({
+            id: randomId(),
+            materialId: dados.materialId,
+            quantidade: dados.quantidade,
+            centroCusto: dados.centroCusto,
+            centroServico: dados.centroServico,
+            dataEntrada: dados.dataEntrada,
+            usuarioResponsavel: usuario,
+          })
         .select(),
       'Falha ao registrar entrada.'
     )
 
-    return entrada
+    return mapEntradaRecord(entrada)
   },
 }
 
@@ -627,8 +732,13 @@ export const SaidasOperations = {
         .from('saidas')
         .insert({
           id: randomId(),
-          ...dados,
+          pessoaId: dados.pessoaId,
+          materialId: dados.materialId,
+          quantidade: dados.quantidade,
+                centroServico: dados.centroServico,
+          dataEntrega: dados.dataEntrega,
           usuarioResponsavel: usuario,
+          status: dados.status,
           dataTroca,
         })
         .select(),
@@ -636,7 +746,7 @@ export const SaidasOperations = {
     )
 
     return {
-      ...saida,
+      ...mapSaidaRecord(saida),
       estoqueAtual: estoqueDisponivel - Number(dados.quantidade),
     }
   },
@@ -658,12 +768,12 @@ export const EstoqueOperations = {
 
 export const AcidentesOperations = {
   async list() {
-    return (
+    const acidentes =
       (await execute(
         supabaseAdmin.from('acidentes').select('*').order('data', { ascending: false }),
         'Falha ao listar acidentes.'
       )) ?? []
-    )
+    return acidentes.map(mapAcidenteRecord)
   },
   async create(payload, user) {
     const dados = sanitizeAcidentePayload(payload)
@@ -671,26 +781,43 @@ export const AcidentesOperations = {
 
     const pessoa = await obterPessoaPorMatricula(dados.matricula)
     if (!pessoa) {
-      throw createHttpError(404, 'Pessoa não encontrada para a matrícula informada.')
+      throw createHttpError(404, 'Pessoa n�o encontrada para a matr�cula informada.')
     }
+
+    const centroServicoBase = dados.centroServico || pessoa.centroServico || pessoa.setor || pessoa.local || ''
+    const localBase = dados.local || pessoa.local || pessoa.centroServico || ''
+    const agora = nowIso()
+    const usuario = resolveUsuarioNome(user)
 
     const acidente = await executeSingle(
       supabaseAdmin
         .from('acidentes')
         .insert({
           id: randomId(),
-          ...dados,
-          setor: dados.setor || pessoa.setor || pessoa.local || '',
-          local: dados.local || pessoa.local || pessoa.setor || '',
-          criadoEm: nowIso(),
+          matricula: dados.matricula,
+          nome: dados.nome,
+          cargo: dados.cargo,
+          data: dados.data,
+          tipo: dados.tipo,
+          agente: dados.agente,
+          lesao: dados.lesao,
+          parteLesionada: dados.parteLesionada,
+          setor: centroServicoBase,
+          local: localBase,
+          diasPerdidos: dados.diasPerdidos,
+          diasDebitados: dados.diasDebitados,
+          cid: dados.cid,
+          cat: dados.cat,
+          observacao: dados.observacao,
+          criadoEm: agora,
           atualizadoEm: null,
-          registradoPor: resolveUsuarioNome(user),
+          registradoPor: usuario,
         })
         .select(),
       'Falha ao registrar acidente.'
     )
 
-    return acidente
+    return mapAcidenteRecord(acidente)
   },
   async update(id, payload, user) {
     const atual = await executeMaybeSingle(
@@ -698,36 +825,58 @@ export const AcidentesOperations = {
       'Falha ao obter acidente.'
     )
     if (!atual) {
-      throw createHttpError(404, 'Acidente não encontrado.')
+      throw createHttpError(404, 'Acidente n�o encontrado.')
     }
 
     let pessoa = null
     if (payload.matricula !== undefined && trim(payload.matricula)) {
       pessoa = await obterPessoaPorMatricula(trim(payload.matricula))
       if (!pessoa) {
-        throw createHttpError(404, 'Pessoa não encontrada para a matrícula informada.')
+        throw createHttpError(404, 'Pessoa n�o encontrada para a matr�cula informada.')
       }
     }
 
     const dados = sanitizeAcidentePayload({ ...atual, ...payload })
     validateAcidentePayload(dados)
 
+    const centroServicoPessoa = pessoa?.centroServico || pessoa?.setor || pessoa?.local || ''
+    const localPessoa = pessoa?.local || pessoa?.centroServico || ''
+    const centroServicoFinal = dados.centroServico || centroServicoPessoa || atual.setor || ''
+    const localFinal = dados.local || localPessoa || atual.local || centroServicoFinal
+    const agora = nowIso()
+    const usuario = resolveUsuarioNome(user)
+
+    dados.centroServico = centroServicoFinal
+    dados.local = localFinal
+
     const acidenteAtualizado = await executeSingle(
       supabaseAdmin
         .from('acidentes')
         .update({
-          ...dados,
-          setor: dados.setor || pessoa?.setor || pessoa?.local || atual.setor,
-          local: dados.local || pessoa?.local || pessoa?.setor || atual.local,
-          atualizadoEm: nowIso(),
-          atualizadoPor: resolveUsuarioNome(user),
+          matricula: dados.matricula,
+          nome: dados.nome,
+          cargo: dados.cargo,
+          data: dados.data,
+          tipo: dados.tipo,
+          agente: dados.agente,
+          lesao: dados.lesao,
+          parteLesionada: dados.parteLesionada,
+          setor: centroServicoFinal,
+          local: localFinal,
+          diasPerdidos: dados.diasPerdidos,
+          diasDebitados: dados.diasDebitados,
+          cid: dados.cid,
+          cat: dados.cat,
+          observacao: dados.observacao,
+          atualizadoEm: agora,
+          atualizadoPor: usuario,
         })
         .eq('id', id)
         .select(),
       'Falha ao atualizar acidente.'
     )
 
-    return acidenteAtualizado
+    return mapAcidenteRecord(acidenteAtualizado)
   },
 }
 

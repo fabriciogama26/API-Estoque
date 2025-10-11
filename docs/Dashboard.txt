@@ -1,53 +1,52 @@
 Tela: Dashboard
-==================
+===============
 
 Objetivo
--------
-- Fornecer uma visão geral dos níveis de estoque de EPI após a migração para a pilha Vercel + Supabase.
-- Métricas agregadas de superfície (entradas, saídas, alertas) e a classificação dos materiais mais movimentados para ação rápida.
+--------
+- Exibir uma visao geral das entradas, saidas e alertas de estoque.
+- Oferecer acompanhamento rapido para acao, independente do modo de dados (Supabase ou local).
 
 Filtros
 -------
-- `periodoInicio` / `periodoFim` (entradas de mês, opcional): encaminhadas para `/api/estoque/dashboard` para restringir as consultas ao Supabase.
-- `termo` (string, opcional): aplicada do lado do cliente a gráficos e classificações para busca instantânea sem chamadas HTTP extras.
+- `periodoInicio` / `periodoFim` (`type="month"`): enviados para `dataClient.estoque.dashboard`.
+- `termo`: filtragem no cliente sobre os arrays retornados (materiais e rankings).
 
-Validações
------------
-- Validação HTML básica (`type="month"`, strings não vazias). Filtros vazios são permitidos.
-- A rota sem servidor valida o período por meio do auxiliar compartilhado `parsePeriodo` antes de consultar o Supabase.
-
-APIs
-----
-- `GET /api/estoque/dashboard?periodoInicio=&periodoFim=&termo=` (requer token Supabase Bearer). 
-* Retorna `{ período, entradas, saidas, entradasDetalhadas[], saidasDetalhadas[], entradasHistoricas[], saidasHistoricas[], materiaisMaisMovimentados[], estoqueAtual }`. 
-* Todos os dados vêm de tabelas Supabase (`materiais`, `entradas`, `saidas`, `pessoas`) através do helper serverless.
+APIs e fontes de dados
+----------------------
+- **Modo remoto**: `GET /api/estoque/dashboard` protegido por token Supabase. Calcula no backend utilizando `EstoqueOperations.dashboard`.
+- **Modo local**: `localApi.estoque.dashboard` usa os dados do `localStorage` e os auxiliares de `src/lib/estoque.js`.
+- Em ambos os casos a resposta contem `{ periodo, entradas, saidas, entradasDetalhadas[], saidasDetalhadas[], entradasHistoricas[], saidasHistoricas[], materiaisMaisMovimentados[], estoqueAtual }`.
 
 Fluxo de dados
----------
-- Solicitação: filtros derivados do estado do componente.
-- Uso de resposta: 
-* Séries temporais preenchem `EntradasSaidasChart` e `ValorMovimentadoChart`. 
-* `estoqueAtual.alertas` gera banners de alerta; `estoqueAtual.itens` alimenta listas de inventário. 
-* Os rankings usam os arrays já agregados e não retornam ao Supabase.
-
-Regras de Negócios
 --------------
-- O manipulador serverless `EstoqueOperations.dashboard` recalcula o estoque e os alertas em cada chamada usando auxiliares sem estado.
-- Os totais de valor são computados no backend para manter os cálculos de moeda consistentes.
-- O cliente aplica a filtragem `termo` apenas aos arrays já retornados.
+1. Componentes enviam filtros atuais.
+2. `dataClient` seleciona a implementacao (remota ou local).
+3. Resposta alimenta:
+   - `EntradasSaidasChart` e `ValorMovimentadoChart`.
+   - `estoqueAtual.alertas` (cards).
+   - `estoqueAtual.itens` (listas).
+   - `materiaisMaisMovimentados` (ranking).
+4. Caso sem dados, exibimos mensagens neutras no lugar de graficos.
 
-Comportamento da IU
-------------
-- Os botões alternam `isLoading` e renderizam spinners textuais.
-- As mensagens de erro vêm da carga útil da API (campo `error`).
-- Se não houver dados disponíveis, a página exibe mensagens de feedback neutras em vez de gráficos.
+Regras e consistencia
+---------------------
+- O backend ou `localApi` recalculam estoque e valores usando `montarDashboard`.
+- Campos monetarios sao arredondados no backend/servico para evitar divergencia entre modos.
+- Filtro `termo` nunca faz chamada extra; apenas reduz arrays em memoria.
 
-Dependências
-------------
-- Requer sessão autenticada do Supabase (token adicionado automaticamente por `src/services/api.js`).
-- Depende de componentes de gráfico compartilhados e autenticação de contexto para exibir o usuário.
-
-Detalhes da Persistência
+Comportamento de UI
 -------------------
-- Leituras das tabelas do Supabase: `materiais`, `entradas`, `saidas`, `pessoas`.
-- Nenhuma gravação ocorre nesta tela; todos os cálculos são somente leitura.
+- `isLoading` alterna estados dos botoes.
+- Erros exibem texto retornado (`error.message`).
+- Cards e graficos mudam dinamicamente conforme filtros.
+
+Dependencias
+------------
+- Sessao valida do `AuthContext`.
+- Componentes de grafico em `src/components/charts`.
+- `dataClient` (modo remoto) depende do token Supabase; no modo local depende da chave `api-estoque-local-data-v1`.
+
+Persistencia
+------------
+- **Modo remoto**: consulta tabelas Supabase `materiais`, `entradas`, `saidas`, `pessoas`.
+- **Modo local**: leitura do snapshot salvo em `localStorage`, com seeds iniciais em `src/data/local-seed.json`.

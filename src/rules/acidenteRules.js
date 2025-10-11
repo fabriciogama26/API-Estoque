@@ -12,7 +12,7 @@ function validarDadosObrigatorios({
   agente,
   lesao,
   parteLesionada,
-  setor,
+  centroServico,
   local,
   data
 }) {
@@ -23,7 +23,7 @@ function validarDadosObrigatorios({
   validarCampoObrigatorio(agente, 'Agente causador obrigatorio');
   validarCampoObrigatorio(lesao, 'Lesao obrigatoria');
   validarCampoObrigatorio(parteLesionada, 'Parte lesionada obrigatoria');
-  validarCampoObrigatorio(setor, 'Setor obrigatorio');
+  validarCampoObrigatorio(centroServico, 'Centro de servico obrigatorio');
   validarCampoObrigatorio(local, 'Local obrigatorio');
   validarCampoObrigatorio(data, 'Data do acidente obrigatoria');
 }

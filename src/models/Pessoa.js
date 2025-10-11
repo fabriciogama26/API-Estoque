@@ -3,6 +3,7 @@ class Pessoa {
     id,
     nome,
     matricula,
+    centroServico,
     local,
     cargo,
     usuarioCadastro = 'sistema',
@@ -14,7 +15,9 @@ class Pessoa {
     this.id = id
     this.nome = nome
     this.matricula = matricula
-    this.local = local
+    const resolvedCentroServico = centroServico ?? local ?? ''
+    this.centroServico = resolvedCentroServico
+    this.local = resolvedCentroServico
     this.cargo = cargo
     this.usuarioCadastro = usuarioCadastro
     this.criadoEm = criadoEm

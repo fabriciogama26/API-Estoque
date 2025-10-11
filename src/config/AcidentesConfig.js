@@ -11,6 +11,7 @@ export const ACIDENTES_FORM_DEFAULT = {
   cid: '',
   lesao: '',
   parteLesionada: '',
+  centroServico: '',
   setor: '',
   local: '',
   cat: '',
@@ -19,6 +20,7 @@ export const ACIDENTES_FORM_DEFAULT = {
 export const ACIDENTES_FILTER_DEFAULT = {
   termo: '',
   tipo: 'todos',
+  centroServico: 'todos',
   setor: 'todos',
   agente: 'todos',
 }

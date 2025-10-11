@@ -1,56 +1,48 @@
 Tela: Entradas
-================
+==============
 
 Objetivo
--------
-- Registrar reabastecimentos de estoque (entradas EPI) e listar o histórico completo com os totais calculados.
-- Toda a persistência é gerenciada pelo endpoint serverless suportado pelo Supabase.
+--------
+- Registrar reabastecimentos de EPIs e exibir historico com valores totais.
+- Compartilha a mesma interface para modo remoto (Supabase) e modo local.
 
-Campos do Formulário
------------
-- `materialId` (select, obrigatório): preenchido via `GET /api/materiais`.
-- `quantidade` (número >= 1, obrigatório).
-- `dataEntrada` (data, opcional). Quando omitido, o backend armazena `now()` em ISO.
+Campos do formulario
+--------------------
+- `materialId` (select, obrigatorio): lista populada via `dataClient.materiais.list`.
+- `quantidade` (numeric, minimo 1).
+- `centroCusto` (texto, obrigatorio): define o centro contábil responsável pelo custo da entrada.
+- `centroServico` (texto, obrigatorio): identifica o centro de serviço que receberá o material.
+- `dataEntrada` (date, opcional). Quando ausente, o backend/servico grava `now()` em ISO.
 
-Validações
------------
-- O frontend aplica campos obrigatórios e quantidade positiva via atributos HTML.
-- O manipulador serverless valida:
-* Existência de material no Supabase (tabela `materiais`).
-* Quantidade numérica e > 0.
-* Data opcional, analisada em um carimbo de data/hora ISO válido.
+Validacoes
+----------
+- HTML garante campos obrigatorios (material, quantidade, centro de custo e centro de serviço) e quantidade positiva.
+- Servico remoto (`EntradasOperations.create`) confirma existencia do material no Supabase e rejeita centros vazios.
+- Servico local replica as mesmas regras e armazena no `localStorage`.
 
 APIs
 ----
-- `GET /api/materiais`
-- `GET /api/entradas`
-- `POST /api/entradas` (espera token Bearer do Supabase). Payload:
-```json
-{
-"materialId": "uuid",
-"quantidade": 5,
-"dataEntrada": "2025-10-06T12:00:00.000Z",
-"usuarioResponsavel": "Laura Silva"
-}
-```
+- Listagem de materiais: `dataClient.materiais.list()`.
+- Historico: `dataClient.entradas.list()`.
+- Registro: `dataClient.entradas.create(payload)`.
+  - Modo remoto envia `POST /api/entradas` com token Supabase.
+  - Modo local grava direto no armazenamento em cache.
 
-Fluxo de Dados
----------
-- Após um POST bem-sucedido, a interface do usuário redefine o formulário e recarrega os materiais e as entradas para manter a sincronização.
-- As linhas da tabela incluem campos derivados (detalhes do material, valor total) calculados no lado do cliente usando a lista de materiais em cache.
-
-Regras de Negócios
+Fluxo de dados
 --------------
-- O backend grava na tabela `entradas` do Supabase e registra o usuário autenticado.
-- Nenhum saldo de estoque é computado aqui; os endpoints do painel e do estoque consomem os dados acumulados.
+1. Ao enviar o formulario, `EntradasPage` monta o payload e chama `dataClient.entradas.create`.
+2. Em sucesso, limpa formulario, recarrega materiais e entradas.
+3. Tabela mostra nome do material, quantidade, valor total (calculado no cliente) e responsavel.
+4. Filtros locais permitem buscas sem chamadas adicionais.
 
-Comportamento da IU
-------------
-- O botão Enviar exibe `Registrando...` ​​enquanto aguarda a resposta.
-- Erros da API são exibidos dentro do formulário por meio do estado `error`.
-- Filtros permitem buscas do lado do cliente sem chamadas HTTP extras.
+Regras de negocio
+-----------------
+- Nenhum saldo e calculado aqui; outros endpoints usam os dados agregados.
+- Campo `usuarioResponsavel` vem do `AuthContext` (nome ou username).
+- Modo local honra seeds e gera IDs com `crypto.randomUUID`.
 
-Dependências
+Dependencias
 ------------
-- Requer sessão autenticada para que `src/services/api.js` possa anexar o token Supabase.
-- Depende dos dados `Materiais` para preencher a seleção e exibir nomes amigáveis.
+- `AuthContext` para obter usuario logado.
+- `dataClient` para encaminhar chamadas ao backend apropriado.
+- Seeds locais (`src/data/local-seed.json`) garantem dados iniciais quando em modo local.

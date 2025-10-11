@@ -1,4 +1,4 @@
-export function PessoasFilters({ filters, locais, cargos, onChange, onSubmit, onClear }) {
+export function PessoasFilters({ filters, centrosServico, cargos, onChange, onSubmit, onClear }) {
   return (
     <form className="form form--inline" onSubmit={onSubmit}>
       <label className="field">
@@ -7,16 +7,16 @@ export function PessoasFilters({ filters, locais, cargos, onChange, onSubmit, on
           name="termo"
           value={filters.termo}
           onChange={onChange}
-          placeholder="Nome, matricula, local"
+          placeholder="Nome, matricula, centro de servico"
         />
       </label>
       <label className="field">
-        <span>Local</span>
-        <select name="local" value={filters.local} onChange={onChange}>
+        <span>Centro de servico</span>
+        <select name="centroServico" value={filters.centroServico} onChange={onChange}>
           <option value="todos">Todos</option>
-          {locais.map((local) => (
-            <option key={local} value={local}>
-              {local}
+          {centrosServico.map((centro) => (
+            <option key={centro} value={centro}>
+              {centro}
             </option>
           ))}
         </select>

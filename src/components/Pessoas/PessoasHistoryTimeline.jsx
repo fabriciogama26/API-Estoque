@@ -1,11 +1,21 @@
 import { formatDateTime } from '../../utils/PessoasUtils.js'
 
+const FIELD_LABELS = {
+  nome: 'Nome',
+  matricula: 'Matricula',
+  centroServico: 'Centro de servico',
+  cargo: 'Cargo',
+}
+
 function formatChange(registro) {
   if (!Array.isArray(registro?.camposAlterados) || registro.camposAlterados.length === 0) {
     return 'Sem alteracoes registradas'
   }
   return registro.camposAlterados
-    .map(({ campo, de, para }) => `${campo}: "${de || '-'}" -> "${para || '-'}"`)
+    .map(({ campo, de, para }) => {
+      const label = FIELD_LABELS[campo] ?? campo
+      return `${label}: "${de || '-'}" -> "${para || '-'}"`
+    })
     .join('; ')
 }
 

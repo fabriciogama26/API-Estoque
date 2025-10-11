@@ -5,7 +5,7 @@ import { MateriaisForm } from '../components/Materiais/MateriaisForm.jsx'
 import { MateriaisFilters } from '../components/Materiais/MateriaisFilters.jsx'
 import { MateriaisTable } from '../components/Materiais/MateriaisTable.jsx'
 import { MateriaisHistoryModal } from '../components/Materiais/MateriaisHistoryModal.jsx'
-import { api } from '../services/api.js'
+import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   HISTORY_MODAL_DEFAULT,

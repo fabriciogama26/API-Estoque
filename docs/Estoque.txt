@@ -1,41 +1,43 @@
 Tela: Estoque Atual
-======================
+===================
 
 Objetivo
--------
-- Monitorar o estoque atual por material, visualizar alertas automáticos e permitir atualizações em linha para o limite mínimo de estoque.
-- Todos os dados agora fluem por rotas serverless suportadas pela Supabase.
+--------
+- Exibir saldo por material, alertas de estoque minimo e permitir ajustes inline.
+- Funciona com dados do Supabase ou com o cache local, sem mudar a interface.
 
 Filtros
 -------
-- `ano` / `mes` (números, opcional): encaminhado para `GET /api/estoque` para recalcular os saldos do período selecionado.
-- `termo` (string, opcional): filtro do lado do cliente para listas de alertas e itens.
+- `ano` / `mes`: enviados para `dataClient.estoque.current` para recalcular saldos do periodo.
+- `termo`: filtragem no cliente (nome ou fabricante).
 
-Editor Em Linha
+Editor inline
 -------------
-- Cada linha expõe um `estoqueMinimo` editável.
-- Os valores devem ser numéricos e >= 0; envios vazios são rejeitados antes de atingir a API.
-- Salvar gatilhos `PUT /api/materiais/:id` com `{ estoqueMinimo, usuarioResponsavel }`.
+- Campo `estoqueMinimo` editavel por linha.
+- Valida numerico >= 0 antes de enviar.
+- `Salvar` chama `dataClient.materiais.update`.
+  - No modo remoto dispara `PUT /api/materiais/:id`.
+  - No modo local atualiza o snapshot e registra historico de preco se necessario.
 
 APIs
 ----
-- `GET /api/estoque?ano=&mes=` retorna `{ itens, alertas }` após a agregação do Supabase.
-- `PUT /api/materiais/:id` atualiza o registro de material; o histórico do Supabase é gerenciado pelo auxiliar de backend quando outros campos são alterados.
+- `dataClient.estoque.current(params)` -> `{ itens, alertas }`.
+- `dataClient.materiais.update(id, payload)` atualiza estoque minimo e auditoria.
 
-Regras de Negócios
---------------
-- Os alertas são produzidos no lado do servidor via `verificarEstoqueMinimo`.
-- Os saldos de estoque dependem dos dados do Supabase (`entradas`, `saidas`, `materiais`) e são recalculados a cada solicitação.
-- O salvamento em linha limpa o histórico em cache para que outras visualizações busquem valores atualizados.
+Regras e calculos
+-----------------
+- Ambos os modos usam `montarEstoqueAtual` para garantir consistencia.
+- Alertas sao gerados por `estoqueRules.verificarEstoqueMinimo`.
+- Ajustes invalidam caches locais (a pagina recarrega dados apos salvar).
 
-Comportamento da IU
+Comportamento de UI
+-------------------
+- `isLoading` e `isSaving` controlam botoes e mensagens (`Filtrando...`, `Salvando...`).
+- Alertas exibem deficit (diferença entre saldo e minimo).
+- Erros especificos aparecem proximo ao componente acionado.
+
+Dependencias
 ------------
-- Os botões exibem carregadores textuais (`Filtrando...`, `Salvando...`) e desabilitam entradas enquanto aguardam respostas.
-- A lista de alertas exibe informações de déficit derivadas do payload no lado do cliente.
-- Erros gerais e por item são exibidos nas respostas da API.
-
-Dependências
-------------
-- Requer sessão autenticada do Supabase (token gerenciado por `src/services/api.js`).
-- Impacta outras telas (Painel, Saídas) após o ajuste de `estoqueMinimo`.
-- Utiliza contexto de autenticação compartilhado para resolver o usuário atual para campos de auditoria.
+- `AuthContext` para capturar `usuarioResponsavel`.
+- `dataClient` para alternar entre remoto/local.
+- Seeds locais oferecem dados iniciais; no modo remoto depende das tabelas Supabase `materiais`, `entradas`, `saidas`.

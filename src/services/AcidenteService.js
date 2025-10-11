@@ -59,12 +59,31 @@ function obterDadosPessoa(matricula, overrides = {}) {
     throw error;
   }
 
+  const centroServico = coalesceRequiredString(
+    overrides.centroServico,
+    pessoa.centroServico,
+    overrides.setor,
+    pessoa.setor,
+    overrides.local,
+    pessoa.local
+  );
+
+  const local = coalesceRequiredString(
+    overrides.local,
+    pessoa.local,
+    overrides.centroServico,
+    pessoa.centroServico,
+    overrides.setor,
+    pessoa.setor
+  );
+
   return {
     matricula: coalesceRequiredString(pessoa.matricula, overrides.matricula, matriculaBusca),
     nome: coalesceRequiredString(pessoa.nome, overrides.nome),
     cargo: coalesceRequiredString(pessoa.cargo, overrides.cargo),
-    setor: coalesceRequiredString(pessoa.setor, overrides.setor, pessoa.local, overrides.local),
-    local: coalesceRequiredString(pessoa.local, overrides.local, pessoa.setor, overrides.setor)
+    centroServico,
+    setor: centroServico,
+    local,
   };
 }
 
@@ -80,7 +99,7 @@ class AcidenteService {
       lesao: sanitizeRequiredString(payload.lesao),
       parteLesionada: sanitizeRequiredString(payload.parteLesionada),
       diasPerdidos: payload.diasPerdidos ?? 0,
-      diasDebitados: payload.diasDebitados ?? 0
+      diasDebitados: payload.diasDebitados ?? 0,
     };
 
     acidenteRules.validarDadosObrigatorios(dadosObrigatorios);
@@ -89,21 +108,13 @@ class AcidenteService {
 
     const acidente = new Acidente({
       id: uuid(),
-      matricula: dadosObrigatorios.matricula,
-      nome: dadosObrigatorios.nome,
-      cargo: dadosObrigatorios.cargo,
-      setor: dadosObrigatorios.setor,
-      local: dadosObrigatorios.local,
-      data: dadosObrigatorios.data,
-      diasPerdidos: Number(dadosObrigatorios.diasPerdidos),
-      diasDebitados: Number(dadosObrigatorios.diasDebitados),
+      ...dadosObrigatorios,
       tipo: dadosObrigatorios.tipo,
       agente: dadosObrigatorios.agente,
-      lesao: dadosObrigatorios.lesao,
-      parteLesionada: dadosObrigatorios.parteLesionada,
       cid: sanitizeOptionalString(payload.cid) ?? null,
       cat: sanitizeOptionalString(payload.cat) ?? null,
-      observacao: sanitizeOptionalString(payload.observacao) ?? null
+      observacao: sanitizeOptionalString(payload.observacao) ?? null,
+      registradoPor: sanitizeRequiredString(payload.usuarioCadastro || 'sistema') || 'sistema',
     });
 
     repositories.acidentes.create(acidente);
@@ -129,11 +140,26 @@ class AcidenteService {
       Object.assign(updates, dadosPessoa);
     }
 
-    ['nome', 'cargo', 'setor', 'local', 'data', 'tipo', 'agente', 'lesao', 'parteLesionada'].forEach((campo) => {
-      if (payload[campo] !== undefined && updates[campo] === undefined) {
-        updates[campo] = sanitizeUpdatableString(payload[campo]);
+    const assignCampo = (campo, sanitizer = sanitizeUpdatableString) => {
+      if (payload[campo] !== undefined) {
+        updates[campo] = sanitizer(payload[campo]);
       }
-    });
+    };
+
+    ['nome', 'cargo', 'tipo', 'agente', 'lesao', 'parteLesionada'].forEach((campo) => assignCampo(campo));
+
+    const centroServicoOverride = sanitizeUpdatableString(payload.centroServico ?? payload.setor);
+    if (centroServicoOverride !== undefined) {
+      updates.centroServico = centroServicoOverride;
+      updates.setor = centroServicoOverride;
+    }
+
+    const localOverride = sanitizeUpdatableString(payload.local);
+    if (localOverride !== undefined) {
+      updates.local = localOverride;
+    }
+
+    assignCampo('data', sanitizeUpdatableString);
 
     if (payload.diasPerdidos !== undefined) {
       updates.diasPerdidos = Number(payload.diasPerdidos);
@@ -155,13 +181,20 @@ class AcidenteService {
       updates.observacao = sanitizeOptionalString(payload.observacao);
     }
 
-    const merged = { ...atual, ...updates };
+    const merged = {
+      ...atual,
+      ...updates,
+      centroServico: updates.centroServico ?? atual.centroServico ?? atual.setor,
+      setor: updates.setor ?? atual.setor ?? atual.centroServico,
+      local: updates.local ?? atual.local,
+    };
 
     acidenteRules.validarDadosObrigatorios(merged);
     acidenteRules.validarData(merged.data);
     acidenteRules.validarDias(merged);
 
     updates.atualizadoEm = new Date().toISOString();
+    updates.atualizadoPor = sanitizeRequiredString(payload.usuarioResponsavel || payload.usuarioCadastro || 'sistema') || 'sistema';
 
     const atualizado = repositories.acidentes.update(id, updates);
     return atualizado;

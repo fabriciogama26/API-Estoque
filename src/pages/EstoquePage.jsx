@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { InventoryIcon } from '../components/icons.jsx'
-import { api } from '../services/api.js'
+import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import '../styles/EstoquePage.css'
 

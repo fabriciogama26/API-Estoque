@@ -1,4 +1,4 @@
-export function AcidentesFilters({ filters, tipos, setores, agentes, onChange, onSubmit, onClear }) {
+export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onChange, onSubmit, onClear }) {
   return (
     <form className="form form--inline" onSubmit={onSubmit}>
       <label className="field">
@@ -7,7 +7,7 @@ export function AcidentesFilters({ filters, tipos, setores, agentes, onChange, o
           name="termo"
           value={filters.termo}
           onChange={onChange}
-          placeholder="Nome, matricula, setor"
+          placeholder="Nome, matricula, centro de servico"
         />
       </label>
       <label className="field">
@@ -22,12 +22,12 @@ export function AcidentesFilters({ filters, tipos, setores, agentes, onChange, o
         </select>
       </label>
       <label className="field">
-        <span>Setor</span>
-        <select name="setor" value={filters.setor} onChange={onChange}>
+        <span>Centro de servico</span>
+        <select name="centroServico" value={filters.centroServico} onChange={onChange}>
           <option value="todos">Todos</option>
-          {setores.map((setor) => (
-            <option key={setor} value={setor}>
-              {setor}
+          {centrosServico.map((centro) => (
+            <option key={centro} value={centro}>
+              {centro}
             </option>
           ))}
         </select>

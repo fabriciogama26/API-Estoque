@@ -1,14 +1,16 @@
 export const PESSOAS_FORM_DEFAULT = {
   nome: '',
   matricula: '',
-  local: '',
+  centroServico: '',
   cargo: '',
+  local: '',
 }
 
 export const PESSOAS_FILTER_DEFAULT = {
   termo: '',
-  local: 'todos',
+  centroServico: 'todos',
   cargo: 'todos',
+  local: 'todos',
 }
 
 export const PESSOAS_HISTORY_DEFAULT = {

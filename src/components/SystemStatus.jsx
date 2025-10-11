@@ -3,29 +3,41 @@ import { LogOut, Settings, UserCircle2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
-import { api } from '../services/api.js'
+import { dataClient as api } from '../services/dataClient.js'
+import { isLocalMode } from '../config/runtime.js'
 import appInfo from '../../package.json?json'
 import '../styles/SystemStatus.css'
 
 const CHECK_INTERVAL = 3 * 60 * 1000 // 3 minutos
 
 function useSystemHealth() {
-  const [status, setStatus] = useState({ state: 'unknown', message: 'Verificando...', timestamp: null })
+  const [status, setStatus] = useState({
+    state: 'unknown',
+    message: 'Verificando...',
+    timestamp: null,
+  })
 
   const check = useCallback(async () => {
     try {
       await api.health()
     } catch (err) {
       console.warn('Falha ao verificar status da API', err)
-      setStatus({ state: 'offline', message: err.message || 'API indisponivel', timestamp: new Date() })
+      setStatus({
+        state: 'offline',
+        message: err.message || 'API indisponivel',
+        timestamp: new Date(),
+      })
       return
     }
 
-    let message = 'API online'
+    let message = isLocalMode ? 'Modo local ativo (dados no navegador)' : 'API online'
 
-    if (isSupabaseConfigured() && supabase) {
+    if (!isLocalMode && isSupabaseConfigured() && supabase) {
       try {
-        const { error } = await supabase.from('materiais').select('id', { count: 'exact', head: true }).limit(1)
+        const { error } = await supabase
+          .from('materiais')
+          .select('id', { count: 'exact', head: true })
+          .limit(1)
         if (error) {
           throw error
         }
@@ -36,7 +48,11 @@ function useSystemHealth() {
       }
     }
 
-    setStatus({ state: 'online', message, timestamp: new Date() })
+    setStatus({
+      state: 'online',
+      message,
+      timestamp: new Date(),
+    })
   }, [])
 
   useEffect(() => {
@@ -59,8 +75,14 @@ export function SystemStatus({ className = '' }) {
     return value.startsWith('v') ? value : `v${value}`
   }, [])
 
-  const indicatorClass = state === 'online' ? 'system-status__dot--online' : state === 'offline' ? 'system-status__dot--offline' : 'system-status__dot--unknown'
-  const statusLabel = state === 'online' ? 'Online' : state === 'offline' ? 'Offline' : 'Desconhecido'
+  const indicatorClass =
+    state === 'online'
+      ? 'system-status__dot--online'
+      : state === 'offline'
+        ? 'system-status__dot--offline'
+        : 'system-status__dot--unknown'
+  const statusLabel =
+    state === 'online' ? 'Online' : state === 'offline' ? 'Offline' : 'Desconhecido'
   const indicatorTitle = message ? `${statusLabel} - ${message}` : statusLabel
 
   const displayName = user?.name || user?.metadata?.nome || user?.email || 'Usuario'
@@ -100,11 +122,15 @@ export function SystemStatus({ className = '' }) {
             <UserCircle2 size={32} />
           </div>
           <div className="system-status__identity">
-            <p className="system-status__user-name" title={displayName}>{displayName}</p>
-            <p className="system-status__user-role" title={roleLabel}>{roleLabel}</p>
+            <p className="system-status__user-name" title={displayName}>
+              {displayName}
+            </p>
+            <p className="system-status__user-role" title={roleLabel}>
+              {roleLabel}
+            </p>
           </div>
         </div>
-        <div className="system-status__actions" role="group" aria-label="Ações rápidas">
+        <div className="system-status__actions" role="group" aria-label="Acoes rapidas">
           <button
             type="button"
             className="system-status__icon-button"
