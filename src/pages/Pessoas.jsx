@@ -6,7 +6,7 @@ import { PessoasFilters } from '../components/Pessoas/PessoasFilters.jsx'
 import { PessoasTable } from '../components/Pessoas/PessoasTable.jsx'
 import { PessoasHistoryModal } from '../components/Pessoas/PessoasHistoryModal.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { api } from '../services/api.js'
+import { dataClient as api } from '../services/dataClient.js'
 import {
   PESSOAS_FILTER_DEFAULT,
   PESSOAS_FORM_DEFAULT,
@@ -17,7 +17,7 @@ import {
   updatePessoaPayload,
   filterPessoas,
   sortPessoasByNome,
-  extractLocais,
+  extractCentrosServico,
   extractCargos,
 } from '../rules/PessoasRules.js'
 import { resolveUsuarioNome } from '../utils/PessoasUtils.js'
@@ -55,11 +55,19 @@ export function PessoasPage() {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target
+    if (name === 'centroServico') {
+      setForm((prev) => ({ ...prev, centroServico: value, local: value }))
+      return
+    }
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target
+    if (name === 'centroServico') {
+      setFilters((prev) => ({ ...prev, centroServico: value, local: value }))
+      return
+    }
     setFilters((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -105,7 +113,8 @@ export function PessoasPage() {
     setForm({
       nome: pessoa.nome || '',
       matricula: pessoa.matricula || '',
-      local: pessoa.local || '',
+      centroServico: pessoa.centroServico ?? pessoa.local ?? '',
+      local: pessoa.centroServico ?? pessoa.local ?? '',
       cargo: pessoa.cargo || '',
     })
   }
@@ -152,7 +161,7 @@ export function PessoasPage() {
     [pessoasFiltradas],
   )
 
-  const locais = useMemo(() => extractLocais(pessoas), [pessoas])
+  const centrosServico = useMemo(() => extractCentrosServico(pessoas), [pessoas])
   const cargos = useMemo(() => extractCargos(pessoas), [pessoas])
 
   return (
@@ -175,7 +184,7 @@ export function PessoasPage() {
 
       <PessoasFilters
         filters={filters}
-        locais={locais}
+        centrosServico={centrosServico}
         cargos={cargos}
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}

@@ -1,42 +1,43 @@
 # API-Estoque
 
-Aplicação completa para controle de EPIs com frontend React (Vite) e backend serverless hospedado na Vercel, utilizando Supabase como provedor de autenticação e banco de dados. A plataforma contempla cadastro de pessoas e materiais, registros de entradas/saídas, acompanhamento do estoque em tempo real e gerenciamento de acidentes de trabalho.
+Aplicacao completa para controle de EPIs com frontend React (Vite) e funcoes serverless hospedadas na Vercel. Em modo padrao tudo roda sobre Supabase (autenticacao, banco e RLS), mas agora tambem existe um modo totalmente local que persiste dados no navegador para desenvolvimento offline.
 
-## Sumário
+## Sumario
 
 - [Arquitetura](#arquitetura)
 - [Requisitos](#requisitos)
-- [Configuração do Ambiente](#configuração-do-ambiente)
-  - [Variáveis de Ambiente](#variáveis-de-ambiente)
+- [Configuracao do Ambiente](#configuracao-do-ambiente)
+  - [Variaveis de Ambiente](#variaveis-de-ambiente)
   - [Supabase](#supabase)
   - [Vercel](#vercel)
-- [Execução Local](#execução-local)
-- [Scripts Disponíveis](#scripts-disponíveis)
+- [Execucao Local](#execucao-local)
+- [Modos de Dados](#modos-de-dados)
+- [Scripts Disponiveis](#scripts-disponiveis)
 - [Estrutura de Pastas](#estrutura-de-pastas)
-- [Fluxo de Autenticação e RLS](#fluxo-de-autenticação-e-rls)
-- [Referências de Documentação](#referências-de-documentação)
-- [Próximos Passos](#próximos-passos)
+- [Fluxo de Autenticacao e RLS](#fluxo-de-autenticacao-e-rls)
+- [Referencias de Documentacao](#referencias-de-documentacao)
+- [Proximos Passos](#proximos-passos)
 
 ## Arquitetura
 
-| Camada            | Descrição                                                                 |
+| Camada            | Descricao                                                                 |
 | ----------------- | -------------------------------------------------------------------------- |
-| Frontend          | React 19 + Vite. Consome as rotas serverless via `src/services/api.js`.    |
-| Backend           | Funções serverless na Vercel (pasta `api/`). Cada handler valida o token Supabase e acessa o banco com a chave de serviço. |
-| Banco de Dados    | Supabase Postgres. Tabelas principais: `pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`. |
-| Autenticação      | Supabase Auth (e-mail/senha). O token é usado em todas as chamadas para `/api`. |
-| Regras de Negócio | Helpers em `api/_shared/operations.js` e `src/lib/estoque.js` centralizam validações e cálculos. |
+| Frontend          | React 19 + Vite. Consome `dataClient`, que escolhe entre Supabase (`api.js`) ou cache local. |
+| Backend           | Funcoes serverless na Vercel (pasta `api/`). Cada handler valida token Supabase e acessa o banco com a chave de servico. |
+| Banco de Dados    | Supabase Postgres (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`). |
+| Autenticacao      | Supabase Auth no modo remoto. Em modo local, credenciais definidas via `.env.local`. |
+| Regras de negocio | `api/_shared/operations.js` (lado serverless) e `src/lib/estoque.js` (calculos compartilhados). |
 
 ## Requisitos
 
 - Node.js 20+
 - npm 10+
-- Conta Supabase (projeto com Postgres e Auth)
-- Conta Vercel (para deploy das funções e frontend estático)
+- Conta Supabase (para modo remoto)
+- Conta Vercel (deploy das funcoes e do frontend)
 
-## Configuração do Ambiente
+## Configuracao do Ambiente
 
-Clone o repositório e instale dependências:
+Clone o repositorio e instale as dependencias:
 
 ```bash
 git clone <url-do-repo>
@@ -44,105 +45,127 @@ cd API-Estoque
 npm install
 ```
 
-### Variáveis de Ambiente
+### Variaveis de Ambiente
 
-Crie um arquivo `.env.local` na raiz com as variáveis públicas usadas pelo Vite:
+Crie um arquivo `.env.local` na raiz com as variaveis publicas usadas pelo Vite:
 
 ```bash
 VITE_SUPABASE_URL=https://<sua-url>.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon-key>
-VITE_API_URL=http://localhost:5173  # em desenvolvimento o Vite fará proxy das rotas /api
+VITE_API_URL=http://localhost:5173   # o Vite faz proxy das rotas /api
 ```
 
-No ambiente das funções serverless (local com `vercel dev` ou produção na Vercel) configure também:
+Variaveis adicionais para o modo local:
+
+```bash
+VITE_DATA_MODE=local                 # use "remote" (padrao) para Supabase
+VITE_LOCAL_USERNAME=admin            # opcional (padrao: admin)
+VITE_LOCAL_PASSWORD=admin123         # opcional (padrao: admin123)
+VITE_LOCAL_DISPLAY_NAME=Administrador Local  # opcional
+```
+
+No ambiente das funcoes serverless (local com `vercel dev` ou producao):
 
 ```bash
 SUPABASE_URL=https://<sua-url>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 ```
 
-> **Atenção:** a chave de serviço **não** deve ser exposta ao frontend.
+> **Importante:** a chave de servico **nunca** deve ser exposta ao frontend.
 
 ### Supabase
 
-1. Crie um novo projeto Supabase.
-2. Construa o schema seguindo o guia em [`docs/stateless-supabase-notes.txt`](docs/stateless-supabase-notes.txt) e políticas RLS conforme [`docs/rls-policies-guide.txt`](docs/rls-policies-guide.txt).
-3. Cadastre as variáveis `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` na Vercel (`vercel env`) e localmente.
-4. Opcional: execute migrations/TODOs extras para usuários padrão e seeds iniciais.
+1. Crie um projeto Supabase.
+2. Construa o schema seguindo [`docs/stateless-supabase-notes.txt`](docs/stateless-supabase-notes.txt) e as politicas RLS de [`docs/rls-policies-guide.txt`](docs/rls-policies-guide.txt).
+3. Cadastre `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` nos ambientes (local e Vercel).
+4. Popular tabelas iniciais conforme necessidade (usuarios, materiais, etc).
 
 ### Vercel
 
-1. Conecte o repositório no dashboard da Vercel.
-2. Ajuste os envs conforme seção anterior.
-3. A Vercel detectará automaticamente o build do Vite (`npm run build`) e criará endpoints a partir da pasta `api/`.
-4. Depois do primeiro deploy, confirme o funcionamento acessando `/login` e `/api/health` (com token válido).
+1. Conecte o repositorio no dashboard da Vercel.
+2. Configure as variaveis mencionadas acima (`vercel env`).
+3. Deploy padrao executa `npm run build` (frontend) e expoe qualquer arquivo em `api/` como endpoint.
+4. Depois do deploy, valide acessando `/login` e `/api/health` (com token valido).
 
-## Execução Local
+## Execucao Local
 
-1. Garanta que as variáveis estejam definidas em `.env.local`.
-2. Rode o servidor de desenvolvimento do Vite (inclui proxy para `/api`):
+1. Defina as variaveis no `.env.local` (tanto Supabase quanto, se desejar, modo local).
+2. Suba o frontend:
 
 ```bash
 npm run dev
 ```
 
-3. Abra `http://localhost:5173` e faça login com o usuário criado no Supabase Auth.
-4. Para testar funções serverless localmente com as variáveis de produção, utilize `vercel dev` (opcional) após configurar o CLI.
+3. Abra `http://localhost:5173`.
+   - **Modo Supabase**: entre com um usuario cadastrado via Supabase Auth.
+   - **Modo local**: use as credenciais configuradas (`VITE_LOCAL_USERNAME` / `VITE_LOCAL_PASSWORD`).
+4. Para testar as funcoes serverless com Supabase localmente, use `vercel dev` (opcional).
 
-## Scripts Disponíveis
+## Modos de Dados
 
-| Script          | Descrição                                           |
-| --------------- | --------------------------------------------------- |
-| `npm run dev`   | Inicia o Vite em modo desenvolvimento.              |
-| `npm run build` | Gera a build de produção (Vite).                    |
-| `npm run preview` | Pré-visualiza a build de produção localmente.     |
-| `npm run lint`  | Executa ESLint para checagem de código.             |
+| Modo    | Como ativar                          | Autenticacao                         | Persistencia                                  |
+| ------- | ------------------------------------ | ------------------------------------ | --------------------------------------------- |
+| Remote  | (padrao) ou `VITE_DATA_MODE=remote`  | Supabase Auth (`supabase.auth.*`)    | Banco Supabase (Postgres + RLS)               |
+| Local   | `VITE_DATA_MODE=local`               | Credenciais definidas em `.env.local`| `localStorage` (`api-estoque-local-data-v1`), seeds em `src/data/local-seed.json` |
+|         |                                        |                                      | Entradas/Saídas registram `centroCusto` e `centroServico` em ambos os modos. |
+
+- Alternar entre os modos exige reiniciar o Vite.
+- Para resetar apenas os dados locais, limpe a chave `api-estoque-local-data-v1` no `localStorage`.
+- Guia completo: [`docs/data-mode-guide.txt`](docs/data-mode-guide.txt).
+
+## Scripts Disponiveis
+
+| Script            | Descricao                                         |
+| ----------------- | ------------------------------------------------ |
+| `npm run dev`     | Inicia o Vite em modo desenvolvimento.           |
+| `npm run build`   | Gera build de producao.                          |
+| `npm run preview` | Servidor local para inspecionar a build.         |
+| `npm run lint`    | Executa ESLint nos arquivos do frontend.         |
 
 ## Estrutura de Pastas
 
 ```
 .
-├── api/                     # Funções serverless (rotas protegidas)
-│   ├── _shared/             # Autenticação, Supabase client e operações reutilizáveis
-│   ├── pessoas/…            # CRUD de pessoas
-│   ├── materiais/…          # CRUD de materiais e histórico de preços
-│   ├── entradas/             # Registro de entradas de estoque
-│   ├── saidas/               # Registro de saídas de estoque
-│   ├── estoque/…             # Estoque atual e dashboard
-│   ├── acidentes/…           # Registro e atualização de acidentes
-│   └── health.js             # Checagem autenticada de status
-├── docs/                    # Documentação funcional e técnica (telas, notas Supabase, RLS)
-├── src/
-│   ├── components/          # Componentes reutilizáveis
-│   ├── pages/               # Páginas (Dashboard, Estoque, Materiais, etc.)
-│   ├── context/             # Contexto de autenticação Supabase
-│   ├── lib/estoque.js       # Regras de agregação/alertas reutilizadas no backend
-│   ├── services/api.js      # Client HTTP que injeta token Bearer
-│   └── services/supabaseClient.js # Cliente Supabase usado pelo frontend
-└── package.json
+├─ api/                         # Funcoes serverless (Vercel)
+│  ├─ _shared/                  # Auth, Supabase client, operacoes reutilizaveis
+│  ├─ pessoas/, materiais/, ... # Rotas protegidas
+│  └─ health.js                 # Checagem autenticada de status
+├─ docs/                        # Documentacao funcional e guias (inclui novo modo local)
+├─ src/
+│  ├─ components/               # Componentes reutilizaveis
+│  ├─ pages/                    # Paginas (Dashboard, Estoque, etc.)
+│  ├─ context/                  # AuthContext (Supabase + modo local)
+│  ├─ services/
+│  │  ├─ api.js                 # Cliente HTTP do modo remoto
+│  │  ├─ localApi.js            # Implementacao de dados locais
+│  │  ├─ dataClient.js          # Seleciona api remoto ou local
+│  │  └─ localDataStore.js      # Persistencia em localStorage
+│  └─ lib/estoque.js            # Calculos reaproveitados no backend
+└─ package.json
 ```
 
-## Fluxo de Autenticação e RLS
+## Fluxo de Autenticacao e RLS
 
-1. Usuário faz login pelo Supabase Auth (formulário em `/login`).
-2. Access token é mantido pelo SDK e usado por `src/services/api.js` para chamar qualquer `/api` com o header `Authorization: Bearer <token>`.
-3. Cada função serverless utiliza `requireAuth` para validar o token e injeta o usuário nas regras de negócio.
-4. Rotas que manipulam dados sensíveis dependem das políticas RLS configuradas no Supabase. Consulte [`docs/rls-policies-guide.txt`](docs/rls-policies-guide.txt) para exemplos de políticas, testes e checklist de implantação.
+1. No modo remoto, o usuario autentica pelo Supabase Auth (`/login`).
+2. O token de acesso e mantido pelo SDK e aplicado nas chamadas a `/api/*` via `dataClient`.
+3. Cada funcao serverless valida o token e executa as operacoes no Supabase (respeitando RLS).
+4. Em modo local, `AuthContext` valida apenas as credenciais do `.env.local` e os dados trafegam dentro do navegador.
 
-## Referências de Documentação
+## Referencias de Documentacao
 
-- Telas e fluxos específicos estão descritos em `docs/` (Dashboard, Entradas, Estoque, Materiais, Pessoas, Saídas).
-- Notas da migração stateless e configuração de ambiente: [`docs/stateless-supabase-notes.txt`](docs/stateless-supabase-notes.txt).
-- Guia completo de políticas RLS: [`docs/rls-policies-guide.txt`](docs/rls-policies-guide.txt).
+- `docs/Login.txt`, `docs/Dashboard.txt`, `docs/Entradas.txt`, `docs/Estoque.txt`, `docs/Materiais.txt`, `docs/Pessoas.txt`, `docs/Saidas.txt`.
+- `docs/rls-policies-guide.txt` para as politicas de seguranca no Supabase.
+- `docs/stateless-supabase-notes.txt` para detalhes do backend stateless.
+- `docs/data-mode-guide.txt` para alternar entre modo local e Supabase.
 
-## Próximos Passos
+## Proximos Passos
 
-- Finalizar políticas RLS conforme guia e testar com usuários de diferentes perfis.
-- Popular dados iniciais (pessoas, materiais) para validar dashboards e relatórios.
-- Considerar testes automatizados (UI e unit) para os principais fluxos.
-- Avaliar code splitting para reduzir o bundle inicial apontado pelo Vite (`>500 kB`).
-- Planejar monitoramento (logs, métricas) para funções serverless e Supabase.
+- Finalizar politicas RLS e testar com perfis diferentes.
+- Popular dados reais para validar relatorios.
+- Adicionar testes automatizados (UI e unitarios) para fluxos criticos.
+- Monitorar tamanho do bundle e considerar code splitting.
+- Avaliar logs/metricas para funcoes serverless e Supabase.
 
 ---
 
-Qualquer dúvida ou sugestão de melhoria, abra uma issue ou envie um PR! 😄
+Sugestoes e melhorias sao bem-vindas. Abra uma issue ou envie um PR!

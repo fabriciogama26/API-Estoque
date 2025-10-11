@@ -4,10 +4,12 @@ const repositories = require('../repositories');
 const { pessoaRules } = require('../rules');
 
 function sanitizePayload(payload = {}) {
+  const centroServico = payload.centroServico?.trim() ?? payload.local?.trim() ?? ''
   return {
     nome: payload.nome?.trim() ?? '',
     matricula: payload.matricula?.trim() ?? '',
-    local: payload.local?.trim() ?? '',
+    centroServico,
+    local: centroServico,
     cargo: payload.cargo?.trim() ?? '',
   }
 }
@@ -54,12 +56,21 @@ class PessoaService {
     pessoaRules.validarPessoa(dados)
 
     const camposAlterados = []
-    ;['nome', 'matricula', 'local', 'cargo'].forEach((campo) => {
-      if (atual[campo] !== dados[campo]) {
+    const comparacoes = [
+      { campo: 'nome' },
+      { campo: 'matricula' },
+      { campo: 'centroServico', atualKey: 'local' },
+      { campo: 'cargo' },
+    ]
+
+    comparacoes.forEach(({ campo, atualKey }) => {
+      const valorAtual = (atualKey ? atual[atualKey] : atual[campo]) || ''
+      const valorNovo = campo === 'centroServico' ? dados.centroServico : dados[campo]
+      if (valorAtual !== valorNovo) {
         camposAlterados.push({
           campo,
-          de: atual[campo] || '',
-          para: dados[campo],
+          de: valorAtual,
+          para: valorNovo,
         })
       }
     })
@@ -79,6 +90,7 @@ class PessoaService {
 
     const atualizado = repositories.pessoas.update(id, {
       ...dados,
+      local: dados.centroServico,
       atualizadoEm: agora,
       historicoEdicao: historicoAtual,
       usuarioEdicao: usuario,

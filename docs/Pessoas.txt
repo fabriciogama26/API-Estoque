@@ -1,65 +1,47 @@
 Tela: Pessoas
-=================
+=============
 
 Objetivo
--------
-- Gerenciar colaboradores para distribuição de EPI e manter um registro de auditoria das edições.
+--------
+- Gerenciar colaboradores (cadastro, edicao, historico de alteracoes).
+- Facilitar integracao com saidas de EPIs e registros de acidentes.
+
+Fluxo
+-----
+1. Formulario cria/edita pessoas via `dataClient.pessoas`.
+2. Filtros (termo, local, cargo) atuam somente no cliente.
+3. Modal de historico (`PessoasHistoryModal`) exibe alteracoes registradas.
+
+Campos principais
+-----------------
+- `nome`, `matricula`, `local`, `cargo`.
+- Historico guarda `dataEdicao`, `usuarioResponsavel`, campos alterados.
 
 APIs
 ----
-- `GET /api/pessoas`
-- `POST /api/pessoas`
-- `PUT /api/pessoas/:id`
-- `GET /api/pessoas/:id/historico-edicoes`
+- `dataClient.pessoas.list()`
+- `dataClient.pessoas.create(payload)`
+- `dataClient.pessoas.update(id, payload)`
+- `dataClient.pessoas.history(id)`
+  - Remoto: endpoints `/api/pessoas` e `/api/pessoas/:id/historico-edicoes`.
+  - Local: leitura/escrita no `localStorage`, garantindo unicidade de matricula.
 
-Regras
------
-- O backend serverless impõe campos obrigatórios e matrícula única.
-- As entradas do histórico são anexadas automaticamente quando os dados são alterados.
+Validacoes
+----------
+- Formulario aplica `required` basico.
+- Servicos confirmam:
+  - Todos os campos nao vazios.
+  - Matricula unica (case insensitive).
 
-Destaques da IU
--------------
-- Os filtros para termo/local/carga são executados no lado do cliente.
-- O modal de histórico armazena em cache as respostas por pessoa para reaberturas mais rápidas.
-- O botão Atualizar consulta novamente o Supabase pela rota serverless.
+Comportamento de UI
+-------------------
+- `isSaving` controla estado dos botoes.
+- Historico carrega do cache quando possivel.
+- Erros exibidos no topo do formulario e no modal.
 
-Visão geral
-========
-- Tela abrangente para gerenciar colaboradores (pessoas), incluindo CRUD, filtragem e linha do tempo do histórico.
-- Utiliza endpoints serverless suportados pelo Supabase e protegidos por tokens de autenticação do Supabase.
-
-Operações principais
---------------
-1. **Criar**
-- O formulário coleta `nome`, `matricula`, `local` e `cargo`.
-- Envia para `POST /api/pessoas`.
-- O backend valida os campos obrigatórios, aplica matrícula exclusiva e armazena informações de auditoria (`usuarioCadastro`, registros de data e hora) no Supabase.
-
-2. **Atualizar**
-- A edição puxa a linha selecionada para o formulário.
-- `PUT /api/pessoas/:id` atualiza o registro e adiciona entradas de histórico (`historicoEdicao`) quando os valores são alterados.
-- O histórico captura `usuarioResponsavel`, `dataEdicao` e valores antes/depois.
-
-3. **Modal de Histórico**
-- `GET /api/pessoas/:id/historico-edicoes` retorna o array JSON armazenado no Supabase.
-- O modal armazena em cache o histórico por pessoa e exibe uma linha do tempo vertical.
-
-4. **Filtragem e Classificação**
-- Filtragem do lado do cliente por termo, local e cargo (`PessoasRules.filterPessoas`).
-- Classificação por nome para uma ordenação estável das tabelas.
-
-Validações
------------
-- O frontend usa as entradas necessárias enquanto o backend revalida.
-- Resultados de matrícula duplicados em HTTP 409 do manipulador serverless.
-
-Tabelas do Supabase
----------------
-- `pessoas`: entidade principal incluindo a coluna JSONB `historicoEdicao`.
-- Tabelas relacionadas (saidas, acidentes) referenciam `pessoas.id`.
-
-Notas da IU
---------
-- A coluna Ação usa `PessoasActions` para acionar a edição e a visualização do histórico.
-- Os estados de erro são exibidos no formulário ou modal com base na ação com falha.
-- O botão de atualização manual emite novamente `GET /api/pessoas` para os dados mais recentes.
+Dependencias
+------------
+- `AuthContext` para registrar usuario responsavel nas alteracoes.
+- `PessoasRules` para sanitizar payload.
+- `dataClient` garante a compatibilidade entre modo remoto e local.
+- Seeds locais incluem dois colaboradores para testes iniciais.

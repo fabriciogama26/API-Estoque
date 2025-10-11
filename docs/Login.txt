@@ -1,30 +1,34 @@
 Tela: Login
-==============
+============
 
 Objetivo
--------
-- Autentica usuários através do Supabase Auth antes de conceder acesso a qualquer rota protegida (`ProtectedRoute`).
-- Em caso de sucesso, redireciona para o caminho originalmente solicitado ou `/`.
+--------
+- Controlar acesso antes de liberar qualquer rota protegida (`ProtectedRoute`).
+- Oferecer dois fluxos de autenticacao:
+  - **Modo remoto (Supabase)**: usa `supabase.auth.signInWithPassword`.
+  - **Modo local**: valida credenciais definidas em `VITE_LOCAL_USERNAME` e `VITE_LOCAL_PASSWORD`.
 
-Campos do Formulário
------------
-- `username` (e-mail, obrigatório): usado como identificador do Supabase Auth.
-- `password` (senha, obrigatório).
-- `remember` (caixa de seleção): atualmente somente na interface do usuário; a persistência da sessão do Supabase é gerenciada pela configuração do SDK.
+Campos do formulario
+--------------------
+- `username` (obrigatorio): email ou identificador. No modo local comparar com o valor de `VITE_LOCAL_USERNAME`.
+- `password` (obrigatorio).
+- `remember` (checkbox): somente visual por enquanto (persistencia depende do Supabase).
 
-Validações
------------
-- Atributos HTML básicos `required` impedem envios vazios.
-- `AuthContext.login` agora:
-* Rejeita quando um dos campos está ausente (`Informe usuário e senha`).
-* Chama `supabase.auth.signInWithPassword`; mensagens de erro do Supabase são exibidas para o usuário.
+Validacoes
+----------
+- HTML `required` impede envio sem usuario/senha.
+- `AuthContext.login` retorna `Informe usuario e senha` quando algum campo esta vazio.
+- Modo remoto: mensagem do Supabase exibida diretamente em caso de erro.
+- Modo local: retorna `Usuario ou senha invalidos` se fugir do par configurado.
 
-Fluxo de Dados
----------
-- Em caso de sucesso, a sessão retornada é armazenada pelo Supabase; o perfil analisado é armazenado em cache em `localStorage` (`api-estoque-auth`) para recarga rápida.
-- Em caso de falha, é exibido um texto de feedback abaixo do formulário.
-
-Notas de Segurança
+Fluxo de dados
 --------------
-- Todas as solicitações de API subsequentes dependem do token de acesso do Supabase adicionado automaticamente por `src/services/api.js`.
-- Nenhum endpoint `/api/auth/login` personalizado permanece; a autenticação é totalmente gerenciada pelo Supabase.
+- Em caso de sucesso, `AuthContext` armazena o usuario normalizado em `localStorage` (`api-estoque-auth`) para recarga rapida.
+- No modo remoto o Supabase mantem a sessao ativa (refresh tokens administrados pelo SDK).
+- No modo local nenhum token externo e emitido; todo o estado fica no navegador.
+
+Notas importantes
+-----------------
+- Para alternar o comportamento defina `VITE_DATA_MODE` (`remote` ou `local`) e reinicie o Vite.
+- Limpe `api-estoque-auth` ao trocar de modo para evitar reaproveitar usuarios com formato diferente.
+- Guia completo: `docs/data-mode-guide.txt`.

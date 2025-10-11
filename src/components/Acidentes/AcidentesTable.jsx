@@ -38,7 +38,7 @@ export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
             <th>Dias debitados</th>
             <th>Tipo</th>
             <th>Agente</th>
-            <th>Setor</th>
+            <th>Centro de servico</th>
             <th>Local</th>
             <th>CAT</th>
             <th>Acao</th>
@@ -65,7 +65,7 @@ export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
                 <td>{formatNumber(acidente.diasDebitados)}</td>
                 <td>{acidente.tipo || '-'}</td>
                 <td>{acidente.agente || '-'}</td>
-                <td>{acidente.setor || '-'}</td>
+                <td>{(acidente.centroServico ?? acidente.setor) || '-'}</td>
                 <td>{acidente.local || '-'}</td>
                 <td>{acidente.cat || '-'}</td>
                 <td>

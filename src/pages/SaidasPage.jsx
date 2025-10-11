@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ExitIcon } from '../components/icons.jsx'
-import { api } from '../services/api.js'
+import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const initialForm = {
   pessoaId: '',
   materialId: '',
   quantidade: '',
+  centroCusto: '',
+  centroServico: '',
   dataEntrega: '',
 }
 
@@ -15,6 +17,8 @@ const filterInitial = {
   termo: '',
   pessoaId: '',
   materialId: '',
+  centroCusto: '',
+  centroServico: '',
   status: '',
   dataInicio: '',
   dataFim: '',
@@ -64,6 +68,17 @@ export function SaidasPage() {
 
   const handleChange = (event) => {
     const { name, value } = event.target
+    if (name === 'pessoaId') {
+      setForm((prev) => {
+        const pessoa = pessoasMap.get(value)
+        return {
+          ...prev,
+          pessoaId: value,
+          centroServico: pessoa?.centroServico ?? pessoa?.local ?? prev.centroServico,
+        }
+      })
+      return
+    }
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -76,6 +91,8 @@ export function SaidasPage() {
         pessoaId: form.pessoaId,
         materialId: form.materialId,
         quantidade: Number(form.quantidade),
+        centroCusto: form.centroCusto.trim(),
+        centroServico: form.centroServico.trim(),
         dataEntrega: form.dataEntrega || undefined,
         usuarioResponsavel: user?.name || user?.username || 'sistema',
       }
@@ -161,6 +178,16 @@ export function SaidasPage() {
         }
       }
 
+      const centroCustoFiltro = filters.centroCusto.trim().toLowerCase()
+      if (centroCustoFiltro && (saida.centroCusto || '').toLowerCase() !== centroCustoFiltro) {
+        return false
+      }
+
+      const centroServicoFiltro = filters.centroServico.trim().toLowerCase()
+      if (centroServicoFiltro && (saida.centroServico || '').toLowerCase() !== centroServicoFiltro) {
+        return false
+      }
+
       if (!termo) {
         return true
       }
@@ -169,7 +196,9 @@ export function SaidasPage() {
         material?.nome || '',
         material?.fabricante || '',
         pessoa?.nome || '',
-        pessoa?.local || '',
+        (pessoa?.centroServico ?? pessoa?.local) || '',
+        saida.centroCusto || '',
+        saida.centroServico || '',
         saida.usuarioResponsavel || '',
         saida.status || '',
       ]
@@ -217,6 +246,26 @@ export function SaidasPage() {
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
           </label>
           <label className="field">
+            <span>Centro de custo*</span>
+            <input
+              name="centroCusto"
+              value={form.centroCusto}
+              onChange={handleChange}
+              required
+              placeholder="Ex: CC-OPER"
+            />
+          </label>
+          <label className="field">
+            <span>Centro de serviço*</span>
+            <input
+              name="centroServico"
+              value={form.centroServico}
+              onChange={handleChange}
+              required
+              placeholder="Ex: Operacao"
+            />
+          </label>
+          <label className="field">
             <span>Data de entrega</span>
             <input type="date" name="dataEntrega" value={form.dataEntrega} onChange={handleChange} />
           </label>
@@ -262,6 +311,24 @@ export function SaidasPage() {
           </select>
         </label>
         <label className="field">
+          <span>Centro de custo</span>
+          <input
+            name="centroCusto"
+            value={filters.centroCusto}
+            onChange={handleFilterChange}
+            placeholder="Ex: CC-OPER"
+          />
+        </label>
+        <label className="field">
+          <span>Centro de serviço</span>
+          <input
+            name="centroServico"
+            value={filters.centroServico}
+            onChange={handleFilterChange}
+            placeholder="Ex: Operacao"
+          />
+        </label>
+        <label className="field">
           <span>Status</span>
           <select name="status" value={filters.status} onChange={handleFilterChange}>
             <option value="">Todos</option>
@@ -303,6 +370,8 @@ export function SaidasPage() {
                   <th>Material</th>
                   <th>Pessoa</th>
                   <th>Quantidade</th>
+                  <th>Centro de custo</th>
+                  <th>Centro de serviço</th>
                   <th>Status</th>
                   <th>Data entrega</th>
                   <th>Data troca</th>
@@ -324,9 +393,11 @@ export function SaidasPage() {
                       </td>
                       <td>
                         <strong>{pessoa?.nome || 'Pessoa removida'}</strong>
-                        <p className="data-table__muted">{pessoa?.local || 'Nao informado'}</p>
+                        <p className="data-table__muted">{(pessoa?.centroServico ?? pessoa?.local) || 'Nao informado'}</p>
                       </td>
                       <td>{saida.quantidade}</td>
+                      <td>{saida.centroCusto || '-'}</td>
+                      <td>{saida.centroServico || '-'}</td>
                       <td>{saida.status || '-'}</td>
                       <td>{saida.dataEntrega ? new Date(saida.dataEntrega).toLocaleString('pt-BR') : 'Nao informado'}</td>
                       <td>{saida.dataTroca ? new Date(saida.dataTroca).toLocaleDateString('pt-BR') : 'Nao informado'}</td>

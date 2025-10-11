@@ -102,8 +102,8 @@ export function AcidentesForm({
           <input name="parteLesionada" value={form.parteLesionada} onChange={onChange} placeholder="Tornozelo" required />
         </label>
         <label className="field">
-          <span>Setor <span className="asterisco">*</span></span>
-          <input name="setor" value={form.setor} readOnly placeholder="Producao" required />
+          <span>Centro de servico <span className="asterisco">*</span></span>
+          <input name="centroServico" value={form.centroServico} readOnly placeholder="Ex: Operacao" required />
         </label>
         <label className="field">
           <span>Local <span className="asterisco">*</span></span>

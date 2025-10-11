@@ -55,7 +55,7 @@ ul, ol {
   margin: 0;
   padding: 0;
   list-style: none;
-  color: rgba(22, 163, 74, 0.9); /* verde link */
+  color: primary; /* verde link */
 }
 
 /* Utilitários */

@@ -5,20 +5,24 @@ function sanitizeCampo(valor) {
 }
 
 export function createPessoaPayload(form, usuario) {
+  const centroServico = sanitizeCampo(form.centroServico ?? form.local)
   return {
     nome: sanitizeCampo(form.nome),
     matricula: sanitizeCampo(form.matricula),
-    local: sanitizeCampo(form.local),
+    centroServico,
+    local: centroServico,
     cargo: sanitizeCampo(form.cargo),
     usuarioCadastro: usuario,
   }
 }
 
 export function updatePessoaPayload(form, usuario) {
+  const centroServico = sanitizeCampo(form.centroServico ?? form.local)
   return {
     nome: sanitizeCampo(form.nome),
     matricula: sanitizeCampo(form.matricula),
-    local: sanitizeCampo(form.local),
+    centroServico,
+    local: centroServico,
     cargo: sanitizeCampo(form.cargo),
     usuarioResponsavel: usuario,
   }
@@ -26,9 +30,11 @@ export function updatePessoaPayload(form, usuario) {
 
 export function filterPessoas(pessoas, filters) {
   const termo = filters.termo.trim().toLowerCase()
+  const centroServicoFiltro = (filters.centroServico ?? filters.local ?? 'todos')
 
   return pessoas.filter((pessoa) => {
-    if (filters.local !== 'todos' && pessoa.local !== filters.local) {
+    const centroServicoAtual = pessoa.centroServico ?? pessoa.local ?? ''
+    if (centroServicoFiltro !== 'todos' && centroServicoAtual !== centroServicoFiltro) {
       return false
     }
 
@@ -43,7 +49,7 @@ export function filterPessoas(pessoas, filters) {
     const alvo = [
       pessoa.nome || '',
       pessoa.matricula || '',
-      pessoa.local || '',
+      centroServicoAtual,
       pessoa.cargo || '',
       pessoa.usuarioCadastro || '',
       pessoa.usuarioEdicao || '',
@@ -59,8 +65,10 @@ export function sortPessoasByNome(pessoas) {
   return pessoas.slice().sort((a, b) => a.nome.localeCompare(b.nome))
 }
 
-export function extractLocais(pessoas) {
-  return uniqueSorted(pessoas.map((pessoa) => pessoa.local))
+export function extractCentrosServico(pessoas) {
+  return uniqueSorted(
+    pessoas.map((pessoa) => pessoa.centroServico ?? pessoa.local)
+  )
 }
 
 export function extractCargos(pessoas) {

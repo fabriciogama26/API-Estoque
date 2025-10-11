@@ -16,6 +16,8 @@ class SaidaService {
       material,
       quantidade: payload.quantidade,
       dataEntrega: payload.dataEntrega,
+      centroCusto: payload.centroCusto,
+      centroServico: payload.centroServico,
       estoqueDisponivel
     });
 
@@ -27,6 +29,8 @@ class SaidaService {
       materialId: material.id,
       pessoaId: pessoa.id,
       quantidade: Number(payload.quantidade),
+      centroCusto: payload.centroCusto || '',
+      centroServico: payload.centroServico || '',
       dataEntrega,
       dataTroca,
       usuarioResponsavel: payload.usuarioResponsavel || null
@@ -108,12 +112,15 @@ class SaidaService {
       materialId: material.id,
       pessoaId: pessoa.id,
       quantidade: saida.quantidade,
+      centroCusto: saida.centroCusto || '',
+      centroServico: saida.centroServico || '',
       dataEntrega: saida.dataEntrega,
       dataTroca: saida.dataTroca,
       status: saida.status,
       pessoa: {
         nome: pessoa.nome,
         local: pessoa.local,
+        centroServico: pessoa.centroServico || pessoa.local,
         cargo: pessoa.cargo
       },
       material: {

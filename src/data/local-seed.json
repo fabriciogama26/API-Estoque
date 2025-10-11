@@ -1,0 +1,147 @@
+{
+  "pessoas": [
+    {
+      "id": "seed-pessoa-joao",
+      "nome": "Joao Silva",
+      "matricula": "1001",
+      "local": "Almoxarifado",
+      "cargo": "Estoquista",
+      "usuarioCadastro": "seed",
+      "usuarioEdicao": null,
+      "criadoEm": "2025-01-10T12:00:00.000Z",
+      "atualizadoEm": null,
+      "historicoEdicao": [],
+      "centroServico": "Almoxarifado"
+    },
+    {
+      "id": "seed-pessoa-maria",
+      "nome": "Maria Souza",
+      "matricula": "1002",
+      "local": "Operacao",
+      "cargo": "Supervisora",
+      "usuarioCadastro": "seed",
+      "usuarioEdicao": null,
+      "criadoEm": "2025-01-12T15:30:00.000Z",
+      "atualizadoEm": null,
+      "historicoEdicao": [],
+      "centroServico": "Operacao"
+    }
+  ],
+  "materiais": [
+    {
+      "id": "seed-material-luva",
+      "nome": "Luva Nitrilica",
+      "fabricante": "Protecbras",
+      "validadeDias": 180,
+      "ca": "12345",
+      "valorUnitario": 35.5,
+      "estoqueMinimo": 10,
+      "ativo": true,
+      "usuarioCadastro": "seed",
+      "usuarioAtualizacao": null,
+      "criadoEm": "2025-01-05T10:00:00.000Z",
+      "atualizadoEm": null
+    },
+    {
+      "id": "seed-material-bota",
+      "nome": "Bota PVC",
+      "fabricante": "SafeStep",
+      "validadeDias": 365,
+      "ca": "67890",
+      "valorUnitario": 82,
+      "estoqueMinimo": 5,
+      "ativo": true,
+      "usuarioCadastro": "seed",
+      "usuarioAtualizacao": null,
+      "criadoEm": "2025-01-08T11:15:00.000Z",
+      "atualizadoEm": null
+    }
+  ],
+  "materialPriceHistory": [
+    {
+      "id": "seed-historico-luva-1",
+      "materialId": "seed-material-luva",
+      "valorUnitario": 35.5,
+      "usuarioResponsavel": "seed",
+      "dataRegistro": "2025-01-05T10:00:00.000Z"
+    },
+    {
+      "id": "seed-historico-bota-1",
+      "materialId": "seed-material-bota",
+      "valorUnitario": 82,
+      "usuarioResponsavel": "seed",
+      "dataRegistro": "2025-01-08T11:15:00.000Z"
+    }
+  ],
+  "entradas": [
+    {
+      "id": "seed-entrada-1",
+      "materialId": "seed-material-luva",
+      "quantidade": 30,
+      "dataEntrada": "2025-02-01T09:00:00.000Z",
+      "usuarioResponsavel": "seed",
+      "centroCusto": "CC-OPER",
+      "centroServico": "Operacao"
+    },
+    {
+      "id": "seed-entrada-2",
+      "materialId": "seed-material-bota",
+      "quantidade": 15,
+      "dataEntrada": "2025-02-03T14:20:00.000Z",
+      "usuarioResponsavel": "seed",
+      "centroCusto": "CC-OPER",
+      "centroServico": "Operacao"
+    }
+  ],
+  "saidas": [
+    {
+      "id": "seed-saida-1",
+      "pessoaId": "seed-pessoa-joao",
+      "materialId": "seed-material-luva",
+      "quantidade": 4,
+      "dataEntrega": "2025-02-05T13:00:00.000Z",
+      "dataTroca": "2025-08-04T13:00:00.000Z",
+      "usuarioResponsavel": "seed",
+      "status": "entregue",
+      "centroCusto": "CC-OPER",
+      "centroServico": "Operacao"
+    },
+    {
+      "id": "seed-saida-2",
+      "pessoaId": "seed-pessoa-maria",
+      "materialId": "seed-material-bota",
+      "quantidade": 2,
+      "dataEntrega": "2025-02-06T16:30:00.000Z",
+      "dataTroca": "2026-02-06T16:30:00.000Z",
+      "usuarioResponsavel": "seed",
+      "status": "entregue",
+      "centroCusto": "CC-OPER",
+      "centroServico": "Operacao"
+    }
+  ],
+  "acidentes": [
+    {
+      "id": "seed-acidente-1",
+      "matricula": "1001",
+      "nome": "Joao Silva",
+      "cargo": "Estoquista",
+      "data": "2025-01-20T12:30:00.000Z",
+      "tipo": "Queda",
+      "agente": "Escada",
+      "lesao": "Torcicolo",
+      "parteLesionada": "Pescoco",
+      "setor": "Almoxarifado",
+      "local": "Deposito 1",
+      "diasPerdidos": 2,
+      "diasDebitados": 0,
+      "cid": null,
+      "cat": "123/2025",
+      "observacao": null,
+      "registradoPor": "seed",
+      "criadoEm": "2025-01-20T15:00:00.000Z",
+      "atualizadoEm": null,
+      "atualizadoPor": null,
+      "centroServico": "Almoxarifado"
+    }
+  ]
+}

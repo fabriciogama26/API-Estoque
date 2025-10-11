@@ -11,8 +11,14 @@ export function PessoasForm({ form, onChange, onSubmit, isSaving, editingPessoa,
           <input name="matricula" value={form.matricula} onChange={onChange} required placeholder="12345" />
         </label>
         <label className="field">
-          <span>Local <span className="asterisco">*</span></span>
-          <input name="local" value={form.local} onChange={onChange} required placeholder="Unidade/Setor" />
+          <span>Centro de servico <span className="asterisco">*</span></span>
+          <input
+            name="centroServico"
+            value={form.centroServico}
+            onChange={onChange}
+            required
+            placeholder="Ex: Operacao"
+          />
         </label>
         <label className="field">
           <span>Cargo <span className="asterisco">*</span></span>

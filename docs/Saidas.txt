@@ -1,33 +1,51 @@
 Tela: Saidas
-==============
+============
 
 Objetivo
--------
-- Registrar entregas de EPI, garantir a disponibilidade de estoque e fornecer histórico completo com contexto financeiro.
+--------
+- Registrar entregas de EPIs a colaboradores e acompanhar status de devolucao/troca.
+- Garantir controle de estoque usando os mesmos dados do modo remoto ou local.
 
-Campos do Formulário
------------
-- `pessoaId` (select, obrigatório) de `/api/pessoas`.
-- `materialId` (select, obrigatório) de `/api/materiais`.
-- `quantidade` (número >= 1, obrigatório).
-- `dataEntrega` (data, opcional).
+Campos do formulario
+--------------------
+- `pessoaId` (select): preenchido com `dataClient.pessoas.list`.
+- `materialId` (select): preenchido com `dataClient.materiais.list`.
+- `quantidade` (numeric >= 1).
+- `centroCusto` (texto, obrigatorio): identifica o centro que receberá o custo da saída.
+- `centroServico` (texto, obrigatorio): centro de serviço responsável pelo colaborador.
+- `dataEntrega` (date opcional).
+- `status` (select na tabela; valores dinamicos).
+
+Validacoes
+----------
+- HTML assegura campos obrigatorios e quantidade positiva.
+- Servico remoto verifica:
+  - Pessoa e material existentes em Supabase.
+  - Disponibilidade de estoque (`calcularSaldoMaterialAtual`).
+  - Centros de custo e serviço preenchidos.
+  - Calcula `dataTroca` com base na validade do material.
+- Servico local aplica a mesma logica antes de persistir no `localStorage`.
 
 APIs
 ----
-- `GET /api/saidas`
-- `POST /api/saidas`
+- `dataClient.saidas.list()`
+- `dataClient.saidas.create(payload)`
+- Em modo remoto mapeia para `/api/saidas`.
 
-Regras de Negócio
+Fluxo de dados
 --------------
-- O manipulador serverless valida:
-* Tanto pessoa quanto material existem no Supabase.
-* Quantidade é positiva.
-* O saldo de estoque (`entradas - saidas`) é suficiente antes da confirmação da gravação.
-* `dataTroca` é calculado a partir da validade do material.
-- A resposta inclui `estoqueAtual` após a dedução para feedback imediato da IU.
+1. Depois de registrar uma saida, pagina recarrega pessoas, materiais e saidas em paralelo.
+2. Tabela mostra pessoa, material, quantidade, status, datas e valor total (calculado no cliente).
+3. Filtros por termo, pessoa, material, status, periodo.
 
-Notas da IU
---------
-- O botão Enviar exibe `Registrando...` ​​durante a solicitação.
-- Os filtros permitem a busca no lado do cliente por pessoa/material/status/intervalo de datas.
-- Os erros da API aparecem em linha acima do formulário.
+Regra de estoque
+----------------
+- Quantidade maxima permitida e o saldo atual do material.
+- Operacao retorna `estoqueAtual` apos o registro (utilizado em mensagens de feedback no futuro).
+
+Dependencias
+------------
+- `AuthContext` para `usuarioResponsavel`.
+- `dataClient` para alternar backend.
+- `SaidasRules` e `MateriaisRules` para reutilizar validacoes.
+- Seeds locais incluem duas saidas de exemplo.

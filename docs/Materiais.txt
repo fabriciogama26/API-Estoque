@@ -1,75 +1,53 @@
-Visão geral
-========
-- Tela completa para registrar, editar, filtrar e auditar materiais EPI.
-- Integra-se com endpoints serverless suportados pelo Supabase e mantém caches locais para feedback rápido da interface do usuário.
+Tela: Materiais
+===============
 
-Principais fluxos
----------
-1. **Criar material**
-- Campos do formulário: `nome`, `fabricante`, `validadeDias`, `ca`, `valorUnitário`.
-- Ao enviar, chama `POST /api/materiais` com token Bearer autenticado.
-- O backend impõe unicidade (nome + fabricante) e validações numéricas antes de gravar em `materiais` do Supabase.
-- Em caso de sucesso, o cache do histórico é limpo e a lista é recarregada.
+Objetivo
+--------
+- Cadastrar e manter EPIs (nome, fabricante, validade, CA, valor unitario, estoque minimo, status).
+- Registrar historico de precos para auditoria.
 
-2. **Atualizar material**
-- A edição carrega os valores atuais no formulário.
-- `PUT /api/materiais/:id` atualiza o Supabase e, quando `valorUnitário` é alterado, o backend registra uma nova linha em `material_price_history`.
-- Atualizações de estoque mínimo em linha reutilizam esta rota.
+Fluxo geral
+-----------
+1. Formulario cria ou atualiza materiais via `dataClient.materiais`.
+2. Tabela lista materiais com filtros por termo/campos.
+3. Modal de historico (`MateriaisHistoryModal`) mostra variaçao de preco.
 
-3. **Visualizar Histórico de Preços**
-- `GET /api/materiais/:id/historico-precos` busca o histórico lentamente e armazena em cache por material.
-- O modal de histórico exibe registros com `valorUnitário`, `usuarioResponsavel` e timestamps.
-
-4. **Filtros e Ordenação**
-- Filtragem do lado do cliente por termo e status (`ativos`, `inativos`, `todos`).
-- Ordenação por nome via `sortMateriaisByNome` sem chamadas de rede extras.
-
-Resumo da Validação
-------------------
-- O frontend limpa os dígitos da CA e formata a entrada de moeda.
-
-- O auxiliar de backend `MateriaisOperations` revalida:
-* `validadeDias > 0`
-* `valorUnitário > 0`
-* `estoqueMinimo >= 0` quando fornecido.
-
-Dependências
-------------
-- Requer sessão autenticada do Supabase (token anexado por `src/services/api.js`).
-- Utiliza regras/utilitários compartilhados (`MateriaisRules`, `MateriaisUtils`) para modelagem e formatação de payload.
-- Atualizações em materiais impactam as telas de Estoque, Entradas, Saídas e Painel.
-
-Tabelas do Supabase
----------------
-- `materiais`: entidade principal com campos de auditoria (`usuarioCadastro`, `usuarioAtualizacao`, timestamps).
-- `material_price_history`: log somente para anexar alterações de preço.
-
-Tratamento de Erros
--------------
-- Erros de API são exibidos perto do formulário ou dentro do modal do histórico.
-- Restrições duplicadas respondem com HTTP 409 e a mensagem "Material já cadastrado para esse fabricante".
-
-Finalidade
--------
-- Interface CRUD para materiais (EPIs) com acesso e filtragem de histórico em linha.
-- Interage exclusivamente com o Supabase por meio de rotas serverless.
+Campos principais
+-----------------
+- `nome`, `fabricante`, `validadeDias`, `ca`, `valorUnitario`, `estoqueMinimo`, `ativo`.
+- Valor unitario usa helpers de formatacao (`formatCurrencyInput`).
+- Atualizacoes registram usuario responsavel e timestamp.
 
 APIs
 ----
-- `GET /api/materiais` – preenche listas e seleciona.
-- `POST /api/materiais` – cria.
-- `PUT /api/materiais/:id` – atualiza campos, incluindo estoque mínimo.
-- `GET /api/materiais/:id/historico-precos` – obtém histórico de preços sob demanda.
+- `dataClient.materiais.list()`
+- `dataClient.materiais.create(payload)`
+- `dataClient.materiais.update(id, payload)`
+- `dataClient.materiais.priceHistory(id)`
+  - Remoto: mapeia para `/api/materiais`, `/api/materiais/:id`, `/api/materiais/:id/historico-precos`.
+  - Local: persiste no `localStorage` e adiciona registros em `materialPriceHistory`.
 
-Regras de Negócios
---------------
-- O backend impõe unicidade (`nome` + `fabricante`) e validações numéricas.
-- Alterações de preço criam entradas em `material_price_history`.
-- O frontend armazena em cache o histórico por material para reduzir chamadas de rede.
+Validacoes
+----------
+- Frontend garante campos obrigatorios e numeros positivos.
+- Servicos validam:
+  - Nome/fabricante nao vazios.
+  - `validadeDias` > 0.
+  - `valorUnitario` > 0.
+  - `estoqueMinimo` >= 0 (ou null).
+  - CA nao vazio.
+- Historico de preco e gravado sempre que `valorUnitario` muda.
 
-Notas da IU
---------
-- O formulário utiliza o auxiliar de formatação de moeda e a sanitização da CA.
+Comportamento da UI
+-------------------
+- `isSaving` desabilita botoes e mostra feedback textual.
+- Erros exibem mensagens do `Error.message`.
+- Abertura do modal busca cache local antes de nova chamada.
+- Edicao preenche formulario com valores formatados.
 
-- Mensagens de erro da API aparecem dentro do formulário e do modal.
-- A barra de filtros oferece filtragem de termos/status do lado do cliente sem solicitações extras.
+Dependencias
+------------
+- `AuthContext` para resolver usuario (nome exibido no historico).
+- `MateriaisRules` para sanitizacao/formatacao.
+- `dataClient` para alternar entre modo remoto e local.
+- Seeds locais fornecem dois materiais de exemplo com historico inicial.

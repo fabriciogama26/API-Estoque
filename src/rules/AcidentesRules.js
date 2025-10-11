@@ -17,6 +17,8 @@ export function resolveUsuarioNome(user) {
 }
 
 export function validateAcidenteForm(form) {
+  const centroServico = form.centroServico?.trim() || form.setor?.trim() || ''
+
   if (!form.nome.trim()) {
     return 'Informe o nome do colaborador.'
   }
@@ -41,8 +43,8 @@ export function validateAcidenteForm(form) {
   if (!form.parteLesionada.trim()) {
     return 'Informe a parte lesionada.'
   }
-  if (!form.setor.trim()) {
-    return 'Informe o setor.'
+  if (!centroServico) {
+    return 'Informe o centro de servico.'
   }
   if (!form.local.trim()) {
     return 'Informe o local.'
@@ -77,7 +79,15 @@ export function validateAcidenteForm(form) {
   return null
 }
 
+const sanitizeCentroServico = (value) => {
+  const trimmed = value?.trim() || ''
+  return trimmed
+}
+
 export function createAcidentePayload(form, usuarioCadastro) {
+  const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
+  const local = form.local.trim() || centroServico
+
   return {
     matricula: form.matricula.trim(),
     nome: form.nome.trim(),
@@ -90,14 +100,18 @@ export function createAcidentePayload(form, usuarioCadastro) {
     cid: form.cid.trim(),
     lesao: form.lesao.trim(),
     parteLesionada: form.parteLesionada.trim(),
-    setor: form.setor.trim(),
-    local: form.local.trim(),
+    centroServico,
+    setor: centroServico,
+    local,
     cat: form.cat.trim(),
     usuarioCadastro,
   }
 }
 
 export function updateAcidentePayload(form, usuarioResponsavel) {
+  const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
+  const local = form.local.trim() || centroServico
+
   return {
     matricula: form.matricula.trim(),
     nome: form.nome.trim(),
@@ -110,8 +124,9 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     cid: form.cid.trim(),
     lesao: form.lesao.trim(),
     parteLesionada: form.parteLesionada.trim(),
-    setor: form.setor.trim(),
-    local: form.local.trim(),
+    centroServico,
+    setor: centroServico,
+    local,
     cat: form.cat.trim(),
     usuarioResponsavel,
   }
@@ -119,13 +134,15 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
 
 export function filterAcidentes(acidentes, filters) {
   const termo = filters.termo.trim().toLowerCase()
+  const centroServicoFiltro = String(filters.centroServico ?? filters.setor ?? 'todos').toLowerCase()
 
   return acidentes.filter((acidente) => {
     if (filters.tipo !== 'todos' && (acidente.tipo || '').toLowerCase() !== filters.tipo.toLowerCase()) {
       return false
     }
 
-    if (filters.setor !== 'todos' && (acidente.setor || '').toLowerCase() !== filters.setor.toLowerCase()) {
+    const centroServicoAtual = (acidente.centroServico ?? acidente.setor ?? '').toLowerCase()
+    if (centroServicoFiltro !== 'todos' && centroServicoAtual !== centroServicoFiltro) {
       return false
     }
 
@@ -146,6 +163,7 @@ export function filterAcidentes(acidentes, filters) {
       acidente.cid,
       acidente.lesao,
       acidente.parteLesionada,
+      acidente.centroServico,
       acidente.setor,
       acidente.local,
       acidente.cat,
@@ -171,5 +189,6 @@ const buildSortedUnique = (items, accessor) => {
 }
 
 export const extractTipos = (acidentes) => buildSortedUnique(acidentes, (item) => item.tipo)
-export const extractSetores = (acidentes) => buildSortedUnique(acidentes, (item) => item.setor)
+export const extractCentrosServico = (acidentes) =>
+  buildSortedUnique(acidentes, (item) => item.centroServico ?? item.setor)
 export const extractAgentes = (acidentes) => buildSortedUnique(acidentes, (item) => item.agente)

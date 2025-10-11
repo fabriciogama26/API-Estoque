@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { EntryIcon } from '../components/icons.jsx'
-import { api } from '../services/api.js'
+import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const initialForm = {
   materialId: '',
   quantidade: '',
+  centroCusto: '',
+  centroServico: '',
   dataEntrada: '',
 }
 
 const filterInitial = {
   termo: '',
   materialId: '',
+  centroCusto: '',
+  centroServico: '',
   dataInicio: '',
   dataFim: '',
 }
@@ -69,6 +73,8 @@ export function EntradasPage() {
       const payload = {
         materialId: form.materialId,
         quantidade: Number(form.quantidade),
+        centroCusto: form.centroCusto.trim(),
+        centroServico: form.centroServico.trim(),
         dataEntrada: form.dataEntrada || undefined,
         usuarioResponsavel: user?.name || user?.username || 'sistema',
       }
@@ -131,6 +137,16 @@ export function EntradasPage() {
         }
       }
 
+      const centroCustoFiltro = filters.centroCusto.trim().toLowerCase()
+      if (centroCustoFiltro && (entrada.centroCusto || '').toLowerCase() !== centroCustoFiltro) {
+        return false
+      }
+
+      const centroServicoFiltro = filters.centroServico.trim().toLowerCase()
+      if (centroServicoFiltro && (entrada.centroServico || '').toLowerCase() !== centroServicoFiltro) {
+        return false
+      }
+
       if (!termo) {
         return true
       }
@@ -138,6 +154,8 @@ export function EntradasPage() {
       const alvo = [
         material?.nome || '',
         material?.fabricante || '',
+        entrada.centroCusto || '',
+        entrada.centroServico || '',
         entrada.usuarioResponsavel || '',
       ]
         .join(' ')
@@ -171,6 +189,26 @@ export function EntradasPage() {
           <label className="field">
             <span>Quantidade*</span>
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
+          </label>
+          <label className="field">
+            <span>Centro de custo*</span>
+            <input
+              name="centroCusto"
+              value={form.centroCusto}
+              onChange={handleChange}
+              required
+              placeholder="Ex: CC-OPER"
+            />
+          </label>
+          <label className="field">
+            <span>Centro de serviço*</span>
+            <input
+              name="centroServico"
+              value={form.centroServico}
+              onChange={handleChange}
+              required
+              placeholder="Ex: Operacao"
+            />
           </label>
           <label className="field">
             <span>Data da entrada</span>
@@ -207,6 +245,19 @@ export function EntradasPage() {
           </select>
         </label>
         <label className="field">
+          <span>Centro de custo</span>
+          <input name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange} placeholder="Ex: CC-OPER" />
+        </label>
+        <label className="field">
+          <span>Centro de serviço</span>
+          <input
+            name="centroServico"
+            value={filters.centroServico}
+            onChange={handleFilterChange}
+            placeholder="Ex: Operacao"
+          />
+        </label>
+        <label className="field">
           <span>Data inicial</span>
           <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
         </label>
@@ -236,6 +287,8 @@ export function EntradasPage() {
                 <tr>
                   <th>Material</th>
                   <th>Quantidade</th>
+                  <th>Centro de custo</th>
+                  <th>Centro de serviço</th>
                   <th>Valor total</th>
                   <th>Data</th>
                   <th>Registrado por</th>
@@ -253,6 +306,8 @@ export function EntradasPage() {
                         <p className="data-table__muted">{material?.fabricante || 'Nao informado'}</p>
                       </td>
                       <td>{entrada.quantidade}</td>
+                      <td>{entrada.centroCusto || '-'}</td>
+                      <td>{entrada.centroServico || '-'}</td>
                       <td>{formatCurrency(total)}</td>
                       <td>{entrada.dataEntrada ? new Date(entrada.dataEntrada).toLocaleString('pt-BR') : 'Nao informado'}</td>
                       <td>{entrada.usuarioResponsavel || 'Nao informado'}</td>

@@ -164,12 +164,12 @@ aside.sidebar {
   color: #ffffff;
 }
 
-/* Active */
+/* Active Link border */
 .sidebar__link--active {
   background: linear-gradient(160deg, var(--color-primary), var(--color-primary-dark));
-  color: #ffffff;
+  color: #091718;
   font-weight: 600;
-  border-left: 3px solid var(--color-primary-dark);
+  border-left: 3px solid var(--color-border-left);
   padding-left: calc(0.7rem - 3px);
 }
 
