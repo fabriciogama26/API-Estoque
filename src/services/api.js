@@ -97,14 +97,14 @@ export const api = {
     create: (payload) => request('/api/pessoas', { method: 'POST', body: payload }),
     update: (id, payload) => request(`/api/pessoas/${id}`, { method: 'PUT', body: payload }),
     get: (id) => request(`/api/pessoas/${id}`),
-    history: (id) => request(`/api/pessoas/${id}/historico-edicoes`),
+    history: (id) => request(`/api/pessoas/history/${id}`),
   },
   materiais: {
     list: () => request('/api/materiais'),
     create: (payload) => request('/api/materiais', { method: 'POST', body: payload }),
     update: (id, payload) => request(`/api/materiais/${id}`, { method: 'PUT', body: payload }),
     get: (id) => request(`/api/materiais/${id}`),
-    priceHistory: (id) => request(`/api/materiais/${id}/historico-precos`),
+    priceHistory: (id) => request(`/api/materiais/price-history/${id}`),
   },
   entradas: {
     list: () => request('/api/entradas'),
@@ -120,8 +120,8 @@ export const api = {
       return request(`/api/estoque${query}`)
     },
     dashboard: (params = {}) => {
-      const query = buildQuery(params)
-      return request(`/api/estoque/dashboard${query}`)
+      const query = buildQuery({ ...params, view: 'dashboard' })
+      return request(`/api/estoque${query}`)
     },
   },
   acidentes: {

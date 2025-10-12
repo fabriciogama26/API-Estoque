@@ -13,7 +13,7 @@ Filtros
 
 APIs e fontes de dados
 ----------------------
-- **Modo remoto**: `GET /api/estoque/dashboard` protegido por token Supabase. Calcula no backend utilizando `EstoqueOperations.dashboard`.
+- **Modo remoto**: `GET /api/estoque?view=dashboard` (demais filtros via query) protegido por token Supabase. Calcula no backend utilizando `EstoqueOperations.dashboard`.
 - **Modo local**: `localApi.estoque.dashboard` usa os dados do `localStorage` e os auxiliares de `src/lib/estoque.js`.
 - Em ambos os casos a resposta contem `{ periodo, entradas, saidas, entradasDetalhadas[], saidasDetalhadas[], entradasHistoricas[], saidasHistoricas[], materiaisMaisMovimentados[], estoqueAtual }`.
 

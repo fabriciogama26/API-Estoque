@@ -7,7 +7,7 @@ router.get('/', controller.listar);
 router.post('/', controller.criar);
 router.get('/:id', controller.obter);
 router.put('/:id', controller.atualizar);
-router.get('/:id/historico-precos', controller.historicoPreco);
+router.get('/price-history/:id', controller.historicoPreco);
 
 module.exports = router;
 
