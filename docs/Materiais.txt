@@ -24,7 +24,7 @@ APIs
 - `dataClient.materiais.create(payload)`
 - `dataClient.materiais.update(id, payload)`
 - `dataClient.materiais.priceHistory(id)`
-  - Remoto: mapeia para `/api/materiais`, `/api/materiais/:id`, `/api/materiais/:id/historico-precos`.
+  - Remoto: mapeia para `/api/materiais`, `/api/materiais/:id`, `/api/materiais/price-history/:id`.
   - Local: persiste no `localStorage` e adiciona registros em `materialPriceHistory`.
 
 Validacoes

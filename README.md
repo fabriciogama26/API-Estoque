@@ -23,7 +23,7 @@ Aplicacao completa para controle de EPIs com frontend React (Vite) e funcoes ser
 | Camada            | Descricao                                                                 |
 | ----------------- | -------------------------------------------------------------------------- |
 | Frontend          | React 19 + Vite. Consome `dataClient`, que escolhe entre Supabase (`api.js`) ou cache local. |
-| Backend           | Funcoes serverless na Vercel (pasta `api/`). Cada handler valida token Supabase e acessa o banco com a chave de servico. |
+| Backend           | Funcoes serverless na Vercel (`api/index.js` centraliza as rotas `/api/*` e delega para `operations`). Cada chamada valida o token Supabase antes de acessar o banco com a chave de servico. |
 | Banco de Dados    | Supabase Postgres (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`). |
 | Autenticacao      | Supabase Auth no modo remoto. Em modo local, credenciais definidas via `.env.local`. |
 | Regras de negocio | `api/_shared/operations.js` (lado serverless) e `src/lib/estoque.js` (calculos compartilhados). |
@@ -113,6 +113,26 @@ npm run dev
 - Para resetar apenas os dados locais, limpe a chave `api-estoque-local-data-v1` no `localStorage`.
 - Guia completo: [`docs/data-mode-guide.txt`](docs/data-mode-guide.txt).
 
+## Endpoints Principais
+
+Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
+
+| Recurso   | Metodo(s)        | Endpoint(s)                                                                                | Observacoes                                               |
+| --------- | ---------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Pessoas   | GET, POST        | `/api/pessoas`                                                                             | Lista e cria registros.                                   |
+| Pessoas   | PUT              | `/api/pessoas/:id`                                                                         | Atualiza dados da pessoa.                                 |
+| Pessoas   | GET              | `/api/pessoas/history/:id`                                                                 | Retorna historico de edicoes.                             |
+| Materiais | GET, POST        | `/api/materiais`                                                                           | Consulta e cria materiais.                                |
+| Materiais | PUT              | `/api/materiais/:id`                                                                       | Atualiza material existente.                              |
+| Materiais | GET              | `/api/materiais/price-history/:id`                                                         | Historico de precos.                                      |
+| Entradas  | GET, POST        | `/api/entradas`                                                                            | Movimentacoes de entrada.                                 |
+| Saidas    | GET, POST        | `/api/saidas`                                                                              | Movimentacoes de saida.                                   |
+| Estoque   | GET              | `/api/estoque`                                                                             | Snapshot atual (aceita filtros como `periodoInicio`).     |
+| Estoque   | GET              | `/api/estoque?view=dashboard`                                                              | Dashboard consolidado (mesmos filtros via query string).  |
+| Acidentes | GET, POST        | `/api/acidentes`                                                                           | Lista e cria acidentes.                                   |
+| Acidentes | PUT              | `/api/acidentes/:id`                                                                       | Atualizacao de acidente.                                  |
+| Health    | GET              | `/api/health`                                                                              | Checagem autenticada de saude.                            |
+
 ## Scripts Disponiveis
 
 | Script            | Descricao                                         |
@@ -126,22 +146,27 @@ npm run dev
 
 ```
 .
-├─ api/                         # Funcoes serverless (Vercel)
-│  ├─ _shared/                  # Auth, Supabase client, operacoes reutilizaveis
-│  ├─ pessoas/, materiais/, ... # Rotas protegidas
-│  └─ health.js                 # Checagem autenticada de status
-├─ docs/                        # Documentacao funcional e guias (inclui novo modo local)
-├─ src/
-│  ├─ components/               # Componentes reutilizaveis
-│  ├─ pages/                    # Paginas (Dashboard, Estoque, etc.)
-│  ├─ context/                  # AuthContext (Supabase + modo local)
-│  ├─ services/
-│  │  ├─ api.js                 # Cliente HTTP do modo remoto
-│  │  ├─ localApi.js            # Implementacao de dados locais
-│  │  ├─ dataClient.js          # Seleciona api remoto ou local
-│  │  └─ localDataStore.js      # Persistencia em localStorage
-│  └─ lib/estoque.js            # Calculos reaproveitados no backend
-└─ package.json
+api/
+  index.js              # roteador principal das rotas /api/*
+  pessoas/
+    [id].js             # leitura e atualizacao por id
+  materiais/
+    [id].js
+  acidentes/
+    [id].js
+  _shared/              # autenticacao, http helpers, operations
+docs/                   # documentacao funcional e guias
+src/
+  components/           # componentes reutilizaveis
+  pages/                # telas (Dashboard, Estoque, etc.)
+  context/              # AuthContext e providers
+  services/
+    api.js              # cliente HTTP remoto
+    localApi.js         # implementacao local
+    dataClient.js       # escolhe entre remoto e local
+  routes/               # servidor Express opcional (modo legado)
+  lib/estoque.js        # calculos compartilhados
+package.json
 ```
 
 ## Fluxo de Autenticacao e RLS
@@ -169,3 +194,4 @@ npm run dev
 ---
 
 Sugestoes e melhorias sao bem-vindas. Abra uma issue ou envie um PR!
+

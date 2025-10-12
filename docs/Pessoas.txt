@@ -23,7 +23,7 @@ APIs
 - `dataClient.pessoas.create(payload)`
 - `dataClient.pessoas.update(id, payload)`
 - `dataClient.pessoas.history(id)`
-  - Remoto: endpoints `/api/pessoas` e `/api/pessoas/:id/historico-edicoes`.
+  - Remoto: endpoints `/api/pessoas` e `/api/pessoas/history/:id`.
   - Local: leitura/escrita no `localStorage`, garantindo unicidade de matricula.
 
 Validacoes
