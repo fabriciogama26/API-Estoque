@@ -4,7 +4,12 @@ export function MateriaisFilters({ filters, onChange, onSubmit, onClear }) {
     <form className="form form--inline" onSubmit={onSubmit}>
       <label className="field">
         <span>Buscar</span>
-        <input name="termo" value={filters.termo} onChange={onChange} placeholder="EPI, fabricante ou CA" />
+        <input
+          name="termo"
+          value={filters.termo}
+          onChange={onChange}
+          placeholder="EPI, fabricante, grupo ou CA"
+        />
       </label>
       <label className="field">
         <span>Status</span>

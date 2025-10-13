@@ -106,7 +106,7 @@ export function AcidentesPage() {
           const centroServico = pessoa.centroServico ?? pessoa.setor ?? pessoa.local ?? ''
           next.centroServico = centroServico
           next.setor = centroServico
-          next.local = pessoa.local ?? centroServico
+          next.local = ''
         } else if (!value) {
           next.nome = ''
           next.cargo = ''
@@ -192,6 +192,8 @@ export function AcidentesPage() {
       cid: acidente.cid || '',
       lesao: acidente.lesao || '',
       parteLesionada: acidente.parteLesionada || '',
+      hht:
+        acidente.hht !== null && acidente.hht !== undefined ? String(acidente.hht) : '',
       centroServico: acidente.centroServico || acidente.setor || '',
       setor: acidente.centroServico || acidente.setor || '',
       local: acidente.local || acidente.centroServico || '',

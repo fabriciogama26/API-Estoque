@@ -13,6 +13,37 @@ function normalizeArray(value) {
   return Array.isArray(value) ? value.slice() : []
 }
 
+const normalizeKeyPart = (value) =>
+  value
+    ? String(value)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    : ''
+
+const isGrupoLocal = (value, target) => normalizeKeyPart(value) === normalizeKeyPart(target)
+
+const sanitizeDigitsLocal = (value = '') => String(value).replace(/\D/g, '')
+
+const buildNumeroEspecificoLocal = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
+  if (isGrupoLocal(grupoMaterial, 'Calçado')) {
+    return sanitizeDigitsLocal(numeroCalcado)
+  }
+  if (isGrupoLocal(grupoMaterial, 'Vestimenta')) {
+    return String(numeroVestimenta || '').trim()
+  }
+  return ''
+}
+
+const buildChaveUnicaLocal = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
+  [
+    normalizeKeyPart(grupoMaterial),
+    normalizeKeyPart(nome),
+    normalizeKeyPart(fabricante),
+    normalizeKeyPart(numeroEspecifico),
+  ].join('||')
+
 function getDefaultState() {
   return {
     version: STATE_VERSION,
@@ -40,7 +71,41 @@ function normalizeState(state) {
       local: pessoa.local ?? centroServico,
     }
   })
-  sanitized.materiais = normalizeArray(sanitized.materiais)
+  sanitized.materiais = normalizeArray(sanitized.materiais).map((material) => {
+    if (!material || typeof material !== 'object') {
+      return material
+    }
+    const grupoMaterial = material.grupoMaterial ?? ''
+    const numeroCalcado = isGrupoLocal(grupoMaterial, 'Calçado')
+      ? sanitizeDigitsLocal(material.numeroCalcado)
+      : ''
+    const numeroVestimenta = isGrupoLocal(grupoMaterial, 'Vestimenta')
+      ? String(material.numeroVestimenta || '').trim()
+      : ''
+    const numeroEspecifico =
+      material.numeroEspecifico ??
+      buildNumeroEspecificoLocal({
+        grupoMaterial,
+        numeroCalcado,
+        numeroVestimenta,
+      })
+    const chaveUnica =
+      material.chaveUnica ??
+      buildChaveUnicaLocal({
+        grupoMaterial,
+        nome: material.nome || '',
+        fabricante: material.fabricante || '',
+        numeroEspecifico,
+      })
+    return {
+      ...material,
+      grupoMaterial,
+      numeroCalcado,
+      numeroVestimenta,
+      numeroEspecifico,
+      chaveUnica,
+    }
+  })
   sanitized.entradas = normalizeArray(sanitized.entradas).map((entrada) => {
     if (!entrada || typeof entrada !== 'object') {
       return entrada

@@ -10,27 +10,28 @@ export function AcidentesForm({
   pessoasError,
   isLoadingPessoas = false,
 }) {
-  const hasMatriculaOption = pessoas.some(
-    (pessoa) => pessoa?.matricula !== undefined && String(pessoa.matricula) === form.matricula,
-  )
-
   return (
     <form className="form" onSubmit={onSubmit}>
       <div className="form__grid form__grid--two">
         <label className="field">
           <span>Matricula <span className="asterisco">*</span></span>
-          <select
+          <input
             name="matricula"
             value={form.matricula}
             onChange={onChange}
+            list="acidentes-matriculas"
+            placeholder="Digite ou selecione a matricula"
             required
             disabled={isLoadingPessoas}
-          >
-            <option value="">Selecione uma matricula</option>
+            autoComplete="off"
+            inputMode="numeric"
+          />
+          <datalist id="acidentes-matriculas">
             {pessoas.map((pessoa) => {
-              const value = pessoa?.matricula !== undefined && pessoa?.matricula !== null
-                ? String(pessoa.matricula)
-                : ''
+              const value =
+                pessoa?.matricula !== undefined && pessoa?.matricula !== null
+                  ? String(pessoa.matricula)
+                  : ''
               if (!value) {
                 return null
               }
@@ -40,10 +41,7 @@ export function AcidentesForm({
                 </option>
               )
             })}
-            {!hasMatriculaOption && form.matricula ? (
-              <option value={form.matricula}>{form.matricula}</option>
-            ) : null}
-          </select>
+          </datalist>
         </label>
         <label className="field">
           <span>Nome <span className="asterisco">*</span></span>
@@ -62,6 +60,7 @@ export function AcidentesForm({
           <input
             type="number"
             min="0"
+            step="1"
             name="diasPerdidos"
             value={form.diasPerdidos}
             onChange={onChange}
@@ -74,11 +73,25 @@ export function AcidentesForm({
           <input
             type="number"
             min="0"
+            step="1"
             name="diasDebitados"
             value={form.diasDebitados}
             onChange={onChange}
             placeholder="0"
             required
+          />
+        </label>
+        <label className="field">
+          <span>HHT</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            name="hht"
+            value={form.hht}
+            onChange={onChange}
+            placeholder="0"
+            inputMode="numeric"
           />
         </label>
         <label className="field">
@@ -106,12 +119,20 @@ export function AcidentesForm({
           <input name="centroServico" value={form.centroServico} readOnly placeholder="Ex: Operacao" required />
         </label>
         <label className="field">
-          <span>Local <span className="asterisco">*</span></span>
-          <input name="local" value={form.local} readOnly placeholder="Linha 1" required />
+          <span>Local</span>
+          <input name="local" value={form.local} onChange={onChange} placeholder="Informe o local do acidente" />
         </label>
         <label className="field">
           <span>CAT</span>
-          <input name="cat" value={form.cat} onChange={onChange} placeholder="000000" />
+          <input
+            type="text"
+            name="cat"
+            value={form.cat}
+            onChange={onChange}
+            placeholder="000000"
+            inputMode="numeric"
+            pattern="[0-9]*"
+          />
         </label>
       </div>
       {pessoasError ? <p className="feedback feedback--error">{pessoasError}</p> : null}

@@ -3,30 +3,72 @@ const { Material, PrecoHistorico } = require('../models');
 const repositories = require('../repositories');
 const { materialRules } = require('../rules');
 
+function normalizeMaterialInput(payload) {
+  const nome = materialRules.sanitizeNomeEpi(payload.nome);
+  const fabricante = String(payload.fabricante || '').trim();
+  const validadeDias = Number(payload.validadeDias);
+  const ca = materialRules.sanitizeDigits(payload.ca);
+  const grupoMaterial = String(payload.grupoMaterial || '').trim();
+  const numeroCalcadoRaw = materialRules.sanitizeDigits(payload.numeroCalcado);
+  const numeroVestimentaRaw = String(payload.numeroVestimenta || '').trim();
+  const numeroCalcado = materialRules.isGrupoCalcado(grupoMaterial) ? numeroCalcadoRaw : '';
+  const numeroVestimenta = materialRules.isGrupoVestimenta(grupoMaterial) ? numeroVestimentaRaw : '';
+  const numeroEspecifico = materialRules.buildNumeroEspecifico({
+    grupoMaterial,
+    numeroCalcado,
+    numeroVestimenta,
+  });
+  const chaveUnica = materialRules.buildChaveUnica({
+    grupoMaterial,
+    nome,
+    fabricante,
+    numeroEspecifico,
+  });
+
+  return {
+    nome,
+    fabricante,
+    validadeDias,
+    ca,
+    grupoMaterial,
+    numeroCalcado,
+    numeroVestimenta,
+    numeroEspecifico,
+    chaveUnica,
+  };
+}
+
 class MaterialService {
   criarMaterial(payload) {
     materialRules.validarDadosObrigatorios(payload);
     materialRules.validarEstoqueMinimo(payload.estoqueMinimo);
 
-    const existente = repositories.materiais.findByNomeAndFabricante(payload.nome, payload.fabricante);
+    const normalized = normalizeMaterialInput(payload);
+    const valorUnitario = Number(payload.valorUnitario);
+    if (Number.isNaN(valorUnitario) || valorUnitario <= 0) {
+      throw new Error('Valor unitario deve ser maior que zero');
+    }
+
+    const existente = repositories.materiais.findByChaveUnica(normalized.chaveUnica);
     if (existente) {
-      throw new Error('Material ja cadastrado para este fabricante');
+      throw new Error('Já existe um EPI com essas mesmas informações cadastrado.');
     }
 
     const material = new Material({
       id: uuid(),
-      nome: payload.nome.trim(),
-      fabricante: payload.fabricante.trim(),
-      validadeDias: Number(payload.validadeDias),
-      ca: payload.ca.trim(),
-      valorUnitario: Number(payload.valorUnitario),
+      ...normalized,
+      valorUnitario,
       usuarioCadastro: payload.usuarioCadastro || 'sistema',
       estoqueMinimo: payload.estoqueMinimo !== undefined ? Number(payload.estoqueMinimo) : 0,
-      ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true
+      ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
     });
 
     repositories.materiais.create(material);
-    this.registrarHistoricoPreco({ material, valorUnitario: material.valorUnitario, usuario: material.usuarioCadastro });
+    this.registrarHistoricoPreco({
+      material,
+      valorUnitario: material.valorUnitario,
+      usuario: material.usuarioCadastro,
+    });
 
     return material;
   }
@@ -37,45 +79,53 @@ class MaterialService {
       throw new Error('Material nao encontrado');
     }
 
-    const atualizacoes = {};
-
-    if (payload.nome !== undefined) {
-      if (!payload.nome.trim()) {
-        throw new Error('Nome invalido');
-      }
-      atualizacoes.nome = payload.nome.trim();
-    }
-
-    if (payload.fabricante !== undefined) {
-      if (!payload.fabricante.trim()) {
-        throw new Error('Fabricante invalido');
-      }
-      atualizacoes.fabricante = payload.fabricante.trim();
-    }
-
-    if (payload.validadeDias !== undefined) {
-      if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
-        throw new Error('Validade deve ser maior que zero');
-      }
-      atualizacoes.validadeDias = Number(payload.validadeDias);
-    }
-
-    if (payload.ca !== undefined) {
-      if (!payload.ca.trim()) {
-        throw new Error('CA invalido');
-      }
-      atualizacoes.ca = payload.ca.trim();
-    }
-
-    if (payload.valorUnitario !== undefined) {
-      if (Number.isNaN(Number(payload.valorUnitario)) || Number(payload.valorUnitario) <= 0) {
-        throw new Error('Valor unitario deve ser maior que zero');
-      }
-      atualizacoes.valorUnitario = Number(payload.valorUnitario);
-    }
-
     if (payload.estoqueMinimo !== undefined) {
       materialRules.validarEstoqueMinimo(payload.estoqueMinimo);
+    }
+
+    const merged = {
+      nome: payload.nome !== undefined ? payload.nome : material.nome,
+      fabricante: payload.fabricante !== undefined ? payload.fabricante : material.fabricante,
+      validadeDias:
+        payload.validadeDias !== undefined ? payload.validadeDias : material.validadeDias,
+      ca: payload.ca !== undefined ? payload.ca : material.ca,
+      grupoMaterial:
+        payload.grupoMaterial !== undefined ? payload.grupoMaterial : material.grupoMaterial,
+      numeroCalcado:
+        payload.numeroCalcado !== undefined ? payload.numeroCalcado : material.numeroCalcado,
+      numeroVestimenta:
+        payload.numeroVestimenta !== undefined
+          ? payload.numeroVestimenta
+          : material.numeroVestimenta,
+    };
+
+    materialRules.validarDadosObrigatorios({
+      ...merged,
+      valorUnitario:
+        payload.valorUnitario !== undefined ? payload.valorUnitario : material.valorUnitario,
+      ca: merged.ca,
+    });
+
+    const normalized = normalizeMaterialInput(merged);
+    const valorUnitarioAtualizado =
+      payload.valorUnitario !== undefined ? Number(payload.valorUnitario) : material.valorUnitario;
+    if (Number.isNaN(valorUnitarioAtualizado) || valorUnitarioAtualizado <= 0) {
+      throw new Error('Valor unitario deve ser maior que zero');
+    }
+
+    const duplicado = repositories.materiais
+      .findAll()
+      .find((item) => item.id !== id && item.chaveUnica === normalized.chaveUnica);
+    if (duplicado) {
+      throw new Error('Já existe um EPI com essas mesmas informações cadastrado.');
+    }
+
+    const atualizacoes = {
+      ...normalized,
+      valorUnitario: valorUnitarioAtualizado,
+    };
+
+    if (payload.estoqueMinimo !== undefined) {
       atualizacoes.estoqueMinimo = Number(payload.estoqueMinimo);
     }
 
@@ -83,10 +133,17 @@ class MaterialService {
       atualizacoes.ativo = Boolean(payload.ativo);
     }
 
+    atualizacoes.usuarioAtualizacao = payload.usuarioResponsavel || 'sistema';
+    atualizacoes.atualizadoEm = new Date().toISOString();
+
     const materialAtualizado = repositories.materiais.update(id, atualizacoes);
 
-    if (atualizacoes.valorUnitario !== undefined && atualizacoes.valorUnitario !== material.valorUnitario) {
-      this.registrarHistoricoPreco({ material: materialAtualizado, valorUnitario: atualizacoes.valorUnitario, usuario: payload.usuarioResponsavel || 'sistema' });
+    if (valorUnitarioAtualizado !== material.valorUnitario) {
+      this.registrarHistoricoPreco({
+        material: materialAtualizado,
+        valorUnitario: valorUnitarioAtualizado,
+        usuario: payload.usuarioResponsavel || 'sistema',
+      });
     }
 
     return materialAtualizado;
@@ -109,7 +166,7 @@ class MaterialService {
       id: uuid(),
       materialId: material.id,
       valorUnitario,
-      usuarioResponsavel: usuario || 'sistema'
+      usuarioResponsavel: usuario || 'sistema',
     });
 
     repositories.precos.create(historico);
@@ -117,6 +174,3 @@ class MaterialService {
 }
 
 module.exports = new MaterialService();
-
-
-

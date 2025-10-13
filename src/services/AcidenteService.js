@@ -68,13 +68,13 @@ function obterDadosPessoa(matricula, overrides = {}) {
     pessoa.local
   );
 
-  const local = coalesceRequiredString(
-    overrides.local,
-    pessoa.local,
-    overrides.centroServico,
-    pessoa.centroServico,
-    overrides.setor,
-    pessoa.setor
+  const local = sanitizeOptionalString(
+    overrides.local ||
+      pessoa.local ||
+      overrides.centroServico ||
+      pessoa.centroServico ||
+      overrides.setor ||
+      pessoa.setor
   );
 
   return {
@@ -85,6 +85,43 @@ function obterDadosPessoa(matricula, overrides = {}) {
     setor: centroServico,
     local,
   };
+}
+
+function sanitizeNonNegativeInteger(value, { defaultValue = 0, allowNull = false, fieldName = 'Valor' } = {}) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    if (allowNull) {
+      return null;
+    }
+    return defaultValue;
+  }
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric)) {
+    const error = new Error(`${fieldName} deve ser um numero inteiro.`);
+    error.status = 400;
+    throw error;
+  }
+  if (numeric < 0) {
+    const error = new Error(`${fieldName} nao pode ser negativo.`);
+    error.status = 400;
+    throw error;
+  }
+  return numeric;
+}
+
+function sanitizeOptionalIntegerString(value, fieldName = 'Valor') {
+  const sanitized = sanitizeOptionalString(value);
+  if (sanitized === undefined) {
+    return undefined;
+  }
+  if (sanitized === null) {
+    return null;
+  }
+  if (!/^\d+$/.test(sanitized)) {
+    const error = new Error(`${fieldName} deve conter apenas numeros inteiros.`);
+    error.status = 400;
+    throw error;
+  }
+  return sanitized;
 }
 
 class AcidenteService {
@@ -98,13 +135,24 @@ class AcidenteService {
       agente: sanitizeRequiredString(payload.agente),
       lesao: sanitizeRequiredString(payload.lesao),
       parteLesionada: sanitizeRequiredString(payload.parteLesionada),
-      diasPerdidos: payload.diasPerdidos ?? 0,
-      diasDebitados: payload.diasDebitados ?? 0,
+      diasPerdidos: sanitizeNonNegativeInteger(payload.diasPerdidos, {
+        defaultValue: 0,
+        fieldName: 'Dias perdidos',
+      }),
+      diasDebitados: sanitizeNonNegativeInteger(payload.diasDebitados, {
+        defaultValue: 0,
+        fieldName: 'Dias debitados',
+      }),
+      hht: sanitizeNonNegativeInteger(payload.hht, {
+        allowNull: true,
+        fieldName: 'HHT',
+      }),
     };
 
     acidenteRules.validarDadosObrigatorios(dadosObrigatorios);
     acidenteRules.validarData(dadosObrigatorios.data);
     acidenteRules.validarDias(dadosObrigatorios);
+    acidenteRules.validarHht(dadosObrigatorios.hht);
 
     const acidente = new Acidente({
       id: uuid(),
@@ -112,10 +160,12 @@ class AcidenteService {
       tipo: dadosObrigatorios.tipo,
       agente: dadosObrigatorios.agente,
       cid: sanitizeOptionalString(payload.cid) ?? null,
-      cat: sanitizeOptionalString(payload.cat) ?? null,
+      cat: sanitizeOptionalIntegerString(payload.cat, 'CAT') ?? null,
       observacao: sanitizeOptionalString(payload.observacao) ?? null,
       registradoPor: sanitizeRequiredString(payload.usuarioCadastro || 'sistema') || 'sistema',
     });
+
+    acidenteRules.validarCat(acidente.cat);
 
     repositories.acidentes.create(acidente);
     return acidente;
@@ -162,11 +212,24 @@ class AcidenteService {
     assignCampo('data', sanitizeUpdatableString);
 
     if (payload.diasPerdidos !== undefined) {
-      updates.diasPerdidos = Number(payload.diasPerdidos);
+      updates.diasPerdidos = sanitizeNonNegativeInteger(payload.diasPerdidos, {
+        defaultValue: atual.diasPerdidos ?? 0,
+        fieldName: 'Dias perdidos',
+      });
     }
 
     if (payload.diasDebitados !== undefined) {
-      updates.diasDebitados = Number(payload.diasDebitados);
+      updates.diasDebitados = sanitizeNonNegativeInteger(payload.diasDebitados, {
+        defaultValue: atual.diasDebitados ?? 0,
+        fieldName: 'Dias debitados',
+      });
+    }
+
+    if (payload.hht !== undefined) {
+      updates.hht = sanitizeNonNegativeInteger(payload.hht, {
+        allowNull: true,
+        fieldName: 'HHT',
+      });
     }
 
     if (payload.cid !== undefined) {
@@ -174,7 +237,7 @@ class AcidenteService {
     }
 
     if (payload.cat !== undefined) {
-      updates.cat = sanitizeOptionalString(payload.cat);
+      updates.cat = sanitizeOptionalIntegerString(payload.cat, 'CAT');
     }
 
     if (payload.observacao !== undefined) {
@@ -186,12 +249,15 @@ class AcidenteService {
       ...updates,
       centroServico: updates.centroServico ?? atual.centroServico ?? atual.setor,
       setor: updates.setor ?? atual.setor ?? atual.centroServico,
-      local: updates.local ?? atual.local,
+      local: updates.local ?? atual.local ?? null,
+      hht: updates.hht ?? atual.hht ?? null,
     };
 
     acidenteRules.validarDadosObrigatorios(merged);
     acidenteRules.validarData(merged.data);
     acidenteRules.validarDias(merged);
+    acidenteRules.validarHht(merged.hht);
+    acidenteRules.validarCat(merged.cat);
 
     updates.atualizadoEm = new Date().toISOString();
     updates.atualizadoPor = sanitizeRequiredString(payload.usuarioResponsavel || payload.usuarioCadastro || 'sistema') || 'sistema';

@@ -22,6 +22,8 @@ const trim = (value) => {
   return String(value).trim()
 }
 
+const sanitizeDigitsOnly = (value = '') => String(value).replace(/\D/g, '')
+
 const toIsoOrNull = (value, defaultNow = false) => {
   if (!value) {
     return defaultNow ? nowIso() : null
@@ -117,21 +119,74 @@ const mapLocalAcidenteRecord = (acidente) => {
   }
 }
 
-const sanitizeMaterialPayload = (payload = {}) => ({
-  nome: trim(payload.nome),
-  fabricante: trim(payload.fabricante),
-  validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
-  ca: trim(payload.ca),
-  valorUnitario: Number(payload.valorUnitario ?? 0),
-  estoqueMinimo:
-    payload.estoqueMinimo !== undefined && payload.estoqueMinimo !== null
-      ? Number(payload.estoqueMinimo)
-      : null,
-  ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
-})
+const normalizeKeyPart = (value) =>
+  value
+    ? value
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    : ''
+
+const isGrupo = (value, target) => normalizeKeyPart(value) === normalizeKeyPart(target)
+
+const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
+  if (isGrupo(grupoMaterial, 'Calçado')) {
+    return numeroCalcado
+  }
+  if (isGrupo(grupoMaterial, 'Vestimenta')) {
+    return numeroVestimenta
+  }
+  return ''
+}
+
+const buildChaveUnica = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
+  [
+    normalizeKeyPart(grupoMaterial),
+    normalizeKeyPart(nome),
+    normalizeKeyPart(fabricante),
+    normalizeKeyPart(numeroEspecifico),
+  ].join('||')
+
+const sanitizeMaterialPayload = (payload = {}) => {
+  const grupoMaterial = trim(payload.grupoMaterial)
+  const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
+  const numeroVestimenta = trim(payload.numeroVestimenta)
+  const numeroEspecifico = buildNumeroEspecifico({
+    grupoMaterial,
+    numeroCalcado,
+    numeroVestimenta,
+  })
+
+  return {
+    nome: trim(payload.nome),
+    fabricante: trim(payload.fabricante),
+    validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
+    ca: trim(payload.ca),
+    valorUnitario: Number(payload.valorUnitario ?? 0),
+    estoqueMinimo:
+      payload.estoqueMinimo !== undefined && payload.estoqueMinimo !== null
+        ? Number(payload.estoqueMinimo)
+        : null,
+    ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
+    grupoMaterial,
+    numeroCalcado: isGrupo(grupoMaterial, 'Calçado') ? numeroCalcado : '',
+    numeroVestimenta: isGrupo(grupoMaterial, 'Vestimenta') ? numeroVestimenta : '',
+    numeroEspecifico,
+    chaveUnica: buildChaveUnica({
+      grupoMaterial,
+      nome: payload.nome,
+      fabricante: payload.fabricante,
+      numeroEspecifico,
+    }),
+  }
+}
 
 const validateMaterialPayload = (payload) => {
   if (!payload.nome) throw createError(400, 'Nome do material obrigatorio.')
+  if (/\d/.test(payload.nome)) {
+    throw createError(400, 'O campo EPI não pode conter números.')
+  }
   if (!payload.fabricante) throw createError(400, 'Fabricante obrigatorio.')
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
     throw createError(400, 'Validade deve ser maior que zero.')
@@ -141,6 +196,15 @@ const validateMaterialPayload = (payload) => {
   }
   if (Number.isNaN(Number(payload.valorUnitario)) || Number(payload.valorUnitario) <= 0) {
     throw createError(400, 'Valor unitario deve ser maior que zero.')
+  }
+  if (!payload.grupoMaterial) {
+    throw createError(400, 'Grupo de material obrigatorio.')
+  }
+  if (isGrupo(payload.grupoMaterial, 'Calçado') && !payload.numeroCalcado) {
+    throw createError(400, 'Informe o número do calçado.')
+  }
+  if (isGrupo(payload.grupoMaterial, 'Vestimenta') && !payload.numeroVestimenta) {
+    throw createError(400, 'Informe o número da vestimenta.')
   }
   if (
     payload.estoqueMinimo !== null &&
@@ -214,6 +278,10 @@ const sanitizeAcidentePayload = (payload = {}) => {
       payload.diasDebitados !== undefined && payload.diasDebitados !== null
         ? Number(payload.diasDebitados)
         : 0,
+    hht:
+      payload.hht !== undefined && payload.hht !== null && String(payload.hht).trim() !== ''
+        ? Number(payload.hht)
+        : null,
     cid: sanitizeOptional(payload.cid),
     cat: sanitizeOptional(payload.cat),
     observacao: sanitizeOptional(payload.observacao),
@@ -229,13 +297,20 @@ const validateAcidentePayload = (payload) => {
   if (!payload.lesao) throw createError(400, 'Lesao obrigatoria.')
   if (!payload.parteLesionada) throw createError(400, 'Parte lesionada obrigatoria.')
   if (!payload.centroServico) throw createError(400, 'Centro de servico obrigatorio.')
-  if (!payload.local) throw createError(400, 'Local obrigatorio.')
   if (!payload.data) throw createError(400, 'Data do acidente obrigatoria.')
-  if (Number.isNaN(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
-    throw createError(400, 'Dias perdidos deve ser zero ou positivo.')
+  if (!Number.isInteger(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
+    throw createError(400, 'Dias perdidos deve ser um inteiro zero ou positivo.')
   }
-  if (Number.isNaN(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
-    throw createError(400, 'Dias debitados deve ser zero ou positivo.')
+  if (!Number.isInteger(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
+    throw createError(400, 'Dias debitados deve ser um inteiro zero ou positivo.')
+  }
+  if (payload.hht !== null && payload.hht !== undefined) {
+    if (!Number.isInteger(Number(payload.hht)) || Number(payload.hht) < 0) {
+      throw createError(400, 'HHT deve ser um inteiro zero ou positivo.')
+    }
+  }
+  if (payload.cat && !/^\d+$/.test(String(payload.cat))) {
+    throw createError(400, 'CAT deve conter apenas numeros inteiros.')
   }
 }
 
@@ -392,12 +467,30 @@ const localApi = {
     async list() {
       return readState((state) => state.materiais.slice())
     },
+    async groups() {
+      return readState((state) =>
+        Array.from(
+          new Set(
+            state.materiais
+              .map((material) => material.grupoMaterial && material.grupoMaterial.trim())
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b))
+      )
+    },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)
       validateMaterialPayload(dados)
       const usuario = trim(payload.usuarioCadastro) || 'sistema'
 
       return writeState((state) => {
+        const existe = state.materiais.find(
+          (item) => item.chaveUnica && item.chaveUnica === dados.chaveUnica
+        )
+        if (existe) {
+          throw createError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
+        }
+
         const material = {
           id: randomId(),
           ...dados,
@@ -434,6 +527,14 @@ const localApi = {
         }
 
         const atual = state.materiais[index]
+
+        const existe = state.materiais.find(
+          (item) => item.id !== id && item.chaveUnica && item.chaveUnica === dados.chaveUnica
+        )
+        if (existe) {
+          throw createError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
+        }
+
         const atualizado = {
           ...atual,
           ...dados,
@@ -586,6 +687,7 @@ const localApi = {
           local: localBase,
           diasPerdidos: dados.diasPerdidos,
           diasDebitados: dados.diasDebitados,
+          hht: dados.hht,
           cid: dados.cid,
           cat: dados.cat,
           observacao: dados.observacao,
@@ -603,8 +705,6 @@ const localApi = {
       if (!id) {
         throw createError(400, 'ID do acidente obrigatorio.')
       }
-      const dadosParciais = sanitizeAcidentePayload(payload)
-
       return writeState((state) => {
         const index = state.acidentes.findIndex((item) => item.id === id)
         if (index === -1) {
@@ -612,21 +712,22 @@ const localApi = {
         }
 
         const atual = state.acidentes[index]
-        const pessoa = dadosParciais.matricula
+        const dadosSanitizados = sanitizeAcidentePayload({ ...atual, ...payload })
+        const pessoa = dadosSanitizados.matricula
           ? state.pessoas.find((item) =>
-              item.matricula && item.matricula.toLowerCase() === dadosParciais.matricula.toLowerCase()
+              item.matricula && item.matricula.toLowerCase() === dadosSanitizados.matricula.toLowerCase()
             )
           : null
 
         const dados = {
           ...atual,
-          ...dadosParciais,
+          ...dadosSanitizados,
         }
 
         const centroServicoPessoa = pessoa?.centroServico || pessoa?.setor || pessoa?.local || ''
         const localPessoa = pessoa?.local || pessoa?.centroServico || ''
-        dados.centroServico = dadosParciais.centroServico || centroServicoPessoa || atual.centroServico || atual.setor || ''
-        dados.local = dadosParciais.local || localPessoa || atual.local || dados.centroServico
+        dados.centroServico = dadosSanitizados.centroServico || centroServicoPessoa || atual.centroServico || atual.setor || ''
+        dados.local = dadosSanitizados.local || localPessoa || atual.local || dados.centroServico
         dados.setor = dados.centroServico
 
         validateAcidentePayload(dados)
@@ -636,6 +737,7 @@ const localApi = {
           centroServico: dados.centroServico,
           setor: dados.centroServico,
           local: dados.local,
+          hht: dados.hht,
           atualizadoEm: nowIso(),
           atualizadoPor: trim(payload.usuarioResponsavel) || 'sistema',
         }

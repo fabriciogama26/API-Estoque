@@ -1,3 +1,5 @@
+import { Pencil } from 'lucide-react'
+
 const formatDate = (value) => {
   if (!value) {
     return '-'
@@ -40,6 +42,7 @@ export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
             <th>Agente</th>
             <th>Centro de servico</th>
             <th>Local</th>
+            <th>HHT</th>
             <th>CAT</th>
             <th>Acao</th>
           </tr>
@@ -47,6 +50,7 @@ export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
         <tbody>
           {acidentes.map((acidente) => {
             const isEditing = editingId === acidente.id
+            const disableEdit = isEditing || isSaving
             return (
               <tr key={acidente.id}>
                 <td>
@@ -67,16 +71,20 @@ export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
                 <td>{acidente.agente || '-'}</td>
                 <td>{(acidente.centroServico ?? acidente.setor) || '-'}</td>
                 <td>{acidente.local || '-'}</td>
+                <td>{formatNumber(acidente.hht)}</td>
                 <td>{acidente.cat || '-'}</td>
                 <td>
-                  <button
-                    type="button"
-                    className="button button--ghost"
-                    onClick={() => onEdit(acidente)}
-                    disabled={isSaving}
-                  >
-                    {isEditing && isSaving ? 'Salvando...' : 'Editar'}
-                  </button>
+                  <div className="pessoas-data-table__actions">
+                    <button
+                      type="button"
+                      className="pessoas-table-action-button"
+                      onClick={() => onEdit(acidente)}
+                      disabled={disableEdit}
+                      aria-label={disableEdit ? 'Editando acidente' : `Editar ${acidente.nome}`}
+                    >
+                      <Pencil size={16} strokeWidth={1.8} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             )

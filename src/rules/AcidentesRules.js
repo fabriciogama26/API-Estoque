@@ -1,6 +1,6 @@
 // Utilitarios de validacao, normalizacao e filtros para acidentes
 
-const numberOrNull = (value) => {
+const integerOrNull = (value) => {
   if (value === undefined || value === null) {
     return null
   }
@@ -8,7 +8,10 @@ const numberOrNull = (value) => {
   if (!trimmed) {
     return null
   }
-  const parsed = Number(trimmed)
+  if (!/^-?\d+$/.test(trimmed)) {
+    return null
+  }
+  const parsed = Number.parseInt(trimmed, 10)
   return Number.isNaN(parsed) ? null : parsed
 }
 
@@ -46,8 +49,15 @@ export function validateAcidenteForm(form) {
   if (!centroServico) {
     return 'Informe o centro de servico.'
   }
-  if (!form.local.trim()) {
-    return 'Informe o local.'
+  const hasHht = String(form.hht ?? '').trim() !== ''
+  if (hasHht) {
+    const hht = integerOrNull(form.hht)
+    if (hht === null) {
+      return 'HHT deve ser um numero inteiro.'
+    }
+    if (hht < 0) {
+      return 'HHT nao pode ser negativo.'
+    }
   }
 
   const hasDiasPerdidos = String(form.diasPerdidos ?? '').trim() !== ''
@@ -55,9 +65,9 @@ export function validateAcidenteForm(form) {
     return 'Informe os dias perdidos.'
   }
 
-  const diasPerdidos = numberOrNull(form.diasPerdidos)
+  const diasPerdidos = integerOrNull(form.diasPerdidos)
   if (diasPerdidos === null) {
-    return 'Dias perdidos deve ser um numero valido.'
+    return 'Dias perdidos deve ser um numero inteiro.'
   }
   if (diasPerdidos !== null && diasPerdidos < 0) {
     return 'Dias perdidos nao pode ser negativo.'
@@ -68,12 +78,17 @@ export function validateAcidenteForm(form) {
     return 'Informe os dias debitados.'
   }
 
-  const diasDebitados = numberOrNull(form.diasDebitados)
+  const diasDebitados = integerOrNull(form.diasDebitados)
   if (diasDebitados === null) {
-    return 'Dias debitados deve ser um numero valido.'
+    return 'Dias debitados deve ser um numero inteiro.'
   }
   if (diasDebitados !== null && diasDebitados < 0) {
     return 'Dias debitados nao pode ser negativo.'
+  }
+
+  const cat = form.cat.trim()
+  if (cat && !/^\d+$/.test(cat)) {
+    return 'CAT deve conter apenas numeros inteiros.'
   }
 
   return null
@@ -93,8 +108,9 @@ export function createAcidentePayload(form, usuarioCadastro) {
     nome: form.nome.trim(),
     cargo: form.cargo.trim(),
     data: form.data || null,
-    diasPerdidos: numberOrNull(form.diasPerdidos),
-    diasDebitados: numberOrNull(form.diasDebitados),
+    diasPerdidos: integerOrNull(form.diasPerdidos),
+    diasDebitados: integerOrNull(form.diasDebitados),
+    hht: integerOrNull(form.hht),
     tipo: form.tipo.trim(),
     agente: form.agente.trim(),
     cid: form.cid.trim(),
@@ -117,8 +133,9 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     nome: form.nome.trim(),
     cargo: form.cargo.trim(),
     data: form.data || null,
-    diasPerdidos: numberOrNull(form.diasPerdidos),
-    diasDebitados: numberOrNull(form.diasDebitados),
+    diasPerdidos: integerOrNull(form.diasPerdidos),
+    diasDebitados: integerOrNull(form.diasDebitados),
+    hht: integerOrNull(form.hht),
     tipo: form.tipo.trim(),
     agente: form.agente.trim(),
     cid: form.cid.trim(),
@@ -166,6 +183,7 @@ export function filterAcidentes(acidentes, filters) {
       acidente.centroServico,
       acidente.setor,
       acidente.local,
+      acidente.hht,
       acidente.cat,
     ]
       .filter(Boolean)

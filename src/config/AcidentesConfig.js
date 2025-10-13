@@ -6,6 +6,7 @@ export const ACIDENTES_FORM_DEFAULT = {
   data: '',
   diasPerdidos: '',
   diasDebitados: '',
+  hht: '',
   tipo: '',
   agente: '',
   cid: '',

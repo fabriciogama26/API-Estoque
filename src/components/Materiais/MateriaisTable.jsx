@@ -12,6 +12,8 @@ export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSavi
         <thead>
           <tr>
             <th>Material</th>
+            <th>Grupo</th>
+            <th>Tamanho</th>
             <th>CA</th>
             <th>Validade (dias)</th>
             <th>Valor unitario</th>
@@ -26,6 +28,8 @@ export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSavi
               <td>
                 <strong>{material.nome}</strong>
               </td>
+              <td>{material.grupoMaterial || '-'}</td>
+              <td>{material.numeroCalcado || material.numeroVestimenta || '-'}</td>
               <td>{material.ca || '-'}</td>
               <td>{material.validadeDias}</td>
               <td>{formatCurrency(material.valorUnitario)}</td>
@@ -48,3 +52,4 @@ export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSavi
     </div>
   )
 }
+
