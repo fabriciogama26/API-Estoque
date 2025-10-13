@@ -16,11 +16,25 @@ import {
   createMaterialPayload,
   filterMateriais,
   resolveUsuarioNome,
+  validateMaterialForm,
   sortMateriaisByNome,
   updateMaterialPayload,
+  GRUPO_MATERIAL_CALCADO,
+  GRUPO_MATERIAL_VESTIMENTA,
 } from '../rules/MateriaisRules.js'
 import { formatCurrency, formatCurrencyInput, sanitizeDigits } from '../utils/MateriaisUtils.js'
 import '../styles/MateriaisPage.css'
+
+const normalizeGrupo = (value) =>
+  value
+    ? value
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    : ''
+
+const isGrupo = (value, target) => normalizeGrupo(value) === normalizeGrupo(target)
 
 export function MateriaisPage() {
   const { user } = useAuth()
@@ -33,6 +47,33 @@ export function MateriaisPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
   const [editingMaterial, setEditingMaterial] = useState(null)
+  const [materialGroups, setMaterialGroups] = useState([])
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false)
+  const [groupsError, setGroupsError] = useState(null)
+
+  const loadMaterialGroups = useCallback(async () => {
+    setIsLoadingGroups(true)
+    setGroupsError(null)
+    try {
+      const grupos = await api.materiais.groups()
+      const lista =
+        Array.isArray(grupos)
+          ? Array.from(
+              new Set(
+                grupos
+                  .map((grupo) => (grupo && typeof grupo === 'string' ? grupo.trim() : ''))
+                  .filter(Boolean)
+              )
+            ).sort((a, b) => a.localeCompare(b))
+          : []
+      setMaterialGroups(lista)
+    } catch (err) {
+      setGroupsError(err.message)
+      setMaterialGroups([])
+    } finally {
+      setIsLoadingGroups(false)
+    }
+  }, [])
 
   const loadMateriais = useCallback(async () => {
     setIsLoading(true)
@@ -51,6 +92,10 @@ export function MateriaisPage() {
     loadMateriais()
   }, [loadMateriais])
 
+  useEffect(() => {
+    loadMaterialGroups()
+  }, [loadMaterialGroups])
+
   const handleFormChange = (event) => {
     const { name, value } = event.target
 
@@ -61,6 +106,32 @@ export function MateriaisPage() {
 
     if (name === 'valorUnitario') {
       setForm((prev) => ({ ...prev, valorUnitario: formatCurrencyInput(value) }))
+      return
+    }
+
+    if (name === 'nome') {
+      const sanitized = value.replace(/\d/g, '')
+      setForm((prev) => ({ ...prev, nome: sanitized }))
+      return
+    }
+
+    if (name === 'grupoMaterial') {
+      setForm((prev) => ({
+        ...prev,
+        grupoMaterial: value,
+        numeroCalcado: isGrupo(value, GRUPO_MATERIAL_CALCADO) ? prev.numeroCalcado : '',
+        numeroVestimenta: isGrupo(value, GRUPO_MATERIAL_VESTIMENTA) ? prev.numeroVestimenta : '',
+      }))
+      return
+    }
+
+    if (name === 'numeroCalcado') {
+      setForm((prev) => ({ ...prev, numeroCalcado: sanitizeDigits(value) }))
+      return
+    }
+
+    if (name === 'numeroVestimenta') {
+      setForm((prev) => ({ ...prev, numeroVestimenta: value }))
       return
     }
 
@@ -87,8 +158,15 @@ export function MateriaisPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    setIsSaving(true)
     setError(null)
+
+    const validationError = validateMaterialForm(form)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
+    setIsSaving(true)
 
     try {
       const usuario = resolveUsuarioNome(user)
@@ -103,6 +181,7 @@ export function MateriaisPage() {
       setHistoryCache({})
       setHistoryModal({ ...HISTORY_MODAL_DEFAULT })
       await loadMateriais()
+      await loadMaterialGroups()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -142,12 +221,24 @@ export function MateriaisPage() {
 
   const startEdit = (material) => {
     setEditingMaterial(material)
+    setMaterialGroups((prev) => {
+      if (!material.grupoMaterial) {
+        return prev
+      }
+      if (prev.includes(material.grupoMaterial)) {
+        return prev
+      }
+      return [...prev, material.grupoMaterial].sort((a, b) => a.localeCompare(b))
+    })
     setForm({
       nome: material.nome || '',
       fabricante: material.fabricante || '',
       validadeDias: String(material.validadeDias ?? ''),
       ca: material.ca || '',
       valorUnitario: formatCurrency(material.valorUnitario),
+      grupoMaterial: material.grupoMaterial || '',
+      numeroCalcado: material.numeroCalcado || '',
+      numeroVestimenta: material.numeroVestimenta || '',
     })
   }
 
@@ -181,6 +272,9 @@ export function MateriaisPage() {
         editingMaterial={editingMaterial}
         onCancel={cancelEdit}
         error={error}
+        materialGroups={materialGroups}
+        isLoadingGroups={isLoadingGroups}
+        groupsError={groupsError}
       />
 
       <MateriaisFilters

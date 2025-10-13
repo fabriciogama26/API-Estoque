@@ -40,7 +40,12 @@
       "usuarioCadastro": "seed",
       "usuarioAtualizacao": null,
       "criadoEm": "2025-01-05T10:00:00.000Z",
-      "atualizadoEm": null
+      "atualizadoEm": null,
+      "grupoMaterial": "Luva",
+      "numeroCalcado": "",
+      "numeroVestimenta": "",
+      "numeroEspecifico": "",
+      "chaveUnica": "luva||luva nitrilica||protecbras||"
     },
     {
       "id": "seed-material-bota",
@@ -54,7 +59,12 @@
       "usuarioCadastro": "seed",
       "usuarioAtualizacao": null,
       "criadoEm": "2025-01-08T11:15:00.000Z",
-      "atualizadoEm": null
+      "atualizadoEm": null,
+      "grupoMaterial": "Calçado",
+      "numeroCalcado": "42",
+      "numeroVestimenta": "",
+      "numeroEspecifico": "42",
+      "chaveUnica": "calcado||bota pvc||safestep||42"
     }
   ],
   "materialPriceHistory": [

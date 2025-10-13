@@ -105,6 +105,7 @@ export const api = {
     update: (id, payload) => request(`/api/materiais/${id}`, { method: 'PUT', body: payload }),
     get: (id) => request(`/api/materiais/${id}`),
     priceHistory: (id) => request(`/api/materiais/price-history/${id}`),
+    groups: () => request('/api/materiais/groups'),
   },
   entradas: {
     list: () => request('/api/entradas'),

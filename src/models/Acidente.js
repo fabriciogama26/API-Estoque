@@ -7,6 +7,7 @@ class Acidente {
     data,
     diasPerdidos,
     diasDebitados,
+    hht = null,
     tipo,
     agente,
     lesao,
@@ -29,6 +30,7 @@ class Acidente {
     this.data = data
     this.diasPerdidos = diasPerdidos
     this.diasDebitados = diasDebitados
+    this.hht = hht ?? null
     this.tipo = tipo
     this.agente = agente
     this.lesao = lesao

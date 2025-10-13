@@ -37,6 +37,9 @@ export default withAuth(async (req, res, user) => {
     }
 
     // Materiais
+    if (path === '/api/materiais/groups' && method === 'GET') {
+      return sendJson(res, 200, await MateriaisOperations.groups())
+    }
     if (path === '/api/materiais') {
       if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
       if (method === 'POST') {

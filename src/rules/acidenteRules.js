@@ -13,7 +13,6 @@ function validarDadosObrigatorios({
   lesao,
   parteLesionada,
   centroServico,
-  local,
   data
 }) {
   validarCampoObrigatorio(matricula, 'Matricula obrigatoria');
@@ -24,7 +23,6 @@ function validarDadosObrigatorios({
   validarCampoObrigatorio(lesao, 'Lesao obrigatoria');
   validarCampoObrigatorio(parteLesionada, 'Parte lesionada obrigatoria');
   validarCampoObrigatorio(centroServico, 'Centro de servico obrigatorio');
-  validarCampoObrigatorio(local, 'Local obrigatorio');
   validarCampoObrigatorio(data, 'Data do acidente obrigatoria');
 }
 
@@ -32,10 +30,10 @@ function validarDias({ diasPerdidos, diasDebitados }) {
   const perdidos = Number(diasPerdidos);
   const debitados = Number(diasDebitados);
 
-  if (Number.isNaN(perdidos) || perdidos < 0) {
+  if (!Number.isInteger(perdidos) || perdidos < 0) {
     throw new Error('Dias perdidos deve ser zero ou positivo');
   }
-  if (Number.isNaN(debitados) || debitados < 0) {
+  if (!Number.isInteger(debitados) || debitados < 0) {
     throw new Error('Dias debitados deve ser zero ou positivo');
   }
 }
@@ -50,8 +48,30 @@ function validarData(data) {
   }
 }
 
+function validarHht(hht) {
+  if (hht === undefined || hht === null || hht === '') {
+    return;
+  }
+  const valor = Number(hht);
+  if (!Number.isInteger(valor) || valor < 0) {
+    throw new Error('HHT deve ser zero ou positivo');
+  }
+}
+
+function validarCat(cat) {
+  const valor = cat && String(cat).trim();
+  if (!valor) {
+    return;
+  }
+  if (!/^\d+$/.test(valor)) {
+    throw new Error('CAT deve conter apenas numeros inteiros');
+  }
+}
+
 module.exports = {
   validarDadosObrigatorios,
   validarDias,
-  validarData
+  validarData,
+  validarHht,
+  validarCat
 };

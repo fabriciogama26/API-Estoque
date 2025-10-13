@@ -6,6 +6,9 @@ export const MATERIAIS_FORM_DEFAULT = {
   validadeDias: '',
   ca: '',
   valorUnitario: '',
+  grupoMaterial: '',
+  numeroCalcado: '',
+  numeroVestimenta: '',
 }
 
 // Filtro padrão de materiais

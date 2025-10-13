@@ -3,8 +3,8 @@ Tela: Materiais
 
 Objetivo
 --------
-- Cadastrar e manter EPIs (nome, fabricante, validade, CA, valor unitario, estoque minimo, status).
-- Registrar historico de precos para auditoria.
+- Cadastrar e manter EPIs (nome sem numeros, fabricante, validade, CA, valor unitario, estoque minimo, grupo e status).
+- Registrar historico de precos para auditoria e garantir chave unica por grupo/material/fabricante/numero especifico.
 
 Fluxo geral
 -----------
@@ -15,6 +15,10 @@ Fluxo geral
 Campos principais
 -----------------
 - `nome`, `fabricante`, `validadeDias`, `ca`, `valorUnitario`, `estoqueMinimo`, `ativo`.
+- `grupoMaterial` (obrigatorio, proveniente da API `/api/materiais/groups`).
+- `numeroCalcado` (requerido quando o grupo for "Calçado").
+- `numeroVestimenta` (requerido quando o grupo for "Vestimenta").
+- `numeroEspecifico` (definido automaticamente a partir do grupo/numero informado).
 - Valor unitario usa helpers de formatacao (`formatCurrencyInput`).
 - Atualizacoes registram usuario responsavel e timestamp.
 
@@ -26,16 +30,21 @@ APIs
 - `dataClient.materiais.priceHistory(id)`
   - Remoto: mapeia para `/api/materiais`, `/api/materiais/:id`, `/api/materiais/price-history/:id`.
   - Local: persiste no `localStorage` e adiciona registros em `materialPriceHistory`.
+- `dataClient.materiais.groups()` (consulta os grupos disponiveis; remoto usa `/api/materiais/groups`).
 
 Validacoes
 ----------
-- Frontend garante campos obrigatorios e numeros positivos.
+- Frontend garante campos obrigatorios, impede digitos no campo EPI e formata numeros.
 - Servicos validam:
-  - Nome/fabricante nao vazios.
+  - Nome/fabricante nao vazios e EPI sem numeros.
+  - `grupoMaterial` obrigatorio.
+  - `numeroCalcado` obrigatorio apenas para grupo "Calçado".
+  - `numeroVestimenta` obrigatorio apenas para grupo "Vestimenta".
   - `validadeDias` > 0.
   - `valorUnitario` > 0.
   - `estoqueMinimo` >= 0 (ou null).
-  - CA nao vazio.
+  - CA nao vazio (apenas digitos).
+  - Chave unica (`grupoMaterial + nome + fabricante + numeroEspecifico`) nao pode se repetir.
 - Historico de preco e gravado sempre que `valorUnitario` muda.
 
 Comportamento da UI

@@ -125,6 +125,7 @@ Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
 | Materiais | GET, POST        | `/api/materiais`                                                                           | Consulta e cria materiais.                                |
 | Materiais | PUT              | `/api/materiais/:id`                                                                       | Atualiza material existente.                              |
 | Materiais | GET              | `/api/materiais/price-history/:id`                                                         | Historico de precos.                                      |
+| Materiais | GET              | `/api/materiais/groups`                                                                     | Lista grupos cadastrados para vincular aos EPIs.         |
 | Entradas  | GET, POST        | `/api/entradas`                                                                            | Movimentacoes de entrada.                                 |
 | Saidas    | GET, POST        | `/api/saidas`                                                                              | Movimentacoes de saida.                                   |
 | Estoque   | GET              | `/api/estoque`                                                                             | Snapshot atual (aceita filtros como `periodoInicio`).     |

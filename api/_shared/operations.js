@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+﻿import { randomUUID } from 'node:crypto'
 import { supabaseAdmin } from './supabaseClient.js'
 import {
   parsePeriodo,
@@ -147,57 +147,117 @@ async function ensureMatriculaDisponivel(matricula, ignoreId) {
   if (ignoreId) {
     query = query.neq('id', ignoreId)
   }
-  const existente = await executeMaybeSingle(query, 'Falha ao validar matrícula.')
+  const existente = await executeMaybeSingle(query, 'Falha ao validar matrÃ­cula.')
   if (existente) {
-    throw createHttpError(409, 'Já existe uma pessoa com essa matrícula.')
+    throw createHttpError(409, 'JÃ¡ existe uma pessoa com essa matrÃ­cula.')
   }
 }
 
+const sanitizeDigits = (value = '') => String(value).replace(/\\D/g, '')
+
+const normalizeKeyPart = (value) =>
+  value
+    ? String(value)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\\u0300-\\u036f]/g, '')
+    : ''
+
+const isGrupo = (value, target) => normalizeKeyPart(value) === normalizeKeyPart(target)
+
+const buildNumeroEspecificoMaterial = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
+  if (isGrupo(grupoMaterial, 'Cal\u00e7ado')) {
+    return sanitizeDigits(numeroCalcado)
+  }
+  if (isGrupo(grupoMaterial, 'Vestimenta')) {
+    return String(numeroVestimenta || '').trim()
+  }
+  return ''
+}
+
+const buildChaveUnicaMaterial = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
+  [
+    normalizeKeyPart(grupoMaterial),
+    normalizeKeyPart(nome),
+    normalizeKeyPart(fabricante),
+    normalizeKeyPart(numeroEspecifico),
+  ].join('||')
+
 function sanitizeMaterialPayload(payload = {}) {
+  const nome = trim(payload.nome)
+  const fabricante = trim(payload.fabricante)
+  const grupoMaterial = trim(payload.grupoMaterial)
+  const numeroCalcadoRaw = sanitizeDigits(payload.numeroCalcado)
+  const numeroVestimentaRaw = trim(payload.numeroVestimenta)
+  const numeroCalcado = isGrupo(grupoMaterial, 'Cal\u00e7ado') ? numeroCalcadoRaw : ''
+  const numeroVestimenta = isGrupo(grupoMaterial, 'Vestimenta') ? numeroVestimentaRaw : ''
+  const numeroEspecifico = buildNumeroEspecificoMaterial({
+    grupoMaterial,
+    numeroCalcado,
+    numeroVestimenta,
+  })
   return {
-    nome: trim(payload.nome),
-    fabricante: trim(payload.fabricante),
+    nome,
+    fabricante,
     validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
-    ca: trim(payload.ca),
+    ca: sanitizeDigits(payload.ca),
     valorUnitario: Number(payload.valorUnitario ?? 0),
     estoqueMinimo:
       payload.estoqueMinimo !== undefined && payload.estoqueMinimo !== null
         ? Number(payload.estoqueMinimo)
         : null,
     ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
+    grupoMaterial,
+    numeroCalcado,
+    numeroVestimenta,
+    numeroEspecifico,
+    chaveUnica: buildChaveUnicaMaterial({
+      grupoMaterial,
+      nome,
+      fabricante,
+      numeroEspecifico,
+    }),
   }
 }
 
 function validateMaterialPayload(payload) {
-  if (!payload.nome) throw createHttpError(400, 'Nome do EPI obrigatório.')
-  if (!payload.fabricante) throw createHttpError(400, 'Fabricante obrigatório.')
+  if (!payload.nome) throw createHttpError(400, 'Nome do EPI obrigatorio.')
+  if (/\d/.test(payload.nome)) throw createHttpError(400, 'O campo EPI nao pode conter numeros.')
+  if (!payload.grupoMaterial) throw createHttpError(400, 'Grupo de material obrigatorio.')
+  if (!payload.fabricante) throw createHttpError(400, 'Fabricante obrigatorio.')
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
     throw createHttpError(400, 'Validade deve ser maior que zero.')
   }
   if (!payload.ca) {
-    throw createHttpError(400, 'CA obrigatório.')
+    throw createHttpError(400, 'CA obrigatorio.')
   }
   if (Number.isNaN(Number(payload.valorUnitario)) || Number(payload.valorUnitario) <= 0) {
-    throw createHttpError(400, 'Valor unitário deve ser maior que zero.')
+    throw createHttpError(400, 'Valor unitario deve ser maior que zero.')
+  }
+  if (isGrupo(payload.grupoMaterial, 'Cal\u00e7ado') && !payload.numeroCalcado) {
+    throw createHttpError(400, 'Informe o numero do calcado.')
+  }
+  if (isGrupo(payload.grupoMaterial, 'Vestimenta') && !payload.numeroVestimenta) {
+    throw createHttpError(400, 'Informe o numero da vestimenta.')
   }
   if (
     payload.estoqueMinimo !== null &&
     (Number.isNaN(Number(payload.estoqueMinimo)) || Number(payload.estoqueMinimo) < 0)
   ) {
-    throw createHttpError(400, 'Estoque mínimo deve ser zero ou positivo.')
+    throw createHttpError(400, 'Estoque minimo deve ser zero ou positivo.')
   }
 }
 
-async function ensureMaterialUnico(nome, fabricante, ignoreId) {
-  if (!nome || !fabricante) {
+async function ensureMaterialChaveUnica(chaveUnica, ignoreId) {
+  if (!chaveUnica) {
     return
   }
 
   let query = supabaseAdmin
     .from('materiais')
     .select('id')
-    .eq('nome', nome)
-    .eq('fabricante', fabricante)
+    .eq('chaveUnica', chaveUnica)
     .limit(1)
 
   if (ignoreId) {
@@ -206,7 +266,7 @@ async function ensureMaterialUnico(nome, fabricante, ignoreId) {
 
   const existente = await executeMaybeSingle(query, 'Falha ao validar material.')
   if (existente) {
-    throw createHttpError(409, 'Material já cadastrado para esse fabricante.')
+    throw createHttpError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
   }
 }
 
@@ -222,14 +282,14 @@ function sanitizeEntradaPayload(payload = {}) {
 }
 
 function validateEntradaPayload(payload) {
-  if (!payload.materialId) throw createHttpError(400, 'Material obrigatório para entrada.')
+  if (!payload.materialId) throw createHttpError(400, 'Material obrigatÃ³rio para entrada.')
   if (Number.isNaN(Number(payload.quantidade)) || Number(payload.quantidade) <= 0) {
     throw createHttpError(400, 'Quantidade deve ser maior que zero.')
   }
-  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatório.')
-  if (!payload.centroServico) throw createHttpError(400, 'Centro de serviço obrigatório.')
+  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatÃ³rio.')
+  if (!payload.centroServico) throw createHttpError(400, 'Centro de serviÃ§o obrigatÃ³rio.')
   if (payload.dataEntrada && Number.isNaN(Date.parse(payload.dataEntrada))) {
-    throw createHttpError(400, 'Data de entrada inválida.')
+    throw createHttpError(400, 'Data de entrada invÃ¡lida.')
   }
 }
 
@@ -247,15 +307,15 @@ function sanitizeSaidaPayload(payload = {}) {
 }
 
 function validateSaidaPayload(payload) {
-  if (!payload.pessoaId) throw createHttpError(400, 'Pessoa obrigatória para saída.')
-  if (!payload.materialId) throw createHttpError(400, 'Material obrigatório para saída.')
+  if (!payload.pessoaId) throw createHttpError(400, 'Pessoa obrigatÃ³ria para saÃ­da.')
+  if (!payload.materialId) throw createHttpError(400, 'Material obrigatÃ³rio para saÃ­da.')
   if (Number.isNaN(Number(payload.quantidade)) || Number(payload.quantidade) <= 0) {
     throw createHttpError(400, 'Quantidade deve ser maior que zero.')
   }
-  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatório.')
-  if (!payload.centroServico) throw createHttpError(400, 'Centro de serviço obrigatório.')
+  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatÃ³rio.')
+  if (!payload.centroServico) throw createHttpError(400, 'Centro de serviÃ§o obrigatÃ³rio.')
   if (payload.dataEntrega && Number.isNaN(Date.parse(payload.dataEntrega))) {
-    throw createHttpError(400, 'Data de entrega inválida.')
+    throw createHttpError(400, 'Data de entrega invÃ¡lida.')
   }
 }
 
@@ -266,9 +326,44 @@ const sanitizeOptional = (value) => {
   return trimmed || null
 }
 
+function sanitizeOptionalIntegerString(value, fieldName = 'Valor') {
+  const sanitized = sanitizeOptional(value)
+  if (sanitized === undefined) {
+    return undefined
+  }
+  if (sanitized === null) {
+    return null
+  }
+  if (!/^[0-9]+$/.test(sanitized)) {
+    throw createHttpError(400, `${fieldName} deve conter apenas numeros inteiros.`)
+  }
+  return sanitized
+}
+
+function sanitizeNonNegativeInteger(value, { defaultValue = 0, allowNull = false, fieldName = 'Valor' } = {}) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    if (allowNull) {
+      return null
+    }
+    return defaultValue
+  }
+  if (!/^-?[0-9]+$/.test(String(value).trim())) {
+    throw createHttpError(400, `${fieldName} deve ser um numero inteiro.`)
+  }
+  const numeric = Number(value)
+  if (!Number.isInteger(numeric) || Number.isNaN(numeric)) {
+    throw createHttpError(400, `${fieldName} deve ser um numero inteiro.`)
+  }
+  if (numeric < 0) {
+    throw createHttpError(400, `${fieldName} nao pode ser negativo.`)
+  }
+  return numeric
+}
+
 function sanitizeAcidentePayload(payload = {}) {
   const centroServico = trim(payload.centroServico ?? payload.setor)
   const local = trim(payload.local)
+  const cat = sanitizeOptionalIntegerString(payload.cat, 'CAT')
   return {
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
@@ -280,45 +375,49 @@ function sanitizeAcidentePayload(payload = {}) {
     parteLesionada: trim(payload.parteLesionada),
     centroServico,
     local: local || centroServico,
-    diasPerdidos:
-      payload.diasPerdidos !== undefined && payload.diasPerdidos !== null
-        ? Number(payload.diasPerdidos)
-        : 0,
-    diasDebitados:
-      payload.diasDebitados !== undefined && payload.diasDebitados !== null
-        ? Number(payload.diasDebitados)
-        : 0,
+    diasPerdidos: sanitizeNonNegativeInteger(payload.diasPerdidos, {
+      defaultValue: 0,
+      fieldName: 'Dias perdidos',
+    }),
+    diasDebitados: sanitizeNonNegativeInteger(payload.diasDebitados, {
+      defaultValue: 0,
+      fieldName: 'Dias debitados',
+    }),
+    hht: sanitizeNonNegativeInteger(payload.hht, {
+      allowNull: true,
+      fieldName: 'HHT',
+    }),
     cid: sanitizeOptional(payload.cid),
-    cat: sanitizeOptional(payload.cat),
+    cat: cat ?? null,
     observacao: sanitizeOptional(payload.observacao),
   }
 }
 
 function validateAcidentePayload(payload) {
-  if (!payload.matricula) throw createHttpError(400, 'Matr�cula obrigat�ria.')
-  if (!payload.nome) throw createHttpError(400, 'Nome obrigat�rio.')
-  if (!payload.cargo) throw createHttpError(400, 'Cargo obrigat�rio.')
-  if (!payload.tipo) throw createHttpError(400, 'Tipo de acidente obrigat�rio.')
-  if (!payload.agente) throw createHttpError(400, 'Agente causador obrigat�rio.')
-  if (!payload.lesao) throw createHttpError(400, 'Les�o obrigat�ria.')
-  if (!payload.parteLesionada) throw createHttpError(400, 'Parte lesionada obrigat�ria.')
-  if (!payload.centroServico) throw createHttpError(400, 'Centro de servi�o obrigat�rio.')
-  if (!payload.local) throw createHttpError(400, 'Local obrigat�rio.')
+  if (!payload.matricula) throw createHttpError(400, 'Matricula obrigatoria')
+  if (!payload.nome) throw createHttpError(400, 'Nome obrigatorio')
+  if (!payload.cargo) throw createHttpError(400, 'Cargo obrigatorio')
+  if (!payload.tipo) throw createHttpError(400, 'Tipo de acidente obrigatorio')
+  if (!payload.agente) throw createHttpError(400, 'Agente causador obrigatorio')
+  if (!payload.lesao) throw createHttpError(400, 'Lesao obrigatoria')
+  if (!payload.parteLesionada) throw createHttpError(400, 'Parte lesionada obrigatoria')
+  if (!payload.centroServico) throw createHttpError(400, 'Centro de servico obrigatorio')
   if (!payload.data || Number.isNaN(Date.parse(payload.data))) {
-    throw createHttpError(400, 'Data do acidente obrigat�ria.')
+    throw createHttpError(400, 'Data do acidente obrigatoria')
   }
-  if (Number.isNaN(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
-    throw createHttpError(400, 'Dias perdidos deve ser zero ou positivo.')
+  if (!Number.isInteger(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
+    throw createHttpError(400, 'Dias perdidos deve ser zero ou positivo')
   }
-  if (Number.isNaN(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
-    throw createHttpError(400, 'Dias debitados deve ser zero ou positivo.')
+  if (!Number.isInteger(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
+    throw createHttpError(400, 'Dias debitados deve ser zero ou positivo')
   }
-}
-  if (Number.isNaN(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
-    throw createHttpError(400, 'Dias perdidos deve ser zero ou positivo.')
+  if (payload.hht !== undefined && payload.hht !== null) {
+    if (!Number.isInteger(Number(payload.hht)) || Number(payload.hht) < 0) {
+      throw createHttpError(400, 'HHT deve ser zero ou positivo')
+    }
   }
-  if (Number.isNaN(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
-    throw createHttpError(400, 'Dias debitados deve ser zero ou positivo.')
+  if (payload.cat && !/^[0-9]+$/.test(String(payload.cat))) {
+    throw createHttpError(400, 'CAT deve conter apenas numeros inteiros')
   }
 }
 
@@ -335,7 +434,7 @@ async function obterPessoaPorMatricula(matricula) {
   }
   const pessoa = await executeMaybeSingle(
     supabaseAdmin.from('pessoas').select('*').eq('matricula', matricula).limit(1),
-    'Falha ao consultar pessoa por matr�cula.'
+    'Falha ao consultar pessoa por matrï¿½cula.'
   )
   return mapPessoaRecord(pessoa)
 }
@@ -378,7 +477,7 @@ async function registrarHistoricoPreco(materialId, valorUnitario, usuario) {
       usuarioResponsavel: usuario || 'sistema',
       criadoEm: nowIso(),
     }),
-    'Falha ao registrar histórico de preço.'
+    'Falha ao registrar histÃ³rico de preÃ§o.'
   )
 }
 
@@ -413,7 +512,7 @@ async function carregarMovimentacoes(params) {
   const [materiais, entradas, saidas] = await Promise.all([
     execute(supabaseAdmin.from('materiais').select('*').order('nome'), 'Falha ao listar materiais.'),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
-    execute(saidasFiltered, 'Falha ao listar saídas.'),
+    execute(saidasFiltered, 'Falha ao listar saÃ­das.'),
   ])
 
   return {
@@ -432,7 +531,7 @@ async function calcularSaldoMaterialAtual(materialId) {
     ),
     execute(
       supabaseAdmin.from('saidas').select('materialId, quantidade, dataEntrega').eq('materialId', materialId),
-      'Falha ao consultar saídas do material.'
+      'Falha ao consultar saÃ­das do material.'
     ),
   ])
 
@@ -483,7 +582,7 @@ export const PessoasOperations = {
       'Falha ao obter pessoa.'
     )
     if (!atual) {
-      throw createHttpError(404, 'Pessoa não encontrada.')
+      throw createHttpError(404, 'Pessoa nÃ£o encontrada.')
     }
 
     const dados = sanitizePessoaPayload(payload)
@@ -567,10 +666,26 @@ export const MateriaisOperations = {
       )) ?? []
     )
   },
+  async groups() {
+    const registros =
+      (await execute(
+        supabaseAdmin
+          .from('materiais')
+          .select('grupoMaterial', { distinct: true })
+          .not('grupoMaterial', 'is', null)
+          .neq('grupoMaterial', '')
+          .order('grupoMaterial'),
+        'Falha ao listar grupos de materiais.'
+      )) ?? []
+    return registros
+      .map((item) => (item.grupoMaterial && item.grupoMaterial.trim()) || '')
+      .filter((value) => Boolean(value))
+      .sort((a, b) => a.localeCompare(b))
+  },
   async create(payload, user) {
     const dados = sanitizeMaterialPayload(payload)
     validateMaterialPayload(dados)
-    await ensureMaterialUnico(dados.nome, dados.fabricante)
+    await ensureMaterialChaveUnica(dados.chaveUnica)
 
     const agora = nowIso()
     const usuario = resolveUsuarioNome(user)
@@ -597,7 +712,7 @@ export const MateriaisOperations = {
       'Falha ao obter material.'
     )
     if (!atual) {
-      throw createHttpError(404, 'Material não encontrado.')
+      throw createHttpError(404, 'Material nÃ£o encontrado.')
     }
 
     const dados = sanitizeMaterialPayload({
@@ -605,7 +720,7 @@ export const MateriaisOperations = {
       ...payload,
     })
     validateMaterialPayload(dados)
-    await ensureMaterialUnico(dados.nome, dados.fabricante, id)
+    await ensureMaterialChaveUnica(dados.chaveUnica, id)
 
     const usuario = resolveUsuarioNome(user)
 
@@ -620,6 +735,11 @@ export const MateriaisOperations = {
           valorUnitario: dados.valorUnitario,
           estoqueMinimo: dados.estoqueMinimo,
           ativo: dados.ativo,
+          grupoMaterial: dados.grupoMaterial,
+          numeroCalcado: dados.numeroCalcado,
+          numeroVestimenta: dados.numeroVestimenta,
+          numeroEspecifico: dados.numeroEspecifico,
+          chaveUnica: dados.chaveUnica,
           usuarioAtualizacao: usuario,
           atualizadoEm: nowIso(),
         })
@@ -648,7 +768,7 @@ export const MateriaisOperations = {
           .select('*')
           .eq('materialId', id)
           .order('criadoEm', { ascending: false }),
-        'Falha ao listar histórico de preços.'
+        'Falha ao listar histÃ³rico de preÃ§os.'
       )) ?? []
     )
   },
@@ -669,7 +789,7 @@ export const EntradasOperations = {
 
     const material = await obterMaterialPorId(dados.materialId)
     if (!material) {
-      throw createHttpError(404, 'Material não encontrado.')
+      throw createHttpError(404, 'Material nÃ£o encontrado.')
     }
 
     const usuario = resolveUsuarioNome(user)
@@ -699,7 +819,7 @@ export const SaidasOperations = {
     return (
       (await execute(
         supabaseAdmin.from('saidas').select('*').order('dataEntrega', { ascending: false }),
-        'Falha ao listar saídas.'
+        'Falha ao listar saÃ­das.'
       )) ?? []
     )
   },
@@ -713,15 +833,15 @@ export const SaidasOperations = {
     ])
 
     if (!pessoa) {
-      throw createHttpError(404, 'Pessoa não encontrada.')
+      throw createHttpError(404, 'Pessoa nÃ£o encontrada.')
     }
     if (!material) {
-      throw createHttpError(404, 'Material não encontrado.')
+      throw createHttpError(404, 'Material nÃ£o encontrado.')
     }
 
     const estoqueDisponivel = await calcularSaldoMaterialAtual(material.id)
     if (Number(dados.quantidade) > estoqueDisponivel) {
-      throw createHttpError(400, 'Quantidade informada maior que estoque disponível.')
+      throw createHttpError(400, 'Quantidade informada maior que estoque disponÃ­vel.')
     }
 
     const dataTroca = calcularDataTroca(dados.dataEntrega, material.validadeDias)
@@ -742,7 +862,7 @@ export const SaidasOperations = {
           dataTroca,
         })
         .select(),
-      'Falha ao registrar saída.'
+      'Falha ao registrar saÃ­da.'
     )
 
     return {
@@ -781,7 +901,7 @@ export const AcidentesOperations = {
 
     const pessoa = await obterPessoaPorMatricula(dados.matricula)
     if (!pessoa) {
-      throw createHttpError(404, 'Pessoa n�o encontrada para a matr�cula informada.')
+      throw createHttpError(404, 'Pessoa nï¿½o encontrada para a matrï¿½cula informada.')
     }
 
     const centroServicoBase = dados.centroServico || pessoa.centroServico || pessoa.setor || pessoa.local || ''
@@ -806,6 +926,7 @@ export const AcidentesOperations = {
           local: localBase,
           diasPerdidos: dados.diasPerdidos,
           diasDebitados: dados.diasDebitados,
+          hht: dados.hht,
           cid: dados.cid,
           cat: dados.cat,
           observacao: dados.observacao,
@@ -825,14 +946,14 @@ export const AcidentesOperations = {
       'Falha ao obter acidente.'
     )
     if (!atual) {
-      throw createHttpError(404, 'Acidente n�o encontrado.')
+      throw createHttpError(404, 'Acidente nï¿½o encontrado.')
     }
 
     let pessoa = null
     if (payload.matricula !== undefined && trim(payload.matricula)) {
       pessoa = await obterPessoaPorMatricula(trim(payload.matricula))
       if (!pessoa) {
-        throw createHttpError(404, 'Pessoa n�o encontrada para a matr�cula informada.')
+        throw createHttpError(404, 'Pessoa nï¿½o encontrada para a matrï¿½cula informada.')
       }
     }
 
@@ -865,6 +986,7 @@ export const AcidentesOperations = {
           local: localFinal,
           diasPerdidos: dados.diasPerdidos,
           diasDebitados: dados.diasDebitados,
+          hht: dados.hht,
           cid: dados.cid,
           cat: dados.cat,
           observacao: dados.observacao,
@@ -890,3 +1012,5 @@ export async function healthCheck() {
   }
   return { status: 'ok' }
 }
+
+
