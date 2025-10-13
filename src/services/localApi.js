@@ -5,6 +5,7 @@ import {
   parsePeriodo,
   calcularSaldoMaterial,
 } from '../lib/estoque.js'
+import gruposEpi from '../data/grupos-epi.json'
 
 const nowIso = () => new Date().toISOString()
 
@@ -147,6 +148,18 @@ const buildChaveUnica = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) 
     normalizeKeyPart(fabricante),
     normalizeKeyPart(numeroEspecifico),
   ].join('||')
+
+const gruposEpiPadrao = (() => {
+  if (Array.isArray(gruposEpi)) {
+    return gruposEpi
+  }
+  if (Array.isArray(gruposEpi?.grupos)) {
+    return gruposEpi.grupos
+  }
+  return []
+})()
+  .map((item) => (item ? String(item).trim() : ''))
+  .filter(Boolean)
 
 const sanitizeMaterialPayload = (payload = {}) => {
   const grupoMaterial = trim(payload.grupoMaterial)
@@ -468,15 +481,14 @@ const localApi = {
       return readState((state) => state.materiais.slice())
     },
     async groups() {
-      return readState((state) =>
-        Array.from(
-          new Set(
-            state.materiais
-              .map((material) => material.grupoMaterial && material.grupoMaterial.trim())
-              .filter(Boolean)
-          )
-        ).sort((a, b) => a.localeCompare(b))
-      )
+      return readState((state) => {
+        const set = new Set(gruposEpiPadrao)
+        state.materiais
+          .map((material) => material.grupoMaterial && material.grupoMaterial.trim())
+          .filter(Boolean)
+          .forEach((grupo) => set.add(grupo))
+        return Array.from(set).sort((a, b) => a.localeCompare(b))
+      })
     },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)

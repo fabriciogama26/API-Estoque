@@ -33,7 +33,7 @@ Regras e calculos
 Comportamento de UI
 -------------------
 - `isLoading` e `isSaving` controlam botoes e mensagens (`Filtrando...`, `Salvando...`).
-- Alertas exibem deficit (diferença entre saldo e minimo).
+- Alertas exibem deficit (diferenca entre saldo e minimo).
 - Erros especificos aparecem proximo ao componente acionado.
 
 Dependencias

@@ -58,7 +58,7 @@ O que muda entre os modos
   - Local: `localStorage` (chave `api-estoque-local-data-v1`). Seeds iniciais sao carregados uma unica vez.
   - Supabase: tabelas reais (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`).
 - **Health check**:
-  - Local: `SystemStatus` exibe “Modo local ativo”.
+  - Local: `SystemStatus` exibe Modo local ativo.
   - Supabase: tenta checar API e consulta uma tabela do Supabase.
 
 Boas praticas
@@ -72,5 +72,5 @@ Solucao de problemas
 --------------------
 - **Login falha no modo local**: verifique as variaveis `VITE_LOCAL_*` e se o navegador nao manteve um valor antigo em `api-estoque-auth`.
 - **Dashboard vazio no modo local**: confirme se os seeds foram carregados (verifique `localStorage`). Se estiver vazio, limpe a chave para recarregar os seeds.
-- **Erros de Supabase quando deveria estar local**: garanta que `VITE_DATA_MODE=local` foi salvo e que o Vite foi reiniciado. O `SystemStatus` deve indicar “Modo local ativo”.
+- **Erros de Supabase quando deveria estar local**: garanta que `VITE_DATA_MODE=local` foi salvo e que o Vite foi reiniciado. O `SystemStatus` deve indicar Modo local ativo.
 - **Erros 401 no modo Supabase**: a sessao pode ter expirado; refaca login e confirme que as variaveis `VITE_SUPABASE_*` apontam para o projeto correto.

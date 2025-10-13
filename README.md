@@ -107,7 +107,7 @@ npm run dev
 | ------- | ------------------------------------ | ------------------------------------ | --------------------------------------------- |
 | Remote  | (padrao) ou `VITE_DATA_MODE=remote`  | Supabase Auth (`supabase.auth.*`)    | Banco Supabase (Postgres + RLS)               |
 | Local   | `VITE_DATA_MODE=local`               | Credenciais definidas em `.env.local`| `localStorage` (`api-estoque-local-data-v1`), seeds em `src/data/local-seed.json` |
-|         |                                        |                                      | Entradas/Saídas registram `centroCusto` e `centroServico` em ambos os modos. |
+|         |                                        |                                      | Entradas/Saidas registram `centroCusto` e `centroServico` em ambos os modos. |
 
 - Alternar entre os modos exige reiniciar o Vite.
 - Para resetar apenas os dados locais, limpe a chave `api-estoque-local-data-v1` no `localStorage`.

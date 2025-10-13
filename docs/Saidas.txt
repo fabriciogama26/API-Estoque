@@ -11,8 +11,8 @@ Campos do formulario
 - `pessoaId` (select): preenchido com `dataClient.pessoas.list`.
 - `materialId` (select): preenchido com `dataClient.materiais.list`.
 - `quantidade` (numeric >= 1).
-- `centroCusto` (texto, obrigatorio): identifica o centro que receberá o custo da saída.
-- `centroServico` (texto, obrigatorio): centro de serviço responsável pelo colaborador.
+- `centroCusto` (texto, obrigatorio): identifica o centro que recebera o custo da saida.
+- `centroServico` (texto, obrigatorio): centro de servico responsavel pelo colaborador.
 - `dataEntrega` (date opcional).
 - `status` (select na tabela; valores dinamicos).
 
@@ -22,7 +22,7 @@ Validacoes
 - Servico remoto verifica:
   - Pessoa e material existentes em Supabase.
   - Disponibilidade de estoque (`calcularSaldoMaterialAtual`).
-  - Centros de custo e serviço preenchidos.
+  - Centros de custo e servico preenchidos.
   - Calcula `dataTroca` com base na validade do material.
 - Servico local aplica a mesma logica antes de persistir no `localStorage`.
 
