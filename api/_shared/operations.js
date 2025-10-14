@@ -97,7 +97,6 @@ function mapEntradaRecord(record) {
   return {
     ...record,
     centroCusto: record.centroCusto ?? '',
-    centroServico: record.centroServico ?? '',
   }
 }
 
@@ -275,7 +274,6 @@ function sanitizeEntradaPayload(payload = {}) {
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
     centroCusto: trim(payload.centroCusto),
-    centroServico: trim(payload.centroServico),
     dataEntrada: payload.dataEntrada ? new Date(payload.dataEntrada).toISOString() : nowIso(),
     usuarioResponsavel: trim(payload.usuarioResponsavel) || null,
   }
@@ -802,7 +800,6 @@ export const EntradasOperations = {
             materialId: dados.materialId,
             quantidade: dados.quantidade,
             centroCusto: dados.centroCusto,
-            centroServico: dados.centroServico,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
           })

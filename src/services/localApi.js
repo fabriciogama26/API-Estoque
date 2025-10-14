@@ -5,6 +5,7 @@ import {
   parsePeriodo,
   calcularSaldoMaterial,
 } from '../lib/estoque.js'
+import gruposEpi from '../data/grupos-epi.json'
 
 const nowIso = () => new Date().toISOString()
 
@@ -35,6 +36,20 @@ const toIsoOrNull = (value, defaultNow = false) => {
   return date.toISOString()
 }
 
+const toLocalDateIso = (value) => {
+  const raw = trim(value)
+  if (!raw) {
+    return null
+  }
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+  const candidate = isDateOnly ? `${raw}T00:00:00` : raw
+  const date = new Date(candidate)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date.toISOString()
+}
+
 const createError = (status, message) => {
   const error = new Error(message)
   error.status = status
@@ -48,6 +63,8 @@ const sanitizePessoaPayload = (payload = {}) => {
     matricula: trim(payload.matricula),
     cargo: trim(payload.cargo),
     centroServico,
+    dataAdmissao: toLocalDateIso(payload.dataAdmissao),
+    tipoExecucao: trim(payload.tipoExecucao),
   }
 }
 
@@ -56,6 +73,7 @@ const validatePessoaPayload = (payload) => {
   if (!payload.matricula) throw createError(400, 'Matricula obrigatoria.')
   if (!payload.centroServico) throw createError(400, 'Centro de servico obrigatorio.')
   if (!payload.cargo) throw createError(400, 'Cargo obrigatorio.')
+  if (!payload.tipoExecucao) throw createError(400, 'Tipo Execucao obrigatorio.')
 }
 
 const mapLocalPessoaRecord = (pessoa) => {
@@ -148,6 +166,18 @@ const buildChaveUnica = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) 
     normalizeKeyPart(numeroEspecifico),
   ].join('||')
 
+const gruposEpiPadrao = (() => {
+  if (Array.isArray(gruposEpi)) {
+    return gruposEpi
+  }
+  if (Array.isArray(gruposEpi?.grupos)) {
+    return gruposEpi.grupos
+  }
+  return []
+})()
+  .map((item) => (item ? String(item).trim() : ''))
+  .filter(Boolean)
+
 const sanitizeMaterialPayload = (payload = {}) => {
   const grupoMaterial = trim(payload.grupoMaterial)
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
@@ -217,6 +247,7 @@ const validateMaterialPayload = (payload) => {
 const sanitizeEntradaPayload = (payload = {}) => ({
   materialId: trim(payload.materialId),
   quantidade: Number(payload.quantidade ?? 0),
+  centroCusto: trim(payload.centroCusto),
   dataEntrada: toIsoOrNull(payload.dataEntrada, true),
   usuarioResponsavel: trim(payload.usuarioResponsavel) || 'sistema',
 })
@@ -227,7 +258,6 @@ const validateEntradaPayload = (payload) => {
     throw createError(400, 'Quantidade deve ser maior que zero.')
   }
   if (!payload.centroCusto) throw createError(400, 'Centro de custo obrigatorio.')
-  if (!payload.centroServico) throw createError(400, 'Centro de servico obrigatorio.')
 }
 
 const sanitizeSaidaPayload = (payload = {}) => ({
@@ -367,6 +397,8 @@ const localApi = {
           centroServico: dados.centroServico,
           local: dados.centroServico,
           cargo: dados.cargo,
+          dataAdmissao: dados.dataAdmissao,
+          tipoExecucao: dados.tipoExecucao,
           usuarioCadastro: usuario,
           usuarioEdicao: null,
           historicoEdicao: [],
@@ -406,6 +438,8 @@ const localApi = {
           { campo: 'matricula' },
           { campo: 'centroServico', atualKey: 'centroServico' },
           { campo: 'cargo' },
+          { campo: 'dataAdmissao' },
+          { campo: 'tipoExecucao' },
         ]
 
         comparacoes.forEach(({ campo, atualKey }) => {
@@ -438,6 +472,8 @@ const localApi = {
           centroServico: dados.centroServico,
           local: dados.centroServico,
           cargo: dados.cargo,
+          dataAdmissao: dados.dataAdmissao,
+          tipoExecucao: dados.tipoExecucao,
           usuarioEdicao: usuario,
           atualizadoEm: agora,
           historicoEdicao: historico,
@@ -468,15 +504,14 @@ const localApi = {
       return readState((state) => state.materiais.slice())
     },
     async groups() {
-      return readState((state) =>
-        Array.from(
-          new Set(
-            state.materiais
-              .map((material) => material.grupoMaterial && material.grupoMaterial.trim())
-              .filter(Boolean)
-          )
-        ).sort((a, b) => a.localeCompare(b))
-      )
+      return readState((state) => {
+        const set = new Set(gruposEpiPadrao)
+        state.materiais
+          .map((material) => material.grupoMaterial && material.grupoMaterial.trim())
+          .filter(Boolean)
+          .forEach((grupo) => set.add(grupo))
+        return Array.from(set).sort((a, b) => a.localeCompare(b))
+      })
     },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)
@@ -516,9 +551,6 @@ const localApi = {
       if (!id) {
         throw createError(400, 'ID do material obrigatorio.')
       }
-      const dados = sanitizeMaterialPayload(payload)
-      validateMaterialPayload(dados)
-      const usuario = trim(payload.usuarioResponsavel) || 'sistema'
 
       return writeState((state) => {
         const index = state.materiais.findIndex((material) => material.id === id)
@@ -527,9 +559,12 @@ const localApi = {
         }
 
         const atual = state.materiais[index]
+        const dadosCompletos = sanitizeMaterialPayload({ ...atual, ...payload })
+        validateMaterialPayload(dadosCompletos)
+        const usuario = trim(payload.usuarioResponsavel) || 'sistema'
 
         const existe = state.materiais.find(
-          (item) => item.id !== id && item.chaveUnica && item.chaveUnica === dados.chaveUnica
+          (item) => item.id !== id && item.chaveUnica && item.chaveUnica === dadosCompletos.chaveUnica
         )
         if (existe) {
           throw createError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
@@ -537,18 +572,18 @@ const localApi = {
 
         const atualizado = {
           ...atual,
-          ...dados,
+          ...dadosCompletos,
           usuarioAtualizacao: usuario,
           atualizadoEm: nowIso(),
         }
 
         state.materiais[index] = atualizado
 
-        if (Number(dados.valorUnitario) !== Number(atual.valorUnitario)) {
+        if (Number(dadosCompletos.valorUnitario) !== Number(atual.valorUnitario)) {
           state.materialPriceHistory.push({
             id: randomId(),
             materialId: id,
-            valorUnitario: Number(dados.valorUnitario),
+            valorUnitario: Number(dadosCompletos.valorUnitario),
             usuarioResponsavel: usuario,
             dataRegistro: nowIso(),
           })

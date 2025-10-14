@@ -24,6 +24,17 @@ import { resolveUsuarioNome } from '../utils/PessoasUtils.js'
 
 import '../styles/PessoasPage.css'
 
+const formatDateInputValue = (value) => {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  return date.toISOString().slice(0, 10)
+}
+
 export function PessoasPage() {
   const { user } = useAuth()
   const [form, setForm] = useState(() => ({ ...PESSOAS_FORM_DEFAULT }))
@@ -116,6 +127,8 @@ export function PessoasPage() {
       centroServico: pessoa.centroServico ?? pessoa.local ?? '',
       local: pessoa.centroServico ?? pessoa.local ?? '',
       cargo: pessoa.cargo || '',
+      dataAdmissao: formatDateInputValue(pessoa.dataAdmissao),
+      tipoExecucao: pessoa.tipoExecucao || '',
     })
   }
 

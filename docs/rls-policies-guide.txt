@@ -1,41 +1,41 @@
-Guia de Configuração e Validação de RLS
+Guia de Configuracao e Validacao de RLS
 ========================================
 
 Contexto
 -------
-Funções serverless em `api/` usam a chave de função de serviço do Supabase para executar a lógica de negócios. As políticas de Segurança em Nível de Linha (RLS) devem, portanto, garantir que os usuários finais, autenticados com o Supabase Auth, possam acessar apenas as linhas permitidas enquanto a função de serviço continua operando para a lógica de back-end.
+Funcoes serverless em `api/` usam a chave de funcao de servico do Supabase para executar a logica de negocios. As politicas de Seguranca em Nivel de Linha (RLS) devem, portanto, garantir que os usuarios finais, autenticados com o Supabase Auth, possam acessar apenas as linhas permitidas enquanto a funcao de servico continua operando para a logica de back-end.
 
-Permissões Recomendadas
+Permissoes Recomendadas
 -----------------------
 1. `pessoas`
-- `SELECT`: permitir usuários autenticados.
-- `INSERT` / `UPDATE`: restringir a funções administrativas (por exemplo, declarar `is_admin` ou ser membro de uma tabela de permissões dedicada).
+- `SELECT`: permitir usuarios autenticados.
+- `INSERT` / `UPDATE`: restringir a funcoes administrativas (por exemplo, declarar `is_admin` ou ser membro de uma tabela de permissoes dedicada).
 2. `materiais`
-- `SELECT`: usuários autenticados.
-- `INSERT` / `UPDATE`: forneça políticas que verifiquem reivindicações ou associação (`usuarios_permissoes`) antes de permitir gravações.
+- `SELECT`: usuarios autenticados.
+- `INSERT` / `UPDATE`: forneca politicas que verifiquem reivindicacoes ou associacao (`usuarios_permissoes`) antes de permitir gravacoes.
 3. `material_price_history`
-- `INSERT`: geralmente deve ser permitido apenas para a função de serviço. Adicione uma política que verifique `current_setting('request.jwt.claim.role', true) = 'service_role'`.
-- `SELECT`: usuários autenticados podem ler para auditoria.
+- `INSERT`: geralmente deve ser permitido apenas para a funcao de servico. Adicione uma politica que verifique `current_setting('request.jwt.claim.role', true) = 'service_role'`.
+- `SELECT`: usuarios autenticados podem ler para auditoria.
 4. `entradas` e `saidas`
-- `SELECT`: usuários autenticados.
-- `INSERT`: limite para operadores responsáveis ​​pelo estoque (por exemplo, associação em `operadores_estoque`).
+- `SELECT`: usuarios autenticados.
+- `INSERT`: limite para operadores responsaveis pelo estoque (por exemplo, associacao em `operadores_estoque`).
 - Sempre registre `usuarioResponsavel` usando o e-mail autenticado para rastreabilidade.
 5. `acidentes`
-- `SELECT` / `INSERT`: pessoal de segurança autenticado.
-- `UPDATE`: restrinja ao registrante original ou funções de segurança explícitas.
+- `SELECT` / `INSERT`: pessoal de seguranca autenticado.
+- `UPDATE`: restrinja ao registrante original ou funcoes de seguranca explicitas.
 
-Criando Políticas
+Criando Politicas
 -----------------
 1. Habilite o RLS:
 ```sql
 alter table pessoas enable row level security;
 ```
-2. Política de leitura simples:
+2. Politica de leitura simples:
 ```sql
 create policy "authenticated read" on pessoas
 for select using (auth.role() = 'authenticated');
 ```
-3. Política de gravação condicional usando declarações personalizadas:
+3. Politica de gravacao condicional usando declaracoes personalizadas:
 ```sql
 create policy "admins update pessoas" on pessoas
 for update using (
@@ -43,9 +43,9 @@ auth.role() = 'authenticated'
 and coalesce((auth.jwt()->>'is_admin')::bool, false)
 );
 ```
-4. Política baseada em associação:
+4. Politica baseada em associacao:
 ```sql
-criar política "operadores estoque" em entradas
+criar politica "operadores estoque" em entradas
 para todos usando (
 auth.role() = 'authenticated'
 e exists (
@@ -55,35 +55,35 @@ onde oe.user_id = auth.uid()
 );
 ```
 
-Validação Contínua
+Validacao Continua
 ---------------------
 - **Testes automatizados**
 - Use o Supabase CLI ou `pgTAP` para simular consultas com diferentes JWTs.
-- Adicione verificações de CI que tentem `SELECT/INSERT/UPDATE` com usuários sem permissões e garanta que falhem.
+- Adicione verificacoes de CI que tentem `SELECT/INSERT/UPDATE` com usuarios sem permissoes e garanta que falhem.
 - **Testes manuais**
-- Gere tokens de acesso via `supabase.auth.signInWithPassword` para cada função e chame os endpoints `/api/*`.
-- Confirme se chamadas não autorizadas retornam respostas 401/403.
+- Gere tokens de acesso via `supabase.auth.signInWithPassword` para cada funcao e chame os endpoints `/api/*`.
+- Confirme se chamadas nao autorizadas retornam respostas 401/403.
 - **Auditorias**
-- Listar políticas ativas: `select * from pg_policies where schemaname = 'public';`
-- Garantir que as novas tabelas tenham o RLS habilitado antes da implantação em produção.
-- Registrar as alterações nesta pasta para referência futura.
+- Listar politicas ativas: `select * from pg_policies where schemaname = 'public';`
+- Garantir que as novas tabelas tenham o RLS habilitado antes da implantacao em producao.
+- Registrar as alteracoes nesta pasta para referencia futura.
 
-Integração com Rotas Serverless
+Integracao com Rotas Serverless
 ----------------------------------
-- Todas as funções usam `requireAuth` para validar o token do portador. Garantir que:
-- Os tokens emitidos pelo usuário nunca incluam o `service_role`.
-- A chave da função de serviço permaneça apenas no lado do servidor.
-- Para operações críticas (ajustes de estoque, atualizações de acidentes), verifique se as regras de negócios ainda são executadas com o RLS habilitado. Se necessário, adicione políticas explícitas concedendo acesso à função de serviço (por exemplo, `FORCE ROW LEVEL SECURITY` mais uma política de serviço).
+- Todas as funcoes usam `requireAuth` para validar o token do portador. Garantir que:
+- Os tokens emitidos pelo usuario nunca incluam o `service_role`.
+- A chave da funcao de servico permaneca apenas no lado do servidor.
+- Para operacoes criticas (ajustes de estoque, atualizacoes de acidentes), verifique se as regras de negocios ainda sao executadas com o RLS habilitado. Se necessario, adicione politicas explicitas concedendo acesso a funcao de servico (por exemplo, `FORCE ROW LEVEL SECURITY` mais uma politica de servico).
 
-Lista de Verificação de Implantação
+Lista de Verificacao de Implantacao
 --------------------
-1. Aplicar ou atualizar políticas para cada tabela acessada pelo aplicativo.
-2. Execute testes de permissão automatizados e manuais para `pessoas`, `materiais`, `entradas`, `saidas`, `estoque` e `acidentes`.
-3. Documente os resultados e atualizações em `docs/`.
-4. Revise as políticas sempre que novas rotas ou tabelas forem introduzidas.
+1. Aplicar ou atualizar politicas para cada tabela acessada pelo aplicativo.
+2. Execute testes de permissao automatizados e manuais para `pessoas`, `materiais`, `entradas`, `saidas`, `estoque` e `acidentes`.
+3. Documente os resultados e atualizacoes em `docs/`.
+4. Revise as politicas sempre que novas rotas ou tabelas forem introduzidas.
 
-Referências
+Referencias
 ----------
 - Guia RLS do Supabase: https://supabase.com/docs/guides/auth/row-level-security
-- Declarações personalizadas: https://supabase.com/docs/guides/auth/custom-claims
+- Declaracoes personalizadas: https://supabase.com/docs/guides/auth/custom-claims
 - Testes da CLI do Supabase: https://supabase.com/docs/guides/cli/local-testing

@@ -6,6 +6,8 @@ class Pessoa {
     centroServico,
     local,
     cargo,
+    dataAdmissao = null,
+    tipoExecucao = '',
     usuarioCadastro = 'sistema',
     criadoEm = new Date().toISOString(),
     atualizadoEm = null,
@@ -19,6 +21,8 @@ class Pessoa {
     this.centroServico = resolvedCentroServico
     this.local = resolvedCentroServico
     this.cargo = cargo
+    this.dataAdmissao = dataAdmissao
+    this.tipoExecucao = tipoExecucao
     this.usuarioCadastro = usuarioCadastro
     this.criadoEm = criadoEm
     this.atualizadoEm = atualizadoEm

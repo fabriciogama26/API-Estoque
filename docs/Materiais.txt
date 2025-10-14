@@ -10,13 +10,13 @@ Fluxo geral
 -----------
 1. Formulario cria ou atualiza materiais via `dataClient.materiais`.
 2. Tabela lista materiais com filtros por termo/campos.
-3. Modal de historico (`MateriaisHistoryModal`) mostra variaçao de preco.
+3. Modal de historico (`MateriaisHistoryModal`) mostra variacao de preco.
 
 Campos principais
 -----------------
 - `nome`, `fabricante`, `validadeDias`, `ca`, `valorUnitario`, `estoqueMinimo`, `ativo`.
 - `grupoMaterial` (obrigatorio, proveniente da API `/api/materiais/groups`).
-- `numeroCalcado` (requerido quando o grupo for "Calçado").
+- `numeroCalcado` (requerido quando o grupo for "Calcado").
 - `numeroVestimenta` (requerido quando o grupo for "Vestimenta").
 - `numeroEspecifico` (definido automaticamente a partir do grupo/numero informado).
 - Valor unitario usa helpers de formatacao (`formatCurrencyInput`).
@@ -38,7 +38,7 @@ Validacoes
 - Servicos validam:
   - Nome/fabricante nao vazios e EPI sem numeros.
   - `grupoMaterial` obrigatorio.
-  - `numeroCalcado` obrigatorio apenas para grupo "Calçado".
+  - `numeroCalcado` obrigatorio apenas para grupo "Calcado".
   - `numeroVestimenta` obrigatorio apenas para grupo "Vestimenta".
   - `validadeDias` > 0.
   - `valorUnitario` > 0.

@@ -107,7 +107,7 @@ npm run dev
 | ------- | ------------------------------------ | ------------------------------------ | --------------------------------------------- |
 | Remote  | (padrao) ou `VITE_DATA_MODE=remote`  | Supabase Auth (`supabase.auth.*`)    | Banco Supabase (Postgres + RLS)               |
 | Local   | `VITE_DATA_MODE=local`               | Credenciais definidas em `.env.local`| `localStorage` (`api-estoque-local-data-v1`), seeds em `src/data/local-seed.json` |
-|         |                                        |                                      | Entradas/Saídas registram `centroCusto` e `centroServico` em ambos os modos. |
+|         |                                        |                                      | Entradas/Saidas registram `centroCusto` e `centroServico` em ambos os modos. |
 
 - Alternar entre os modos exige reiniciar o Vite.
 - Para resetar apenas os dados locais, limpe a chave `api-estoque-local-data-v1` no `localStorage`.
@@ -128,11 +128,13 @@ Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
 | Materiais | GET              | `/api/materiais/groups`                                                                     | Lista grupos cadastrados para vincular aos EPIs.         |
 | Entradas  | GET, POST        | `/api/entradas`                                                                            | Movimentacoes de entrada.                                 |
 | Saidas    | GET, POST        | `/api/saidas`                                                                              | Movimentacoes de saida.                                   |
-| Estoque   | GET              | `/api/estoque`                                                                             | Snapshot atual (aceita filtros como `periodoInicio`).     |
+| Estoque   | GET              | `/api/estoque`                                                                             | Snapshot atual (filtros `periodoInicio`, `periodoFim`, `centroCusto`).     |
 | Estoque   | GET              | `/api/estoque?view=dashboard`                                                              | Dashboard consolidado (mesmos filtros via query string).  |
 | Acidentes | GET, POST        | `/api/acidentes`                                                                           | Lista e cria acidentes.                                   |
 | Acidentes | PUT              | `/api/acidentes/:id`                                                                       | Atualizacao de acidente.                                  |
 | Health    | GET              | `/api/health`                                                                              | Checagem autenticada de saude.                            |
+
+> Pessoas: obrigatorio informar `nome`, `matricula`, `centroServico`, `cargo` e `tipoExecucao`. Campo opcional `dataAdmissao` aceita ISO completo ou `yyyy-mm-dd`; valores invalidos sao ignorados.
 
 ## Scripts Disponiveis
 

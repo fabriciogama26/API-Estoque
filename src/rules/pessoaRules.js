@@ -1,4 +1,4 @@
-function validarPessoa({ nome, matricula, centroServico, cargo }) {
+function validarPessoa({ nome, matricula, centroServico, cargo, tipoExecucao }) {
   if (!nome || !nome.trim()) {
     throw new Error('Nome obrigatorio');
   }
@@ -10,6 +10,9 @@ function validarPessoa({ nome, matricula, centroServico, cargo }) {
   }
   if (!cargo || !cargo.trim()) {
     throw new Error('Cargo obrigatorio');
+  }
+  if (!tipoExecucao || !tipoExecucao.trim()) {
+    throw new Error('Tipo Execucao obrigatorio');
   }
 }
 

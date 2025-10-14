@@ -162,23 +162,24 @@ export function filtrarPorPeriodo(registro, campoData, periodo) {
   return true
 }
 
-function verificarEstoqueMinimo(material, estoqueAtual) {
+function calcularDeficit(material, estoqueAtual) {
   if (!material) {
-    return null
-  }
-  if (material.estoqueMinimo === undefined || material.estoqueMinimo === null) {
-    return null
-  }
-  if (estoqueAtual <= Number(material.estoqueMinimo)) {
     return {
-      materialId: material.id,
-      nome: material.nome,
-      fabricante: material.fabricante,
-      estoqueAtual,
-      estoqueMinimo: Number(material.estoqueMinimo),
+      estoqueMinimo: 0,
+      deficitQuantidade: 0,
+      valorReposicao: 0,
     }
   }
-  return null
+
+  const estoqueMinimo = Number(material.estoqueMinimo ?? 0)
+  const deficitQuantidade = Math.max(estoqueMinimo - estoqueAtual, 0)
+  const valorReposicao = Number((deficitQuantidade * Number(material.valorUnitario ?? 0)).toFixed(2))
+
+  return {
+    estoqueMinimo,
+    deficitQuantidade,
+    valorReposicao,
+  }
 }
 
 export function calcularSaldoMaterial(materialId, entradas, saidas, periodo) {
@@ -214,8 +215,38 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
 
   const itens = materiaisNormalizados.map((material) => {
+    const entradasMaterial = entradas
+      .filter((entrada) => entrada.materialId === material.id)
+      .filter((entrada) => filtrarPorPeriodo(entrada, 'dataEntrada', periodo))
+    const saidasMaterial = saidas
+      .filter((saida) => saida.materialId === material.id)
+      .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
+
     const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo)
-    const alerta = verificarEstoqueMinimo(material, saldo)
+    const { estoqueMinimo, deficitQuantidade, valorReposicao } = calcularDeficit(material, saldo)
+
+    const centrosCustoSet = new Set()
+    entradasMaterial.forEach((entrada) => {
+      if (entrada?.centroCusto) {
+        centrosCustoSet.add(String(entrada.centroCusto).trim())
+      }
+    })
+    saidasMaterial.forEach((saida) => {
+      if (saida?.centroCusto) {
+        centrosCustoSet.add(String(saida.centroCusto).trim())
+      }
+    })
+
+    const ultimaAtualizacaoDate = [...entradasMaterial.map((item) => item.dataEntrada), ...saidasMaterial.map((item) => item.dataEntrega)]
+      .map((raw) => {
+        const data = new Date(raw)
+        return Number.isNaN(data.getTime()) ? null : data
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.getTime() - a.getTime())[0] || null
+
+    const alertaAtivo = deficitQuantidade > 0
+
     return {
       materialId: material.id,
       nome: material.nome,
@@ -226,16 +257,43 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       quantidade: saldo,
       estoqueAtual: saldo,
       valorTotal: Number((saldo * material.valorUnitario).toFixed(2)),
-      estoqueMinimo: material.estoqueMinimo,
-      alerta,
+      estoqueMinimo,
+      deficitQuantidade,
+      valorReposicao,
+      alerta: alertaAtivo,
+      centrosCusto: Array.from(centrosCustoSet).filter(Boolean),
+      ultimaAtualizacao: ultimaAtualizacaoDate ? ultimaAtualizacaoDate.toISOString() : null,
     }
   })
 
-  const alertas = itens.filter((item) => item.alerta)
+  const alertas = itens
+    .filter((item) => item.alerta)
+    .map((item) => ({
+      materialId: item.materialId,
+      nome: item.nome,
+      fabricante: item.fabricante,
+      estoqueAtual: item.estoqueAtual,
+      estoqueMinimo: item.estoqueMinimo,
+      deficitQuantidade: item.deficitQuantidade,
+      valorReposicao: item.valorReposicao,
+      centrosCusto: item.centrosCusto,
+    }))
+
+  const totalItens = itens.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+  const valorReposicaoTotal = itens.reduce((acc, item) => acc + Number(item.valorReposicao ?? 0), 0)
+  const ultimaAtualizacaoGeral = itens
+    .map((item) => (item.ultimaAtualizacao ? new Date(item.ultimaAtualizacao) : null))
+    .filter((data) => data && !Number.isNaN(data.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0] || null
 
   return {
     itens,
     alertas,
+    resumo: {
+      totalItens,
+      valorReposicao: Number(valorReposicaoTotal.toFixed(2)),
+      ultimaAtualizacao: ultimaAtualizacaoGeral ? ultimaAtualizacaoGeral.toISOString() : null,
+    },
   }
 }
 
