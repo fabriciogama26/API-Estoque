@@ -128,11 +128,13 @@ Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
 | Materiais | GET              | `/api/materiais/groups`                                                                     | Lista grupos cadastrados para vincular aos EPIs.         |
 | Entradas  | GET, POST        | `/api/entradas`                                                                            | Movimentacoes de entrada.                                 |
 | Saidas    | GET, POST        | `/api/saidas`                                                                              | Movimentacoes de saida.                                   |
-| Estoque   | GET              | `/api/estoque`                                                                             | Snapshot atual (aceita filtros como `periodoInicio`).     |
+| Estoque   | GET              | `/api/estoque`                                                                             | Snapshot atual (filtros `periodoInicio`, `periodoFim`, `centroCusto`).     |
 | Estoque   | GET              | `/api/estoque?view=dashboard`                                                              | Dashboard consolidado (mesmos filtros via query string).  |
 | Acidentes | GET, POST        | `/api/acidentes`                                                                           | Lista e cria acidentes.                                   |
 | Acidentes | PUT              | `/api/acidentes/:id`                                                                       | Atualizacao de acidente.                                  |
 | Health    | GET              | `/api/health`                                                                              | Checagem autenticada de saude.                            |
+
+> Pessoas: obrigatorio informar `nome`, `matricula`, `centroServico`, `cargo` e `tipoExecucao`. Campo opcional `dataAdmissao` aceita ISO completo ou `yyyy-mm-dd`; valores invalidos sao ignorados.
 
 ## Scripts Disponiveis
 

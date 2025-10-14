@@ -24,6 +24,26 @@ export function PessoasForm({ form, onChange, onSubmit, isSaving, editingPessoa,
           <span>Cargo <span className="asterisco">*</span></span>
           <input name="cargo" value={form.cargo} onChange={onChange} required placeholder="Tecnico de manutencao" />
         </label>
+        <label className="field">
+          <span>Data de admissao</span>
+          <input
+            type="date"
+            name="dataAdmissao"
+            value={form.dataAdmissao}
+            onChange={onChange}
+            placeholder="2025-01-01"
+          />
+        </label>
+        <label className="field">
+          <span>Tipo Execucao <span className="asterisco">*</span></span>
+          <input
+            name="tipoExecucao"
+            value={form.tipoExecucao}
+            onChange={onChange}
+            required
+            placeholder="Ex: Proprio, Terceirizado"
+          />
+        </label>
       </div>
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">

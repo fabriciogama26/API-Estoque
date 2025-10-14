@@ -8,7 +8,6 @@ const initialForm = {
   materialId: '',
   quantidade: '',
   centroCusto: '',
-  centroServico: '',
   dataEntrada: '',
 }
 
@@ -16,7 +15,6 @@ const filterInitial = {
   termo: '',
   materialId: '',
   centroCusto: '',
-  centroServico: '',
   dataInicio: '',
   dataFim: '',
 }
@@ -74,7 +72,6 @@ export function EntradasPage() {
         materialId: form.materialId,
         quantidade: Number(form.quantidade),
         centroCusto: form.centroCusto.trim(),
-        centroServico: form.centroServico.trim(),
         dataEntrada: form.dataEntrada || undefined,
         usuarioResponsavel: user?.name || user?.username || 'sistema',
       }
@@ -142,11 +139,6 @@ export function EntradasPage() {
         return false
       }
 
-      const centroServicoFiltro = filters.centroServico.trim().toLowerCase()
-      if (centroServicoFiltro && (entrada.centroServico || '').toLowerCase() !== centroServicoFiltro) {
-        return false
-      }
-
       if (!termo) {
         return true
       }
@@ -155,7 +147,6 @@ export function EntradasPage() {
         material?.nome || '',
         material?.fabricante || '',
         entrada.centroCusto || '',
-        entrada.centroServico || '',
         entrada.usuarioResponsavel || '',
       ]
         .join(' ')
@@ -201,16 +192,6 @@ export function EntradasPage() {
             />
           </label>
           <label className="field">
-            <span>Centro de serviço*</span>
-            <input
-              name="centroServico"
-              value={form.centroServico}
-              onChange={handleChange}
-              required
-              placeholder="Ex: Operacao"
-            />
-          </label>
-          <label className="field">
             <span>Data da entrada</span>
             <input type="date" name="dataEntrada" value={form.dataEntrada} onChange={handleChange} />
           </label>
@@ -249,15 +230,6 @@ export function EntradasPage() {
           <input name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange} placeholder="Ex: CC-OPER" />
         </label>
         <label className="field">
-          <span>Centro de serviço</span>
-          <input
-            name="centroServico"
-            value={filters.centroServico}
-            onChange={handleFilterChange}
-            placeholder="Ex: Operacao"
-          />
-        </label>
-        <label className="field">
           <span>Data inicial</span>
           <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
         </label>
@@ -288,7 +260,6 @@ export function EntradasPage() {
                   <th>Material</th>
                   <th>Quantidade</th>
                   <th>Centro de custo</th>
-                  <th>Centro de serviço</th>
                   <th>Valor total</th>
                   <th>Data</th>
                   <th>Registrado por</th>
@@ -307,7 +278,6 @@ export function EntradasPage() {
                       </td>
                       <td>{entrada.quantidade}</td>
                       <td>{entrada.centroCusto || '-'}</td>
-                      <td>{entrada.centroServico || '-'}</td>
                       <td>{formatCurrency(total)}</td>
                       <td>{entrada.dataEntrada ? new Date(entrada.dataEntrada).toLocaleString('pt-BR') : 'Nao informado'}</td>
                       <td>{entrada.usuarioResponsavel || 'Nao informado'}</td>

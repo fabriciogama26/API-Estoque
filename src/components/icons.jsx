@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   TrendingUp,
   Users,
+  Save,
 } from 'lucide-react'
 
 const defaultSize = 18
@@ -37,3 +38,4 @@ export const TrendIcon = (props) => <TrendingUp {...withDefaultProps(props)} />
 export const PieIcon = (props) => <PieChart {...withDefaultProps(props)} />
 export const BarsIcon = (props) => <BarChart3 {...withDefaultProps(props)} />
 export const ChevronIcon = (props) => <ChevronDown {...withDefaultProps(props)} />
+export const SaveIcon = (props) => <Save {...withDefaultProps(props)} />

@@ -1,10 +1,22 @@
-import { formatDateTime } from '../../utils/PessoasUtils.js'
+import { formatDate, formatDateTime } from '../../utils/PessoasUtils.js'
 
 const FIELD_LABELS = {
   nome: 'Nome',
   matricula: 'Matricula',
   centroServico: 'Centro de servico',
   cargo: 'Cargo',
+  dataAdmissao: 'Data de admissao',
+  tipoExecucao: 'Tipo Execucao',
+}
+
+function formatValue(campo, valor) {
+  if (!valor) {
+    return '-'
+  }
+  if (campo === 'dataAdmissao') {
+    return formatDate(valor)
+  }
+  return valor
 }
 
 function formatChange(registro) {
@@ -14,7 +26,7 @@ function formatChange(registro) {
   return registro.camposAlterados
     .map(({ campo, de, para }) => {
       const label = FIELD_LABELS[campo] ?? campo
-      return `${label}: "${de || '-'}" -> "${para || '-'}"`
+      return `${label}: "${formatValue(campo, de)}" -> "${formatValue(campo, para)}"`
     })
     .join('; ')
 }

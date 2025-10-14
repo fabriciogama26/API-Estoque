@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { InventoryIcon } from '../components/icons.jsx'
+import { InventoryIcon, SaveIcon } from '../components/icons.jsx'
 import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import '../styles/EstoquePage.css'
 
 const initialFilters = {
-  ano: '',
-  mes: '',
+  periodoInicio: '',
+  periodoFim: '',
   termo: '',
+  centroCusto: '',
 }
 
 function formatCurrency(value) {
@@ -19,16 +20,44 @@ function formatCurrency(value) {
   }).format(Number(value ?? 0))
 }
 
+function formatInteger(value) {
+  return new Intl.NumberFormat('pt-BR').format(Number(value ?? 0))
+}
+
 function normalizarTermo(termo) {
   return termo ? termo.trim().toLowerCase() : ''
+}
+
+function formatDateTimeValue(value) {
+  if (!value) {
+    return '-'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+  return date.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
 }
 
 function combinaComTermo(material = {}, termoNormalizado = '') {
   if (!termoNormalizado) {
     return true
   }
-  const alvo = `${material.nome || ''} ${material.fabricante || ''}`.toLowerCase()
+  const alvo = [
+    material.nome || '',
+    material.fabricante || '',
+    Array.isArray(material.centrosCusto) ? material.centrosCusto.join(' ') : '',
+  ]
+    .join(' ')
+    .toLowerCase()
   return alvo.includes(termoNormalizado)
+}
+
+function uniqueSorted(values = []) {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b))
 }
 
 export function EstoquePage() {
@@ -46,8 +75,8 @@ export function EstoquePage() {
     setError(null)
     try {
       const data = await api.estoque.current({
-        ano: params.ano || undefined,
-        mes: params.mes || undefined,
+        periodoInicio: params.periodoInicio || undefined,
+        periodoFim: params.periodoFim || undefined,
       })
       setEstoque({ itens: data?.itens ?? [], alertas: data?.alertas ?? [] })
       setMinStockDrafts(() => {
@@ -69,9 +98,33 @@ export function EstoquePage() {
   }
 
   useEffect(() => {
-    load(initialFilters)
+    load({ ...initialFilters })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const centrosCustoDisponiveis = useMemo(
+    () => uniqueSorted(estoque.itens.flatMap((item) => item.centrosCusto ?? [])),
+    [estoque.itens],
+  )
+
+  const periodoFiltro = useMemo(() => {
+    const parseMonthStart = (value) => {
+      if (!value) return null
+      const [ano, mes] = value.split('-').map(Number)
+      if (!ano || !mes) return null
+      return new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0))
+    }
+    const parseMonthEnd = (value) => {
+      if (!value) return null
+      const [ano, mes] = value.split('-').map(Number)
+      if (!ano || !mes) return null
+      return new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999))
+    }
+
+    const start = parseMonthStart(filters.periodoInicio)
+    const end = parseMonthEnd(filters.periodoFim || filters.periodoInicio)
+    return { start, end }
+  }, [filters.periodoInicio, filters.periodoFim])
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -80,12 +133,12 @@ export function EstoquePage() {
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    load(filters)
+    load({ ...filters })
   }
 
   const handleClear = () => {
-    setFilters(initialFilters)
-    load(initialFilters)
+    setFilters({ ...initialFilters })
+    load({ ...initialFilters })
   }
 
   const handleMinStockChange = (materialId, value) => {
@@ -101,7 +154,7 @@ export function EstoquePage() {
 
     const parsed = Number(draftValue)
     if (Number.isNaN(parsed) || parsed < 0) {
-      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor inválido' }))
+      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor invalido' }))
       return
     }
 
@@ -141,17 +194,60 @@ export function EstoquePage() {
 
   const termoNormalizado = useMemo(() => normalizarTermo(filters.termo), [filters.termo])
 
-  const itensFiltrados = useMemo(
-    () => estoque.itens.filter((item) => combinaComTermo(item, termoNormalizado)),
-    [estoque.itens, termoNormalizado],
-  )
+  const itensFiltrados = useMemo(() => {
+    const centroFiltro = filters.centroCusto.trim().toLowerCase()
+    return estoque.itens.filter((item) => {
+      if (centroFiltro) {
+        const centros = Array.isArray(item.centrosCusto) ? item.centrosCusto : []
+        const possuiCentro = centros.some((centro) => centro.toLowerCase() === centroFiltro)
+        if (!possuiCentro) {
+          return false
+        }
+      }
+
+      if (periodoFiltro.start || periodoFiltro.end) {
+        const ultimaAtualizacao = item.ultimaAtualizacao ? new Date(item.ultimaAtualizacao) : null
+        if (!ultimaAtualizacao || Number.isNaN(ultimaAtualizacao.getTime())) {
+          return false
+        }
+        if (periodoFiltro.start && ultimaAtualizacao < periodoFiltro.start) {
+          return false
+        }
+        if (periodoFiltro.end && ultimaAtualizacao > periodoFiltro.end) {
+          return false
+        }
+      }
+
+      return combinaComTermo(item, termoNormalizado)
+    })
+  }, [estoque.itens, termoNormalizado, filters.centroCusto, periodoFiltro])
 
   const alertasFiltrados = useMemo(
-    () => estoque.alertas.filter((item) => combinaComTermo(item, termoNormalizado)),
-    [estoque.alertas, termoNormalizado],
+    () => itensFiltrados.filter((item) => item.alerta),
+    [itensFiltrados],
   )
 
   const totalValor = itensFiltrados.reduce((acc, item) => acc + Number(item.valorTotal ?? 0), 0)
+
+  const resumoFiltrado = useMemo(() => {
+    const totalItens = itensFiltrados.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+    const valorReposicao = itensFiltrados.reduce((acc, item) => acc + Number(item.valorReposicao ?? 0), 0)
+    const ultimaAtualizacao = itensFiltrados
+      .map((item) => (item.ultimaAtualizacao ? new Date(item.ultimaAtualizacao) : null))
+      .filter((data) => data && !Number.isNaN(data.getTime()))
+      .sort((a, b) => b.getTime() - a.getTime())[0] || null
+
+    return {
+      totalItens,
+      valorReposicao,
+      ultimaAtualizacao: ultimaAtualizacao ? ultimaAtualizacao.toISOString() : null,
+    }
+  }, [itensFiltrados])
+
+  const ultimaAtualizacaoFormatada = useMemo(
+    () => formatDateTimeValue(resumoFiltrado.ultimaAtualizacao),
+    [resumoFiltrado.ultimaAtualizacao],
+  )
 
   return (
     <div className="stack">
@@ -163,12 +259,22 @@ export function EstoquePage() {
 
       <form className="form form--inline" onSubmit={handleSubmit}>
         <label className="field">
-          <span>Ano</span>
-          <input type="number" name="ano" value={filters.ano} onChange={handleChange} placeholder="2025" />
+          <span>Periodo inicial</span>
+          <input
+            type="month"
+            name="periodoInicio"
+            value={filters.periodoInicio}
+            onChange={handleChange}
+          />
         </label>
         <label className="field">
-          <span>Mes</span>
-          <input type="number" min="1" max="12" name="mes" value={filters.mes} onChange={handleChange} placeholder="1" />
+          <span>Periodo final</span>
+          <input
+            type="month"
+            name="periodoFim"
+            value={filters.periodoFim}
+            onChange={handleChange}
+          />
         </label>
         <label className="field">
           <span>Material ou fabricante</span>
@@ -178,6 +284,17 @@ export function EstoquePage() {
             onChange={handleChange}
             placeholder="ex: bota, 3M, luva"
           />
+        </label>
+        <label className="field">
+          <span>Centro de custo</span>
+          <select name="centroCusto" value={filters.centroCusto} onChange={handleChange}>
+            <option value="">Todos</option>
+            {centrosCustoDisponiveis.map((centro) => (
+              <option key={centro} value={centro}>
+                {centro}
+              </option>
+            ))}
+          </select>
         </label>
         <div className="form__actions">
           <button type="submit" className="button button--primary" disabled={isLoading}>
@@ -198,16 +315,24 @@ export function EstoquePage() {
         {alertasFiltrados.length ? (
           <ul className="estoque-alert-list">
             {alertasFiltrados.map((alerta) => {
-              const deficit = Math.max(Number(alerta.estoqueMinimo ?? 0) - Number(alerta.estoqueAtual ?? 0), 0)
+              const deficit = Number(alerta.deficitQuantidade ?? 0)
+              const centrosLabel = (alerta.centrosCusto && alerta.centrosCusto.length)
+                ? alerta.centrosCusto.join(', ')
+                : 'Sem centro de custo'
               return (
                 <li key={alerta.materialId} className="estoque-alert-list__item">
                   <span className="estoque-badge estoque-badge--alert">{alerta.nome?.split(' ')[0] || 'Material'}</span>
                   <span>
                     Estoque atual: <strong>{alerta.estoqueAtual}</strong>
                     {' '}| Minimo: <strong>{alerta.estoqueMinimo}</strong>
-                    {deficit > 0 ? <span className="estoque-alert-list__deficit"> - faltam {deficit}</span> : null}
+                    {deficit > 0 ? (
+                      <span className="estoque-alert-list__deficit">
+                        {' '}Faltam {deficit} ({formatCurrency(alerta.valorReposicao)})
+                      </span>
+                    ) : null}
                   </span>
                   <span className="estoque-alert-list__material">{alerta.nome} - {alerta.fabricante}</span>
+                  <span className="estoque-alert-list__centro">Centro de custo: {centrosLabel}</span>
                 </li>
               )
             })}
@@ -220,8 +345,29 @@ export function EstoquePage() {
       <section className="card">
         <header className="card__header">
           <h2>Resumo</h2>
-          <span>Total em estoque: {formatCurrency(totalValor)}</span>
         </header>
+        <div className="estoque-summary-grid">
+          <article className="estoque-summary-card">
+            <span className="estoque-summary-card__title">Total em estoque</span>
+            <strong className="estoque-summary-card__value">{formatCurrency(totalValor)}</strong>
+            <span className="estoque-summary-card__hint">Valor monetario dos itens filtrados</span>
+          </article>
+          <article className="estoque-summary-card">
+            <span className="estoque-summary-card__title">Total de itens</span>
+            <strong className="estoque-summary-card__value">{formatInteger(resumoFiltrado.totalItens)}</strong>
+            <span className="estoque-summary-card__hint">Soma das quantidades disponiveis</span>
+          </article>
+          <article className="estoque-summary-card">
+            <span className="estoque-summary-card__title">Valor para reposicao</span>
+            <strong className="estoque-summary-card__value">{formatCurrency(resumoFiltrado.valorReposicao)}</strong>
+            <span className="estoque-summary-card__hint">Diferenca entre minimo e estoque atual</span>
+          </article>
+          <article className="estoque-summary-card">
+            <span className="estoque-summary-card__title">Ultima atualizacao</span>
+            <strong className="estoque-summary-card__value">{ultimaAtualizacaoFormatada}</strong>
+            <span className="estoque-summary-card__hint">Movimentacao mais recente</span>
+          </article>
+        </div>
       </section>
 
       <section className="card">
@@ -234,6 +380,11 @@ export function EstoquePage() {
             const draftValue = minStockDrafts[item.materialId] ?? ''
             const isSavingMin = Boolean(savingMinStock[item.materialId])
             const fieldError = minStockErrors[item.materialId]
+            const centrosCustoLabel = (item.centrosCusto && item.centrosCusto.length)
+              ? item.centrosCusto.join(', ')
+              : 'Sem centro de custo'
+            const ultimaAtualizacaoItem = formatDateTimeValue(item.ultimaAtualizacao)
+            const deficitQuantidade = Number(item.deficitQuantidade ?? 0)
             return (
               <article key={item.materialId} className={`estoque-list__item${item.alerta ? ' estoque-list__item--alert' : ''}`}>
                 <header className="estoque-list__item-header">
@@ -245,6 +396,11 @@ export function EstoquePage() {
                     <span>Quantidade: {item.quantidade}</span>
                     <span>Valor unitario: {formatCurrency(item.valorUnitario)}</span>
                     <span>Valor total: {formatCurrency(item.valorTotal)}</span>
+                    {deficitQuantidade > 0 ? (
+                      <span className="estoque-list__item-deficit">
+                        Necessario repor {deficitQuantidade} ({formatCurrency(item.valorReposicao)})
+                      </span>
+                    ) : null}
                     <div className="estoque-list__item-min-stock">
                       <label>
                         <span>Estoque minimo</span>
@@ -258,11 +414,13 @@ export function EstoquePage() {
                       </label>
                       <button
                         type="button"
-                        className="button button--ghost"
+                        className="estoque-list__item-save"
                         onClick={() => handleMinStockSave(item)}
                         disabled={isSavingMin}
+                        aria-label={isSavingMin ? 'Salvando' : 'Salvar'}
+                        title={isSavingMin ? 'Salvando' : 'Salvar'}
                       >
-                        {isSavingMin ? 'Salvando...' : 'Salvar'}
+                        <SaveIcon size={16} strokeWidth={1.8} aria-hidden="true" />
                       </button>
                     </div>
                     {fieldError ? <span className="estoque-list__item-error">{fieldError}</span> : null}
@@ -271,6 +429,8 @@ export function EstoquePage() {
                 <div className="estoque-list__item-body">
                   <span>Validade (dias): {item.validadeDias}</span>
                   <span>CA: {item.ca}</span>
+                  <span>Centros de custo: {centrosCustoLabel}</span>
+                  <span>Ultima atualizacao: {ultimaAtualizacaoItem}</span>
                 </div>
               </article>
             )

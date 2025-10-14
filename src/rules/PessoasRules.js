@@ -4,6 +4,19 @@ function sanitizeCampo(valor) {
   return valor?.trim() ?? ''
 }
 
+function sanitizeDate(value) {
+  const raw = (value ?? '').trim()
+  if (!raw) {
+    return null
+  }
+  const candidate = `${raw}T00:00:00`
+  const date = new Date(candidate)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date.toISOString()
+}
+
 export function createPessoaPayload(form, usuario) {
   const centroServico = sanitizeCampo(form.centroServico ?? form.local)
   return {
@@ -12,6 +25,8 @@ export function createPessoaPayload(form, usuario) {
     centroServico,
     local: centroServico,
     cargo: sanitizeCampo(form.cargo),
+    dataAdmissao: sanitizeDate(form.dataAdmissao),
+    tipoExecucao: sanitizeCampo(form.tipoExecucao),
     usuarioCadastro: usuario,
   }
 }
@@ -24,6 +39,8 @@ export function updatePessoaPayload(form, usuario) {
     centroServico,
     local: centroServico,
     cargo: sanitizeCampo(form.cargo),
+    dataAdmissao: sanitizeDate(form.dataAdmissao),
+    tipoExecucao: sanitizeCampo(form.tipoExecucao),
     usuarioResponsavel: usuario,
   }
 }
@@ -51,6 +68,7 @@ export function filterPessoas(pessoas, filters) {
       pessoa.matricula || '',
       centroServicoAtual,
       pessoa.cargo || '',
+      pessoa.tipoExecucao || '',
       pessoa.usuarioCadastro || '',
       pessoa.usuarioEdicao || '',
     ]

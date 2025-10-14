@@ -4,6 +4,8 @@ export const PESSOAS_FORM_DEFAULT = {
   centroServico: '',
   cargo: '',
   local: '',
+  dataAdmissao: '',
+  tipoExecucao: '',
 }
 
 export const PESSOAS_FILTER_DEFAULT = {

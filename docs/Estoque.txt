@@ -8,36 +8,42 @@ Objetivo
 
 Filtros
 -------
-- `ano` / `mes`: enviados para `dataClient.estoque.current` para recalcular saldos do periodo.
-- `termo`: filtragem no cliente (nome ou fabricante).
+- `periodoInicio` / `periodoFim`: campos month (`yyyy-mm`) que filtram pela data da ultima movimentacao do item.
+- `termo`: filtragem no cliente (nome, fabricante ou centro de custo).
+- `centroCusto`: lista deduzida das movimentacoes exibidas.
+
+Resumo
+------
+- Cards exibem total monetario, quantidade agregada, valor estimado para reposicao e ultima atualizacao geral.
+- Valores sao recalculados apos aplicar filtros ou editar estoque minimo.
 
 Editor inline
 -------------
 - Campo `estoqueMinimo` editavel por linha.
 - Valida numerico >= 0 antes de enviar.
-- `Salvar` chama `dataClient.materiais.update`.
-  - No modo remoto dispara `PUT /api/materiais/:id`.
-  - No modo local atualiza o snapshot e registra historico de preco se necessario.
+- Botao com icone de disquete dispara `dataClient.materiais.update`.
+  - Modo remoto: `PUT /api/materiais/:id`.
+  - Modo local: persiste no `localStorage` e reaproveita o payload completo para manter o material consistente.
 
 APIs
 ----
-- `dataClient.estoque.current(params)` -> `{ itens, alertas }`.
+- `dataClient.estoque.current(params)` -> `{ itens, alertas, resumo }`.
 - `dataClient.materiais.update(id, payload)` atualiza estoque minimo e auditoria.
 
 Regras e calculos
 -----------------
-- Ambos os modos usam `montarEstoqueAtual` para garantir consistencia.
-- Alertas sao gerados por `estoqueRules.verificarEstoqueMinimo`.
-- Ajustes invalidam caches locais (a pagina recarrega dados apos salvar).
+- Ambos os modos usam `montarEstoqueAtual` para gerar saldo, deficit, centros de custo e ultima atualizacao.
+- Alertas apenas listam itens com quantidade abaixo do minimo.
+- Valor de reposicao = deficit * valor unitario.
 
 Comportamento de UI
 -------------------
-- `isLoading` e `isSaving` controlam botoes e mensagens (`Filtrando...`, `Salvando...`).
-- Alertas exibem deficit (diferenca entre saldo e minimo).
-- Erros especificos aparecem proximo ao componente acionado.
+- `isLoading` e `isSaving` controlam labels e estados (ex.: `Filtrando...`, spinner no botao de salvar).
+- Alertas e cards usam grid responsivo.
+- Ultima atualizacao por item exibida na lista; resumo mostra a mais recente global.
 
 Dependencias
 ------------
-- `AuthContext` para capturar `usuarioResponsavel`.
-- `dataClient` para alternar entre remoto/local.
-- Seeds locais oferecem dados iniciais; no modo remoto depende das tabelas Supabase `materiais`, `entradas`, `saidas`.
+- `AuthContext` para capturar `usuarioResponsavel` nas atualizacoes de estoque minimo.
+- `dataClient` alterna entre implementacao remota (`api.js`) e local (`localApi.js`).
+- Seeds locais (`src/data/local-seed.json`) oferecem dados iniciais para testes.

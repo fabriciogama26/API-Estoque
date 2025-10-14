@@ -3,6 +3,23 @@ const { Pessoa } = require('../models');
 const repositories = require('../repositories');
 const { pessoaRules } = require('../rules');
 
+function normalizeDate(value) {
+  if (!value) {
+    return null
+  }
+  const raw = String(value).trim()
+  if (!raw) {
+    return null
+  }
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+  const candidate = isDateOnly ? `${raw}T00:00:00` : raw
+  const date = new Date(candidate)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date.toISOString()
+}
+
 function sanitizePayload(payload = {}) {
   const centroServico = payload.centroServico?.trim() ?? payload.local?.trim() ?? ''
   return {
@@ -11,6 +28,8 @@ function sanitizePayload(payload = {}) {
     centroServico,
     local: centroServico,
     cargo: payload.cargo?.trim() ?? '',
+    dataAdmissao: normalizeDate(payload.dataAdmissao),
+    tipoExecucao: payload.tipoExecucao?.trim() ?? '',
   }
 }
 
@@ -61,6 +80,8 @@ class PessoaService {
       { campo: 'matricula' },
       { campo: 'centroServico', atualKey: 'local' },
       { campo: 'cargo' },
+      { campo: 'dataAdmissao' },
+      { campo: 'tipoExecucao' },
     ]
 
     comparacoes.forEach(({ campo, atualKey }) => {

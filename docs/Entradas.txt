@@ -11,13 +11,12 @@ Campos do formulario
 - `materialId` (select, obrigatorio): lista populada via `dataClient.materiais.list`.
 - `quantidade` (numeric, minimo 1).
 - `centroCusto` (texto, obrigatorio): define o centro contabil responsavel pelo custo da entrada.
-- `centroServico` (texto, obrigatorio): identifica o centro de servico que recebera o material.
 - `dataEntrada` (date, opcional). Quando ausente, o backend/servico grava `now()` em ISO.
 
 Validacoes
 ----------
-- HTML garante campos obrigatorios (material, quantidade, centro de custo e centro de servico) e quantidade positiva.
-- Servico remoto (`EntradasOperations.create`) confirma existencia do material no Supabase e rejeita centros vazios.
+- HTML garante campos obrigatorios (material, quantidade, centro de custo) e quantidade positiva.
+- Servico remoto (`EntradasOperations.create`) confirma existencia do material no Supabase e rejeita centro de custo vazio.
 - Servico local replica as mesmas regras e armazena no `localStorage`.
 
 APIs

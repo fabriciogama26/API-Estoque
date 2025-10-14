@@ -14,7 +14,8 @@ Fluxo
 
 Campos principais
 -----------------
-- `nome`, `matricula`, `local`, `cargo`.
+- `nome`, `matricula`, `local`, `cargo`, `tipoExecucao` (obrigatorio).
+- `dataAdmissao` (opcional) aceita data ISO ou `yyyy-mm-dd`.
 - Historico guarda `dataEdicao`, `usuarioResponsavel`, campos alterados.
 
 APIs
@@ -30,14 +31,16 @@ Validacoes
 ----------
 - Formulario aplica `required` basico.
 - Servicos confirmam:
-  - Todos os campos nao vazios.
+  - Todos os campos obrigatorios nao vazios (`nome`, `matricula`, `centroServico`, `cargo`, `tipoExecucao`).
   - Matricula unica (case insensitive).
+  - `dataAdmissao`, quando informada, precisa representar uma data valida.
 
 Comportamento de UI
 -------------------
 - `isSaving` controla estado dos botoes.
 - Historico carrega do cache quando possivel.
 - Erros exibidos no topo do formulario e no modal.
+- Tabela apresenta `dataAdmissao` formatada (dd/mm/aaaa) e `tipoExecucao`.
 
 Dependencias
 ------------

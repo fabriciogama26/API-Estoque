@@ -11,7 +11,6 @@ class EntradaService {
       material,
       quantidade: payload.quantidade,
       centroCusto: payload.centroCusto,
-      centroServico: payload.centroServico,
       dataEntrada: payload.dataEntrada
     });
 
@@ -20,7 +19,6 @@ class EntradaService {
       materialId: material.id,
       quantidade: Number(payload.quantidade),
       centroCusto: payload.centroCusto || '',
-      centroServico: payload.centroServico || '',
       dataEntrada: payload.dataEntrada || new Date().toISOString(),
       usuarioResponsavel: payload.usuarioResponsavel || null
     });
@@ -60,7 +58,6 @@ class EntradaService {
       materialId: material.id,
       quantidade: entrada.quantidade,
       centroCusto: entrada.centroCusto || '',
-      centroServico: entrada.centroServico || '',
       dataEntrada: entrada.dataEntrada,
       material: {
         nome: material.nome,

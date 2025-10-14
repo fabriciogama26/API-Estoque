@@ -33,3 +33,8 @@ build/
 tmp/
 temp/
 *.tmp
+
+# Excel and CSV files
+.xlsx
+*.xls
+*.csv
