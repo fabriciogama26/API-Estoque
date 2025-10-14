@@ -124,6 +124,47 @@ const normalizePessoaHistory = (lista) => {
   }))
 }
 
+const normalizeAcidenteHistory = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  return lista.map((registro) => ({
+    ...registro,
+    camposAlterados: Array.isArray(registro.camposAlterados)
+      ? registro.camposAlterados.slice()
+      : [],
+  }))
+}
+
+const ACIDENTE_HISTORY_FIELDS = [
+  'matricula',
+  'nome',
+  'cargo',
+  'data',
+  'tipo',
+  'agente',
+  'lesao',
+  'parteLesionada',
+  'centroServico',
+  'local',
+  'diasPerdidos',
+  'diasDebitados',
+  'hht',
+  'cid',
+  'cat',
+  'observacao',
+]
+
+const normalizeHistoryValue = (value) => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  if (typeof value === 'number' && Number.isNaN(value)) {
+    return ''
+  }
+  return value
+}
+
 const mapLocalAcidenteRecord = (acidente) => {
   if (!acidente || typeof acidente !== 'object') {
     return acidente
@@ -730,6 +771,7 @@ const localApi = {
           criadoEm: agora,
           atualizadoEm: null,
           atualizadoPor: null,
+          historicoEdicao: [],
         }
 
         state.acidentes.push(acidente)
@@ -747,6 +789,7 @@ const localApi = {
         }
 
         const atual = state.acidentes[index]
+        const usuario = trim(payload.usuarioResponsavel) || 'sistema'
         const dadosSanitizados = sanitizeAcidentePayload({ ...atual, ...payload })
         const pessoa = dadosSanitizados.matricula
           ? state.pessoas.find((item) =>
@@ -767,18 +810,60 @@ const localApi = {
 
         validateAcidentePayload(dados)
 
+        const camposAlterados = []
+        ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
+          let valorAtual
+          if (campo === 'centroServico') {
+            valorAtual = normalizeHistoryValue(atual.centroServico ?? atual.setor ?? '')
+          } else if (campo === 'local') {
+            valorAtual = normalizeHistoryValue(atual.local ?? atual.centroServico ?? '')
+          } else {
+            valorAtual = normalizeHistoryValue(atual[campo])
+          }
+          const valorNovo = normalizeHistoryValue(dados[campo])
+          if (valorAtual !== valorNovo) {
+            camposAlterados.push({
+              campo,
+              de: valorAtual,
+              para: valorNovo,
+            })
+          }
+        })
+
+        const historicoBase = Array.isArray(atual.historicoEdicao) ? atual.historicoEdicao.slice() : []
+        const agora = nowIso()
+        if (camposAlterados.length > 0) {
+          historicoBase.push({
+            id: randomId(),
+            dataEdicao: agora,
+            usuarioResponsavel: usuario,
+            camposAlterados,
+          })
+        }
+
         const atualizado = {
           ...dados,
           centroServico: dados.centroServico,
           setor: dados.centroServico,
           local: dados.local,
           hht: dados.hht,
-          atualizadoEm: nowIso(),
-          atualizadoPor: trim(payload.usuarioResponsavel) || 'sistema',
+          atualizadoEm: agora,
+          atualizadoPor: usuario,
+          historicoEdicao: historicoBase,
         }
 
         state.acidentes[index] = atualizado
         return mapLocalAcidenteRecord(atualizado)
+      })
+    },
+    async history(id) {
+      return readState((state) => {
+        const acidente = state.acidentes.find((item) => item.id === id)
+        if (!acidente) {
+          throw createError(404, 'Acidente nao encontrado.')
+        }
+        const historico = Array.isArray(acidente.historicoEdicao) ? acidente.historicoEdicao.slice() : []
+        return sortByDateDesc(normalizeAcidenteHistory(historico), 'dataEdicao')
       })
     },
   },

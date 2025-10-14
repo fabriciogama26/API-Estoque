@@ -129,5 +129,6 @@ export const api = {
     list: () => request('/api/acidentes'),
     create: (payload) => request('/api/acidentes', { method: 'POST', body: payload }),
     update: (id, payload) => request(`/api/acidentes/${id}`, { method: 'PUT', body: payload }),
+    history: (id) => request(`/api/acidentes/history/${id}`),
   },
 }
