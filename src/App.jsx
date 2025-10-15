@@ -10,6 +10,7 @@ import { SaidasPage } from './pages/SaidasPage.jsx'
 import { EstoquePage } from './pages/EstoquePage.jsx'
 import { DashboardPage } from './pages/DashboardPage.jsx'
 import { AcidentesPage } from './pages/Acidentes.jsx'
+import { TermosEpiPage } from './pages/TermosEpiPage.jsx'
 
 function App() {
   return (
@@ -37,6 +38,10 @@ function App() {
           <Route path="movimentacoes">
             <Route path="entradas" element={<EntradasPage />} />
             <Route path="saidas" element={<SaidasPage />} />
+          </Route>
+
+          <Route path="termos">
+            <Route path="epi" element={<TermosEpiPage />} />
           </Route>
         </Route>
       </Route>

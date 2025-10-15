@@ -51,6 +51,12 @@ const navSections = [
       { to: '/cadastros/materiais', label: "EPI's", icon: MaterialIcon },
     ],
   },
+  {
+    id: 'termos',
+    title: 'Termos',
+    icon: ChecklistIcon,
+    items: [{ to: '/termos/epi', label: 'Termo de EPI', icon: ChecklistIcon }],
+  },
 ]
 
 const shouldOpenSection = (pathname, section) =>

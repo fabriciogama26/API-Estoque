@@ -7,8 +7,10 @@ import {
   EntradasOperations,
   SaidasOperations,
   EstoqueOperations,
+  DocumentosOperations,
   healthCheck,
 } from '../_shared/operations.js'
+import { gerarTermoEpiPdf } from './documents/termoEpiRenderer.js'
 
 export default withAuth(async (req, res, user) => {
   const { method, url } = req
@@ -98,6 +100,22 @@ export default withAuth(async (req, res, user) => {
         return sendJson(res, 200, await EstoqueOperations.dashboard(query))
       }
       return sendJson(res, 200, await EstoqueOperations.current(query))
+    }
+
+    if (path === '/api/documentos/termo-epi' && method === 'GET') {
+      const contexto = await DocumentosOperations.termoEpiContext(query)
+      if (query.format === 'json') {
+        return sendJson(res, 200, contexto)
+      }
+
+      const buffer = await gerarTermoEpiPdf(contexto)
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="termo-epi-${contexto.colaborador.matricula || 'colaborador'}.pdf"`,
+        'Content-Length': buffer.length,
+      })
+      res.end(buffer)
+      return
     }
 
     // Health check

@@ -256,7 +256,7 @@ export function SaidasPage() {
             />
           </label>
           <label className="field">
-            <span>Centro de serviço*</span>
+            <span>Centro de servico*</span>
             <input
               name="centroServico"
               value={form.centroServico}
@@ -320,7 +320,7 @@ export function SaidasPage() {
           />
         </label>
         <label className="field">
-          <span>Centro de serviço</span>
+          <span>Centro de servico</span>
           <input
             name="centroServico"
             value={filters.centroServico}
@@ -371,7 +371,7 @@ export function SaidasPage() {
                   <th>Pessoa</th>
                   <th>Quantidade</th>
                   <th>Centro de custo</th>
-                  <th>Centro de serviço</th>
+                  <th>Centro de servico</th>
                   <th>Status</th>
                   <th>Data entrega</th>
                   <th>Data troca</th>
@@ -414,4 +414,6 @@ export function SaidasPage() {
     </div>
   )
 }
+
+
 
