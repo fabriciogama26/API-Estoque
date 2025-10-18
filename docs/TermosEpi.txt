@@ -1,0 +1,43 @@
+Tela: Termo de EPI
+==================
+
+Objetivo
+--------
+- Permitir localizar um colaborador e gerar o termo de entrega de EPI com visualizacao imediata.
+- Disponibilizar o download do PDF gerado via Puppeteer (mesma saida em modo local e remoto).
+
+Entradas e filtros
+------------------
+- Campos de busca: `matricula` (preferencial) ou `nome`.
+- Botao "Gerar termo" envia o formulario; "Limpar" restaura o estado inicial.
+- Quando nenhum campo e informado, exibe erro "Informe a matricula ou o nome do colaborador." sem chamar a API.
+
+Fluxo de dados
+--------------
+1. Submissao chama `dataClient.documentos.termoEpiContext(query)` com `format=json`.
+2. O backend (`DocumentosOperations.termoEpiContext`) resolve os dados do colaborador e das ultimas saidas e adiciona `origem` (`local` ou `remoto`).
+3. O frontend constrói o HTML com `buildEpiTermHtml(contexto)` e armazena em `preview.html` para pre-visualizacao no `<iframe>`.
+4. O botao "Baixar PDF" chama `downloadTermoEpiPdf`, que redireciona para `/api/documentos/termo-epi` (sem `format=json`) e baixa o binario retornado.
+
+Estados e mensagens
+-------------------
+- `preview.isLoading` controla o feedback "Carregando documento..." e desabilita os botoes.
+- Erros retornados pela API aparecem abaixo do formulario (`feedback--error`). Exemplos tratados:
+  - colaborador nao encontrado;
+  - colaborador sem saidas registradas.
+- Badge acima do formulario indica o modo atual: `Modo local (dados do navegador)` ou `Modo online (Supabase)`, usando `isLocalMode`.
+
+Pre-visualizacao
+----------------
+- Painel lateral resume colaborador, centro de servico, total de itens entregues e data da ultima entrega.
+- O iframe ajusta a altura dinamicamente apos carregar (`onLoad`).
+- Quando nao ha HTML, mostra orientacao para preencher os dados e gerar o termo.
+
+Persistencia
+------------
+- **Modo remoto**: supabase usa tabelas `pessoas` e `saidas`; geracao do PDF via Puppeteer (endpoint `/api/documentos/termo-epi`).
+- **Modo local**: `localApi.documentos.termoEpiContext` usa o seed `src/data/local-seed.json` e ainda aciona Puppeteer localmente para o download.
+
+Recursos relacionados
+---------------------
+- Configuracao detalhada do ambiente e modos de dados: [`docs/ambiente-termos-epi.txt`](ambiente-termos-epi.txt).

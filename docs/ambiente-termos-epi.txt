@@ -1,4 +1,4 @@
-﻿Ambiente de geracao do Termo de EPI
+Ambiente de geracao do Termo de EPI
 ===================================
 
 Visao geral
@@ -13,7 +13,7 @@ Pontos principais
 * O backend (funcoes em `api/`) verifica a variavel `DATA_MODE`. Quando vale `local`, busca os dados seed e continua usando Puppeteer.
 * A pagina `Termos > Termo de EPI` mostra um badge indicando o modo atual. O JSON retornado pela API inclui o campo `origem` (`local` ou `remoto`).
 * O front sempre aciona `/api/documentos/termo-epi` e recebe um PDF. Nao existe mais geracao com `html2pdf.js`.
-* A lista de saidas nao possui mais botao de termo; toda a experiencia fica na pagina dedicada.
+* A lista de saidas nao possui mais botao de termo; toda a experiencia fica na pagina dedicada (veja `docs/TermosEpi.txt`).
 
 Como usar
 ---------

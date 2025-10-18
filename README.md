@@ -138,12 +138,12 @@ Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
 
 ### Termo de EPI (Puppeteer)
 
-- Sempre que a pagina **Termos > Termo de EPI** gera ou baixa o documento, a requisicao vai para /api/documentos/termo-epi, que usa Puppeteer para produzir o PDF (mesmo resultado local e em producao).
-- O comportamento dos dados depende das variaveis DATA_MODE (backend) e VITE_DATA_MODE (frontend):
-  - local: usa o seed (localDataStore) e dispensa autenticacao.
-  - emote (padrao): depende do Supabase (Postgres + Auth).
-- A pagina exibe um badge indicando o modo atual e o contexto retornado pela API inclui o campo origem (local ou emoto).
-- As acoes de termo foram removidas da lista de saidas; utilize a pagina dedicada para pre-visualizacao e exportacao.
+- A pagina **Termos > Termo de EPI** sempre consulta `/api/documentos/termo-epi`. A rota gera o PDF com Puppeteer tanto em producao quanto no modo local.
+- As variaveis `DATA_MODE` (backend) e `VITE_DATA_MODE` (frontend) definem a origem dos dados:
+  - `local`: utiliza o seed armazenado no navegador (`localDataStore`) e dispensa autenticacao.
+  - `remote` (padrao): usa Supabase (Postgres + Auth).
+- A interface exibe um badge com o modo atual e o JSON de contexto traz `origem` (`local` ou `remoto`).
+- Toda a experiencia de pre-visualizacao e download fica centralizada na pagina dedicada (sem botoes extras na lista de saidas). Consulte `docs/TermosEpi.txt` para detalhes de UI.
 
 ## Scripts Disponiveis
 
@@ -156,29 +156,39 @@ Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
 
 ## Estrutura de Pastas
 
-```
+```text
 .
-api/
-  index.js              # roteador principal das rotas /api/*
-  pessoas/
-    [id].js             # leitura e atualizacao por id
-  materiais/
-    [id].js
-  acidentes/
-    [id].js
-  _shared/              # autenticacao, http helpers, operations
-docs/                   # documentacao funcional e guias
-src/
-  components/           # componentes reutilizaveis
-  pages/                # telas (Dashboard, Estoque, etc.)
-  context/              # AuthContext e providers
-  services/
-    api.js              # cliente HTTP remoto
-    localApi.js         # implementacao local
-    dataClient.js       # escolhe entre remoto e local
-  routes/               # servidor Express opcional (modo legado)
-  lib/estoque.js        # calculos compartilhados
-package.json
+├── api/                      # Funcoes serverless (Vercel)
+│   ├── index.js              # Entrada das rotas /api/*
+│   ├── _shared/              # Autenticacao Supabase, helpers HTTP, orquestracao
+│   └── documents/            # Geracao de PDFs (Termo de EPI)
+├── shared/
+│   └── documents/            # Templates reutilizados por api/ e frontend
+├── src/                      # Aplicacao React (Vite)
+│   ├── App.jsx               # Componente raiz
+│   ├── app.js                # Configuracao de rotas e provedores
+│   ├── components/           # Componentes reutilizaveis (formularios, tabelas, UI)
+│   ├── config/               # Configuracoes globais (toasts, ambiente)
+│   ├── context/              # Providers (AuthContext, DataContext, etc.)
+│   ├── controllers/          # Controladores que integram servicos e regras
+│   ├── data/                 # Seeds e adaptadores estaticos
+│   ├── layouts/              # Layouts compartilhados pelas paginas
+│   ├── lib/                  # Utilitarios de dominio (ex.: lib/estoque.js)
+│   ├── models/               # Modelos e normalizadores de dados
+│   ├── pages/                # Telas (Dashboard, Pessoas, Materiais, etc.)
+│   ├── repositories/         # Acesso a dados estruturado por recurso
+│   ├── routes/               # Definicoes das rotas internas
+│   ├── rules/                # Validacoes e regras de negocio da UI
+│   ├── services/             # Cliente HTTP, dataClient e APIs especificas
+│   ├── styles/               # Folhas de estilo globais e especificas
+│   └── utils/                # Helpers utilitarios da interface
+├── supabase/                 # Migrations e anotacoes de infraestrutura
+│   ├── README.md
+│   └── migrations/           # Scripts SQL versionados
+├── docs/                     # Documentacao funcional de telas e fluxos
+├── public/                   # Assets estaticos servidos pelo Vite
+├── vercel.json               # Configuracao do deploy serverless
+└── vite.config.js            # Build e ajustes do Vite
 ```
 
 ## Fluxo de Autenticacao e RLS
@@ -190,7 +200,8 @@ package.json
 
 ## Referencias de Documentacao
 
-- `docs/Login.txt`, `docs/Dashboard.txt`, `docs/Entradas.txt`, `docs/Estoque.txt`, `docs/Materiais.txt`, `docs/Pessoas.txt`, `docs/Saidas.txt`.
+- `docs/Login.txt`, `docs/Dashboard.txt`, `docs/Entradas.txt`, `docs/Estoque.txt`, `docs/Materiais.txt`, `docs/Pessoas.txt`, `docs/Saidas.txt`, `docs/Acidentes.txt`, `docs/TermosEpi.txt`.
+- `docs/ambiente-termos-epi.txt` com instrucoes de configuracao e modo de operacao do termo de EPI.
 - `docs/rls-policies-guide.txt` para as politicas de seguranca no Supabase.
 - `docs/stateless-supabase-notes.txt` para detalhes do backend stateless.
 - `docs/data-mode-guide.txt` para alternar entre modo local e Supabase.
@@ -206,6 +217,8 @@ package.json
 ---
 
 Sugestoes e melhorias sao bem-vindas. Abra uma issue ou envie um PR!
+
+
 
 
 
