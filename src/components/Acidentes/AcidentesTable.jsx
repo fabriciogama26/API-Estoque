@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react'
+import { Pencil, History as HistoryIcon } from 'lucide-react'
 
 const formatDate = (value) => {
   if (!value) {
@@ -22,7 +22,7 @@ const formatNumber = (value) => {
   return numeric
 }
 
-export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
+export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSaving, historyState }) {
   if (!acidentes.length) {
     return <p className="feedback">Nenhum acidente registrado.</p>
   }
@@ -51,6 +51,10 @@ export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
           {acidentes.map((acidente) => {
             const isEditing = editingId === acidente.id
             const disableEdit = isEditing || isSaving
+            const isHistoryLoading = Boolean(
+              historyState?.isLoading && historyState?.acidente?.id === acidente.id
+            )
+            const disableHistory = isSaving || isHistoryLoading || typeof onHistory !== 'function'
             return (
               <tr key={acidente.id}>
                 <td>
@@ -84,6 +88,17 @@ export function AcidentesTable({ acidentes, onEdit, editingId, isSaving }) {
                     >
                       <Pencil size={16} strokeWidth={1.8} />
                     </button>
+                    {typeof onHistory === 'function' ? (
+                      <button
+                        type="button"
+                        className="pessoas-table-action-button"
+                        onClick={() => onHistory(acidente)}
+                        disabled={disableHistory}
+                        aria-label={`Ver historico de edicao de ${acidente.nome}`}
+                      >
+                        <HistoryIcon size={16} strokeWidth={1.8} />
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>

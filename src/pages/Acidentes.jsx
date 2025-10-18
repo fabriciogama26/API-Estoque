@@ -4,9 +4,14 @@ import { AlertIcon } from '../components/icons.jsx'
 import { AcidentesForm } from '../components/Acidentes/AcidentesForm.jsx'
 import { AcidentesFilters } from '../components/Acidentes/AcidentesFilters.jsx'
 import { AcidentesTable } from '../components/Acidentes/AcidentesTable.jsx'
+import { AcidentesHistoryModal } from '../components/Acidentes/AcidentesHistoryModal.jsx'
 import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { ACIDENTES_FORM_DEFAULT, ACIDENTES_FILTER_DEFAULT } from '../config/AcidentesConfig.js'
+import {
+  ACIDENTES_FORM_DEFAULT,
+  ACIDENTES_FILTER_DEFAULT,
+  ACIDENTES_HISTORY_DEFAULT,
+} from '../config/AcidentesConfig.js'
 import {
   resolveUsuarioNome,
   validateAcidenteForm,
@@ -17,6 +22,8 @@ import {
   extractCentrosServico,
   extractTipos,
 } from '../rules/AcidentesRules.js'
+
+import '../styles/AcidentesPage.css'
 
 const toInputDate = (value) => {
   if (!value) {
@@ -41,6 +48,8 @@ export function AcidentesPage() {
   const [filters, setFilters] = useState(() => ({ ...ACIDENTES_FILTER_DEFAULT }))
   const [acidentes, setAcidentes] = useState([])
   const [editingAcidente, setEditingAcidente] = useState(null)
+  const [historyCache, setHistoryCache] = useState({})
+  const [historyState, setHistoryState] = useState(() => ({ ...ACIDENTES_HISTORY_DEFAULT }))
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [listError, setListError] = useState(null)
@@ -169,6 +178,8 @@ export function AcidentesPage() {
       }
 
       resetForm()
+      setHistoryCache({})
+      setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT })
       await loadAcidentes()
     } catch (err) {
       setFormError(err.message)
@@ -203,6 +214,33 @@ export function AcidentesPage() {
 
   const cancelEdit = () => {
     resetForm()
+  }
+
+  const openHistory = async (acidente) => {
+    const cached = historyCache[acidente.id]
+    if (cached) {
+      setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT, open: true, acidente, registros: cached })
+      return
+    }
+
+    setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT, open: true, acidente, isLoading: true })
+
+    try {
+      const registros = (await api.acidentes.history(acidente.id)) ?? []
+      setHistoryCache((prev) => ({ ...prev, [acidente.id]: registros }))
+      setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT, open: true, acidente, registros })
+    } catch (err) {
+      setHistoryState({
+        ...ACIDENTES_HISTORY_DEFAULT,
+        open: true,
+        acidente,
+        error: err.message || 'Nao foi possivel carregar o historico.',
+      })
+    }
+  }
+
+  const closeHistory = () => {
+    setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT })
   }
 
   const acidentesFiltrados = useMemo(
@@ -258,11 +296,15 @@ export function AcidentesPage() {
           <AcidentesTable
             acidentes={acidentesFiltrados}
             onEdit={startEdit}
+            onHistory={openHistory}
             editingId={editingAcidente?.id ?? null}
             isSaving={isSaving}
+            historyState={historyState}
           />
         ) : null}
       </section>
+
+      <AcidentesHistoryModal state={historyState} onClose={closeHistory} />
     </div>
   )
 }

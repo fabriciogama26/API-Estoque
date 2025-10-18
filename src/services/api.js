@@ -67,6 +67,35 @@ async function request(path, options = {}) {
   }
 }
 
+async function requestBinary(path, options = {}) {
+  const token = await getAccessToken()
+
+  const config = {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.headers ?? {}),
+    },
+    ...options,
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, config)
+
+  if (response.status === 401) {
+    const error = new Error('Sessão expirada. Faça login novamente.')
+    error.status = 401
+    throw error
+  }
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(response)
+    const error = new Error(message)
+    error.status = response.status
+    throw error
+  }
+
+  return response.blob()
+}
+
 async function extractErrorMessage(response) {
   try {
     const data = await response.json()
@@ -129,5 +158,16 @@ export const api = {
     list: () => request('/api/acidentes'),
     create: (payload) => request('/api/acidentes', { method: 'POST', body: payload }),
     update: (id, payload) => request(`/api/acidentes/${id}`, { method: 'PUT', body: payload }),
+    history: (id) => request(`/api/acidentes/history/${id}`),
+  },
+  documentos: {
+    termoEpiContext: (params = {}) => {
+      const query = buildQuery({ ...params, format: 'json' })
+      return request(`/api/documentos/termo-epi${query}`)
+    },
+    termoEpiPdf: (params = {}) => {
+      const query = buildQuery(params)
+      return requestBinary(`/api/documentos/termo-epi${query}`)
+    },
   },
 }

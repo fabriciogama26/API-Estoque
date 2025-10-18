@@ -25,3 +25,11 @@ export const ACIDENTES_FILTER_DEFAULT = {
   setor: 'todos',
   agente: 'todos',
 }
+
+export const ACIDENTES_HISTORY_DEFAULT = {
+  open: false,
+  acidente: null,
+  registros: [],
+  isLoading: false,
+  error: null,
+}

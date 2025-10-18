@@ -131,11 +131,13 @@ function normalizeState(state) {
       return acidente
     }
     const centroServico = acidente.centroServico ?? acidente.setor ?? ''
+    const historicoEdicao = Array.isArray(acidente.historicoEdicao) ? acidente.historicoEdicao.slice() : []
     return {
       ...acidente,
       centroServico,
       setor: acidente.setor ?? centroServico,
       local: acidente.local ?? centroServico,
+      historicoEdicao,
     }
   })
   sanitized.materialPriceHistory = normalizeArray(sanitized.materialPriceHistory)
