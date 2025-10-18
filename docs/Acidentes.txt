@@ -1,0 +1,49 @@
+Tela: Cadastro de Acidentes
+===========================
+
+Objetivo
+--------
+- Registrar e manter o historico de acidentes/incidentes envolvendo colaboradores.
+- Consultar rapidamente registros existentes, aplicar filtros e acessar o historico de edicoes.
+
+Componentes principais
+----------------------
+- **`<AcidentesForm />`**: formulario de cadastro/edicao com preenchimento automatico de nome, cargo e centro de servico ao informar a matricula.
+- **`<AcidentesFilters />`**: filtros aplicados em memoria sobre a lista carregada (termo livre, tipo, centro de servico, agente).
+- **`<AcidentesTable />`**: tabela com botoes para editar e abrir o historico de edicoes.
+- **`<AcidentesHistoryModal />`**: modal que exibe a linha do tempo de alteracoes (`/history`).
+
+Fluxo de dados
+--------------
+1. Ao montar a pagina:
+   - Lista acidentes via `dataClient.acidentes.list()`.
+   - Busca pessoas com `dataClient.pessoas.list()` para popular o `datalist` de matrículas.
+2. O `dataClient` encaminha chamadas para Supabase (`api.js`) ou para o modo local (`localApi.js`), dependendo de `VITE_DATA_MODE`.
+3. No envio do formulario:
+   - Valida com `validateAcidenteForm` (campos obrigatorios, datas numericas, valores >= 0).
+   - Monta o payload com `createAcidentePayload` ou `updateAcidentePayload`, adicionando `registradoPor`/`atualizadoPor`.
+   - Chama `dataClient.acidentes.create()` ou `.update()`.
+   - Recarrega a lista e limpa caches de historico.
+4. O historico usa `dataClient.acidentes.history(id)` apenas quando o usuario abre o modal, mantendo cache por `id` para proximas consultas.
+
+Validacoes e regras
+-------------------
+- Matricula e demais dados chaves sao obtidos da tabela de pessoas; em modo remoto, o backend rejeita matriculas inexistentes.
+- Dias perdidos/debitados e HHT devem ser inteiros nao negativos (tratados nas regras e novamente no backend).
+- Centro de servico/setor e nome/cargo ficam somente leitura porque sao derivados da pessoa selecionada.
+- Edicao reusa o formulario e bloqueia o botao "Registrar" ate que a requisicao finalize (`isSaving`).
+- O filtro por termo considera nome, matricula e centro de servico (vide `filterAcidentes`).
+
+Comportamento de UI
+-------------------
+- Mensagens de erro do formulario aparecem abaixo dos campos quando `validateAcidenteForm` ou a API retornam erro.
+- Loading states:
+  - Lista: feedback de "Carregando acidentes..." no cabecalho da tabela (estado controlado por `isLoading`).
+  - Pessoas: desabilita a entrada de matricula enquanto `isLoadingPessoas` for verdadeiro.
+- Tabela mostra destaque para parte lesionada/lesao abaixo do nome.
+- O modal de historico abre em tela cheia com overlay clicavel para fechar.
+
+Persistencia
+------------
+- **Modo remoto (Supabase)**: tabelas `acidentes` e `pessoas`; valida tokens Supabase e aplica RLS.
+- **Modo local**: estrutura mantida em `localStorage` (`api-estoque-local-data-v1`) com helpers em `src/services/localApi.js`.
