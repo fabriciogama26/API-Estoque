@@ -141,8 +141,10 @@ Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
 - Sempre que a pagina **Termos > Termo de EPI** gera ou baixa o documento, a requisicao vai para /api/documentos/termo-epi, que usa Puppeteer para produzir o PDF (mesmo resultado local e em producao).
 - O comportamento dos dados depende das variaveis DATA_MODE (backend) e VITE_DATA_MODE (frontend):
   - local: usa o seed (localDataStore) e dispensa autenticacao.
-  - emote (padrao): depende do Supabase (Postgres + Auth).
-- A pagina exibe um badge indicando o modo atual e o contexto retornado pela API inclui o campo origem (local ou emoto).
+  - 
+emote (padrao): depende do Supabase (Postgres + Auth).
+- A pagina exibe um badge indicando o modo atual e o contexto retornado pela API inclui o campo origem (local ou 
+emoto).
 - As acoes de termo foram removidas da lista de saidas; utilize a pagina dedicada para pre-visualizacao e exportacao.
 
 ## Scripts Disponiveis
@@ -155,6 +157,7 @@ Todos os endpoints remotos exigem cabecalho `Authorization: Bearer <token>`.
 | `npm run lint`    | Executa ESLint nos arquivos do frontend.         |
 
 ## Estrutura de Pastas
+
 
 ```
 .
