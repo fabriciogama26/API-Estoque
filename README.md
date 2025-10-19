@@ -25,7 +25,7 @@ Aplicação completa para controle de EPIs com frontend em React (Vite) e funç�
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Frontend          | React 19 + Vite. O `dataClient` escolhe entre o Supabase (`src/services/api.js`) ou o armazenamento local (`src/services/localApi.js`). |
 | Backend           | Funções serverless na Vercel (`api/index.js` centraliza as rotas `/api/*` e delega para `api/_shared/operations.js`). Cada chamada valida o token Supabase antes de acessar o banco com a chave de serviço. |
-| Banco de Dados    | Supabase Postgres (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`). Migrations em `supabase/migrations`. |
+| Banco de Dados    | Supabase Postgres (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`) e views analíticas como `vw_indicadores_acidentes`. Migrations em `supabase/migrations`. |
 | Geração de PDFs   | Template compartilhado em `shared/documents/epiTermTemplate.js` consumido tanto pela API (Puppeteer) quanto pelo frontend. |
 | Autenticação      | Supabase Auth no modo remoto. Em modo local, credenciais definidas via `.env.local`. |
 | Regras de negócio | `api/_shared/operations.js` (lado serverless) e `src/lib/estoque.js` (cálculos compartilhados). |
@@ -131,6 +131,24 @@ Todos os endpoints remotos exigem cabeçalho `Authorization: Bearer <token>`.
 | Documentos | GET             | `/api/documentos/termo-epi`                                                                | Retorna PDF (default) ou JSON (`?format=json`).           |
 | Health    | GET              | `/api/health`                                                                              | Checagem autenticada de saúde.                            |
 
+## Dashboard de Acidentes (Supabase)
+
+- Tela `src/pages/DashboardAcidentes.jsx` disponível na rota `/dashboard/acidentes`.
+- Consulta diretamente a view `vw_indicadores_acidentes` pelo cliente oficial do Supabase, portanto **exige** `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` configurados.
+- A view deve retornar um único registro com os seguintes campos (nomes alternativos são aceitos para facilitar integrações legadas):
+  - `resumo`/`cards`/`indicadores`/`resumo_indicadores`: objeto com totais (`total_acidentes`, `dias_perdidos`, `hht_total`, `taxa_frequencia`, `taxa_gravidade`, `periodo_label`).
+  - `tendencia`/`serie_mensal`/`mensal`: série mensal utilizada pelo gráfico de linha.
+  - `tipos`/`distribuicao_tipos`/`por_tipo`: distribuição por tipo de acidente.
+  - `partes_lesionadas`/`partes`/`distribuicao_partes`: distribuição por parte lesionada.
+  - `cargos`/`distribuicao_cargos`/`por_cargo`: ranking de cargos.
+  - `agentes`/`distribuicao_agentes`/`por_agente`: distribuição por agente causador.
+  - `anos_disponiveis`/`anos`: lista de anos para o filtro.
+  - `unidades_disponiveis`/`unidades`: unidades organizacionais disponíveis.
+- Todos os campos podem ser `null`; o componente normaliza respostas vazias para manter a UI consistente.
+- Recomenda-se definir políticas RLS na view permitindo somente leitura para perfis autenticados.
+
+> Dica: utilize `supabase/supabase db remote commit` para versionar a view ou registre a definição manualmente em `supabase/migrations/`.
+
 > Pessoas: obrigatório informar `nome`, `matricula`, `centroServico`, `cargo` e `tipoExecucao`. Campo opcional `dataAdmissao` aceita ISO completo ou `yyyy-mm-dd`; valores inválidos são ignorados.
 
 ### Termo de EPI (Puppeteer)
@@ -190,7 +208,7 @@ Todos os endpoints remotos exigem cabeçalho `Authorization: Bearer <token>`.
 
 ## Referências de Documentação
 
-- `docs/Login.txt`, `docs/Dashboard.txt`, `docs/Entradas.txt`, `docs/Estoque.txt`, `docs/Materiais.txt`, `docs/Pessoas.txt`, `docs/Saidas.txt`.
+- `docs/Login.txt`, `docs/Dashboard.txt`, `docs/DashboardAcidentes.txt`, `docs/Entradas.txt`, `docs/Estoque.txt`, `docs/Materiais.txt`, `docs/Pessoas.txt`, `docs/Acidentes.txt`, `docs/Saidas.txt`.
 - `docs/rls-policies-guide.txt` para as políticas de segurança no Supabase.
 - `docs/stateless-supabase-notes.txt` para detalhes do backend stateless.
 - `docs/data-mode-guide.txt` para alternar entre modo local e Supabase.
