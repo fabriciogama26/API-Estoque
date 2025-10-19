@@ -1,0 +1,232 @@
+Guia de Estrutura Supabase
+==========================
+
+Pre-requisitos
+--------------
+- Habilite as extensoes `uuid-ossp` e `pgcrypto` para suportar `uuid_generate_v4()` e funcoes de seguranca usadas pelas migrations.
+- Ative Row Level Security (RLS) em todas as tabelas listadas e mantenha politicas que liberam leitura para usuarios autenticados e escrita apenas via chave `service_role`, conforme `docs/rls-policies-guide.txt`.
+- Padronize schemas no namespace `public` para compatibilidade com o codigo existente.
+
+Diagnostico do Schema Atual (Supabase)
+--------------------------------------
+- `public.current_stock`
+  - Esta tabela e redundante: o backend calcula saldos em tempo real a partir de `entradas` e `saidas`. Remova-a para evitar divergencias (pode ser substituida por uma view se desejar relatorios ad-hoc).
+- `public.materials`
+  - Renomeie para `materiais` e alinhe colunas:
+    * `epi` -> `nome`, `manufacturer` -> `fabricante`, `ca_number` -> `ca`.
+    * Converta `validity_days` para `validadeDias integer not null check (validadeDias > 0)`.
+    * Troque `unit_price` para `valorUnitario numeric(14,2) not null check (valorUnitario >= 0)`.
+    * Troque `minimum_stock integer` para `estoqueMinimo integer not null default 0 check (estoqueMinimo >= 0)`.
+    * Renomeie `created_at` para `dataCadastro` e adicione `usuarioCadastro text not null default 'sistema'`.
+    * Adicione `ativo boolean default true`, `usuarioAtualizacao text default 'sistema'`, `atualizadoEm timestamptz`, `descricao text`, `grupoMaterial text`, `numeroCalcado text`, `numeroVestimenta text`, `numeroEspecifico text`, `chaveUnica text`.
+  - Ajuste indices: recrie `materiais_nome_fabricante_idx` e `materiais_chave_unica_idx`.
+- `public.people`
+  - Renomeie para `pessoas` e converta colunas:
+    * `name` -> `nome`, `matriculation bigint` -> `matricula text not null`, `workplace` -> `centro_servico`, `role` -> `cargo`.
+    * Substitua `created_by uuid default auth.uid()` por `usuarioCadastro text not null default 'sistema'`.
+    * Adicione `centro_servico text not null`, `tipoExecucao text not null`, `dataAdmissao timestamptz`, `usuarioEdicao text`, `atualizadoEm timestamptz`, `historicoEdicao jsonb not null default '[]'`.
+  - Aplique a constraint `pessoas_matricula_not_blank` e o indice unico `pessoas_matricula_unique_idx`.
+- `public.material_entries`
+  - Renomeie para `entradas` e alinhe colunas:
+    * Renomeie `material_id` -> `"materialId"`, `created_at` -> `criadoEm` (se precisar manter auditoria) e `entry_date` -> `"dataEntrada"`.
+    * `quantity bigint` -> `quantidade numeric(14,2) not null check (quantidade > 0)`.
+    * `dataEntrada` deve ser `timestamptz not null default now()`.
+    * `created_by text` -> `usuarioResponsavel text`.
+    * Adicione `centro_custo text not null default ''`, `centro_servico text not null default ''`.
+  - Garanta que `"materialId"` referencie `materiais(id)` com `on delete restrict`.
+  - Crie o indice `entradas_material_idx (materialId, dataEntrada desc)`.
+- `public.material_exits`
+  - Renomeie para `saidas` e alinhe colunas:
+    * Renomeie `material_id` -> `"materialId"`, `person_id` -> `"pessoaId"`, `delivery_date` -> `"dataEntrega"`, `replacement_due` -> `"dataTroca"`.
+    * `quantity bigint` -> `quantidade numeric(14,2) not null check (quantidade > 0)`.
+    * `dataEntrega` deve ser `timestamptz not null default now()`.
+    * `dataTroca` deve aceitar `timestamptz`.
+    * `delivery_status text` -> `status text not null default 'entregue'`.
+    * `created_by uuid default gen_random_uuid()` -> substitua por `usuarioResponsavel text`.
+    * Adicione `centro_custo text not null default ''`, `centro_servico text not null default ''`.
+  - Ajuste FKs: `"materialId"` -> `materiais(id) on delete restrict`, `"pessoaId"` -> `pessoas(id) on delete restrict`.
+  - Recrie indices `saidas_material_idx` e `saidas_pessoa_idx`.
+- `public.price_history`
+  - Renomeie para `material_price_history`.
+  - Remova o default `gen_random_uuid()` de `material_id` e garanta FK `references public.materiais(id) on delete cascade`.
+  - Renomeie `unit_price` -> `valorUnitario numeric(14,2) not null`, `valid_from`/`valid_until` nao sao usados (remova-os) e adicione `criadoEm timestamptz not null default now()`, `usuarioResponsavel text not null default 'sistema'`.
+  - Crie o indice `material_price_history_material_idx (materialId, criadoEm desc)`.
+- Tabelas ausentes
+  - Crie `public.app_users` para mapear usuarios Supabase Auth (`id`, `auth_user_id`, `username`, `display_name`, timestamps).
+  - Crie `public.acidentes` com os campos descritos neste guia (matricula, tipo, agente, lesao, hht, etc.).
+  - Ative RLS em todas as tabelas novas e aplique as politicas listadas a seguir.
+
+Tabelas Principais
+------------------
+`public.app_users`
+- Colunas
+  - `id uuid primary key default uuid_generate_v4()` - identificador interno da aplicacao.
+  - `auth_user_id uuid unique` - referencia opcional ao usuario criado no Supabase Auth.
+  - `username text not null unique` - login de uso interno.
+  - `display_name text not null` - nome apresentado na UI.
+  - `created_at timestamptz default now()`, `updated_at timestamptz default now()` - auditoria basica.
+- Indices e restricoes
+  - Chaves unicas em `auth_user_id` e `username`.
+- Observacoes
+  - Tabela usada para vincular perfis Auth a permissoes internas.
+
+`public.pessoas`
+- Colunas
+  - `id uuid primary key default uuid_generate_v4()`.
+  - `nome text not null`.
+  - `matricula text not null` (trim obrigatorio, veja constraint `pessoas_matricula_not_blank`).
+  - `centro_servico text not null` - armazena o centro de servico; o backend expone como `centroServico` nos objetos retornados.
+  - `cargo text not null`.
+  - `usuarioCadastro text not null default 'sistema'`.
+  - `criadoEm timestamptz not null default now()`.
+  - `usuarioEdicao text`.
+  - `atualizadoEm timestamptz`.
+  - `historicoEdicao jsonb not null default '[]'`.
+  - Recomendado adicionar `dataAdmissao timestamptz` e `tipoExecucao text` para alimentar o Termo de EPI e filtros (o frontend ja consome esses campos quando existem).
+- Indices e restricoes
+  - `pessoas_matricula_not_blank` impede valores vazios em `matricula`.
+  - `pessoas_matricula_unique_idx` garante unicidade (case insensitive).
+- Observacoes
+  - Historicos de edicao sao acumulados em `historicoEdicao` pelo backend.
+
+`public.materiais`
+- Colunas
+  - `id uuid primary key default uuid_generate_v4()`.
+  - `nome text not null`.
+  - `fabricante text not null`.
+  - `validadeDias integer not null check (validadeDias > 0)`.
+  - `ca text`.
+  - `valorUnitario numeric(14,2) not null check (valorUnitario >= 0)`.
+  - `estoqueMinimo integer not null default 0 check (estoqueMinimo >= 0)`.
+  - `ativo boolean not null default true`.
+  - `usuarioCadastro text not null default 'sistema'`.
+  - `dataCadastro timestamptz not null default now()`.
+  - `usuarioAtualizacao text default 'sistema'`.
+  - `atualizadoEm timestamptz`.
+  - `descricao text`.
+  - `grupoMaterial text`.
+  - `numeroCalcado text`.
+  - `numeroVestimenta text`.
+  - `numeroEspecifico text`.
+  - `chaveUnica text`.
+- Indices e restricoes
+  - `materiais_nome_fabricante_idx` evita duplicidades por nome e fabricante.
+  - `materiais_chave_unica_idx` assegura unicidade condicional de `chaveUnica`.
+  - `materiais_grupo_material_idx` acelera filtros por grupo.
+- Observacoes
+  - Sempre que `valorUnitario` mudar, o backend registra o historico em `material_price_history`.
+
+`public.material_price_history`
+- Colunas
+  - `id uuid primary key default uuid_generate_v4()`.
+  - `materialId uuid not null references public.materiais(id) on delete cascade`.
+  - `valorUnitario numeric(14,2) not null`.
+  - `criadoEm timestamptz not null default now()`.
+  - `usuarioResponsavel text not null default 'sistema'`.
+- Indices e restricoes
+  - `material_price_history_material_idx` ordena por `materialId, criadoEm desc`.
+- Observacoes
+  - Usado para montar grafico de evolucao de preco e auditoria de alteracoes.
+
+`public.entradas`
+- Colunas
+  - `id uuid primary key default uuid_generate_v4()`.
+  - `materialId uuid not null references public.materiais(id) on delete restrict`.
+  - `quantidade numeric(14,2) not null check (quantidade > 0)`.
+  - `dataEntrada timestamptz not null default now()`.
+  - `usuarioResponsavel text`.
+  - `centro_custo text not null default ''`.
+  - `centro_servico text not null default ''`.
+- Indices e restricoes
+  - `entradas_material_idx` em `(materialId, dataEntrada desc)`.
+- Observacoes
+  - Alimenta os calculos de saldo e dashboards de movimentacao.
+
+`public.saidas`
+- Colunas
+  - `id uuid primary key default uuid_generate_v4()`.
+  - `materialId uuid not null references public.materiais(id) on delete restrict`.
+  - `pessoaId uuid not null references public.pessoas(id) on delete restrict`.
+  - `quantidade numeric(14,2) not null check (quantidade > 0)`.
+  - `dataEntrega timestamptz not null default now()`.
+  - `dataTroca timestamptz`.
+  - `status text not null default 'entregue'`.
+  - `usuarioResponsavel text`.
+  - `centro_custo text not null default ''`.
+  - `centro_servico text not null default ''`.
+- Indices e restricoes
+  - `saidas_material_idx` em `(materialId, dataEntrega desc)`.
+  - `saidas_pessoa_idx` em `(pessoaId, dataEntrega desc)`.
+- Observacoes
+  - Campo `dataTroca` e calculado pelo backend com base em `dataEntrega` + `validadeDias` do material quando disponivel.
+
+`public.acidentes`
+- Colunas
+  - `id uuid primary key default uuid_generate_v4()`.
+  - `matricula text not null`.
+  - `nome text not null`.
+  - `cargo text not null`.
+  - `data timestamptz not null`.
+  - `diasPerdidos numeric(14,2) not null default 0 check (diasPerdidos >= 0)`.
+  - `diasDebitados numeric(14,2) not null default 0 check (diasDebitados >= 0)`.
+  - `hht numeric(14,2) not null default 0 check (hht >= 0)` - horas homem trabalhadas usadas nos indicadores.
+  - `tipo text not null`.
+  - `agente text not null`.
+  - `cid text`.
+  - `lesao text not null`.
+  - `parteLesionada text not null`.
+  - `setor text not null`.
+  - `local text not null`.
+  - `cat text`.
+  - `observacao text`.
+  - `criadoEm timestamptz not null default now()`.
+  - `atualizadoEm timestamptz`.
+  - `registradoPor text`.
+  - `atualizadoPor text`.
+- Indices e restricoes
+  - `acidentes_matricula_idx` em `(lower(matricula), data desc)`.
+- Observacoes
+  - Quando um acidente e cadastrado, o backend busca a pessoa por matricula para preencher automaticamente `setor`, `local` e `centroServico`.
+
+Relacionamentos e Integridade
+-----------------------------
+- `entradas.materialId`, `saidas.materialId` e `material_price_history.materialId` referenciam `materiais.id`.
+- `saidas.pessoaId` referencia `pessoas.id`.
+- A API garante unicidade de `matricula` e `chaveUnica` via consultas antes de inserir; manter os indices evita race conditions.
+- Use `on delete restrict` nas movimentacoes para bloquear exclusao de materiais ou pessoas ainda referenciados.
+
+Calculos Realizados pelo Backend
+--------------------------------
+- Saldo por material (`calcularSaldoMaterial`): `sum(entradas.quantidade) - sum(saidas.quantidade)` filtrando por periodo quando informado.
+- Estoque atual (`montarEstoqueAtual`):
+  - `estoqueAtual` = saldo atual.
+  - `deficitQuantidade` = `max(estoqueMinimo - estoqueAtual, 0)`.
+  - `valorReposicao` = `deficitQuantidade * valorUnitario`.
+  - Lista de alertas inclui materiais com `deficitQuantidade > 0`.
+- Dashboard de movimentacao (`montarDashboard`):
+  - `entradas.valorTotal` e `saidas.valorTotal` sao soma de `quantidade * valorUnitario`.
+  - `materiaisMaisMovimentados` ranqueia por quantidade total movimentada no periodo.
+  - Historicos mensais agrupam por `ano-mes` considerando `dataEntrada` e `dataEntrega`.
+- Historico de precos (`registrarHistoricoPreco`): toda vez que `valorUnitario` muda, um registro e adicionado a `material_price_history`.
+- Termo de EPI (`montarContextoTermoEpi`): combina dados de `pessoas` e `saidas` para montar as entregas ordenadas e preencher informacoes de colaborador (matricula, cargo, centroServico, tipoExecucao, datas).
+- Indicadores de acidentes (`montarDashboardAcidentes`):
+  - `taxa_frequencia = (total_acidentes * 1_000_000) / hht_total`.
+  - `taxa_gravidade = (dias_perdidos * 1_000_000) / hht_total`.
+  - Agrupamentos por tipo, agente, parte lesionada e cargo usam contagem simples.
+- Datas de troca de EPI (`calcularDataTroca`): `dataEntrega + validadeDias` (em dias) quando a validade estiver definida no material.
+
+Politicas e Automatizacoes
+--------------------------
+- Politicas RLS recomendadas:
+  - Leituras permitidas para roles `authenticated` e `service_role`.
+  - Escrita permitida somente para `service_role` (a API serverless usa essa chave).
+- Considere criar gatilhos para preencher `usuarioAtualizacao`, `atualizadoEm` e `usuarioEdicao` em updates, mantendo a trilha de auditoria alinhada com o frontend.
+- Seeds de desenvolvimento podem ser carregados via `supabase db reset`, mas evite aplica-los em producao.
+
+Checklist Rapido
+----------------
+- Extensoes carregadas (`uuid-ossp`, `pgcrypto`).
+- Tabelas e indices criados conforme secoes acima.
+- Politicas RLS aplicadas.
+- Dados basicos (pessoas, materiais) cadastrados para validar fluxos iniciais.
+- Conferir que colunas opcionais (`dataAdmissao`, `tipoExecucao`, `hht`) existem caso os relatorios e documentos dependam delas.

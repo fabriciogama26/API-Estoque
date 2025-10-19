@@ -50,7 +50,7 @@ create unique index if not exists materiais_nome_fabricante_idx
 
 -- === Pessoas ================================================================
 update public.pessoas
-set matricula = concat('MIG-', substr(uuid_generate_v4()::text, 1, 8))
+set matricula = concat('MIG-', substr(gen_random_uuid()::text, 1, 8))
 where matricula is null or length(trim(matricula)) = 0;
 
 alter table if exists public.pessoas
@@ -82,9 +82,6 @@ alter table if exists public.entradas
   rename column material_id to "materialId";
 
 alter table if exists public.entradas
-  rename column quantidade to "quantidade";
-
-alter table if exists public.entradas
   rename column data_entrada to "dataEntrada";
 
 alter table if exists public.entradas
@@ -110,9 +107,6 @@ alter table if exists public.saidas
 
 alter table if exists public.saidas
   rename column pessoa_id to "pessoaId";
-
-alter table if exists public.saidas
-  rename column quantidade to "quantidade";
 
 alter table if exists public.saidas
   rename column data_entrega to "dataEntrega";
@@ -170,7 +164,7 @@ create index if not exists material_price_history_material_idx
 
 -- === Acidentes ==============================================================
 create table if not exists public.acidentes (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   matricula text not null,
   nome text not null,
   cargo text not null,
