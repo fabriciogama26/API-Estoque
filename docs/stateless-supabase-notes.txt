@@ -19,11 +19,11 @@ Variaveis de Ambiente
 
 Expectativas do esquema Supabase
 ----------------------------
-- `pessoas(id uuid pk, nome text, matricula text unique, local text, cargo text, usuarioCadastro text, usuarioEdicao text, criadoEm timestamp, atualizarEm timestamp, historicoEdicao jsonb)`
+- `pessoas(id uuid pk, nome text, matricula text unique, centro_servico text, cargo text, usuarioCadastro text, usuarioEdicao text, criadoEm timestamp, atualizarEm timestamp, historicoEdicao jsonb)`
 - `materiais(id uuid pk, nome text, fabricante text, validadeDias int, ca text, valorUnitario numeric, estoqueMinimo numeric, ativo boolean, usuarioCadastro text, usuarioAtualizacao text, dataCadastro timestamp, atualizarEm timestamp)`
 - `material_price_history(id uuid pk, materialId uuid fk, valorUnitario numerico, usuarioResponsavel text, criadoEm timestamp)`
-- `entradas(id uuid pk, materialId uuid fk, quantidade numerica, centroCusto texto, centroServico texto, dataEntrada timestamp, usuarioResponsavel texto)`
-- `saidas(id uuid pk, materialId uuid fk, pessoaId uuid fk, quantidade numerica, dataEntrega timestamp, dataTroca timestamp, status text, usuarioResponsavel text)`
+- `entradas(id uuid pk, materialId uuid fk, quantidade numerica, centro_custo texto, centro_servico texto, dataEntrada timestamp, usuarioResponsavel texto)`
+- `saidas(id uuid pk, materialId uuid fk, pessoaId uuid fk, quantidade numerica, centro_custo texto, centro_servico texto, dataEntrega timestamp, dataTroca timestamp, status text, usuarioResponsavel text)`
 - `acidentes(id uuid pk, matricula text, nome text, cargo text, data timestamp, diasPerdidos numeric, diasDebitados numeric, tipo text, agente text, cid text, lesao text, parteLesionada text, setor text, local text, cat text, observacao text, criadoEm timestamp, atualizadoEm timestamp)`
 
 Destaques da logica de negocios
