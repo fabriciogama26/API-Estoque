@@ -9,6 +9,7 @@ import { EntradasPage } from './pages/EntradasPage.jsx'
 import { SaidasPage } from './pages/SaidasPage.jsx'
 import { EstoquePage } from './pages/EstoquePage.jsx'
 import { DashboardPage } from './pages/DashboardPage.jsx'
+import { DashboardAcidentes } from './pages/DashboardAcidentes.jsx'
 import { AcidentesPage } from './pages/Acidentes.jsx'
 import { TermosEpiPage } from './pages/TermosEpiPage.jsx'
 
@@ -21,7 +22,7 @@ function App() {
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="dashboard/acidentes" element={<AcidentesPage />} />
+          <Route path="dashboard/acidentes" element={<DashboardAcidentes />} />
           <Route path="estoque" element={<EstoquePage />} />
 
           <Route path="cadastros">
