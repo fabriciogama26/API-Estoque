@@ -14,9 +14,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.75.1",
+    "@sparticuz/chromium": "^141.0.0",
     "lucide-react": "^0.544.0",
     "prop-types": "^15.8.1",
     "puppeteer": "^24.24.1",
+    "puppeteer-core": "^24.24.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.1",
