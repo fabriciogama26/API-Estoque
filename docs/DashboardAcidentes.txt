@@ -1,0 +1,56 @@
+Tela: Dashboard de Acidentes
+===========================
+
+Objetivo
+--------
+- Consolidar indicadores de SST (acidentes, dias perdidos, HHT, TF, TG) em uma única visão executiva.
+- Facilitar a análise de tendências e distribuições por tipo, parte lesionada, cargo e agente causador.
+
+Filtros
+-------
+- `ano`: obrigatório, inicializado com o ano corrente; enviado como `Number` para a view Supabase.
+- `unidade`: opcional. Valor `"todas"` consulta a visão completa; outros valores aplicam `eq('unidade', <valor>)`.
+
+Fontes de dados
+---------------
+- Exclusivamente o Supabase, via view `vw_indicadores_acidentes`.
+- A view deve respeitar políticas RLS e pode expor os campos com nomenclaturas alternativas:
+  - Totais/resumo: `resumo`, `cards`, `indicadores` ou `resumo_indicadores`.
+  - Série temporal: `tendencia`, `serie_mensal` ou `mensal`.
+  - Distribuições: `tipos` (`distribuicao_tipos`/`por_tipo`), `partes_lesionadas` (`partes`/`distribuicao_partes`), `cargos` (`distribuicao_cargos`/`por_cargo`), `agentes` (`distribuicao_agentes`/`por_agente`).
+  - Metadados: `anos_disponiveis` (`anos`) e `unidades_disponiveis` (`unidades`).
+- Dados ausentes retornam arrays vazios; o componente normaliza respostas `null`/`undefined` para manter a experiência consistente.
+
+Componentes principais
+----------------------
+- **`<FiltrosDashboard />`**: formulário de filtros compartilhado com outros dashboards. Recebe anos e unidades disponíveis.
+- **`<DashboardCards />`**: renderiza os cartões com total de acidentes, dias perdidos, HHT, TF e TG. Usa `resolveIndicadorValor` para mapear chaves alternativas.
+- **`<ChartTendencia />`**: gráfico de linha exibindo a série mensal de acidentes/dias/HHT (depende do payload da view).
+- **`<ChartTipos />`, `<ChartPartesLesionadas />`, `<ChartCargos />`, `<ChartAgentes />`**: gráficos de pizza/barras com distribuições segmentadas.
+
+Fluxo de dados
+--------------
+1. Ao montar, `load(initialFilters())` verifica se o Supabase está configurado (`isSupabaseConfigured`).
+2. Se configurado, executa `supabase.from('vw_indicadores_acidentes').select('*').maybeSingle()` aplicando filtros.
+3. Normaliza o resultado por meio de `normalizeResumo`/`normalizeArray` para garantir objetos e arrays válidos.
+4. Atualiza estado local com:
+   - `dashboardData.resumo`, `tendencia`, `tipos`, `partesLesionadas`, `cargos`, `agentes`.
+   - `availableYears`/`availableUnits`.
+5. Em erros (falta de configuração, exceção na query) limpa o estado e exibe mensagem dentro de um `<section class="card">`.
+
+Regras e consistência
+---------------------
+- Todos os botões desabilitam enquanto `isLoading` é `true`.
+- `helperText` exibe o período/ano corrente obtido do resumo (campos `periodo_label`, `periodo`, `referencia` ou equivalentes).
+- A view deve retornar números (ou strings numéricas) para permitir formatação via `Intl.NumberFormat`.
+- Caso a organização utilize multiunidades, garantir que `unidade` faça parte da resposta para suportar o filtro.
+
+Persistência
+------------
+- A view pode ser materializada ou recalculada em tempo real; independentemente da abordagem, ela deve ler das tabelas `acidentes` e `pessoas`.
+- Recomendado versionar a definição da view junto das migrations para ambientes diferentes.
+
+Testes recomendados
+-------------------
+- Validar manualmente com uma conta configurada no Supabase.
+- Cobrir cenários: sem dados (resposta `null`), múltiplos anos/unidades e restrições de RLS.

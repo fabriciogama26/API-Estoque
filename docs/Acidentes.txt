@@ -47,3 +47,10 @@ Persistencia
 ------------
 - **Modo remoto (Supabase)**: tabelas `acidentes` e `pessoas`; valida tokens Supabase e aplica RLS.
 - **Modo local**: estrutura mantida em `localStorage` (`api-estoque-local-data-v1`) com helpers em `src/services/localApi.js`.
+
+Integração com dashboards
+-------------------------
+- O dashboard específico de acidentes (`/dashboard/acidentes`) consome a view Supabase `vw_indicadores_acidentes`.
+- O preenchimento correto da tela depende de agregados atualizados (totais, séries mensais, distribuições por tipo/parte/cargo/agente).
+- Recomenda-se agendar uma rotina (trigger ou cron externo) que alimente a view a partir das tabelas `acidentes` e `pessoas`.
+- Garanta que as políticas RLS da view permitam apenas leitura e respeitem a organização/unidade disponível nos filtros.
