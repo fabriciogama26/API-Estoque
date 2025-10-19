@@ -15,7 +15,6 @@ import {
 import {
   createPessoaPayload,
   updatePessoaPayload,
-  filterPessoas,
   sortPessoasByNome,
   extractCentrosServico,
   extractCargos,
@@ -35,11 +34,29 @@ const formatDateInputValue = (value) => {
   return date.toISOString().slice(0, 10)
 }
 
+const buildPessoasQuery = (filters) => {
+  const query = {}
+  const termo = filters.termo?.trim()
+  if (termo) {
+    query.termo = termo
+  }
+  const centroServico = filters.centroServico ?? filters.local
+  if (centroServico && centroServico.toLowerCase() !== 'todos') {
+    query.centroServico = centroServico
+  }
+  const cargo = filters.cargo
+  if (cargo && cargo.toLowerCase() !== 'todos') {
+    query.cargo = cargo
+  }
+  return query
+}
+
 export function PessoasPage() {
   const { user } = useAuth()
   const [form, setForm] = useState(() => ({ ...PESSOAS_FORM_DEFAULT }))
   const [filters, setFilters] = useState(() => ({ ...PESSOAS_FILTER_DEFAULT }))
   const [pessoas, setPessoas] = useState([])
+  const [pessoasOptions, setPessoasOptions] = useState([])
   const [editingPessoa, setEditingPessoa] = useState(null)
   const [historyCache, setHistoryCache] = useState({})
   const [historyState, setHistoryState] = useState(() => ({ ...PESSOAS_HISTORY_DEFAULT }))
@@ -47,21 +64,33 @@ export function PessoasPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  const loadPessoas = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await api.pessoas.list()
-      setPessoas(response ?? [])
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+  const loadPessoas = useCallback(
+    async (params, refreshOptions = false) => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const query = buildPessoasQuery(params)
+        const needsOptionsRefresh = refreshOptions || pessoasOptions.length === 0
+        const [optionsData, filteredData] = await Promise.all([
+          needsOptionsRefresh ? api.pessoas.list() : Promise.resolve(null),
+          api.pessoas.list(query),
+        ])
+
+        if (optionsData) {
+          setPessoasOptions(optionsData ?? [])
+        }
+        setPessoas(filteredData ?? [])
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [pessoasOptions.length],
+  )
 
   useEffect(() => {
-    loadPessoas()
+    loadPessoas(PESSOAS_FILTER_DEFAULT, true)
   }, [loadPessoas])
 
   const handleFormChange = (event) => {
@@ -111,7 +140,7 @@ export function PessoasPage() {
       resetForm()
       setHistoryCache({})
       setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
-      await loadPessoas()
+      await loadPessoas(filters, true)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -164,18 +193,13 @@ export function PessoasPage() {
     setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
   }
 
-  const pessoasFiltradas = useMemo(
-    () => filterPessoas(pessoas, filters),
-    [pessoas, filters],
-  )
-
   const pessoasOrdenadas = useMemo(
-    () => sortPessoasByNome(pessoasFiltradas),
-    [pessoasFiltradas],
+    () => sortPessoasByNome(pessoas),
+    [pessoas],
   )
 
-  const centrosServico = useMemo(() => extractCentrosServico(pessoas), [pessoas])
-  const cargos = useMemo(() => extractCargos(pessoas), [pessoas])
+  const centrosServico = useMemo(() => extractCentrosServico(pessoasOptions), [pessoasOptions])
+  const cargos = useMemo(() => extractCargos(pessoasOptions), [pessoasOptions])
 
   return (
     <div className="stack">
@@ -207,7 +231,7 @@ export function PessoasPage() {
       <section className="card">
         <header className="card__header">
           <h2>Lista de pessoas</h2>
-          <button type="button" className="button button--ghost" onClick={loadPessoas} disabled={isLoading}>
+          <button type="button" className="button button--ghost" onClick={() => loadPessoas(filters, true)} disabled={isLoading}>
             Atualizar
           </button>
         </header>
@@ -228,3 +252,8 @@ export function PessoasPage() {
     </div>
   )
 }
+
+
+
+
+

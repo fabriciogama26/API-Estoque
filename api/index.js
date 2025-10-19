@@ -20,7 +20,7 @@ export default withAuth(async (req, res, user) => {
   try {
     // Pessoas
     if (path === '/api/pessoas') {
-      if (method === 'GET') return sendJson(res, 200, await PessoasOperations.list())
+      if (method === 'GET') return sendJson(res, 200, await PessoasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
         return sendJson(res, 201, await PessoasOperations.create(body, user))
@@ -78,7 +78,7 @@ export default withAuth(async (req, res, user) => {
 
     // Entradas
     if (path === '/api/entradas') {
-      if (method === 'GET') return sendJson(res, 200, await EntradasOperations.list())
+      if (method === 'GET') return sendJson(res, 200, await EntradasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
         return sendJson(res, 201, await EntradasOperations.create(body, user))
@@ -87,7 +87,7 @@ export default withAuth(async (req, res, user) => {
 
     // Saídas
     if (path === '/api/saidas') {
-      if (method === 'GET') return sendJson(res, 200, await SaidasOperations.list())
+      if (method === 'GET') return sendJson(res, 200, await SaidasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
         return sendJson(res, 201, await SaidasOperations.create(body, user))

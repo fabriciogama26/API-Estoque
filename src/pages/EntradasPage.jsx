@@ -19,6 +19,28 @@ const filterInitial = {
   dataFim: '',
 }
 
+const buildEntradasQuery = (filters) => {
+  const query = {}
+  if (filters.materialId) {
+    query.materialId = filters.materialId
+  }
+  const centroCusto = filters.centroCusto?.trim()
+  if (centroCusto) {
+    query.centroCusto = centroCusto
+  }
+  if (filters.dataInicio) {
+    query.dataInicio = filters.dataInicio
+  }
+  if (filters.dataFim) {
+    query.dataFim = filters.dataFim
+  }
+  const termo = filters.termo?.trim()
+  if (termo) {
+    query.termo = termo
+  }
+  return query
+}
+
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -37,13 +59,13 @@ export function EntradasPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const load = async () => {
+  const load = async (params = filters) => {
     setIsLoading(true)
     setError(null)
     try {
       const [materiaisData, entradasData] = await Promise.all([
         api.materiais.list(),
-        api.entradas.list(),
+        api.entradas.list(buildEntradasQuery(params)),
       ])
       setMateriais(materiaisData ?? [])
       setEntradas(entradasData ?? [])
@@ -55,7 +77,8 @@ export function EntradasPage() {
   }
 
   useEffect(() => {
-    load()
+    load(filterInitial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleChange = (event) => {
@@ -77,7 +100,7 @@ export function EntradasPage() {
       }
       await api.entradas.create(payload)
       setForm(initialForm)
-      await load()
+      await load(filters)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -92,10 +115,12 @@ export function EntradasPage() {
 
   const handleFilterSubmit = (event) => {
     event.preventDefault()
+    load(filters)
   }
 
   const handleFilterClear = () => {
-    setFilters(filterInitial)
+    setFilters({ ...filterInitial })
+    load(filterInitial)
   }
 
   const materiaisMap = useMemo(() => {
@@ -105,56 +130,6 @@ export function EntradasPage() {
     })
     return map
   }, [materiais])
-
-  const filteredEntradas = useMemo(() => {
-    const termo = filters.termo.trim().toLowerCase()
-
-    return entradas.filter((entrada) => {
-      const material = materiaisMap.get(entrada.materialId)
-
-      if (filters.materialId && entrada.materialId !== filters.materialId) {
-        return false
-      }
-
-      if (filters.dataInicio) {
-        const data = entrada.dataEntrada ? new Date(entrada.dataEntrada) : null
-        const inicio = new Date(filters.dataInicio)
-        inicio.setHours(0, 0, 0, 0)
-        if (!data || data < inicio) {
-          return false
-        }
-      }
-
-      if (filters.dataFim) {
-        const data = entrada.dataEntrada ? new Date(entrada.dataEntrada) : null
-        const fim = new Date(filters.dataFim)
-        fim.setHours(23, 59, 59, 999)
-        if (!data || data > fim) {
-          return false
-        }
-      }
-
-      const centroCustoFiltro = filters.centroCusto.trim().toLowerCase()
-      if (centroCustoFiltro && (entrada.centroCusto || '').toLowerCase() !== centroCustoFiltro) {
-        return false
-      }
-
-      if (!termo) {
-        return true
-      }
-
-      const alvo = [
-        material?.nome || '',
-        material?.fabricante || '',
-        entrada.centroCusto || '',
-        entrada.usuarioResponsavel || '',
-      ]
-        .join(' ')
-        .toLowerCase()
-
-      return alvo.includes(termo)
-    })
-  }, [entradas, filters, materiaisMap])
 
   return (
     <div className="stack">
@@ -246,13 +221,13 @@ export function EntradasPage() {
       <section className="card">
         <header className="card__header">
           <h2>Historico de entradas</h2>
-          <button type="button" className="button button--ghost" onClick={load} disabled={isLoading}>
+          <button type="button" className="button button--ghost" onClick={() => load(filters)} disabled={isLoading}>
             Atualizar
           </button>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
-        {!isLoading && filteredEntradas.length === 0 ? <p className="feedback">Nenhuma entrada registrada.</p> : null}
-        {filteredEntradas.length > 0 ? (
+        {!isLoading && entradas.length === 0 ? <p className="feedback">Nenhuma entrada registrada.</p> : null}
+        {entradas.length > 0 ? (
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -266,7 +241,7 @@ export function EntradasPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredEntradas.map((entrada) => {
+                {entradas.map((entrada) => {
                   const material = materiaisMap.get(entrada.materialId)
                   const valorUnitario = Number(material?.valorUnitario ?? 0)
                   const total = valorUnitario * Number(entrada.quantidade ?? 0)
@@ -292,3 +267,5 @@ export function EntradasPage() {
     </div>
   )
 }
+
+
