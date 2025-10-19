@@ -1,4 +1,4 @@
-Guia: alternar modo local e Supabase
+﻿Guia: alternar modo local e Supabase
 ===================================
 
 Resumo
@@ -72,5 +72,7 @@ Solucao de problemas
 --------------------
 - **Login falha no modo local**: verifique as variaveis `VITE_LOCAL_*` e se o navegador nao manteve um valor antigo em `api-estoque-auth`.
 - **Dashboard vazio no modo local**: confirme se os seeds foram carregados (verifique `localStorage`). Se estiver vazio, limpe a chave para recarregar os seeds.
+  * Estoque: processado por `localApi.estoque.dashboard` (`src/lib/estoque.js`).
+  * Acidentes: processado por `localApi.acidentes.dashboard` (`src/lib/acidentesDashboard.js`), que tambem preenche as listas de filtros dinamicos.
 - **Erros de Supabase quando deveria estar local**: garanta que `VITE_DATA_MODE=local` foi salvo e que o Vite foi reiniciado. O `SystemStatus` deve indicar Modo local ativo.
 - **Erros 401 no modo Supabase**: a sessao pode ter expirado; refaca login e confirme que as variaveis `VITE_SUPABASE_*` apontam para o projeto correto.

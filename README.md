@@ -28,7 +28,9 @@ Aplicação completa para controle de EPIs com frontend em React (Vite) e funç�
 | Banco de Dados    | Supabase Postgres (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`). Migrations em `supabase/migrations`. |
 | Geração de PDFs   | Template compartilhado em `shared/documents/epiTermTemplate.js` consumido tanto pela API (Puppeteer) quanto pelo frontend. |
 | Autenticação      | Supabase Auth no modo remoto. Em modo local, credenciais definidas via `.env.local`. |
-| Regras de negócio | `api/_shared/operations.js` (lado serverless) e `src/lib/estoque.js` (cálculos compartilhados). |
+| Regras de negócio | `api/_shared/operations.js` (lado serverless) e `src/lib/estoque.js` / `src/lib/acidentesDashboard.js` (cálculos compartilhados). |
+
+> Estilos dos dashboards: `src/styles/DashboardPage.css` organiza o layout e `src/styles/charts.css` agrupa helpers de graficos compartilhados.
 
 ## Requisitos
 
@@ -175,7 +177,7 @@ Todos os endpoints remotos exigem cabeçalho `Authorization: Bearer <token>`.
 │   ├── repositories/        # Acesso a dados (Supabase ou local)
 │   ├── routes/              # Definição das rotas da aplicação
 │   ├── services/            # Clientes HTTP e selectors de modo
-│   ├── styles/              # Estilos globais e tokens
+│   ├── styles/              # Estilos globais (DashboardPage.css) e utilidades de graficos (charts.css)
 │   └── utils/               # Funções utilitárias compartilhadas
 ├── supabase/                # Migrations SQL e guia de configuração
 └── vercel.json              # Configurações de deploy na Vercel
@@ -190,7 +192,7 @@ Todos os endpoints remotos exigem cabeçalho `Authorization: Bearer <token>`.
 
 ## Referências de Documentação
 
-- `docs/Login.txt`, `docs/Dashboard.txt`, `docs/Entradas.txt`, `docs/Estoque.txt`, `docs/Materiais.txt`, `docs/Pessoas.txt`, `docs/Saidas.txt`.
+- `docs/Login.txt`, `docs/Dashboard.txt` (estoque e acidentes), `docs/Entradas.txt`, `docs/Estoque.txt`, `docs/Materiais.txt`, `docs/Pessoas.txt`, `docs/Saidas.txt`.
 - `docs/rls-policies-guide.txt` para as políticas de segurança no Supabase.
 - `docs/stateless-supabase-notes.txt` para detalhes do backend stateless.
 - `docs/data-mode-guide.txt` para alternar entre modo local e Supabase.

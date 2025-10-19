@@ -37,21 +37,32 @@ CustomTooltip.propTypes = {
 
 export function ChartAgentes({ data, nameKey, valueKey }) {
   if (!Array.isArray(data) || data.length === 0) {
-    return <div className="dashboard-card__empty">Nenhum dado disponível</div>
+    return <div className="dashboard-card__empty">Nenhum dado disponivel</div>
+  }
+
+  const sanitizedData = data
+    .map((item) => ({
+      ...item,
+      [valueKey]: Number.parseFloat(item?.[valueKey] ?? 0) || 0,
+    }))
+    .filter((item) => item[valueKey] > 0)
+
+  if (sanitizedData.length === 0) {
+    return <div className="dashboard-card__empty">Nenhum dado disponivel para os filtros escolhidos</div>
   }
 
   return (
     <ResponsiveContainer width="100%" height={320}>
       <PieChart>
         <Pie
-          data={data}
+          data={sanitizedData}
           dataKey={valueKey}
           nameKey={nameKey}
           outerRadius={120}
           paddingAngle={4}
           strokeWidth={0}
         >
-          {data.map((entry, index) => (
+          {sanitizedData.map((entry, index) => (
             <Cell key={`${entry[nameKey]}-${index}`} fill={palette[index % palette.length]} />
           ))}
         </Pie>
