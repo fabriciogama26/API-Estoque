@@ -1,5 +1,6 @@
 import { dataClient } from "../services/dataClient.js";
 
+
 export async function downloadTermoEpiPdf({ params = {} } = {}) {
   const blob = await dataClient.documentos.termoEpiPdf(params);
   const identificador = params.matricula || params.nome || "colaborador";

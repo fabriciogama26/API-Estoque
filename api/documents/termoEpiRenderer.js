@@ -22,8 +22,8 @@ async function ensureCacheDir() {
 async function launchBrowser() {
   const isServerless = Boolean(
     process.env.AWS_REGION ||
-      process.env.AWS_LAMBDA_FUNCTION_VERSION ||
-      process.env.VERCEL,
+    process.env.AWS_LAMBDA_FUNCTION_VERSION ||
+    process.env.VERCEL,
   )
 
   if (isServerless) {
