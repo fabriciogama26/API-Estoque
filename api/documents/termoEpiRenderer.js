@@ -30,17 +30,20 @@ async function launchBrowser() {
     const { default: chromium } = await import('@sparticuz/chromium')
     const { default: puppeteer } = await import('puppeteer-core')
 
+    chromium.setGraphicsMode = false
+
     const executablePath = await chromium.executablePath()
 
     return puppeteer.launch({
-      headless: chromium.headless ?? true,
       args: chromium.args,
       executablePath,
+      headless: 'shell',
       defaultViewport: chromium.defaultViewport ?? {
         width: 1240,
         height: 1754,
         deviceScaleFactor: 2,
       },
+      ignoreHTTPSErrors: true,
     })
   }
 
