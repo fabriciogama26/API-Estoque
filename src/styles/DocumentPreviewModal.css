@@ -66,9 +66,11 @@
 .document-preview__frame {
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 0.75rem;
-  flex: 1;
+  flex: none;
+  flex-shrink: 0;
   width: 100%;
   background: #fff;
+  overflow: hidden;
 }
 
 .document-preview__inline {
@@ -120,4 +122,29 @@
 
 .document-preview__mode-indicator {
   margin-bottom: 1rem;
+}
+
+.termo-texto {
+  font-family: "Arial", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: justify;
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fafafa;
+}
+
+.termo-texto p {
+  margin-bottom: 10px;
+}
+
+.termo-texto ol {
+  margin-left: 20px;
+}
+
+.termo-texto li {
+  margin-bottom: 5px;
 }

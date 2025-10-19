@@ -33,6 +33,7 @@ function renderEntregaRow(entrega) {
         <td class="text-center">${escapeHtml(entrega.usuarioResponsavel || '')}</td>
         <td>${formatDate(entrega.dataTroca)}</td>
         <td>${escapeHtml(entrega.motivo || '')}</td>
+        <td class="assinatura-coluna">${escapeHtml(entrega.assinatura || '')}</td>
       </tr>
     `
 }
@@ -41,6 +42,7 @@ function renderEmptyRow() {
   return `
       <tr>
         <td>&nbsp;</td>
+        <td></td>
         <td></td>
         <td></td>
         <td></td>
@@ -110,11 +112,11 @@ export function buildEpiTermHtml(context = {}) {
         margin-bottom: 16px;
       }
       .empresa__logo {
-        max-width: 160px;
+        max-width: 200px;
       }
       .empresa__logo img {
-        max-width: 100%;
-        max-height: 64px;
+        max-width: 200%;
+        max-height: 160px;
         display: block;
       }
       .empresa__logo.empresa__logo--secundaria {
@@ -178,7 +180,7 @@ export function buildEpiTermHtml(context = {}) {
         border-bottom: 1px solid #1e293b;
         margin: 0 auto 4px;
         height: 40px;
-        width: 100%;
+        width: 50%;
       }
       table.entregas {
         width: 100%;
@@ -194,6 +196,10 @@ export function buildEpiTermHtml(context = {}) {
         background: #e2e8f0;
         text-transform: uppercase;
         font-size: 10px;
+      }
+      .assinatura-coluna {
+        min-width: 140px;
+        text-align: center;
       }
       .text-center {
         text-align: center;
@@ -222,17 +228,24 @@ export function buildEpiTermHtml(context = {}) {
       </tr>
     </table>
     <div class="termo-texto">
-      Declaro para fins de direito que estou recebendo os Equipamentos de Proteção Individual relacionados abaixo,
-      gratuitamente, e comprometo-me a zelar por sua guarda e conservação, utilizando-os somente para o fim a que se
-      destinam, bem como a devolvê-los sempre que solicitado pela empresa. Declaro ainda estar ciente das obrigações
-      previstas nas normas de segurança do trabalho aplicáveis.
+      <p>
+        Declaro para fins de direito, que estou Recebendo da Fundação Educacional Dom Andre Arco Verde os EPIs - Equipamentos de Proteção Individual, aqui relacionados, 
+        e estes foram fornecidos gratuitamente, em perfeito estado de conservação e funcionamento e são destinados exclusivamente a minha proteção contra Acidentes e/ou doenças do trabalho, nos termos do Art. 166, Art.191 da CLT, Decreto Lei 5452/43 e com a NR - 6  Portaria 3.214/78.
+      </p>
+
+      <p>
+        Declaro ainda estar ciente que, de acordo com Artigo 158 parágrafo único alínea B da CLT e item 6.3 da mesma portaria, devo:
+      </p>
+
+      <ol>
+        <li>Usar os equipamentos de proteção individual que me forem entregues de forma adequada, sempre que estiver em local onde a utilização dos mesmos se fizer obrigatória;</li>
+        <li>Zelar pela guarda e conservação dos EPIs que me forem entregues, não entregando a outros colaboradores;</li>
+        <li>Comunicar imediatamente à empresa em caso de quebra, desgaste, perda ou extravio do EPI, para que o mesmo seja reposto de imediato;</li>
+        <li>Comunicar à área de Segurança do Trabalho, através do Coordenador, Líder e/ou Supervisor imediato, qualquer alteração no EPI que o torne parcial ou totalmente danificado. Em caso de inutilização por uso inadequado ou extravio por minha culpa, ou pela não devolução dos mesmos no ato da rescisão do contrato de trabalho, autorizo o desconto do valor de custo do referido material em meus salários/proventos;</li>
+        <li>Atesto que recebi da área de SESMT treinamento sobre a utilização correta e conservação dos EPIs que me foram entregues.</li>
+      </ol>
+    
     </div>
-    <div class="assinaturas">
-      <div class="assinaturas__area">
-        <div class="assinaturas__linha"></div>
-        <div>Colaborador (assinar por extenso)</div>
-        <div>${assinaturaColaborador}</div>
-      </div>
       <div class="assinaturas__area">
         <div class="assinaturas__linha"></div>
         <div>Responsável pela entrega</div>
@@ -249,6 +262,7 @@ export function buildEpiTermHtml(context = {}) {
           <th>Responsável</th>
           <th>Devolução prevista</th>
           <th>Motivo/observação</th>
+          <th class="assinatura-coluna">Assinatura do colaborador</th>
         </tr>
       </thead>
       <tbody>

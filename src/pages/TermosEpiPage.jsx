@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon } from '../components/icons.jsx'
 import { isLocalMode } from '../config/runtime.js'
 import { dataClient as dataApi } from '../services/dataClient.js'
 import { buildEpiTermHtml } from '../../shared/documents/epiTermTemplate.js'
 import { downloadTermoEpiPdf } from '../utils/TermoEpiUtils.js'
+import { AutoResizeIframe } from '../components/AutoResizeIframe.jsx'
 import '../styles/DocumentPreviewModal.css'
 
 const initialForm = {
@@ -23,7 +24,6 @@ export function TermosEpiPage() {
   const [form, setForm] = useState(initialForm)
   const [preview, setPreview] = useState(initialPreview)
   const [lastQuery, setLastQuery] = useState(null)
-  const iframeRef = useRef(null)
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -95,24 +95,6 @@ export function TermosEpiPage() {
     : '-'
   const origemLabel = context?.origem === 'local' ? 'Dados locais' : context?.origem === 'remoto' ? 'Banco (Supabase)' : null
 
-  useEffect(() => {
-    if (iframeRef.current) {
-      iframeRef.current.style.height = 'auto'
-    }
-  }, [preview.html])
-
-  const handleFrameLoad = () => {
-    if (!iframeRef.current) {
-      return
-    }
-    const doc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document
-    if (!doc) {
-      return
-    }
-    const height = doc.documentElement.scrollHeight || doc.body.scrollHeight || 0
-    iframeRef.current.style.height = `${Math.max(height, 400)}px`
-  }
-
   return (
     <div className="stack">
       <PageHeader
@@ -120,11 +102,7 @@ export function TermosEpiPage() {
         title="Termo de EPI"
         subtitle="Pesquise colaboradores e gere o termo de responsabilidade de EPI."
       />
-      <div className="document-preview__mode-indicator">
-        <span className={`document-preview__origin${isLocalMode ? ' document-preview__origin--local' : ''}`}>
-          {isLocalMode ? 'Modo local (dados do navegador)' : 'Modo online (Supabase)'}
-        </span>
-      </div>
+    
 
       <section className="card">
         <header className="card__header">
@@ -187,12 +165,10 @@ export function TermosEpiPage() {
                 </span>
               ) : null}
             </div>
-            <iframe
-              ref={iframeRef}
+            <AutoResizeIframe
               title="Pre-visualizacao do termo de EPI"
               className="document-preview__frame"
               srcDoc={preview.html}
-              onLoad={handleFrameLoad}
             />
           </div>
         ) : (

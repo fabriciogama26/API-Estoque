@@ -1,3 +1,4 @@
+import { AutoResizeIframe } from '../AutoResizeIframe.jsx'
 import '../../styles/DocumentPreviewModal.css'
 
 export function TermoEpiPreviewModal({ state, onClose, onDownload, onRetry, downloadLabel = 'Baixar PDF' }) {
@@ -54,7 +55,7 @@ export function TermoEpiPreviewModal({ state, onClose, onDownload, onRetry, down
               ) : null}
             </div>
           ) : html ? (
-            <iframe
+            <AutoResizeIframe
               title="Visualizacao do termo de responsabilidade de EPI"
               className="document-preview__frame"
               loading="lazy"
