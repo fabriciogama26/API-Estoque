@@ -27,15 +27,9 @@ Requisitos para modo Supabase
    ```
    VITE_SUPABASE_URL=...
    VITE_SUPABASE_ANON_KEY=...
-   VITE_API_URL=https://seu-deploy-ou-proxy
    ```
-2. Nos handlers (Vercel ou `vercel dev`), configure:
-   ```
-   SUPABASE_URL=...
-   SUPABASE_SERVICE_ROLE_KEY=...
-   ```
-3. Deixe `VITE_DATA_MODE` ausente ou defina `VITE_DATA_MODE=remote`.
-4. Cadastre usuarios e dados diretamente no Supabase (sem dependencia dos seeds locais).
+2. Deixe `VITE_DATA_MODE` ausente ou defina `VITE_DATA_MODE=remote`.
+3. Cadastre usuarios e dados diretamente no Supabase.
 
 Como alternar rapidamente
 -------------------------

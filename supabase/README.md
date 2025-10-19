@@ -1,4 +1,4 @@
-# Supabase Setup
+﻿# Supabase Setup
 
 Este diretório contém as migrations e instruções para replicar o banco do projeto no Supabase, tanto em ambientes locais (CLI + Docker) quanto remotos.
 
@@ -14,14 +14,18 @@ Este diretório contém as migrations e instruções para replicar o banco do pr
 supabase/
 ├── README.md
 └── migrations/
-    ├── 0001_create_schema.sql           # Cria tabelas principais (pessoas, materiais, entradas, saídas, acidentes, price history)
-    ├── 0002_enable_rls.sql              # Habilita RLS e define policies básicas
-    ├── 0003_seed_sample_data.sql        # Seeds de desenvolvimento (usuários, materiais, grupos)
-    ├── 0004_update_schema_supabase.sql  # Ajustes de nomenclatura camelCase, índices e colunas de auditoria
-    └── 0005_add_material_group_fields.sql # Campos adicionais para agrupamento de materiais
+    ├── 0001_create_schema.sql             # Cria tabelas principais (pessoas, materiais, entradas, saídas, acidentes, price history)
+    ├── 0002_enable_rls.sql                # Habilita RLS e define policies básicas
+    ├── 0003_seed_sample_data.sql          # Seeds de desenvolvimento (usuários, materiais, grupos)
+    ├── 0004_update_schema_supabase.sql    # Ajustes de nomenclatura camelCase, índices e colunas de auditoria
+    ├── 0005_add_material_group_fields.sql # Campos adicionais para agrupamento de materiais
+    ├── 0006_add_missing_person_accident_fields.sql # Campos adicionais (`dataAdmissao`, `tipoExecucao`, `hht`)
+    ├── 0007_rename_centro_columns.sql     # Converte colunas de centros para snake_case
+    └── 0008_update_centros.sql            # Ajusta centros (remove coluna em entradas e renomeia setor -> centro_servico)
 ```
 
 As migrations foram desenhadas para serem idempotentes (verificam `if not exists`) e podem ser reaplicadas com segurança.
+ desenhadas para serem idempotentes (verificam `if not exists`) e podem ser reaplicadas com segurança.
 
 ## Como aplicar localmente
 
@@ -60,3 +64,4 @@ As migrations foram desenhadas para serem idempotentes (verificam `if not exists
 - **Auditoria**: os campos adicionados em `0004_update_schema_supabase.sql` (`usuarioCadastro`, `usuarioAtualizacao`, `historicoEdicao`, etc.) são usados pelo frontend para exibir logs e devem ser mantidos em updates.
 
 Com isso o Supabase ficará alinhado com as expectativas das funções serverless e do frontend.
+
