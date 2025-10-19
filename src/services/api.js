@@ -976,6 +976,7 @@ export const api = {
       }
 
       const url = new URL('/api/documentos/termo-epi', base)
+      url.searchParams.set('format', 'pdf')
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && String(value).trim() !== '') {
           url.searchParams.set(key, value)
