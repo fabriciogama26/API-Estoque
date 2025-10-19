@@ -1,5 +1,5 @@
-import { withAuth } from '../_shared/withAuth.js'
-import { readJson, sendJson, methodNotAllowed, handleError, parseQuery } from '../_shared/http.js'
+import { withAuth } from './_shared/withAuth.js'
+import { readJson, sendJson, methodNotAllowed, handleError, parseQuery } from './_shared/http.js'
 import {
   PessoasOperations,
   MateriaisOperations,
@@ -9,7 +9,7 @@ import {
   EstoqueOperations,
   DocumentosOperations,
   healthCheck,
-} from '../_shared/operations.js'
+} from './_shared/operations.js'
 import { gerarTermoEpiPdf } from './documents/termoEpiRenderer.js'
 
 export default withAuth(async (req, res, user) => {

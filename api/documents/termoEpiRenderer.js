@@ -1,12 +1,12 @@
 import path from 'node:path'
+import os from 'node:os'
 import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import puppeteer from 'puppeteer'
 import { buildEpiTermHtml } from '../../shared/documents/index.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const OUTPUT_CACHE_DIR = path.join(__dirname, '.cache')
+const OUTPUT_CACHE_DIR = path.join(os.tmpdir(), 'termo-epi-cache')
 const DEFAULT_PUPPETEER_TIMEOUT = 30_000
 
 async function ensureCacheDir() {
@@ -20,6 +20,35 @@ async function ensureCacheDir() {
 }
 
 async function launchBrowser() {
+  const isServerless = Boolean(
+    process.env.AWS_REGION ||
+    process.env.AWS_LAMBDA_FUNCTION_VERSION ||
+    process.env.VERCEL,
+  )
+
+  if (isServerless) {
+    const { default: chromium } = await import('@sparticuz/chromium')
+    const { default: puppeteer } = await import('puppeteer-core')
+
+    chromium.setGraphicsMode = false
+
+    const executablePath = await chromium.executablePath()
+
+    return puppeteer.launch({
+      args: chromium.args,
+      executablePath,
+      headless: 'shell',
+      defaultViewport: chromium.defaultViewport ?? {
+        width: 1240,
+        height: 1754,
+        deviceScaleFactor: 2,
+      },
+      ignoreHTTPSErrors: true,
+    })
+  }
+
+  const { default: puppeteer } = await import('puppeteer')
+
   return puppeteer.launch({
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
