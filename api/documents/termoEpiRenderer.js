@@ -30,6 +30,7 @@ async function launchBrowser() {
     const { default: chromium } = await import('@sparticuz/chromium')
     const { default: puppeteer } = await import('puppeteer-core')
 
+    // Serverless runtimes have tight memory limits, so disable GPU-related features.
     chromium.setGraphicsMode = false
 
     const executablePath = await chromium.executablePath()
