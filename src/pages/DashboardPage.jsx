@@ -209,7 +209,7 @@ export function DashboardPage() {
   const highlightCards = [
     {
       id: 'movimentacoes',
-      title: 'Movimentacoes',
+      title: 'Movimentacões',
       value: totalMovimentacoes,
       helper: `${resumoEntradas.quantidade} entradas / ${resumoSaidas.quantidade} saidas`,
       icon: MovementIcon,
@@ -245,8 +245,8 @@ export function DashboardPage() {
     <div className="stack">
       <PageHeader
         icon={<DashboardIcon size={28} />}
-        title="Dashboard"
-        subtitle="Monitore indicadores de movimentacao e estoque para agir rapidamente."
+        title="Dashboard de Estoque"
+        subtitle="Monitore indicadores de movimentacão e estoque para agir rapidamente."
       />
 
       <form className="form form--inline" onSubmit={handleSubmit}>

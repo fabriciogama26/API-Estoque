@@ -1,52 +1,40 @@
-Tela: Dashboard
-===============
+﻿Tela: Dashboards
+=================
 
-Objetivo
---------
-- Exibir uma visao geral das entradas, saidas e alertas de estoque.
-- Oferecer acompanhamento rapido para acao, independente do modo de dados (Supabase ou local).
+1. Dashboard de Estoque
+-----------------------
+- Objetivo: mostrar panorama de entradas, saidas e alertas de estoque.
+- Filtros: periodoInicio, periodoFim (inputs type="month") e termo (busca em memoria por nome/fabricante).
+- Dados:
+  * Modo remoto: GET /api/estoque?view=dashboard (c/ token). Backend usa EstoqueOperations.dashboard.
+  * Modo local: localApi.estoque.dashboard combina seeds do localStorage via src/lib/estoque.js.
+- Fluxo: filtros -> dataClient.estoque.dashboard -> charts EntradasSaidasChart, ValorMovimentadoChart, EstoquePorMaterialChart, EstoquePorCategoriaChart, MateriaisMaisUsadosChart.
+- Regras: numero de materiais e valores tratados no backend/servico; filtro termo nao dispara novas chamadas.
+- UI: loading nos botoes, mensagens neutras sem dados, cards destacados por tonalidades.
 
-Filtros
--------
-- `periodoInicio` / `periodoFim` (`type="month"`): enviados para `dataClient.estoque.dashboard`.
-- `termo`: filtragem no cliente sobre os arrays retornados (materiais e rankings).
+2. Dashboard de Acidentes
+-------------------------
+- Objetivo: acompanhar indicadores SST (acidentes, TF, TG, distribuicoes) alinhados com o estilo do dashboard de estoque.
+- Filtros do formulario (src/components/FiltrosDashboard.jsx):
+  * periodoInicio / periodoFim (type="month").
+  * centroServico, tipo, lesao, parteLesionada, agente, cargo (selects dinamicos).
+- Dados:
+  * Modo remoto: view vw_indicadores_acidentes via Supabase (maybeSingle). Ainda aceita apenas ano/unidade; filtros adicionais sao aplicados apenas no modo local.
+  * Modo local: localApi.acidentes.dashboard delega para src/lib/acidentesDashboard.js, que agrega acidentes em memoria, calcula TF/TG e expoe opcoes unicas para os selects.
+- Fluxo: filtros -> dataClient.acidentes.dashboard -> componentes DashboardCards, ChartTendencia, ChartTipos, ChartPartesLesionadas, ChartCargos, ChartAgentes.
+- Regras:
+  * montarDashboardAcidentes normaliza datas, limita periodo, contabiliza contagens > 0 e monta helper periodo_label.
+  * O retorno inclui options com listas unicas (centros, tipos, lesoes, partes, agentes, cargos).
+  * Graficos ignoram valores <= 0 e exibem mensagem "Nenhum dado disponivel para os filtros escolhidos".
+- UI: formulario usa classes form form--inline form--filters; os cards de grafico compartilham estilos de src/styles/charts.css (tamanhos especificos por classe dashboard-card--*).
+- Modo local: filtros adicionais sao aplicados diretamente nos dados do localStorage; limpar filtros recarrega seeds.
 
-APIs e fontes de dados
-----------------------
-- **Modo remoto**: `GET /api/estoque?view=dashboard` (demais filtros via query) protegido por token Supabase. Calcula no backend utilizando `EstoqueOperations.dashboard`.
-- **Modo local**: `localApi.estoque.dashboard` usa os dados do `localStorage` e os auxiliares de `src/lib/estoque.js`.
-- Em ambos os casos a resposta contem `{ periodo, entradas, saidas, entradasDetalhadas[], saidasDetalhadas[], entradasHistoricas[], saidasHistoricas[], materiaisMaisMovimentados[], estoqueAtual }`.
-
-Fluxo de dados
---------------
-1. Componentes enviam filtros atuais.
-2. `dataClient` seleciona a implementacao (remota ou local).
-3. Resposta alimenta:
-   - `EntradasSaidasChart` e `ValorMovimentadoChart`.
-   - `estoqueAtual.alertas` (cards).
-   - `estoqueAtual.itens` (listas).
-   - `materiaisMaisMovimentados` (ranking).
-4. Caso sem dados, exibimos mensagens neutras no lugar de graficos.
-
-Regras e consistencia
----------------------
-- O backend ou `localApi` recalculam estoque e valores usando `montarDashboard`.
-- Campos monetarios sao arredondados no backend/servico para evitar divergencia entre modos.
-- Filtro `termo` nunca faz chamada extra; apenas reduz arrays em memoria.
-
-Comportamento de UI
+Notas sobre estilos
 -------------------
-- `isLoading` alterna estados dos botoes.
-- Erros exibem texto retornado (`error.message`).
-- Cards e graficos mudam dinamicamente conforme filtros.
+- src/styles/DashboardPage.css concentra layout/base dos formularios e dos "cartoes brancos".
+- src/styles/charts.css concentra o grid, dimensoes padrao dos cards e variacoes para cada grafico (dashboard-card--tendencia, --tipos, --parte, --cargos, --agentes).
 
-Dependencias
-------------
-- Sessao valida do `AuthContext`.
-- Componentes de grafico em `src/components/charts`.
-- `dataClient` (modo remoto) depende do token Supabase; no modo local depende da chave `api-estoque-local-data-v1`.
-
-Persistencia
-------------
-- **Modo remoto**: consulta tabelas Supabase `materiais`, `entradas`, `saidas`, `pessoas`.
-- **Modo local**: leitura do snapshot salvo em `localStorage`, com seeds iniciais em `src/data/local-seed.json`.
+Documentacao relacionada
+------------------------
+- docs/data-mode-guide.txt: detalhes para reset do modo local e alternancia de ambientes.
+- docs/Estoque.txt e docs/Acidentes.txt: regras especificas das telas operacionais.

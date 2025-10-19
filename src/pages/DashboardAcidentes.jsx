@@ -8,14 +8,26 @@ import { ChartPartesLesionadas } from '../components/charts/ChartPartesLesionada
 import { ChartCargos } from '../components/charts/ChartCargos.jsx'
 import { ChartAgentes } from '../components/charts/ChartAgentes.jsx'
 import { FiltrosDashboard } from '../components/FiltrosDashboard.jsx'
+import { dataClient } from '../services/dataClient.js'
+import { isLocalMode } from '../config/runtime.js'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { resolveIndicadorValor } from '../utils/indicadores.js'
 
 import '../styles/DashboardPage.css'
 
+const CURRENT_YEAR = new Date().getFullYear()
+
 const initialFilters = () => ({
-  ano: String(new Date().getFullYear()),
+  ano: String(CURRENT_YEAR),
   unidade: 'todas',
+  periodoInicio: `${CURRENT_YEAR}-01`,
+  periodoFim: `${CURRENT_YEAR}-12`,
+  centroServico: '',
+  tipo: '',
+  lesao: '',
+  parteLesionada: '',
+  agente: '',
+  cargo: '',
 })
 
 const EMPTY_STATE = {
@@ -25,6 +37,15 @@ const EMPTY_STATE = {
   partesLesionadas: [],
   cargos: [],
   agentes: [],
+}
+
+const EMPTY_FILTER_OPTIONS = {
+  centrosServico: [],
+  tipos: [],
+  lesoes: [],
+  partesLesionadas: [],
+  agentes: [],
+  cargos: [],
 }
 
 function normalizeResumo(data) {
@@ -56,17 +77,15 @@ function normalizeArray(data) {
 export function DashboardAcidentes() {
   const [filters, setFilters] = useState(() => initialFilters())
   const [dashboardData, setDashboardData] = useState(EMPTY_STATE)
-  const [availableYears, setAvailableYears] = useState([])
-  const [availableUnits, setAvailableUnits] = useState([])
+  const [filterOptions, setFilterOptions] = useState(() => ({ ...EMPTY_FILTER_OPTIONS }))
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const load = useCallback(async (params) => {
-    if (!isSupabaseConfigured()) {
-      setError('Configuração do Supabase não encontrada. Verifique as variáveis de ambiente.')
+    if (!isLocalMode && !isSupabaseConfigured()) {
+      setError('Configuracao do Supabase nao encontrada. Verifique as variaveis de ambiente.')
       setDashboardData(EMPTY_STATE)
-      setAvailableYears([])
-      setAvailableUnits([])
+      setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
       return
     }
 
@@ -74,6 +93,41 @@ export function DashboardAcidentes() {
     setError(null)
 
     try {
+      if (isLocalMode) {
+        if (!dataClient?.acidentes?.dashboard) {
+          throw new Error('Recurso local para dashboard de acidentes indisponivel.')
+        }
+
+        const resultado = await dataClient.acidentes.dashboard(params)
+        const {
+          resumo = null,
+          tendencia = [],
+          tipos = [],
+          partesLesionadas = [],
+          cargos = [],
+          agentes = [],
+          options = {},
+        } = resultado ?? {}
+
+        setDashboardData({
+          resumo,
+          tendencia,
+          tipos,
+          partesLesionadas,
+          cargos,
+          agentes,
+        })
+        setFilterOptions({
+          centrosServico: Array.isArray(options.centrosServico) ? options.centrosServico : [],
+          tipos: Array.isArray(options.tipos) ? options.tipos : [],
+          lesoes: Array.isArray(options.lesoes) ? options.lesoes : [],
+          partesLesionadas: Array.isArray(options.partesLesionadas) ? options.partesLesionadas : [],
+          agentes: Array.isArray(options.agentes) ? options.agentes : [],
+          cargos: Array.isArray(options.cargos) ? options.cargos : [],
+        })
+        return
+      }
+
       let query = supabase.from('vw_indicadores_acidentes').select('*')
 
       if (params?.ano) {
@@ -92,8 +146,7 @@ export function DashboardAcidentes() {
 
       if (!data) {
         setDashboardData(EMPTY_STATE)
-        setAvailableYears([])
-        setAvailableUnits([])
+        setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
         return
       }
 
@@ -104,13 +157,6 @@ export function DashboardAcidentes() {
       const cargos = normalizeArray(data.cargos ?? data.distribuicao_cargos ?? data.por_cargo)
       const agentes = normalizeArray(data.agentes ?? data.distribuicao_agentes ?? data.por_agente)
 
-      const anos = Array.isArray(data.anos_disponiveis ?? data.anos)
-        ? (data.anos_disponiveis ?? data.anos).map(String)
-        : []
-      const unidades = Array.isArray(data.unidades_disponiveis ?? data.unidades)
-        ? data.unidades_disponiveis ?? data.unidades
-        : []
-
       setDashboardData({
         resumo,
         tendencia,
@@ -119,13 +165,11 @@ export function DashboardAcidentes() {
         cargos,
         agentes,
       })
-      setAvailableYears(anos)
-      setAvailableUnits(unidades)
+      setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
     } catch (err) {
-      setError(err.message)
+      setError(err?.message ?? 'Falha ao carregar dashboard de acidentes.')
       setDashboardData(EMPTY_STATE)
-      setAvailableYears([])
-      setAvailableUnits([])
+      setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
     } finally {
       setIsLoading(false)
     }
@@ -163,30 +207,23 @@ export function DashboardAcidentes() {
   }, [dashboardData.resumo])
 
   return (
-    <div className="page dashboard-page">
+    <div className="stack dashboard-page">
       <PageHeader
         title="Dashboard de Acidentes"
         icon={<AlertIcon size={28} />}
-        description="Monitoramento de indicadores de SST a partir dos dados consolidados no Supabase."
+        subtitle="Monitoramento de indicadores de SST com dados consolidados."
       />
 
-      <section className="card">
-        <FiltrosDashboard
-          filters={filters}
-          anos={availableYears.length ? availableYears : undefined}
-          unidades={availableUnits.length ? availableUnits : undefined}
-          onChange={handleFilterChange}
-          onSubmit={handleSubmit}
-          onReset={handleReset}
-          isLoading={isLoading}
-        />
-      </section>
+      <FiltrosDashboard
+        filters={filters}
+        options={filterOptions}
+        onChange={handleFilterChange}
+        onSubmit={handleSubmit}
+        onReset={handleReset}
+        isLoading={isLoading}
+      />
 
-      {error ? (
-        <section className="card">
-          <div className="dashboard-card__empty">{error}</div>
-        </section>
-      ) : null}
+      {error ? <p className="feedback feedback--error">{error}</p> : null}
 
       <DashboardCards indicadores={dashboardData.resumo ?? {}} helperText={helperText ?? undefined} />
 
@@ -194,49 +231,59 @@ export function DashboardAcidentes() {
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <h2 className="dashboard-card__title">
-              <TrendIcon size={20} /> <span>Tendência mensal</span>
+              <TrendIcon size={20} /> <span>Tendencia mensal</span>
             </h2>
           </header>
-          <ChartTendencia data={dashboardData.tendencia} />
+          <div className="dashboard-chart-container">
+            <ChartTendencia data={dashboardData.tendencia} />
+          </div>
         </section>
 
-        <section className="card dashboard-card--chart">
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <h2 className="dashboard-card__title">
-              <PieIcon size={20} /> <span>Distribuição por tipo</span>
+              <PieIcon size={20} /> <span>Distribuicao por tipo</span>
             </h2>
           </header>
-          <ChartTipos data={dashboardData.tipos} />
+          <div className="dashboard-chart-container">
+            <ChartTipos data={dashboardData.tipos} />
+          </div>
         </section>
       </div>
 
       <div className="dashboard-grid dashboard-grid--two">
-        <section className="card dashboard-card--chart">
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <h2 className="dashboard-card__title">
               <BarsIcon size={20} /> <span>Parte lesionada</span>
             </h2>
           </header>
-          <ChartPartesLesionadas data={dashboardData.partesLesionadas} />
+          <div className="dashboard-chart-container">
+            <ChartPartesLesionadas data={dashboardData.partesLesionadas} />
+          </div>
         </section>
 
-        <section className="card dashboard-card--chart">
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <h2 className="dashboard-card__title">
               <BarsIcon size={20} /> <span>Acidentes por cargo</span>
             </h2>
           </header>
-          <ChartCargos data={dashboardData.cargos} />
+          <div className="dashboard-chart-container">
+            <ChartCargos data={dashboardData.cargos} />
+          </div>
         </section>
       </div>
 
-      <section className="card dashboard-card--chart">
+      <section className="card dashboard-card--wide">
         <header className="card__header dashboard-card__header">
           <h2 className="dashboard-card__title">
             <PieIcon size={20} /> <span>Agente causador</span>
           </h2>
         </header>
-        <ChartAgentes data={dashboardData.agentes} />
+        <div className="dashboard-chart-container">
+          <ChartAgentes data={dashboardData.agentes} />
+        </div>
       </section>
     </div>
   )

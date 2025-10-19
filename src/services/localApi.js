@@ -5,6 +5,7 @@ import {
   parsePeriodo,
   calcularSaldoMaterial,
 } from '../lib/estoque.js'
+import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
 import gruposEpi from '../data/grupos-epi.json'
 import { buildEpiTermHtml } from '../../shared/documents/epiTermTemplate.js'
 import { filterPessoas } from '../rules/PessoasRules.js'
@@ -1048,6 +1049,11 @@ const localApi = {
   acidentes: {
     async list() {
       return readState((state) => sortByDateDesc(state.acidentes.map(mapLocalAcidenteRecord), 'data'))
+    },
+    async dashboard(params = {}) {
+      return readState((state) =>
+        montarDashboardAcidentes(state.acidentes.map(mapLocalAcidenteRecord), params)
+      )
     },
     async create(payload) {
       const dados = sanitizeAcidentePayload(payload)
