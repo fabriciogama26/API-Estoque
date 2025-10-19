@@ -122,7 +122,10 @@ function buildQuery(params) {
 export const api = {
   health: () => request('/api/health'),
   pessoas: {
-    list: () => request('/api/pessoas'),
+    list: (params = {}) => {
+      const query = buildQuery(params)
+      return request(`/api/pessoas${query}`)
+    },
     create: (payload) => request('/api/pessoas', { method: 'POST', body: payload }),
     update: (id, payload) => request(`/api/pessoas/${id}`, { method: 'PUT', body: payload }),
     get: (id) => request(`/api/pessoas/${id}`),
@@ -137,11 +140,17 @@ export const api = {
     groups: () => request('/api/materiais/groups'),
   },
   entradas: {
-    list: () => request('/api/entradas'),
+    list: (params = {}) => {
+      const query = buildQuery(params)
+      return request(`/api/entradas${query}`)
+    },
     create: (payload) => request('/api/entradas', { method: 'POST', body: payload }),
   },
   saidas: {
-    list: () => request('/api/saidas'),
+    list: (params = {}) => {
+      const query = buildQuery(params)
+      return request(`/api/saidas${query}`)
+    },
     create: (payload) => request('/api/saidas', { method: 'POST', body: payload }),
   },
   estoque: {

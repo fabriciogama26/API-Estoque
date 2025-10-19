@@ -63,6 +63,75 @@ const trim = (value) => {
   return String(value).trim()
 }
 
+const normalizeSearchTerm = (value) => (value ? String(value).trim().toLowerCase() : '')
+
+const isAllFilter = (value) => {
+  if (value === undefined || value === null) {
+    return true
+  }
+  return String(value).trim().toLowerCase() === 'todos'
+}
+
+const toStartOfDayIso = (value) => {
+  const raw = trim(value)
+  if (!raw) {
+    return null
+  }
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  date.setHours(0, 0, 0, 0)
+  return date.toISOString()
+}
+
+const toEndOfDayIso = (value) => {
+  const raw = trim(value)
+  if (!raw) {
+    return null
+  }
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  date.setHours(23, 59, 59, 999)
+  return date.toISOString()
+}
+
+function matchesEntradaSearch(entrada, termo, materiaisMap) {
+  const material = materiaisMap.get(entrada.materialId)
+  const alvo = [
+    material?.nome || '',
+    material?.fabricante || '',
+    entrada.centroCusto || '',
+    entrada.usuarioResponsavel || '',
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return alvo.includes(termo)
+}
+
+function matchesSaidaSearch(saida, termo, pessoasMap, materiaisMap) {
+  const pessoa = pessoasMap.get(saida.pessoaId)
+  const material = materiaisMap.get(saida.materialId)
+  const centroPessoa = pessoa?.centroServico ?? pessoa?.local ?? ''
+  const alvo = [
+    material?.nome || '',
+    material?.fabricante || '',
+    pessoa?.nome || '',
+    centroPessoa,
+    saida.centroCusto || '',
+    saida.centroServico || '',
+    saida.usuarioResponsavel || '',
+    saida.status || '',
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return alvo.includes(termo)
+}
+
 function sanitizePessoaPayload(payload = {}) {
   const centroServico = trim(payload.centroServico ?? payload.local)
   return {
@@ -705,12 +774,37 @@ function montarContextoTermoEpi(pessoa, saidas) {
 }
 
 export const PessoasOperations = {
-  async list() {
+  async list(params = {}) {
+    let query = supabaseAdmin.from('pessoas').select('*').order('nome')
+
+    const centroServico = trim(params.centroServico ?? params.local ?? '')
+    if (!isAllFilter(centroServico)) {
+      query = query.eq('local', centroServico)
+    }
+
+    const cargo = trim(params.cargo ?? '')
+    if (!isAllFilter(cargo)) {
+      query = query.eq('cargo', cargo)
+    }
+
+    const termo = trim(params.termo)
+    if (termo) {
+      const like = '%' + termo + '%'
+      query = query.or(
+        [
+          `nome.ilike.${like}`,
+          `matricula.ilike.${like}`,
+          `local.ilike.${like}`,
+          `cargo.ilike.${like}`,
+          `tipoExecucao.ilike.${like}`,
+          `usuarioCadastro.ilike.${like}`,
+          `usuarioEdicao.ilike.${like}`,
+        ].join(',')
+      )
+    }
+
     const pessoas =
-      (await execute(
-        supabaseAdmin.from('pessoas').select('*').order('nome'),
-        'Falha ao listar pessoas.'
-      )) ?? []
+      (await execute(query, 'Falha ao listar pessoas.')) ?? []
     return pessoas.map(mapPessoaRecord)
   },
   async create(payload, user) {
@@ -941,13 +1035,49 @@ export const MateriaisOperations = {
 }
 
 export const EntradasOperations = {
-  async list() {
-    const entradas =
-      (await execute(
-        supabaseAdmin.from('entradas').select('*').order('dataEntrada', { ascending: false }),
-        'Falha ao listar entradas.'
-      )) ?? []
-    return entradas.map(mapEntradaRecord)
+  async list(params = {}) {
+    let query = supabaseAdmin
+      .from('entradas')
+      .select('*')
+      .order('dataEntrada', { ascending: false })
+
+    const materialId = trim(params.materialId)
+    if (materialId) {
+      query = query.eq('materialId', materialId)
+    }
+
+    const centroCusto = trim(params.centroCusto)
+    if (centroCusto) {
+      query = query.ilike('centroCusto', centroCusto)
+    }
+
+    const dataInicio = toStartOfDayIso(params.dataInicio)
+    if (dataInicio) {
+      query = query.gte('dataEntrada', dataInicio)
+    }
+
+    const dataFim = toEndOfDayIso(params.dataFim)
+    if (dataFim) {
+      query = query.lte('dataEntrada', dataFim)
+    }
+
+    let entradas =
+      (await execute(query, 'Falha ao listar entradas.')) ?? []
+    entradas = entradas.map(mapEntradaRecord)
+
+    const termo = normalizeSearchTerm(params.termo)
+    if (termo) {
+      const materiais = await execute(
+        supabaseAdmin.from('materiais').select('id, nome, fabricante'),
+        'Falha ao listar materiais.'
+      )
+      const materiaisMap = new Map((materiais ?? []).map((material) => [material.id, material]))
+      entradas = entradas.filter((entrada) =>
+        matchesEntradaSearch(entrada, termo, materiaisMap)
+      )
+    }
+
+    return entradas
   },
   async create(payload, user) {
     const dados = sanitizeEntradaPayload(payload)
@@ -980,13 +1110,71 @@ export const EntradasOperations = {
 }
 
 export const SaidasOperations = {
-  async list() {
-    return (
-      (await execute(
-        supabaseAdmin.from('saidas').select('*').order('dataEntrega', { ascending: false }),
-        'Falha ao listar saÃ­das.'
-      )) ?? []
-    )
+  async list(params = {}) {
+    let query = supabaseAdmin
+      .from('saidas')
+      .select('*')
+      .order('dataEntrega', { ascending: false })
+
+    const pessoaId = trim(params.pessoaId)
+    if (pessoaId) {
+      query = query.eq('pessoaId', pessoaId)
+    }
+
+    const materialId = trim(params.materialId)
+    if (materialId) {
+      query = query.eq('materialId', materialId)
+    }
+
+    const status = trim(params.status)
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    const centroCusto = trim(params.centroCusto)
+    if (centroCusto) {
+      query = query.ilike('centroCusto', centroCusto)
+    }
+
+    const centroServico = trim(params.centroServico)
+    if (centroServico) {
+      query = query.ilike('centroServico', centroServico)
+    }
+
+    const dataInicio = toStartOfDayIso(params.dataInicio)
+    if (dataInicio) {
+      query = query.gte('dataEntrega', dataInicio)
+    }
+
+    const dataFim = toEndOfDayIso(params.dataFim)
+    if (dataFim) {
+      query = query.lte('dataEntrega', dataFim)
+    }
+
+    let saidas =
+      (await execute(query, 'Falha ao listar saídas.')) ?? []
+    saidas = saidas.map(mapSaidaRecord)
+
+    const termo = normalizeSearchTerm(params.termo)
+    if (termo) {
+      const [pessoas, materiais] = await Promise.all([
+        execute(
+          supabaseAdmin.from('pessoas').select('id, nome, local, centroServico'),
+          'Falha ao listar pessoas.'
+        ),
+        execute(
+          supabaseAdmin.from('materiais').select('id, nome, fabricante'),
+          'Falha ao listar materiais.'
+        ),
+      ])
+      const pessoasMap = new Map((pessoas ?? []).map((pessoa) => [pessoa.id, mapPessoaRecord(pessoa)]))
+      const materiaisMap = new Map((materiais ?? []).map((material) => [material.id, material]))
+      saidas = saidas.filter((saida) =>
+        matchesSaidaSearch(saida, termo, pessoasMap, materiaisMap)
+      )
+    }
+
+    return saidas
   },
   async create(payload, user) {
     const dados = sanitizeSaidaPayload(payload)

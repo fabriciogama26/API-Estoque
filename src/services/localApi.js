@@ -7,6 +7,7 @@ import {
 } from '../lib/estoque.js'
 import gruposEpi from '../data/grupos-epi.json'
 import { buildEpiTermHtml } from '../../shared/documents/epiTermTemplate.js'
+import { filterPessoas } from '../rules/PessoasRules.js'
 
 const nowIso = () => new Date().toISOString()
 
@@ -550,6 +551,156 @@ const calcularDataTroca = (dataEntregaIso, validadeDias) => {
   return data.toISOString()
 }
 
+const normalizeSearchTerm = (value) => (value ? String(value).trim().toLowerCase() : '')
+
+const toStartOfDay = (value) => {
+  const raw = value ? String(value).trim() : ''
+  if (!raw) {
+    return null
+  }
+  const date = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date
+}
+
+const toEndOfDay = (value) => {
+  const raw = value ? String(value).trim() : ''
+  if (!raw) {
+    return null
+  }
+  const date = new Date(`${raw}T23:59:59.999`)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date
+}
+
+function filterLocalEntradas(entradas, params = {}, state) {
+  const termo = normalizeSearchTerm(params.termo)
+  const materialId = trim(params.materialId || '')
+  const centroCusto = normalizeSearchTerm(params.centroCusto)
+  const inicio = toStartOfDay(params.dataInicio)
+  const fim = toEndOfDay(params.dataFim)
+
+  const materiaisMap = new Map(state.materiais.map((material) => [material.id, material]))
+
+  return entradas.filter((entrada) => {
+    if (materialId && entrada.materialId !== materialId) {
+      return false
+    }
+
+    if (centroCusto && normalizeSearchTerm(entrada.centroCusto) !== centroCusto) {
+      return false
+    }
+
+    if (inicio || fim) {
+      const data = entrada.dataEntrada ? new Date(entrada.dataEntrada) : null
+      if (!data || Number.isNaN(data.getTime())) {
+        return false
+      }
+      if (inicio && data < inicio) {
+        return false
+      }
+      if (fim && data > fim) {
+        return false
+      }
+    }
+
+    if (!termo) {
+      return true
+    }
+
+    const material = materiaisMap.get(entrada.materialId)
+    const alvo = [
+      material?.nome || '',
+      material?.fabricante || '',
+      entrada.centroCusto || '',
+      entrada.usuarioResponsavel || '',
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    return alvo.includes(termo)
+  })
+}
+
+function filterLocalSaidas(saidas, params = {}, state) {
+  const termo = normalizeSearchTerm(params.termo)
+  const pessoaId = trim(params.pessoaId || '')
+  const materialId = trim(params.materialId || '')
+  const centroCusto = normalizeSearchTerm(params.centroCusto)
+  const centroServico = normalizeSearchTerm(params.centroServico)
+  const status = normalizeSearchTerm(params.status)
+  const inicio = toStartOfDay(params.dataInicio)
+  const fim = toEndOfDay(params.dataFim)
+
+  const pessoasMap = new Map(
+    state.pessoas.map((pessoa) => {
+      const normalizada = mapLocalPessoaRecord(pessoa)
+      return [normalizada.id || pessoa.id, normalizada]
+    }),
+  )
+  const materiaisMap = new Map(state.materiais.map((material) => [material.id, material]))
+
+  return saidas.filter((saida) => {
+    if (pessoaId && saida.pessoaId !== pessoaId) {
+      return false
+    }
+
+    if (materialId && saida.materialId !== materialId) {
+      return false
+    }
+
+    if (status && normalizeSearchTerm(saida.status) !== status) {
+      return false
+    }
+
+    if (centroCusto && normalizeSearchTerm(saida.centroCusto) !== centroCusto) {
+      return false
+    }
+
+    if (centroServico && normalizeSearchTerm(saida.centroServico) !== centroServico) {
+      return false
+    }
+
+    if (inicio || fim) {
+      const data = saida.dataEntrega ? new Date(saida.dataEntrega) : null
+      if (!data || Number.isNaN(data.getTime())) {
+        return false
+      }
+      if (inicio && data < inicio) {
+        return false
+      }
+      if (fim && data > fim) {
+        return false
+      }
+    }
+
+    if (!termo) {
+      return true
+    }
+
+    const pessoa = pessoasMap.get(saida.pessoaId)
+    const material = materiaisMap.get(saida.materialId)
+    const alvo = [
+      material?.nome || '',
+      material?.fabricante || '',
+      pessoa?.nome || '',
+      (pessoa?.centroServico ?? pessoa?.local) || '',
+      saida.centroCusto || '',
+      saida.centroServico || '',
+      saida.usuarioResponsavel || '',
+      saida.status || '',
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    return alvo.includes(termo)
+  })
+}
+
 const sortByDateDesc = (lista, campo) =>
   lista.slice().sort((a, b) => {
     const aTime = a[campo] ? new Date(a[campo]).getTime() : 0
@@ -562,9 +713,18 @@ const localApi = {
     return { status: 'ok', mode: 'local' }
   },
   pessoas: {
-    async list() {
-      return readState((state) => state.pessoas.map(mapLocalPessoaRecord))
-    },
+      async list(params = {}) {
+        return readState((state) => {
+          const pessoas = state.pessoas.map(mapLocalPessoaRecord)
+          const filters = {
+            termo: params.termo ?? '',
+            centroServico: params.centroServico ?? params.local ?? 'todos',
+            local: params.local ?? params.centroServico ?? 'todos',
+            cargo: params.cargo ?? 'todos',
+          }
+          return filterPessoas(pessoas, filters)
+        })
+      },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
       validatePessoaPayload(dados)
@@ -794,10 +954,14 @@ const localApi = {
       )
     },
   },
-  entradas: {
-    async list() {
-      return readState((state) => sortByDateDesc(state.entradas.map(mapLocalEntradaRecord), 'dataEntrada'))
-    },
+    entradas: {
+      async list(params = {}) {
+        return readState((state) => {
+          const mapped = state.entradas.map(mapLocalEntradaRecord)
+          const filtradas = filterLocalEntradas(mapped, params, state)
+          return sortByDateDesc(filtradas, 'dataEntrada')
+        })
+      },
     async create(payload) {
       const dados = sanitizeEntradaPayload(payload)
       validateEntradaPayload(dados)
@@ -817,10 +981,14 @@ const localApi = {
       })
     },
   },
-  saidas: {
-    async list() {
-      return readState((state) => sortByDateDesc(state.saidas.map(mapLocalSaidaRecord), 'dataEntrega'))
-    },
+    saidas: {
+      async list(params = {}) {
+        return readState((state) => {
+          const mapped = state.saidas.map(mapLocalSaidaRecord)
+          const filtradas = filterLocalSaidas(mapped, params, state)
+          return sortByDateDesc(filtradas, 'dataEntrega')
+        })
+      },
     async create(payload) {
       const dados = sanitizeSaidaPayload(payload)
       validateSaidaPayload(dados)

@@ -24,6 +24,39 @@ const filterInitial = {
   dataFim: '',
 }
 
+const buildSaidasQuery = (filters) => {
+  const query = {}
+  if (filters.pessoaId) {
+    query.pessoaId = filters.pessoaId
+  }
+  if (filters.materialId) {
+    query.materialId = filters.materialId
+  }
+  const centroCusto = filters.centroCusto?.trim()
+  if (centroCusto) {
+    query.centroCusto = centroCusto
+  }
+  const centroServico = filters.centroServico?.trim()
+  if (centroServico) {
+    query.centroServico = centroServico
+  }
+  const status = filters.status?.trim()
+  if (status) {
+    query.status = status
+  }
+  if (filters.dataInicio) {
+    query.dataInicio = filters.dataInicio
+  }
+  if (filters.dataFim) {
+    query.dataFim = filters.dataFim
+  }
+  const termo = filters.termo?.trim()
+  if (termo) {
+    query.termo = termo
+  }
+  return query
+}
+
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -43,14 +76,14 @@ export function SaidasPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const load = async () => {
+  const load = async (params = filters) => {
     setIsLoading(true)
     setError(null)
     try {
       const [pessoasData, materiaisData, saidasData] = await Promise.all([
         api.pessoas.list(),
         api.materiais.list(),
-        api.saidas.list(),
+        api.saidas.list(buildSaidasQuery(params)),
       ])
       setPessoas(pessoasData ?? [])
       setMateriais(materiaisData ?? [])
@@ -63,7 +96,8 @@ export function SaidasPage() {
   }
 
   useEffect(() => {
-    load()
+    load(filterInitial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleChange = (event) => {
@@ -98,7 +132,7 @@ export function SaidasPage() {
       }
       await api.saidas.create(payload)
       setForm(initialForm)
-      await load()
+      await load(filters)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -113,10 +147,12 @@ export function SaidasPage() {
 
   const handleFilterSubmit = (event) => {
     event.preventDefault()
+    load(filters)
   }
 
   const handleFilterClear = () => {
-    setFilters(filterInitial)
+    setFilters({ ...filterInitial })
+    load(filterInitial)
   }
 
   const pessoasMap = useMemo(() => {
@@ -140,74 +176,6 @@ export function SaidasPage() {
     })
     return Array.from(values).sort()
   }, [saidas])
-
-  const filteredSaidas = useMemo(() => {
-    const termo = filters.termo.trim().toLowerCase()
-
-    return saidas.filter((saida) => {
-      const pessoa = pessoasMap.get(saida.pessoaId)
-      const material = materiaisMap.get(saida.materialId)
-
-      if (filters.pessoaId && saida.pessoaId !== filters.pessoaId) {
-        return false
-      }
-
-      if (filters.materialId && saida.materialId !== filters.materialId) {
-        return false
-      }
-
-      if (filters.status && saida.status !== filters.status) {
-        return false
-      }
-
-      if (filters.dataInicio) {
-        const data = saida.dataEntrega ? new Date(saida.dataEntrega) : null
-        const inicio = new Date(filters.dataInicio)
-        inicio.setHours(0, 0, 0, 0)
-        if (!data || data < inicio) {
-          return false
-        }
-      }
-
-      if (filters.dataFim) {
-        const data = saida.dataEntrega ? new Date(saida.dataEntrega) : null
-        const fim = new Date(filters.dataFim)
-        fim.setHours(23, 59, 59, 999)
-        if (!data || data > fim) {
-          return false
-        }
-      }
-
-      const centroCustoFiltro = filters.centroCusto.trim().toLowerCase()
-      if (centroCustoFiltro && (saida.centroCusto || '').toLowerCase() !== centroCustoFiltro) {
-        return false
-      }
-
-      const centroServicoFiltro = filters.centroServico.trim().toLowerCase()
-      if (centroServicoFiltro && (saida.centroServico || '').toLowerCase() !== centroServicoFiltro) {
-        return false
-      }
-
-      if (!termo) {
-        return true
-      }
-
-      const alvo = [
-        material?.nome || '',
-        material?.fabricante || '',
-        pessoa?.nome || '',
-        (pessoa?.centroServico ?? pessoa?.local) || '',
-        saida.centroCusto || '',
-        saida.centroServico || '',
-        saida.usuarioResponsavel || '',
-        saida.status || '',
-      ]
-        .join(' ')
-        .toLowerCase()
-
-      return alvo.includes(termo)
-    })
-  }, [saidas, filters, pessoasMap, materiaisMap])
 
   return (
     <div className="stack">
@@ -356,13 +324,13 @@ export function SaidasPage() {
       <section className="card">
         <header className="card__header">
           <h2>Historico de saidas</h2>
-          <button type="button" className="button button--ghost" onClick={load} disabled={isLoading}>
+          <button type="button" className="button button--ghost" onClick={() => load(filters)} disabled={isLoading}>
             Atualizar
           </button>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
-        {!isLoading && filteredSaidas.length === 0 ? <p className="feedback">Nenhuma saida registrada.</p> : null}
-        {filteredSaidas.length > 0 ? (
+        {!isLoading && saidas.length === 0 ? <p className="feedback">Nenhuma saida registrada.</p> : null}
+        {saidas.length > 0 ? (
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -380,7 +348,7 @@ export function SaidasPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSaidas.map((saida) => {
+                {saidas.map((saida) => {
                   const pessoa = pessoasMap.get(saida.pessoaId)
                   const material = materiaisMap.get(saida.materialId)
                   const total = (material?.valorUnitario ?? 0) * Number(saida.quantidade ?? 0)
@@ -414,6 +382,24 @@ export function SaidasPage() {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
