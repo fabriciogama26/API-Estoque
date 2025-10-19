@@ -213,6 +213,7 @@ function normalizarMaterial(material) {
 
 export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], periodo = null) {
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
+  const materiaisComMovimentacao = new Set()
 
   const itens = materiaisNormalizados.map((material) => {
     const entradasMaterial = entradas
@@ -224,6 +225,10 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
 
     const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo)
     const { estoqueMinimo, deficitQuantidade, valorReposicao } = calcularDeficit(material, saldo)
+
+    if (saldo !== 0 || entradasMaterial.length > 0) {
+      materiaisComMovimentacao.add(material.id)
+    }
 
     const centrosCustoSet = new Set()
     entradasMaterial.forEach((entrada) => {
@@ -266,7 +271,9 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     }
   })
 
-  const alertas = itens
+  const itensFiltrados = itens.filter((item) => materiaisComMovimentacao.has(item.materialId))
+
+  const alertas = itensFiltrados
     .filter((item) => item.alerta)
     .map((item) => ({
       materialId: item.materialId,
@@ -279,15 +286,15 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       centrosCusto: item.centrosCusto,
     }))
 
-  const totalItens = itens.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
-  const valorReposicaoTotal = itens.reduce((acc, item) => acc + Number(item.valorReposicao ?? 0), 0)
-  const ultimaAtualizacaoGeral = itens
+  const totalItens = itensFiltrados.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+  const valorReposicaoTotal = itensFiltrados.reduce((acc, item) => acc + Number(item.valorReposicao ?? 0), 0)
+  const ultimaAtualizacaoGeral = itensFiltrados
     .map((item) => (item.ultimaAtualizacao ? new Date(item.ultimaAtualizacao) : null))
     .filter((data) => data && !Number.isNaN(data.getTime()))
     .sort((a, b) => b.getTime() - a.getTime())[0] || null
 
   return {
-    itens,
+    itens: itensFiltrados,
     alertas,
     resumo: {
       totalItens,

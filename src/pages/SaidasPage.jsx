@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ExitIcon } from '../components/icons.jsx'
 import { dataClient as api } from '../services/dataClient.js'
@@ -67,7 +67,7 @@ function formatCurrency(value) {
 
 export function SaidasPage() {
   const { user } = useAuth()
-  const [pessoas, setPessoas] = useState([])
+  const [Nomes, setNomes] = useState([])
   const [materiais, setMateriais] = useState([])
   const [saidas, setSaidas] = useState([])
   const [form, setForm] = useState(initialForm)
@@ -80,12 +80,12 @@ export function SaidasPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [pessoasData, materiaisData, saidasData] = await Promise.all([
+      const [NomesData, materiaisData, saidasData] = await Promise.all([
         api.pessoas.list(),
         api.materiais.list(),
         api.saidas.list(buildSaidasQuery(params)),
       ])
-      setPessoas(pessoasData ?? [])
+      setNomes(NomesData ?? [])
       setMateriais(materiaisData ?? [])
       setSaidas(saidasData ?? [])
     } catch (err) {
@@ -104,11 +104,11 @@ export function SaidasPage() {
     const { name, value } = event.target
     if (name === 'pessoaId') {
       setForm((prev) => {
-        const pessoa = pessoasMap.get(value)
+        const Nome = NomesMap.get(value)
         return {
           ...prev,
           pessoaId: value,
-          centroServico: pessoa?.centroServico ?? pessoa?.local ?? prev.centroServico,
+          centroServico: Nome?.centroServico ?? Nome?.local ?? prev.centroServico,
         }
       })
       return
@@ -155,11 +155,11 @@ export function SaidasPage() {
     load(filterInitial)
   }
 
-  const pessoasMap = useMemo(() => {
+  const NomesMap = useMemo(() => {
     const map = new Map()
-    pessoas.forEach((item) => map.set(item.id, item))
+    Nomes.forEach((item) => map.set(item.id, item))
     return map
-  }, [pessoas])
+  }, [Nomes])
 
   const materiaisMap = useMemo(() => {
     const map = new Map()
@@ -188,12 +188,12 @@ export function SaidasPage() {
       <form className="form" onSubmit={handleSubmit}>
         <div className="form__grid form__grid--two">
           <label className="field">
-            <span>Pessoa*</span>
+            <span>Nome*</span>
             <select name="pessoaId" value={form.pessoaId} onChange={handleChange} required>
-              <option value="">Selecione uma pessoa</option>
-              {pessoas.map((pessoa) => (
-                <option key={pessoa.id} value={pessoa.id}>
-                  {pessoa.nome} - {pessoa.local}
+              <option value="">Selecione uma Nome</option>
+              {Nomes.map((Nome) => (
+                <option key={Nome.id} value={Nome.id}>
+                  {Nome.nome} - {Nome.local}
                 </option>
               ))}
             </select>
@@ -253,16 +253,16 @@ export function SaidasPage() {
             name="termo"
             value={filters.termo}
             onChange={handleFilterChange}
-            placeholder="Pessoa, material ou responsavel"
+            placeholder="Nome, material ou responsavel"
           />
         </label>
         <label className="field">
-          <span>Pessoa</span>
+          <span>Nome</span>
           <select name="pessoaId" value={filters.pessoaId} onChange={handleFilterChange}>
             <option value="">Todas</option>
-            {pessoas.map((pessoa) => (
-              <option key={pessoa.id} value={pessoa.id}>
-                {pessoa.nome}
+            {Nomes.map((Nome) => (
+              <option key={Nome.id} value={Nome.id}>
+                {Nome.nome}
               </option>
             ))}
           </select>
@@ -336,7 +336,7 @@ export function SaidasPage() {
               <thead>
                 <tr>
                   <th>Material</th>
-                  <th>Pessoa</th>
+                  <th>Nome</th>
                   <th>Quantidade</th>
                   <th>Centro de custo</th>
                   <th>Centro de servico</th>
@@ -349,7 +349,7 @@ export function SaidasPage() {
               </thead>
               <tbody>
                 {saidas.map((saida) => {
-                  const pessoa = pessoasMap.get(saida.pessoaId)
+                  const Nome = NomesMap.get(saida.pessoaId)
                   const material = materiaisMap.get(saida.materialId)
                   const total = (material?.valorUnitario ?? 0) * Number(saida.quantidade ?? 0)
 
@@ -360,8 +360,8 @@ export function SaidasPage() {
                         <p className="data-table__muted">{material?.fabricante || 'Nao informado'}</p>
                       </td>
                       <td>
-                        <strong>{pessoa?.nome || 'Pessoa removida'}</strong>
-                        <p className="data-table__muted">{(pessoa?.centroServico ?? pessoa?.local) || 'Nao informado'}</p>
+                        <strong>{Nome?.nome || 'Nome removida'}</strong>
+                        <p className="data-table__muted">{(Nome?.centroServico ?? Nome?.local) || 'Nao informado'}</p>
                       </td>
                       <td>{saida.quantidade}</td>
                       <td>{saida.centroCusto || '-'}</td>
@@ -382,6 +382,10 @@ export function SaidasPage() {
     </div>
   )
 }
+
+
+
+
 
 
 
