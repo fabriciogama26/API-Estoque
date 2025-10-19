@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 
 const STORAGE_KEY = 'api-estoque-auth'
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
 const LOCAL_AUTH = {
   username: (import.meta.env.VITE_LOCAL_USERNAME || 'admin').trim(),
   password: (import.meta.env.VITE_LOCAL_PASSWORD || 'admin123').trim(),
@@ -162,6 +163,64 @@ export function AuthProvider({ children }) {
     setUser(null)
     window.localStorage.removeItem(STORAGE_KEY)
   }, [hasSupabase])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+    if (!user) {
+      return undefined
+    }
+
+    let timeoutId = null
+    let loggedOut = false
+
+    const triggerLogout = async () => {
+      if (loggedOut) {
+        return
+      }
+      loggedOut = true
+      try {
+        await logout()
+      } catch (error) {
+        console.error('Falha ao encerrar sessão por inatividade', error)
+      } finally {
+        window.location.href = '/login'
+      }
+    }
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(() => {
+        triggerLogout()
+      }, INACTIVITY_TIMEOUT_MS)
+    }
+
+    const handleActivity = () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return
+      }
+      resetTimer()
+    }
+
+    const listeners = [
+      { target: window, event: 'mousemove' },
+      { target: window, event: 'mousedown' },
+      { target: window, event: 'keydown' },
+      { target: window, event: 'wheel' },
+      { target: window, event: 'touchstart' },
+      { target: window, event: 'focus' },
+      { target: document, event: 'visibilitychange' },
+    ]
+
+    listeners.forEach(({ target, event }) => target.addEventListener(event, handleActivity))
+    resetTimer()
+
+    return () => {
+      clearTimeout(timeoutId)
+      listeners.forEach(({ target, event }) => target.removeEventListener(event, handleActivity))
+    }
+  }, [user, logout])
 
   const value = useMemo(
     () => ({
