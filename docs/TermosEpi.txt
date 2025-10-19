@@ -1,10 +1,10 @@
-Tela: Termo de EPI
+﻿Tela: Termo de EPI
 ==================
 
 Objetivo
 --------
 - Permitir localizar um colaborador e gerar o termo de entrega de EPI com visualizacao imediata.
-- Disponibilizar o download do PDF gerado via Puppeteer (mesma saida em modo local e remoto).
+- (Opcional) Exibir link para download; atualmente o PDF nao esta disponivel sem o backend.
 
 Entradas e filtros
 ------------------
@@ -35,9 +35,9 @@ Pre-visualizacao
 
 Persistencia
 ------------
-- **Modo remoto**: supabase usa tabelas `pessoas` e `saidas`; geracao do PDF via Puppeteer (endpoint `/api/documentos/termo-epi`).
-- **Modo local**: `localApi.documentos.termoEpiContext` usa o seed `src/data/local-seed.json` e ainda aciona Puppeteer localmente para o download.
+- **Modo remoto**: Supabase é acessado diretamente pelo frontend (`@supabase/supabase-js`).\r\n- **Modo local**: `localApi.documentos.termoEpiContext` continua disponível apenas para desenvolvimento offline (sem geração de PDF).
 
 Recursos relacionados
 ---------------------
 - Configuracao detalhada do ambiente e modos de dados: [`docs/ambiente-termos-epi.txt`](ambiente-termos-epi.txt).
+

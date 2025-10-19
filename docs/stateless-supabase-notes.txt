@@ -4,31 +4,33 @@ Nota: desde 2025-10 o frontend tambem suporta modo de dados local. Para detalhes
 Visao Geral da Arquitetura
 ---------------------
 - O frontend (Vite/React) e implantado como ativos estaticos no Vercel.
-- Funcoes serverless em `api/` expoem endpoints REST, executam validacoes e interagem com o Supabase usando a chave de funcao de servico.
-- Cada solicitacao reconstroi o estado do Supabase; nenhum processo Node de longa duracao e necessario.
-- O frontend conecta os usuarios via Supabase Auth e envia `Authorization: Bearer <token>` para cada chamada de API.
+- As chamadas de dados sao feitas diretamente pelo navegador usando o SDK oficial `@supabase/supabase-js`; nenhuma funcao serverless intermediaria e necessaria.
+- Cada requisicao utiliza o token do Supabase Auth armazenado pelo cliente e respeita as policies RLS definidas para os usuarios autenticados.
 
 Variaveis de Ambiente
 ---------------------
-- `VITE_SUPABASE_URL`: URL publica do Supabase para o navegador.
-- `VITE_SUPABASE_ANON_KEY`: chave anonima com politicas RLS para o frontend.
-- `SUPABASE_URL`: mesma URL, disponivel para as funcoes serverless.
-
-- `SUPABASE_SERVICE_ROLE_KEY`: chave de funcao de servico usada apenas por codigo serverless.
-- Defina valores localmente em `.env.local` e implante-os com `vercel env`.
+- `VITE_SUPABASE_URL`: URL publica do Supabase usada pelo navegador.
+- `VITE_SUPABASE_ANON_KEY`: chave anonima utilizada pelo SDK (respeita RLS).
+- `VITE_DATA_MODE`: `remote` para trabalhar direto com o Supabase.
+- Variaveis opcionais para o modo local (`APP_USERNAME`, etc.) permanecem para desenvolvimento offline.
 
 Expectativas do esquema Supabase
 ----------------------------
 - `pessoas(id uuid pk, nome text, matricula text unique, centro_servico text, cargo text, usuarioCadastro text, usuarioEdicao text, criadoEm timestamp, atualizarEm timestamp, historicoEdicao jsonb)`
 - `materiais(id uuid pk, nome text, fabricante text, validadeDias int, ca text, valorUnitario numeric, estoqueMinimo numeric, ativo boolean, usuarioCadastro text, usuarioAtualizacao text, dataCadastro timestamp, atualizarEm timestamp)`
 - `material_price_history(id uuid pk, materialId uuid fk, valorUnitario numerico, usuarioResponsavel text, criadoEm timestamp)`
-- `entradas(id uuid pk, materialId uuid fk, quantidade numerica, centro_custo texto, centro_servico texto, dataEntrada timestamp, usuarioResponsavel texto)`
+- `entradas(id uuid pk, materialId uuid fk, quantidade numerica, centro_custo texto, dataEntrada timestamp, usuarioResponsavel texto)`
 - `saidas(id uuid pk, materialId uuid fk, pessoaId uuid fk, quantidade numerica, centro_custo texto, centro_servico texto, dataEntrega timestamp, dataTroca timestamp, status text, usuarioResponsavel text)`
-- `acidentes(id uuid pk, matricula text, nome text, cargo text, data timestamp, diasPerdidos numeric, diasDebitados numeric, tipo text, agente text, cid text, lesao text, parteLesionada text, setor text, local text, cat text, observacao text, criadoEm timestamp, atualizadoEm timestamp)`
+- `acidentes(id uuid pk, matricula text, nome text, cargo text, data timestamp, diasPerdidos numeric, diasDebitados numeric, tipo text, agente text, cid text, lesao text, parteLesionada text, centro_servico text, local text, cat text, observacao text, criadoEm timestamp, atualizadoEm timestamp)`
+
+Fluxo de dados no frontend
+--------------------------
+- O `src/services/api.js` instancia o client Supabase e executa selects/inserts/updates diretamente nas tabelas.
+- Regras de negocio (estoque, dashboards, historicos) continuam sendo calculadas no cliente com as funcoes de `src/lib`.
+- Para operacoes que exigiriam chave `service_role` (ex.: PDF server-side) o app alerta o usuario, pois nao ha backend intermediario.
 
 Destaques da logica de negocios
--------------------------
-- O middleware `withAuth` valida o token Supabase e injeta o usuario autenticado em cada manipulador.
+-------------------------------
 - Pessoas: campos obrigatorios, matricula unica, historico de edicoes armazenado em `historicoEdicao`.
 - Materiais: valida insumos, evita duplicatas, registra historico de precos quando o valor muda.
 - Entradas: garante a existencia de material, a quantidade e positiva e captura o usuario responsavel.

@@ -32,7 +32,7 @@ Diagnostico do Schema Atual (Supabase)
     * `quantity bigint` -> `quantidade numeric(14,2) not null check (quantidade > 0)`.
     * `dataEntrada` deve ser `timestamptz not null default now()`.
     * `created_by text` -> `usuarioResponsavel text`.
-    * Adicione `centro_custo text not null default ''`, `centro_servico text not null default ''`.
+    * Adicione `centro_custo text not null default ''`.
   - Garanta que `"materialId"` referencie `materiais(id)` com `on delete restrict`.
   - Crie o indice `entradas_material_idx (materialId, dataEntrada desc)`.
 - `public.material_exits`
@@ -43,7 +43,7 @@ Diagnostico do Schema Atual (Supabase)
     * `dataTroca` deve aceitar `timestamptz`.
     * `delivery_status text` -> `status text not null default 'entregue'`.
     * `created_by uuid default gen_random_uuid()` -> substitua por `usuarioResponsavel text`.
-    * Adicione `centro_custo text not null default ''`, `centro_servico text not null default ''`.
+    * Adicione `centro_custo text not null default ''`.
   - Ajuste FKs: `"materialId"` -> `materiais(id) on delete restrict`, `"pessoaId"` -> `pessoas(id) on delete restrict`.
   - Recrie indices `saidas_material_idx` e `saidas_pessoa_idx`.
 - `public.price_history`

@@ -3,10 +3,12 @@ Ambiente de geracao do Termo de EPI
 
 Visao geral
 -----------
-O projeto oferece dois modos para gerar o termo com Puppeteer:
+Historicamente o projeto oferecia dois modos para gerar o termo com Puppeteer:
 
-* **Modo online (Supabase)** – usa o banco Supabase e exige autenticacao.
-* **Modo local (seed)** – consome os dados do `localDataStore` e dispensa login para testes offline, mantendo a mesma saida do PDF.
+* **Modo online (Supabase)** – usava o banco Supabase e exigia autenticacao.
+* **Modo local (seed)** – consumia os dados do `localDataStore` e dispensava login para testes offline, mantendo a mesma saida do PDF.
+
+> ⚠️ Atualmente o frontend acessa o Supabase diretamente (sem backend) e a geracao de PDF nao esta disponivel. As instrucoes abaixo permanecem apenas como referencia caso volte a existir uma camada serverless.
 
 Pontos principais
 -----------------
@@ -21,7 +23,6 @@ Como usar
 
 ```
 VITE_DATA_MODE=local          # ou "remote" para usar Supabase
-VITE_API_URL=http://localhost:3000
 ```
 
 2. Se quiser rodar o backend em modo local, execute (em um terminal separado):

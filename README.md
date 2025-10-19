@@ -1,4 +1,4 @@
-# API-Estoque
+﻿# API-Estoque
 
 Aplicação completa para controle de EPIs com frontend em React (Vite) e funções serverless hospedadas na Vercel. Em modo padrão tudo roda sobre Supabase (autenticação, banco e RLS), mas também existe um modo totalmente local que persiste dados no navegador para desenvolvimento offline.
 
@@ -24,11 +24,14 @@ Aplicação completa para controle de EPIs com frontend em React (Vite) e funç�
 | Camada            | Descrição                                                                                                                    |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Frontend          | React 19 + Vite. O `dataClient` escolhe entre o Supabase (`src/services/api.js`) ou o armazenamento local (`src/services/localApi.js`). |
-| Backend           | Funções serverless na Vercel (`api/index.js` centraliza as rotas `/api/*` e delega para `api/_shared/operations.js`). Cada chamada valida o token Supabase antes de acessar o banco com a chave de serviço. |
+| Backend           | Chamadas diretas ao Supabase via `@supabase/supabase-js`; backend serverless tornou-se opcional (apenas para recursos como geração de PDF). |
+
 | Banco de Dados    | Supabase Postgres (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`). Migrations em `supabase/migrations`. |
-| Geração de PDFs   | Template compartilhado em `shared/documents/epiTermTemplate.js` consumido tanto pela API (Puppeteer) quanto pelo frontend. |
+| Geração de PDFs   | Template compartilhado em `shared/documents/epiTermTemplate.js`; a geração automática de PDF requer uma camada serverless opcional. |
+
 | Autenticação      | Supabase Auth no modo remoto. Em modo local, credenciais definidas via `.env.local`. |
-| Regras de negócio | `api/_shared/operations.js` (lado serverless) e `src/lib/estoque.js` / `src/lib/acidentesDashboard.js` (cálculos compartilhados). |
+| Regras de negócio | `src/lib/estoque.js` / `src/lib/acidentesDashboard.js` (cálculos compartilhados) aplicados no frontend após carregar dados do Supabase. |
+
 
 > Estilos dos dashboards: `src/styles/DashboardPage.css` organiza o layout e `src/styles/charts.css` agrupa helpers de graficos compartilhados.
 
@@ -37,7 +40,7 @@ Aplicação completa para controle de EPIs com frontend em React (Vite) e funç�
 - Node.js 20+
 - npm 10+
 - Conta Supabase (para modo remoto)
-- Conta Vercel (deploy das funções e do frontend)
+- Conta Vercel (deploy do frontend e, opcionalmente, de funções serverless)
 
 ## Configuração do Ambiente
 
@@ -57,13 +60,12 @@ Crie um arquivo `.env.local` na raiz com as variáveis públicas usadas pelo Vit
 | ---------------------------- | ------------------------------------------------------------------------------------------ |
 | `VITE_SUPABASE_URL`          | URL do projeto Supabase.                                                                   |
 | `VITE_SUPABASE_ANON_KEY`     | Chave pública (`anon`) do Supabase.                                                        |
-| `VITE_API_URL`               | URL base para chamadas às funções serverless (ex.: `http://localhost:5173`).              |
 | `VITE_DATA_MODE`             | `remote` (padrão) usa Supabase; `local` persiste no `localStorage`.                        |
 | `VITE_LOCAL_USERNAME`        | Usuário padrão do modo local (opcional, default `admin`).                                  |
 | `VITE_LOCAL_PASSWORD`        | Senha padrão do modo local (opcional, default `admin123`).                                 |
 | `VITE_LOCAL_DISPLAY_NAME`    | Nome exibido para o usuário local.                                                         |
 
-Para as funções serverless (local com `vercel dev` ou produção) crie `.env` ou configure no painel da Vercel:
+Caso mantenha uma camada serverless (para recursos opcionais como geração de PDF) crie `.env` ou configure no painel da Vercel:
 
 | Variável                     | Descrição                                      |
 | ---------------------------- | ---------------------------------------------- |
@@ -83,8 +85,7 @@ Para as funções serverless (local com `vercel dev` ou produção) crie `.env` 
 
 1. Conecte o repositório no dashboard da Vercel.
 2. Configure as variáveis mencionadas acima (`vercel env`).
-3. O deploy padrão executa `npm run build` (frontend) e expõe qualquer arquivo em `api/` como endpoint.
-4. Depois do deploy, valide acessando `/login` e `/api/health` (com token válido).
+3. O deploy padrão executa `npm run build` para o frontend. Se você mantiver funções serverless, arquivos em `api/` continuarão sendo publicados como endpoints.\r\n4. Depois do deploy, valide o fluxo de login `/login` e realize uma consulta simples no Supabase (por exemplo via Supabase Studio).
 
 ## Execução Local
 
@@ -111,38 +112,19 @@ Para as funções serverless (local com `vercel dev` ou produção) crie `.env` 
 - Para resetar apenas os dados locais, limpe a chave `api-estoque-local-data-v1` no `localStorage`.
 - Guia completo: [`docs/data-mode-guide.txt`](docs/data-mode-guide.txt).
 
-## Endpoints Principais
+## Operações Remotas
 
-Todos os endpoints remotos exigem cabeçalho `Authorization: Bearer <token>`.
+O módulo `src/services/api.js` utiliza `@supabase/supabase-js` para consultar e atualizar diretamente as tabelas (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`).
 
-| Recurso   | Método(s)        | Endpoint(s)                                                                                | Observações                                               |
-| --------- | ---------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Pessoas   | GET, POST        | `/api/pessoas`                                                                             | Lista e cria registros.                                   |
-| Pessoas   | PUT              | `/api/pessoas/:id`                                                                         | Atualiza dados da pessoa.                                 |
-| Pessoas   | GET              | `/api/pessoas/history/:id`                                                                 | Retorna histórico de edições.                             |
-| Materiais | GET, POST        | `/api/materiais`                                                                           | Consulta e cria materiais.                                |
-| Materiais | PUT              | `/api/materiais/:id`                                                                       | Atualiza material existente.                              |
-| Materiais | GET              | `/api/materiais/price-history/:id`                                                         | Histórico de preços.                                      |
-| Materiais | GET              | `/api/materiais/groups`                                                                    | Lista grupos cadastrados para vincular aos EPIs.          |
-| Entradas  | GET, POST        | `/api/entradas`                                                                            | Movimentações de entrada.                                 |
-| Saídas    | GET, POST        | `/api/saidas`                                                                              | Movimentações de saída.                                   |
-| Estoque   | GET              | `/api/estoque`                                                                             | Snapshot atual (filtros `periodoInicio`, `periodoFim`, `centroCusto`).     |
-| Estoque   | GET              | `/api/estoque?view=dashboard`                                                              | Dashboard consolidado (mesmos filtros via query string).  |
-| Acidentes | GET, POST        | `/api/acidentes`                                                                           | Lista e cria acidentes.                                   |
-| Acidentes | PUT              | `/api/acidentes/:id`                                                                       | Atualização de acidente.                                  |
-| Documentos | GET             | `/api/documentos/termo-epi`                                                                | Retorna PDF (default) ou JSON (`?format=json`).           |
-| Health    | GET              | `/api/health`                                                                              | Checagem autenticada de saúde.                            |
+- Todas as chamadas dependem de um usuário autenticado (`supabase.auth.signInWithPassword`).
+- As policies RLS do Supabase controlam permissões de leitura/escrita.
+- Para desenvolvimento offline continua disponível o modo local via `localApi`.
 
-> Pessoas: obrigatório informar `nome`, `matricula`, `centroServico`, `cargo` e `tipoExecucao`. Campo opcional `dataAdmissao` aceita ISO completo ou `yyyy-mm-dd`; valores inválidos são ignorados.
+### Termo de EPI
 
-### Termo de EPI (Puppeteer)
-
-- Sempre que a página **Termos > Termo de EPI** gera ou baixa o documento, a requisição vai para `/api/documentos/termo-epi`, que usa Puppeteer para produzir o PDF (mesmo resultado local e em produção).
-- O comportamento dos dados depende das variáveis `DATA_MODE` (backend) e `VITE_DATA_MODE` (frontend):
-  - `local`: usa o seed (`localDataStore`) e dispensa autenticação.
-  - `remote` (padrão): depende do Supabase (Postgres + Auth).
-- A UI exibe um badge indicando o modo atual e o contexto retornado pela API inclui o campo `origem` (local ou remoto).
-- As ações de termo foram removidas da lista de saídas; utilize a página dedicada para pré-visualização e exportação.
+- O contexto (dados do colaborador e entregas) é montado no frontend após consultar Supabase.
+- A pré-visualização permanece renderizada com `buildEpiTermHtml`.
+- A geração automática de PDF via backend foi desativada; o botão “Baixar PDF” apenas informa que o recurso está indisponível sem uma camada serverless.
 
 ## Scripts Disponíveis
 
@@ -186,8 +168,8 @@ Todos os endpoints remotos exigem cabeçalho `Authorization: Bearer <token>`.
 ## Fluxo de Autenticação e RLS
 
 1. No modo remoto, o usuário autentica pelo Supabase Auth (`/login`).
-2. O token de acesso é mantido pelo SDK e aplicado nas chamadas a `/api/*` via `dataClient`.
-3. Cada função serverless valida o token e executa as operações no Supabase (respeitando RLS).
+2. O token de acesso é mantido pelo SDK e utilizado pelo `dataClient` para executar consultas/updates diretamente no Supabase.
+3. As policies RLS determinam o que cada usuário pode ler/escrever; funções serverless tornam-se opcionais para cenários específicos.
 4. Em modo local, `AuthContext` valida apenas as credenciais do `.env.local` e os dados trafegam dentro do navegador.
 
 ## Referências de Documentação
@@ -208,5 +190,10 @@ Todos os endpoints remotos exigem cabeçalho `Authorization: Bearer <token>`.
 ---
 
 Sugestões e melhorias são bem-vindas. Abra uma issue ou envie um PR!
+
+
+
+
+
 
 

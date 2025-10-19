@@ -1,11 +1,11 @@
-Guia de Autenticacao Supabase
+﻿Guia de Autenticacao Supabase
 =============================
 
 Visao Geral
 -----------
 - O frontend usa o Supabase Auth (SDK oficial) para login e guarda o token `access_token`.
-- As funcoes serverless (`api/`) validam cada requisicao com `supabaseAdmin.auth.getUser(token)` usando a `service_role`.
-- A tabela `public.app_users` (criada em `supabase/migrations/0001_create_schema.sql`) permite mapear perfis autenticados a metadados internos quando necessario.
+- As chamadas de dados são feitas diretamente com `@supabase/supabase-js` (sem backend intermediário).
+- A tabela `public.app_users` (criada em `supabase/migrations/0001_create_schema.sql`) pode mapear perfis autenticados a metadados internos caso exista alguma camada serverless opcional.
 - As migrations **nao** configuram provedores de login, politicas de confirmacao ou templates de email; esses passos sao manuais no painel Supabase.
 
 Passo a Passo de Configuracao
@@ -17,10 +17,8 @@ Passo a Passo de Configuracao
      * Requisito de confirmacao de email se aplicavel.
      * URLs de redirecionamento (por exemplo `http://localhost:5173` para desenvolvimento e o dominio de producao).
 2. Chaves e Variaveis
-   - Copie `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` em:
-     * `.env.local` (frontend): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
-     * `.env` ou configuracao da Vercel (API): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
-   - Nunca exponha a `service_role` no frontend.
+   - Defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no `.env.local` e no ambiente de deploy.
+   - A `service_role` permanece reservada para funcoes backend opcionais (nao e utilizada pelo frontend direto).
 3. Aplicar Schema e Politicas
    - `npx supabase link --project-ref <project-ref>` dentro de `supabase/`.
    - `npx supabase db push` aplica as migrations `0001`–`0005`, criando `app_users`, `pessoas`, `materiais`, `entradas`, `saidas`, `material_price_history`, `acidentes` e ativando RLS conforme `0002_enable_rls.sql`.
@@ -43,3 +41,5 @@ Observacoes Importantes
 - A camada serverless assume que o usuario possui `user_metadata.nome` ou similares para compor `usuarioResponsavel`; configure os providers para capturar esses campos ou ajuste o codigo.
 - A migrations **nao** criam funcoes, triggers ou rotinas para provisionar usuarios automaticamente; qualquer sincronizacao adicional com sistemas externos deve ser codificada separadamente.
 - Depois de alterar politicas ou provedores, valide os fluxos de login/logout no frontend e rode `npx supabase db status` para garantir que nao ha migrations pendentes.
+
+
