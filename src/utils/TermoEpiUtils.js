@@ -6,6 +6,7 @@ const DEFAULT_PDF_OPTIONS = {
     scale: 2,
     useCORS: true,
     logging: false,
+    backgroundColor: "#ffffff",
   },
   jsPDF: {
     unit: "mm",
@@ -95,12 +96,21 @@ function createRenderContainer(html) {
   const parsed = parser.parseFromString(html, "text/html");
 
   const container = document.createElement("div");
-  container.style.position = "absolute";
-  container.style.left = "-9999px";
+  container.style.position = "fixed";
   container.style.top = "0";
+  container.style.left = "0";
   container.style.width = "794px";
-  container.style.padding = "16px";
+  container.style.minHeight = "1122px";
   container.style.backgroundColor = "#ffffff";
+  container.style.visibility = "hidden";
+  container.style.pointerEvents = "none";
+  container.style.zIndex = "-1";
+  container.style.overflow = "visible";
+
+  const bodyClass = parsed.body?.getAttribute("class");
+  if (bodyClass) {
+    container.className = bodyClass;
+  }
 
   const styles = parsed.head?.querySelectorAll("style, link[rel='stylesheet']") || [];
   styles.forEach((styleNode) => {
@@ -118,6 +128,50 @@ function createRenderContainer(html) {
   return container;
 }
 
+function waitForAnimationFrame() {
+  if (typeof requestAnimationFrame === "function") {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function waitForImages(scope) {
+  const images = Array.from(scope.querySelectorAll("img"));
+  if (!images.length) {
+    return;
+  }
+
+  await Promise.all(
+    images.map((img) => {
+      if (img.complete && img.naturalWidth > 0) {
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        const clear = () => {
+          img.removeEventListener("load", clear);
+          img.removeEventListener("error", clear);
+          resolve();
+        };
+
+        img.addEventListener("load", clear, { once: true });
+        img.addEventListener("error", clear, { once: true });
+      });
+    })
+  );
+}
+
+async function waitForFonts() {
+  if (document.fonts && typeof document.fonts.ready?.then === "function") {
+    try {
+      await document.fonts.ready;
+    } catch (error) {
+      // ignore font loading failures and continue rendering
+    }
+  }
+}
+
 export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) {
   if (!html) {
     throw new Error("Nao ha conteudo para gerar o PDF.");
@@ -130,6 +184,11 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
   document.body.appendChild(container);
 
   try {
+    await waitForAnimationFrame();
+    await waitForImages(container);
+    await waitForFonts();
+    await waitForAnimationFrame();
+
     const filename = options.filename || buildFileName(context);
     const pdfOptions = {
       ...DEFAULT_PDF_OPTIONS,
