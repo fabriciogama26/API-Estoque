@@ -10,7 +10,6 @@ import {
   DocumentosOperations,
   healthCheck,
 } from './_shared/operations.js'
-import { gerarTermoEpiPdf } from './documents/termoEpiRenderer.js'
 
 export default withAuth(async (req, res, user) => {
   const { method, url } = req
@@ -103,19 +102,14 @@ export default withAuth(async (req, res, user) => {
     }
 
     if (path === '/api/documentos/termo-epi' && method === 'GET') {
-      const contexto = await DocumentosOperations.termoEpiContext(query)
-      if (query.format === 'json') {
-        return sendJson(res, 200, contexto)
+      if (query.format && query.format !== 'json') {
+        return sendJson(res, 400, {
+          error: 'Formato nao suportado. Utilize format=json para obter o contexto do termo.',
+        })
       }
 
-      const buffer = await gerarTermoEpiPdf(contexto)
-      res.writeHead(200, {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="termo-epi-${contexto.colaborador.matricula || 'colaborador'}.pdf"`,
-        'Content-Length': buffer.length,
-      })
-      res.end(buffer)
-      return
+      const contexto = await DocumentosOperations.termoEpiContext(query)
+      return sendJson(res, 200, contexto)
     }
 
     // Health check

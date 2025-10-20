@@ -3,18 +3,13 @@ Ambiente de geracao do Termo de EPI
 
 Visao geral
 -----------
-Historicamente o projeto oferecia dois modos para gerar o termo com Puppeteer:
-
-* **Modo online (Supabase)** – usava o banco Supabase e exigia autenticacao.
-* **Modo local (seed)** – consumia os dados do `localDataStore` e dispensava login para testes offline, mantendo a mesma saida do PDF.
-
-> ⚠️ Atualmente o frontend acessa o Supabase diretamente (sem backend) e a geracao de PDF nao esta disponivel. As instrucoes abaixo permanecem apenas como referencia caso volte a existir uma camada serverless.
+Historicamente o projeto dependia de Puppeteer em uma funcao serverless, mas o fluxo atual gera o PDF diretamente no navegador com `html2pdf.js`.
 
 Pontos principais
 -----------------
-* O backend (funcoes em `api/`) verifica a variavel `DATA_MODE`. Quando vale `local`, busca os dados seed e continua usando Puppeteer.
+* O backend (funcoes em `api/`) continua disponivel apenas para montar o contexto (`DocumentosOperations.termoEpiContext`). A rota `/api/documentos/termo-epi` agora responde somente JSON.
 * A pagina `Termos > Termo de EPI` mostra um badge indicando o modo atual. O JSON retornado pela API inclui o campo `origem` (`local` ou `remoto`).
-* O front sempre aciona `/api/documentos/termo-epi` e recebe um PDF. Nao existe mais geracao com `html2pdf.js`.
+* O front nao depende mais de Chromium/Puppeteer: o botao "Baixar PDF" usa `html2pdf.js` para baixar o documento com base no HTML exibido.
 * A lista de saidas nao possui mais botao de termo; toda a experiencia fica na pagina dedicada (veja `docs/TermosEpi.txt`).
 
 Como usar
@@ -35,7 +30,7 @@ $env:DATA_MODE='local'; npx vercel dev --listen 3000
 DATA_MODE=local npx vercel dev --listen 3000
 ```
 
-   Sem esse comando o download dependera do ambiente publicado na Vercel.
+   Sem esse comando o download dependera do ambiente publicado na Vercel para obter o contexto, mas o PDF sera gerado localmente de qualquer forma.
 
 3. Rode o frontend normalmente com `npm run dev` e acesse `http://localhost:5173`.
 
