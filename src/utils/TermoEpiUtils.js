@@ -91,45 +91,46 @@ function buildFileName(context) {
     .toLowerCase() || "colaborador"}.pdf`;
 }
 
-function createRenderContainer(html) {
-  const parser = new DOMParser();
-  const parsed = parser.parseFromString(html, "text/html");
+function createRenderFrame(html) {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "absolute";
+    iframe.style.top = "0";
+    iframe.style.left = "-10000px";
+    iframe.style.width = "794px";
+    iframe.style.height = "1123px";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0.01";
+    iframe.style.pointerEvents = "none";
+    iframe.setAttribute("aria-hidden", "true");
 
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.top = "0";
-  container.style.left = "0";
-  container.style.width = "794px";
-  container.style.minHeight = "1122px";
-  container.style.backgroundColor = "#ffffff";
-  container.style.pointerEvents = "none";
-  container.style.zIndex = "-1";
-  container.style.overflow = "visible";
+    const cleanup = () => {
+      iframe.removeEventListener("load", handleLoad);
+      iframe.removeEventListener("error", handleError);
+    };
 
-  const bodyClass = parsed.body?.getAttribute("class");
-  if (bodyClass) {
-    container.className = bodyClass;
-  }
+    const handleLoad = () => {
+      cleanup();
+      resolve(iframe);
+    };
 
-  const styles = parsed.head?.querySelectorAll("style, link[rel='stylesheet']") || [];
-  styles.forEach((styleNode) => {
-    container.appendChild(styleNode.cloneNode(true));
+    const handleError = () => {
+      cleanup();
+      iframe.remove();
+      reject(new Error("Falha ao preparar o documento para PDF."));
+    };
+
+    iframe.addEventListener("load", handleLoad, { once: true });
+    iframe.addEventListener("error", handleError, { once: true });
+
+    iframe.srcdoc = html;
+    document.body.appendChild(iframe);
   });
-
-  container.insertAdjacentHTML("beforeend", parsed.body?.innerHTML || html);
-
-  container.querySelectorAll("img").forEach((img) => {
-    if (!img.getAttribute("crossorigin")) {
-      img.setAttribute("crossorigin", "anonymous");
-    }
-  });
-
-  return container;
 }
 
-function waitForAnimationFrame() {
-  if (typeof requestAnimationFrame === "function") {
-    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+function waitForAnimationFrame(win = window) {
+  if (typeof win.requestAnimationFrame === "function") {
+    return new Promise((resolve) => win.requestAnimationFrame(() => resolve()));
   }
 
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -161,10 +162,10 @@ async function waitForImages(scope) {
   );
 }
 
-async function waitForFonts() {
-  if (document.fonts && typeof document.fonts.ready?.then === "function") {
+async function waitForFonts(doc = document) {
+  if (doc.fonts && typeof doc.fonts.ready?.then === "function") {
     try {
-      await document.fonts.ready;
+      await doc.fonts.ready;
     } catch (error) {
       // ignore font loading failures and continue rendering
     }
@@ -178,25 +179,60 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
 
   const html2pdf = await ensureHtml2Pdf();
 
-  const container = createRenderContainer(html);
+  const frame = await createRenderFrame(html);
+  const frameWindow = frame.contentWindow;
+  const frameDocument = frame.contentDocument;
+  const target = frameDocument?.body;
 
-  document.body.appendChild(container);
+  if (!frameWindow || !frameDocument || !target) {
+    frame.remove();
+    throw new Error("Nao foi possivel montar o documento para PDF.");
+  }
 
   try {
-    await waitForAnimationFrame();
-    await waitForImages(container);
-    await waitForFonts();
-    await waitForAnimationFrame();
+    target.querySelectorAll("img[src]").forEach((img) => {
+      if (!img.getAttribute("crossorigin")) {
+        img.setAttribute("crossorigin", "anonymous");
+      }
+    });
+
+    await waitForAnimationFrame(frameWindow);
+    await waitForImages(target);
+    await waitForFonts(frameDocument);
+    await waitForAnimationFrame(frameWindow);
+
+    const scrollWidth = Math.max(
+      target.scrollWidth,
+      frameDocument.documentElement.scrollWidth,
+      frameDocument.body?.scrollWidth ?? 0
+    );
+    const scrollHeight = Math.max(
+      target.scrollHeight,
+      frameDocument.documentElement.scrollHeight,
+      frameDocument.body?.scrollHeight ?? 0
+    );
+
+    frame.style.width = `${scrollWidth}px`;
+    frame.style.height = `${scrollHeight}px`;
 
     const filename = options.filename || buildFileName(context);
     const pdfOptions = {
       ...DEFAULT_PDF_OPTIONS,
       ...options,
+      html2canvas: {
+        ...DEFAULT_PDF_OPTIONS.html2canvas,
+        ...(options.html2canvas || {}),
+        windowWidth: scrollWidth,
+        windowHeight: scrollHeight,
+      },
       filename,
     };
 
-    await html2pdf().set(pdfOptions).from(container).save();
+    await html2pdf()
+      .set(pdfOptions)
+      .from(target)
+      .save();
   } finally {
-    container.remove();
+    frame.remove();
   }
 }
