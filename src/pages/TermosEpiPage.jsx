@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon } from '../components/icons.jsx'
-import { isLocalMode } from '../config/runtime.js'
 import { dataClient as dataApi } from '../services/dataClient.js'
 import { buildEpiTermHtml } from '../../shared/documents/epiTermTemplate.js'
 import { downloadTermoEpiPdf } from '../utils/TermoEpiUtils.js'
@@ -23,7 +22,7 @@ const initialPreview = {
 export function TermosEpiPage() {
   const [form, setForm] = useState(initialForm)
   const [preview, setPreview] = useState(initialPreview)
-  const [lastQuery, setLastQuery] = useState(null)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -59,7 +58,6 @@ export function TermosEpiPage() {
         context: contexto,
         html,
       })
-      setLastQuery(query)
     } catch (err) {
       setPreview({
         ...initialPreview,
@@ -69,24 +67,26 @@ export function TermosEpiPage() {
   }
 
   const handleDownload = async () => {
-    if (!preview.context || !preview.html || !lastQuery) {
+    if (!preview.context || !preview.html) {
       return
     }
 
     try {
-      await downloadTermoEpiPdf({ params: lastQuery })
+      setIsDownloading(true)
+      await downloadTermoEpiPdf({ html: preview.html, context: preview.context })
     } catch (err) {
       setPreview((prev) => ({
         ...prev,
         error: err.message || 'Falha ao baixar o PDF.',
       }))
+    } finally {
+      setIsDownloading(false)
     }
   }
 
   const handleReset = () => {
     setForm(initialForm)
     setPreview(initialPreview)
-    setLastQuery(null)
   }
 
   const context = preview.context
@@ -145,8 +145,13 @@ export function TermosEpiPage() {
         <header className="card__header">
           <h2>Pre-visualizacao</h2>
           {preview.html ? (
-            <button type="button" className="button button--ghost" onClick={handleDownload}>
-              Baixar PDF
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleDownload}
+              disabled={isDownloading}
+            >
+              {isDownloading ? 'Gerando PDF...' : 'Baixar PDF'}
             </button>
           ) : null}
         </header>
