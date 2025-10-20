@@ -3,13 +3,13 @@
     "version": 2,
     "buildCommand": "npm run build",
     "outputDirectory": "dist",
+    
     "functions": {
-        "api/index.js": {
-            "runtime": "nodejs20.x",
+        "api/**/*.js": {
+            "runtime": "vercel-node@20",
             "memory": 1024,
             "maxDuration": 60
         }
-        
     },
     "rewrites": [
         {
