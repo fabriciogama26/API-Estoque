@@ -7,7 +7,6 @@ import {
 } from '../lib/estoque.js'
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
 import gruposEpi from '../data/grupos-epi.json'
-import { buildEpiTermHtml } from '../../shared/documents/epiTermTemplate.js'
 import { filterPessoas } from '../rules/PessoasRules.js'
 
 const nowIso = () => new Date().toISOString()
@@ -1193,11 +1192,6 @@ const localApi = {
   documentos: {
     async termoEpiContext(params = {}) {
       return obterContextoTermoEpiLocal(params)
-    },
-    async termoEpiPdf(params = {}) {
-      const contexto = obterContextoTermoEpiLocal(params)
-      const html = buildEpiTermHtml(contexto)
-      return new Blob([html], { type: 'text/html;charset=utf-8' })
     },
   },
 }
