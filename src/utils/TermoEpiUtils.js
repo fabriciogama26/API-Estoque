@@ -90,6 +90,34 @@ function buildFileName(context) {
     .toLowerCase() || "colaborador"}.pdf`;
 }
 
+function createRenderContainer(html) {
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, "text/html");
+
+  const container = document.createElement("div");
+  container.style.position = "absolute";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+  container.style.width = "794px";
+  container.style.padding = "16px";
+  container.style.backgroundColor = "#ffffff";
+
+  const styles = parsed.head?.querySelectorAll("style, link[rel='stylesheet']") || [];
+  styles.forEach((styleNode) => {
+    container.appendChild(styleNode.cloneNode(true));
+  });
+
+  container.insertAdjacentHTML("beforeend", parsed.body?.innerHTML || html);
+
+  container.querySelectorAll("img").forEach((img) => {
+    if (!img.getAttribute("crossorigin")) {
+      img.setAttribute("crossorigin", "anonymous");
+    }
+  });
+
+  return container;
+}
+
 export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) {
   if (!html) {
     throw new Error("Nao ha conteudo para gerar o PDF.");
@@ -97,14 +125,7 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
 
   const html2pdf = await ensureHtml2Pdf();
 
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-9999px";
-  container.style.top = "0";
-  container.style.width = "794px";
-  container.style.padding = "16px";
-  container.style.backgroundColor = "#ffffff";
-  container.innerHTML = html;
+  const container = createRenderContainer(html);
 
   document.body.appendChild(container);
 
