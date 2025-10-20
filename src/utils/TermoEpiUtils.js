@@ -1,5 +1,3 @@
-import html2pdf from "html2pdf.js";
-
 const DEFAULT_PDF_OPTIONS = {
   margin: [10, 10, 10, 10],
   filename: "termo-epi.pdf",
@@ -15,6 +13,68 @@ const DEFAULT_PDF_OPTIONS = {
     orientation: "portrait",
   },
 };
+
+const HTML2PDF_CDN =
+  "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+
+let html2pdfPromise = null;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${src}"]`);
+
+    if (existingScript) {
+      if (existingScript.dataset.loaded === "true") {
+        resolve();
+        return;
+      }
+
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error(`Falha ao carregar ${src}`)), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      resolve();
+    };
+    script.onerror = () => {
+      script.remove();
+      reject(new Error(`Falha ao carregar ${src}`));
+    };
+
+    document.body.appendChild(script);
+  });
+}
+
+async function ensureHtml2Pdf() {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    throw new Error("html2pdf so pode ser carregado no navegador.");
+  }
+
+  if (!html2pdfPromise) {
+    html2pdfPromise = (async () => {
+      if (window.html2pdf) {
+        return window.html2pdf;
+      }
+
+      await loadScript(HTML2PDF_CDN);
+
+      if (!window.html2pdf) {
+        throw new Error("Nao foi possivel inicializar o html2pdf.");
+      }
+
+      return window.html2pdf;
+    })();
+  }
+
+  return html2pdfPromise;
+}
 
 function buildFileName(context) {
   const identificador =
@@ -34,6 +94,8 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
   if (!html) {
     throw new Error("Nao ha conteudo para gerar o PDF.");
   }
+
+  const html2pdf = await ensureHtml2Pdf();
 
   const container = document.createElement("div");
   container.style.position = "fixed";
