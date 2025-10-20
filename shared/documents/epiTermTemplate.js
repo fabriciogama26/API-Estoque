@@ -96,7 +96,7 @@ export function buildEpiTermHtml(context = {}) {
       * {
         box-sizing: border-box;
       }
-      body {
+      .termo-epi-document {
         font-family: 'Segoe UI', Arial, sans-serif;
         font-size: 12px;
         margin: 24px;
@@ -204,9 +204,14 @@ export function buildEpiTermHtml(context = {}) {
       .text-center {
         text-align: center;
       }
+      ol {
+        margin: 0 0 16px 18px;
+        padding: 0;
+        list-style: decimal;
+      }
     </style>
   </head>
-  <body>
+  <body class="termo-epi-document">
     ${cabecalhoEmpresa}
     <div class="titulo-principal">Termo de responsabilidade de uso do equipamento de proteção individual</div>
     <table class="quadro-colaborador">
@@ -244,8 +249,14 @@ export function buildEpiTermHtml(context = {}) {
         <li>Comunicar à área de Segurança do Trabalho, através do Coordenador, Líder e/ou Supervisor imediato, qualquer alteração no EPI que o torne parcial ou totalmente danificado. Em caso de inutilização por uso inadequado ou extravio por minha culpa, ou pela não devolução dos mesmos no ato da rescisão do contrato de trabalho, autorizo o desconto do valor de custo do referido material em meus salários/proventos;</li>
         <li>Atesto que recebi da área de SESMT treinamento sobre a utilização correta e conservação dos EPIs que me foram entregues.</li>
       </ol>
-    
+
     </div>
+    <div class="assinaturas">
+      <div class="assinaturas__area">
+        <div class="assinaturas__linha"></div>
+        <div>${assinaturaColaborador}</div>
+        <div>Colaborador</div>
+      </div>
       <div class="assinaturas__area">
         <div class="assinaturas__linha"></div>
         <div>Responsável pela entrega</div>
