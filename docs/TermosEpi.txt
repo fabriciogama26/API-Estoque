@@ -17,7 +17,7 @@ Fluxo de dados
 1. Submissao chama `dataClient.documentos.termoEpiContext(query)` com `format=json`.
 2. O backend (`DocumentosOperations.termoEpiContext`) resolve os dados do colaborador e das ultimas saidas e adiciona `origem` (`local` ou `remoto`).
 3. O frontend constrói o HTML com `buildEpiTermHtml(contexto)` e armazena em `preview.html` para pre-visualizacao no `<iframe>`.
-4. O botao "Baixar PDF" chama `downloadTermoEpiPdf`, que redireciona para `/api/documentos/termo-epi` (sem `format=json`) e baixa o binario retornado.
+4. O botao "Baixar PDF" chama `downloadTermoEpiPdf`, que usa `html2pdf.js` para converter o HTML ja renderizado no navegador em um arquivo PDF.
 
 Estados e mensagens
 -------------------
@@ -35,7 +35,7 @@ Pre-visualizacao
 
 Persistencia
 ------------
-- **Modo remoto**: Supabase é acessado diretamente pelo frontend (`@supabase/supabase-js`).\r\n- **Modo local**: `localApi.documentos.termoEpiContext` continua disponível apenas para desenvolvimento offline (sem geração de PDF).
+- **Modo remoto**: Supabase é acessado diretamente pelo frontend (`@supabase/supabase-js`).\r\n- **Modo local**: `localApi.documentos.termoEpiContext` continua disponível apenas para desenvolvimento offline; o PDF é gerado sempre no cliente via `html2pdf.js`.
 
 Recursos relacionados
 ---------------------
