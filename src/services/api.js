@@ -967,52 +967,6 @@ export const api = {
         },
       }
     },
-    async termoEpiPdf(params = {}) {
-      const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
-      if (!base) {
-        const err = new Error('VITE_API_URL não configurado para geração de PDF.')
-        err.status = 500
-        throw err
-      }
-
-      const url = new URL('/api/documentos/termo-epi', base)
-      url.searchParams.set('format', 'pdf')
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && String(value).trim() !== '') {
-          url.searchParams.set(key, value)
-        }
-      })
-
-      const { data } = await supabase.auth.getSession()
-      const token = data?.session?.access_token
-      const headers = new Headers()
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`)
-      }
-
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers,
-      })
-
-      if (!response.ok) {
-        const text = await response.text()
-        let message = 'Falha ao gerar PDF.'
-        try {
-          const payload = JSON.parse(text)
-          message = payload.error || payload.message || message
-        } catch {
-          if (text) {
-            message = text
-          }
-        }
-        const error = new Error(message)
-        error.status = response.status
-        throw error
-      }
-
-      return response.blob()
-    },
   },
 }
 
