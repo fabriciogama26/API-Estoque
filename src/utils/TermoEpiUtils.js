@@ -102,7 +102,7 @@ function createRenderContainer(html) {
   container.style.width = "794px";
   container.style.minHeight = "1122px";
   container.style.backgroundColor = "#ffffff";
-  container.style.visibility = "hidden";
+  container.style.opacity = "0";
   container.style.pointerEvents = "none";
   container.style.zIndex = "-1";
   container.style.overflow = "visible";
