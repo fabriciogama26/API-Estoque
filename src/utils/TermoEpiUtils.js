@@ -115,20 +115,23 @@ function createRenderContainer(html) {
     container.className = bodyClass;
   }
 
-  const styles = parsed.head?.querySelectorAll("style, link[rel='stylesheet']") || [];
-  styles.forEach((styleNode) => {
-    container.appendChild(styleNode.cloneNode(true));
+    const handleLoad = () => {
+      cleanup();
+      resolve(iframe);
+    };
+
+    const handleError = () => {
+      cleanup();
+      iframe.remove();
+      reject(new Error("Falha ao preparar o documento para PDF."));
+    };
+
+    iframe.addEventListener("load", handleLoad, { once: true });
+    iframe.addEventListener("error", handleError, { once: true });
+
+    iframe.srcdoc = html;
+    document.body.appendChild(iframe);
   });
-
-  container.insertAdjacentHTML("beforeend", parsed.body?.innerHTML || html);
-
-  container.querySelectorAll("img").forEach((img) => {
-    if (!img.getAttribute("crossorigin")) {
-      img.setAttribute("crossorigin", "anonymous");
-    }
-  });
-
-  return container;
 }
 
 function isSupabaseStorageUrl(src) {
@@ -268,10 +271,10 @@ async function waitForImages(scope) {
   );
 }
 
-async function waitForFonts() {
-  if (document.fonts && typeof document.fonts.ready?.then === "function") {
+async function waitForFonts(doc = document) {
+  if (doc.fonts && typeof doc.fonts.ready?.then === "function") {
     try {
-      await document.fonts.ready;
+      await doc.fonts.ready;
     } catch (error) {
       // ignore font loading failures and continue rendering
     }
@@ -285,9 +288,15 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
 
   const html2pdf = await ensureHtml2Pdf();
 
-  const container = createRenderContainer(html);
+  const frame = await createRenderFrame(html);
+  const frameWindow = frame.contentWindow;
+  const frameDocument = frame.contentDocument;
+  const target = frameDocument?.body;
 
-  document.body.appendChild(container);
+  if (!frameWindow || !frameDocument || !target) {
+    frame.remove();
+    throw new Error("Nao foi possivel montar o documento para PDF.");
+  }
 
   try {
     await waitForAnimationFrame();
@@ -300,11 +309,20 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
     const pdfOptions = {
       ...DEFAULT_PDF_OPTIONS,
       ...options,
+      html2canvas: {
+        ...DEFAULT_PDF_OPTIONS.html2canvas,
+        ...(options.html2canvas || {}),
+        windowWidth: scrollWidth,
+        windowHeight: scrollHeight,
+      },
       filename,
     };
 
-    await html2pdf().set(pdfOptions).from(container).save();
+    await html2pdf()
+      .set(pdfOptions)
+      .from(target)
+      .save();
   } finally {
-    container.remove();
+    frame.remove();
   }
 }
