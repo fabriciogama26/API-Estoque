@@ -31,6 +31,13 @@ export function TermosEpiPage() {
     }
   }, [preview])
 
+  useEffect(() => {
+    window.__downloadTermoEpiPdf = downloadTermoEpiPdf
+    return () => {
+      delete window.__downloadTermoEpiPdf
+    }
+  }, [])
+
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((prev) => ({ ...prev, [name]: value }))
