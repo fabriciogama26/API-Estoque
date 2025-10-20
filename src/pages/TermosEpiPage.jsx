@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon } from '../components/icons.jsx'
 import { dataClient as dataApi } from '../services/dataClient.js'
@@ -23,6 +23,13 @@ export function TermosEpiPage() {
   const [form, setForm] = useState(initialForm)
   const [preview, setPreview] = useState(initialPreview)
   const [isDownloading, setIsDownloading] = useState(false)
+
+  useEffect(() => {
+    window.__TERMO_PREVIEW = preview
+    return () => {
+      delete window.__TERMO_PREVIEW
+    }
+  }, [preview])
 
   const handleChange = (event) => {
     const { name, value } = event.target
