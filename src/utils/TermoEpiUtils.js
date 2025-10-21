@@ -81,9 +81,10 @@ async function ensureHtml2Pdf() {
 }
 
 function buildFileName(context) {
+  const colaborador = context && context.colaborador ? context.colaborador : null;
   const identificador =
-    context?.colaborador?.matricula ||
-    context?.colaborador?.nome ||
+    (colaborador && colaborador.matricula) ||
+    (colaborador && colaborador.nome) ||
     "colaborador";
 
   return `termo-epi-${String(identificador)
@@ -272,9 +273,11 @@ async function waitForImages(scope) {
 }
 
 async function waitForFonts(doc = document) {
-  if (doc.fonts && typeof doc.fonts.ready?.then === "function") {
+  const fonts = doc && doc.fonts ? doc.fonts : null;
+  const fontsReady = fonts && fonts.ready ? fonts.ready : null;
+  if (fontsReady && typeof fontsReady.then === "function") {
     try {
-      await doc.fonts.ready;
+      await fontsReady;
     } catch (error) {
       // ignore font loading failures and continue rendering
     }
@@ -291,7 +294,7 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
   const frame = await createRenderFrame(html);
   const frameWindow = frame.contentWindow;
   const frameDocument = frame.contentDocument;
-  const target = frameDocument?.body;
+  const target = frameDocument && frameDocument.body ? frameDocument.body : null;
 
   if (!frameWindow || !frameDocument || !target) {
     frame.remove();
@@ -299,11 +302,52 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
   }
 
   try {
-    await waitForAnimationFrame();
-    await inlineImages(container);
-    await waitForImages(container);
-    await waitForFonts();
-    await waitForAnimationFrame();
+    target.querySelectorAll("img[src]").forEach((img) => {
+      if (!img.getAttribute("crossorigin")) {
+        img.setAttribute("crossorigin", "anonymous");
+      }
+    });
+
+    await waitForAnimationFrame(frameWindow);
+    await waitForImages(target);
+    await waitForFonts(frameDocument);
+    await waitForAnimationFrame(frameWindow);
+
+    const fallbackWidth = 794;
+    const fallbackHeight = 1123;
+    const bodyScrollWidth =
+      frameDocument.body && typeof frameDocument.body.scrollWidth === "number"
+        ? frameDocument.body.scrollWidth
+        : 0;
+    const bodyScrollHeight =
+      frameDocument.body && typeof frameDocument.body.scrollHeight === "number"
+        ? frameDocument.body.scrollHeight
+        : 0;
+    const scrollWidth = Math.max(
+      target.scrollWidth || 0,
+      frameDocument.documentElement ? frameDocument.documentElement.scrollWidth || 0 : 0,
+      bodyScrollWidth,
+      fallbackWidth
+    );
+    const scrollHeight = Math.max(
+      target.scrollHeight || 0,
+      frameDocument.documentElement ? frameDocument.documentElement.scrollHeight || 0 : 0,
+      bodyScrollHeight,
+      fallbackHeight
+    );
+
+    frame.style.width = `${scrollWidth}px`;
+    frame.style.height = `${scrollHeight}px`;
+    if (frameDocument.documentElement) {
+      frameDocument.documentElement.style.width = `${scrollWidth}px`;
+      frameDocument.documentElement.style.height = `${scrollHeight}px`;
+      frameDocument.documentElement.style.backgroundColor =
+        frameDocument.documentElement.style.backgroundColor || "#ffffff";
+    }
+    target.style.width = `${scrollWidth}px`;
+    target.style.minWidth = `${scrollWidth}px`;
+    target.style.height = `${scrollHeight}px`;
+    target.style.minHeight = `${scrollHeight}px`;
 
     const filename = options.filename || buildFileName(context);
     const pdfOptions = {
@@ -318,11 +362,10 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
       filename,
     };
 
-    await html2pdf()
-      .set(pdfOptions)
-      .from(target)
-      .save();
+    const pdfBuilder = html2pdf();
+    await pdfBuilder.set(pdfOptions).from(target).save();
   } finally {
     frame.remove();
   }
 }
+    target.style.backgroundColor = target.style.backgroundColor || "#ffffff";

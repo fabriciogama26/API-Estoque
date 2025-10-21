@@ -81,18 +81,31 @@ export function AuthProvider({ children }) {
     let active = true
 
     const syncUser = async () => {
-      const { data, error } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
       if (!active) {
         return
       }
-      if (error) {
-        if (error.name !== 'AuthSessionMissingError') {
-          console.warn('Nao foi possivel obter usuario do Supabase', error)
-        }
+      if (sessionError) {
+        console.warn('Nao foi possivel obter sessao do Supabase', sessionError)
         setUser(null)
+        window.localStorage.removeItem(STORAGE_KEY)
         return
       }
-      setUser(parseSupabaseUser(data?.session?.user))
+
+      const session = sessionData?.session
+      if (!session) {
+        setUser(null)
+        window.localStorage.removeItem(STORAGE_KEY)
+        return
+      }
+
+      const nextUser = parseSupabaseUser(session.user)
+      setUser(nextUser)
+      if (nextUser) {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
+      } else {
+        window.localStorage.removeItem(STORAGE_KEY)
+      }
     }
 
     syncUser()
