@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import puppeteer from "puppeteer";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +7,6 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Expose-Headers": "Content-Disposition",
 };
 
-const VIEWPORT = { width: 1240, height: 1754, deviceScaleFactor: 2 } as const;
-const PDF_TIMEOUT_MS = 15_000;
 const PDF_FILENAME = "termo-epi.pdf";
 
 serve(async (req: Request): Promise<Response> => {
@@ -18,10 +15,8 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const key = getBrowserlessKey();
     const input = await resolveInput(req);
-    const endpoint = buildBrowserlessEndpoint(key);
-    const pdfBytes = await renderPdf({ ...input, endpoint });
+    const pdfBytes = await renderPdf(input);
 
     const headers = new Headers({
       ...corsHeaders,
@@ -33,34 +28,39 @@ serve(async (req: Request): Promise<Response> => {
 
     return new Response(pdfBytes, { status: 200, headers });
   } catch (error) {
-    console.error("Erro ao gerar PDF na função termo-epi:", error);
+    console.error("Erro ao gerar PDF na funcao termo-epi:", error);
 
     if (error instanceof HttpError) {
       return jsonError(error.message, error.status, error.headers);
     }
 
     if (isTimeoutError(error)) {
-      return jsonError(
-        "A geração do PDF excedeu o tempo limite. Tente novamente.",
-        504,
-      );
+      return jsonError("A geracao do PDF excedeu o tempo limite. Tente novamente.", 504);
     }
 
     if (isBrowserlessAuthError(error)) {
       return jsonError(
-        "Falha na autenticação com o serviço de renderização. Verifique a chave configurada.",
+        "Falha na autenticacao com o servico de renderizacao. Verifique a chave configurada.",
         502,
       );
     }
 
     if (isBrowserlessConnectionError(error)) {
-      return jsonError(
-        "Não foi possível conectar ao serviço de renderização de PDF.",
-        502,
-      );
+      return jsonError("Nao foi possivel conectar ao servico de renderizacao de PDF.", 502);
     }
 
-    return jsonError("Erro inesperado ao gerar o PDF.", 500);
+    let message: string;
+    if (typeof ErrorEvent !== "undefined" && error instanceof ErrorEvent) {
+      message = `${error.type || "ErrorEvent"}: ${
+        error.message ?? "Falha de comunicacao com o servico de PDF."
+      }`;
+    } else if (error instanceof Error) {
+      message = `${error.name}: ${error.message}`;
+    } else {
+      message = `Erro inesperado: ${String(error)}`;
+    }
+
+    return jsonError(message, 500);
   }
 });
 
@@ -69,45 +69,49 @@ type RenderInput = {
   url?: string;
 };
 
-type RenderOptions = RenderInput & { endpoint: string };
+async function renderPdf({ html, url }: RenderInput): Promise<Uint8Array> {
+  const key = getBrowserlessKey();
+  const endpoint = buildBrowserlessPdfEndpoint(key);
 
-async function renderPdf({ html, url, endpoint }: RenderOptions): Promise<Uint8Array> {
-  const browser = await puppeteer.connect({ browserWSEndpoint: endpoint });
+  const payload: Record<string, unknown> = {
+    options: {
+      format: "A4",
+      printBackground: true,
+      margin: {
+        top: "10mm",
+        right: "10mm",
+        bottom: "10mm",
+        left: "10mm",
+      },
+    },
+  };
 
-  try {
-    const page = await browser.newPage();
-    try {
-      await page.setViewport(VIEWPORT);
-      page.setDefaultNavigationTimeout(PDF_TIMEOUT_MS);
-      page.setDefaultTimeout(PDF_TIMEOUT_MS);
-
-      if (html) {
-        await page.setContent(html, {
-          waitUntil: "networkidle0",
-          timeout: PDF_TIMEOUT_MS,
-        });
-      } else if (url) {
-        await page.goto(url, {
-          waitUntil: "networkidle0",
-          timeout: PDF_TIMEOUT_MS,
-        });
-      } else {
-        throw new HttpError(400, "Nenhum conteúdo recebido para gerar o PDF.");
-      }
-
-      await page.emulateMediaType("screen");
-
-      return await page.pdf({
-        format: "A4",
-        margin: { top: "10mm", right: "10mm", bottom: "10mm", left: "10mm" },
-        printBackground: true,
-      });
-    } finally {
-      await page.close();
-    }
-  } finally {
-    await browser.close();
+  if (html) {
+    payload.html = html;
+  } else if (url) {
+    payload.url = url;
+  } else {
+    throw new HttpError(400, "Nenhum conteudo recebido para gerar o PDF.");
   }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new HttpError(
+      response.status,
+      `Falha ao gerar PDF no Browserless (status ${response.status}). Detalhes: ${text}`,
+    );
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
 }
 
 async function resolveInput(req: Request): Promise<RenderInput> {
@@ -117,33 +121,27 @@ async function resolveInput(req: Request): Promise<RenderInput> {
   if (method === "GET") {
     const targetUrl = requestUrl.searchParams.get("url");
     if (!targetUrl) {
-      throw new HttpError(
-        400,
-        "Informe a URL pública pelo parâmetro `url` para gerar o PDF.",
-      );
+      throw new HttpError(400, "Informe a URL publica pelo parametro `url` para gerar o PDF.");
     }
     return { url: normalizeUrl(targetUrl) };
   }
 
   if (method === "POST") {
-    const body = await readJsonBody(req);
-    const rawHtml = body.html;
-    const rawUrl = body.url ?? body.link;
+    const data = await readJsonBody(req);
+    const rawHtml = data.html ?? data.content ?? data.body ?? data.markup;
+    const rawUrl = data.url ?? data.href ?? data.link;
 
-    const html = rawHtml === undefined ? undefined : normalizeHtml(rawHtml);
+    const html = rawHtml === undefined ? undefined : normalizeHtmlDocument(rawHtml);
     const url = rawUrl === undefined ? undefined : normalizeUrl(rawUrl);
 
     if (!html && !url) {
-      throw new HttpError(
-        400,
-        "Informe o HTML ou uma URL para gerar o PDF.",
-      );
+      throw new HttpError(400, "Informe o HTML ou uma URL para gerar o PDF.");
     }
 
     return { html, url };
   }
 
-  throw new HttpError(405, "Método não suportado.", {
+  throw new HttpError(405, "Metodo nao suportado.", {
     Allow: "GET, POST, OPTIONS",
   });
 }
@@ -152,59 +150,71 @@ async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {
     const data = await req.json();
     if (!data || typeof data !== "object") {
-      throw new HttpError(
-        400,
-        "Envie um JSON válido com os campos `html` ou `url`.",
-      );
+      throw new HttpError(400, "Envie um JSON valido com os campos `html` ou `url`.");
     }
     return data as Record<string, unknown>;
   } catch (error) {
     if (error instanceof HttpError) {
       throw error;
     }
-    throw new HttpError(400, "Não foi possível interpretar o corpo da requisição como JSON.");
+    throw new HttpError(400, "Nao foi possivel interpretar o corpo da requisicao como JSON.");
   }
 }
 
-function normalizeHtml(raw: unknown): string {
+function normalizeHtmlDocument(raw: unknown): string {
   if (typeof raw !== "string") {
     throw new HttpError(400, "O campo `html` deve ser uma string.");
   }
 
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    throw new HttpError(400, "O HTML fornecido está vazio.");
+  let html = raw.trim();
+  if (!html) {
+    throw new HttpError(400, "O HTML enviado esta vazio.");
   }
 
-  if (!/<html[\s>]/i.test(trimmed)) {
-    return wrapHtml(trimmed);
+  if (!/^<!DOCTYPE/i.test(html)) {
+    html = "<!DOCTYPE html>\n" + html;
   }
 
-  let html = trimmed;
-
-  if (!/<!doctype/i.test(html)) {
-    html = `<!DOCTYPE html>\n${html}`;
-  }
-
-  if (!/<meta[^>]+charset=/i.test(html)) {
-    if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(
-        /<head([^>]*)>/i,
-        (match, attrs) => `<head${attrs}>\n    <meta charset="utf-8" />`,
-      );
-    } else {
-      html = html.replace(
-        /<html([^>]*)>/i,
-        (match, attrs) => `<html${attrs}>\n<head>\n    <meta charset="utf-8" />\n</head>`,
-      );
-    }
+  if (!/<html[\s>]/i.test(html)) {
+    html = wrapHtml(html);
+  } else {
+    html = ensureMetaCharset(html);
   }
 
   return html;
 }
 
+function ensureMetaCharset(html: string): string {
+  if (/<head[\s\S]*?<\/head>/i.test(html)) {
+    if (!/<meta[^>]+charset=/i.test(html)) {
+      return html.replace(
+        /<head([^>]*)>/i,
+        (match, attrs) => `<head${attrs}>\n    <meta charset="utf-8" />`,
+      );
+    }
+    return html;
+  }
+
+  return html.replace(
+    /<html([^>]*)>/i,
+    (match, attrs) =>
+      `<html${attrs}>\n<head>\n    <meta charset="utf-8" />\n</head>`,
+  );
+}
+
 function wrapHtml(content: string): string {
-  return `<!DOCTYPE html>\n<html lang="pt-BR">\n  <head>\n    <meta charset="utf-8" />\n    <meta http-equiv="X-UA-Compatible" content="IE=edge" />\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n    <title>Termo de EPI</title>\n  </head>\n  <body>\n${content}\n  </body>\n</html>`;
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Termo de EPI</title>
+  </head>
+  <body>
+${content}
+  </body>
+</html>`;
 }
 
 function normalizeUrl(raw: unknown): string {
@@ -214,7 +224,7 @@ function normalizeUrl(raw: unknown): string {
 
   let value = raw.trim();
   if (!value) {
-    throw new HttpError(400, "Informe uma URL válida para gerar o PDF.");
+    throw new HttpError(400, "Informe uma URL valida para gerar o PDF.");
   }
 
   if (!/^https?:\/\//i.test(value)) {
@@ -225,11 +235,11 @@ function normalizeUrl(raw: unknown): string {
   try {
     parsed = new URL(value);
   } catch {
-    throw new HttpError(400, "Informe uma URL válida para gerar o PDF.");
+    throw new HttpError(400, "Informe uma URL valida para gerar o PDF.");
   }
 
   if (!/^https?:$/i.test(parsed.protocol)) {
-    throw new HttpError(400, "Apenas URLs HTTP(s) são suportadas.");
+    throw new HttpError(400, "Apenas URLs HTTP(s) sao suportadas.");
   }
 
   return parsed.toString();
@@ -240,14 +250,14 @@ function getBrowserlessKey(): string {
   if (!key) {
     throw new HttpError(
       500,
-      "Variável de ambiente PUPPETEER_BROWSERLESS_IO_KEY não configurada.",
+      "Variavel de ambiente PUPPETEER_BROWSERLESS_IO_KEY nao configurada.",
     );
   }
   return key;
 }
 
-function buildBrowserlessEndpoint(key: string): string {
-  return `wss://chrome.browserless.io?token=${encodeURIComponent(key)}`;
+function buildBrowserlessPdfEndpoint(key: string): string {
+  return `https://production-sfo.browserless.io/pdf?token=${encodeURIComponent(key)}`;
 }
 
 class HttpError extends Error {
@@ -301,7 +311,11 @@ function isBrowserlessAuthError(error: unknown): boolean {
 }
 
 function isBrowserlessConnectionError(error: unknown): boolean {
-  if (error instanceof Deno.errors.ConnectionRefused || error instanceof Deno.errors.NotConnected) {
+  if (
+    error instanceof Deno.errors.ConnectionRefused ||
+    error instanceof Deno.errors.NotConnected ||
+    error instanceof Deno.errors.BrokenPipe
+  ) {
     return true;
   }
 
@@ -312,7 +326,7 @@ function isBrowserlessConnectionError(error: unknown): boolean {
   const message = error.message.toLowerCase();
   return (
     message.includes("socket") ||
-    message.includes("websocket") ||
+    message.includes("network") ||
     message.includes("connection") ||
     message.includes("closed before")
   );
