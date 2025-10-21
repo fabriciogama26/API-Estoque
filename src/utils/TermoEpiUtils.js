@@ -78,9 +78,10 @@ async function ensureHtml2Pdf() {
 }
 
 function buildFileName(context) {
+  const colaborador = context && context.colaborador ? context.colaborador : null;
   const identificador =
-    context?.colaborador?.matricula ||
-    context?.colaborador?.nome ||
+    (colaborador && colaborador.matricula) ||
+    (colaborador && colaborador.nome) ||
     "colaborador";
 
   return `termo-epi-${String(identificador)
@@ -163,9 +164,11 @@ async function waitForImages(scope) {
 }
 
 async function waitForFonts(doc = document) {
-  if (doc.fonts && typeof doc.fonts.ready?.then === "function") {
+  const fonts = doc && doc.fonts ? doc.fonts : null;
+  const fontsReady = fonts && fonts.ready ? fonts.ready : null;
+  if (fontsReady && typeof fontsReady.then === "function") {
     try {
-      await doc.fonts.ready;
+      await fontsReady;
     } catch (error) {
       // ignore font loading failures and continue rendering
     }
@@ -182,7 +185,7 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
   const frame = await createRenderFrame(html);
   const frameWindow = frame.contentWindow;
   const frameDocument = frame.contentDocument;
-  const target = frameDocument?.body;
+  const target = frameDocument && frameDocument.body ? frameDocument.body : null;
 
   if (!frameWindow || !frameDocument || !target) {
     frame.remove();
@@ -204,12 +207,16 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
     const scrollWidth = Math.max(
       target.scrollWidth,
       frameDocument.documentElement.scrollWidth,
-      frameDocument.body?.scrollWidth ?? 0
+      frameDocument.body && frameDocument.body.scrollWidth
+        ? frameDocument.body.scrollWidth
+        : 0
     );
     const scrollHeight = Math.max(
       target.scrollHeight,
       frameDocument.documentElement.scrollHeight,
-      frameDocument.body?.scrollHeight ?? 0
+      frameDocument.body && frameDocument.body.scrollHeight
+        ? frameDocument.body.scrollHeight
+        : 0
     );
 
     frame.style.width = `${scrollWidth}px`;
@@ -228,10 +235,8 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
       filename,
     };
 
-    await html2pdf()
-      .set(pdfOptions)
-      .from(target)
-      .save();
+    const pdfBuilder = html2pdf();
+    await pdfBuilder.set(pdfOptions).from(target).save();
   } finally {
     frame.remove();
   }
