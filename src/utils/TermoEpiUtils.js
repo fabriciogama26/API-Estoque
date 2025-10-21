@@ -348,6 +348,7 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
     target.style.minWidth = `${scrollWidth}px`;
     target.style.height = `${scrollHeight}px`;
     target.style.minHeight = `${scrollHeight}px`;
+    target.style.backgroundColor = target.style.backgroundColor || "#ffffff";
 
     const filename = options.filename || buildFileName(context);
     const pdfOptions = {
@@ -368,4 +369,3 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
     frame.remove();
   }
 }
-    target.style.backgroundColor = target.style.backgroundColor || "#ffffff";
