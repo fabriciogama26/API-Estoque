@@ -204,23 +204,41 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
     await waitForFonts(frameDocument);
     await waitForAnimationFrame(frameWindow);
 
-    const scrollWidth = Math.max(
-      target.scrollWidth,
-      frameDocument.documentElement.scrollWidth,
-      frameDocument.body && frameDocument.body.scrollWidth
+    const fallbackWidth = 794;
+    const fallbackHeight = 1123;
+    const bodyScrollWidth =
+      frameDocument.body && typeof frameDocument.body.scrollWidth === "number"
         ? frameDocument.body.scrollWidth
-        : 0
+        : 0;
+    const bodyScrollHeight =
+      frameDocument.body && typeof frameDocument.body.scrollHeight === "number"
+        ? frameDocument.body.scrollHeight
+        : 0;
+    const scrollWidth = Math.max(
+      target.scrollWidth || 0,
+      frameDocument.documentElement ? frameDocument.documentElement.scrollWidth || 0 : 0,
+      bodyScrollWidth,
+      fallbackWidth
     );
     const scrollHeight = Math.max(
-      target.scrollHeight,
-      frameDocument.documentElement.scrollHeight,
-      frameDocument.body && frameDocument.body.scrollHeight
-        ? frameDocument.body.scrollHeight
-        : 0
+      target.scrollHeight || 0,
+      frameDocument.documentElement ? frameDocument.documentElement.scrollHeight || 0 : 0,
+      bodyScrollHeight,
+      fallbackHeight
     );
 
     frame.style.width = `${scrollWidth}px`;
     frame.style.height = `${scrollHeight}px`;
+    if (frameDocument.documentElement) {
+      frameDocument.documentElement.style.width = `${scrollWidth}px`;
+      frameDocument.documentElement.style.height = `${scrollHeight}px`;
+      frameDocument.documentElement.style.backgroundColor =
+        frameDocument.documentElement.style.backgroundColor || "#ffffff";
+    }
+    target.style.width = `${scrollWidth}px`;
+    target.style.minWidth = `${scrollWidth}px`;
+    target.style.height = `${scrollHeight}px`;
+    target.style.minHeight = `${scrollHeight}px`;
 
     const filename = options.filename || buildFileName(context);
     const pdfOptions = {
@@ -241,3 +259,4 @@ export async function downloadTermoEpiPdf({ html, context, options = {} } = {}) 
     frame.remove();
   }
 }
+    target.style.backgroundColor = target.style.backgroundColor || "#ffffff";
