@@ -18,7 +18,6 @@ const DEFAULT_PDF_OPTIONS = {
   },
 };
 
-
 const HTML2PDF_CDN =
   "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
 
@@ -96,26 +95,23 @@ function buildFileName(context) {
     .toLowerCase() || "colaborador"}.pdf`;
 }
 
-function createRenderContainer(html) {
-  const parser = new DOMParser();
-  const parsed = parser.parseFromString(html, "text/html");
+function createRenderFrame(html) {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "absolute";
+    iframe.style.top = "0";
+    iframe.style.left = "-10000px";
+    iframe.style.width = "794px";
+    iframe.style.height = "1123px";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0.01";
+    iframe.style.pointerEvents = "none";
+    iframe.setAttribute("aria-hidden", "true");
 
-  const container = document.createElement("div");
-  container.style.position = "absolute";
-  container.style.top = "0";
-  container.style.left = "-9999px";
-  container.style.width = "794px";
-  container.style.minHeight = "1122px";
-  container.style.backgroundColor = "#ffffff";
-  container.style.pointerEvents = "none";
-  container.style.visibility = "hidden";
-  container.style.zIndex = "-1";
-  container.style.overflow = "visible";
-
-  const bodyClass = parsed.body?.getAttribute("class");
-  if (bodyClass) {
-    container.className = bodyClass;
-  }
+    const cleanup = () => {
+      iframe.removeEventListener("load", handleLoad);
+      iframe.removeEventListener("error", handleError);
+    };
 
     const handleLoad = () => {
       cleanup();
@@ -150,6 +146,8 @@ function isSupabaseStorageUrl(src) {
     }
     return src.includes(".supabase.co/storage/");
   } catch (_error) {
+    
+    console.warn("Erro ao verificar URL do Supabase Storage", _error);
     return false;
   }
 }
@@ -206,6 +204,7 @@ async function fetchImageAsDataUrl(src) {
 }
 
 async function inlineImages(container) {
+  await waitForAnimationFrame();
   const images = Array.from(container.querySelectorAll("img[src]"));
   if (!images.length) {
     return;
@@ -281,6 +280,7 @@ async function waitForFonts(doc = document) {
       await fontsReady;
     } catch (error) {
       // ignore font loading failures and continue rendering
+      console.warn("Erro ao carregar fontes", error);
     }
   }
 }
