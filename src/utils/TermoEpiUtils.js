@@ -18,6 +18,7 @@ const DEFAULT_PDF_OPTIONS = {
   },
 };
 
+
 const HTML2PDF_CDN =
   "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
 
