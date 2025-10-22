@@ -17,8 +17,8 @@ function validarSaida({ pessoa, material, quantidade, dataEntrega, centroCusto, 
   if (estoqueDisponivel !== undefined && Number(quantidade) > estoqueDisponivel) {
     throw new Error('Quantidade informada maior que estoque disponivel');
   }
-  if (dataEntrega && Number.isNaN(Date.parse(dataEntrega))) {
-    throw new Error('Data de entrega invalida');
+  if (!dataEntrega || Number.isNaN(Date.parse(dataEntrega))) {
+    throw new Error('Data de entrega obrigatoria e deve ser valida');
   }
 }
 

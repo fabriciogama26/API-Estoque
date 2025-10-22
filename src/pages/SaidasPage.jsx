@@ -118,6 +118,10 @@ export function SaidasPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (!form.dataEntrega) {
+      setError('Informe a data de entrega.')
+      return
+    }
     setIsSaving(true)
     setError(null)
     try {
@@ -127,7 +131,7 @@ export function SaidasPage() {
         quantidade: Number(form.quantidade),
         centroCusto: form.centroCusto.trim(),
         centroServico: form.centroServico.trim(),
-        dataEntrega: form.dataEntrega || undefined,
+        dataEntrega: form.dataEntrega,
         usuarioResponsavel: user?.name || user?.username || 'sistema',
       }
       await api.saidas.create(payload)
@@ -233,10 +237,10 @@ export function SaidasPage() {
               placeholder="Ex: Operacao"
             />
           </label>
-          <label className="field">
-            <span>Data de entrega</span>
-            <input type="date" name="dataEntrega" value={form.dataEntrega} onChange={handleChange} />
-          </label>
+        <label className="field">
+          <span>Data de entrega*</span>
+          <input type="date" name="dataEntrega" value={form.dataEntrega} onChange={handleChange} required />
+        </label>
         </div>
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
