@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import '../styles/LoginPage.css'
 
-const logoSrc = '/logo_epicontrol.png'
+const logoSrc = '/logo2.png'
 
 const BadgeIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className="field__icon">
@@ -24,22 +24,27 @@ const LockIcon = () => (
 )
 
 export function LoginPage() {
-  const { login } = useAuth()
+  const { login, recoverPassword } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [form, setForm] = useState({ username: '', password: '', remember: false })
+  const [form, setForm] = useState({ username: '', password: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [status, setStatus] = useState(null)
+  const [isRecovering, setIsRecovering] = useState(false)
 
   const from = location.state?.from?.pathname ?? '/'
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target
+    setError(null)
+    setStatus(null)
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    setStatus(null)
     setError(null)
     setIsSubmitting(true)
     try {
@@ -49,6 +54,27 @@ export function LoginPage() {
       setError(err.message)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handlePasswordRecovery = async () => {
+    setStatus(null)
+    setError(null)
+
+    const email = form.username?.trim() ?? ''
+    if (!email) {
+      setError('Informe seu email para recuperar a senha.')
+      return
+    }
+
+    setIsRecovering(true)
+    try {
+      await recoverPassword(email)
+      setStatus('Enviamos um link de recuperação para o seu email.')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setIsRecovering(false)
     }
   }
 
@@ -96,13 +122,17 @@ export function LoginPage() {
         </label>
 
         {error ? <p className="feedback feedback--error">{error}</p> : null}
+        {status ? <p className="feedback feedback--success">{status}</p> : null}
 
         <div className="login-auth-card__options">
-          <label className="login-checkbox">
-            <input type="checkbox" name="remember" checked={form.remember} onChange={handleChange} />
-            <span>Manter conectado</span>
-          </label>
-          <button type="button" className="link-button">Esqueceu a senha?</button>
+          <button
+            type="button"
+            className="link-button"
+            onClick={handlePasswordRecovery}
+            disabled={isRecovering}
+          >
+            {isRecovering ? 'Enviando...' : 'Esqueceu a senha?'}
+          </button>
         </div>
 
         <button type="submit" className="button login-button--neon" disabled={isSubmitting}>
@@ -110,7 +140,7 @@ export function LoginPage() {
         </button>
 
         <footer className="login-auth-card__footer">
-          <p>Seu EPI e sua protecao. Registre corretamente cada movimentacao.</p>
+          <p>Seu EPI é sua proteção. Registre corretamente cada movimentação.</p>
         </footer>
       </form>
     </div>
