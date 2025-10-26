@@ -68,6 +68,9 @@ function matchesFilter(value, targetKey) {
   if (!targetKey) {
     return true
   }
+  if (Array.isArray(value)) {
+    return value.some((item) => normalizeKey(item) === targetKey)
+  }
   return normalizeKey(value) === targetKey
 }
 
@@ -190,18 +193,21 @@ function buildPeriodoLabel(periodoInicio, periodoFim) {
 function collectOptions(lista, selector) {
   const mapa = new Map()
   lista.forEach((item) => {
-    const valor = selector(item)
-    if (valor === undefined || valor === null) {
-      return
-    }
-    const label = String(valor).trim()
-    if (!label) {
-      return
-    }
-    const chave = normalizeKey(label)
-    if (!mapa.has(chave)) {
-      mapa.set(chave, label)
-    }
+    const bruto = selector(item)
+    const valores = Array.isArray(bruto) ? bruto : [bruto]
+    valores.forEach((valor) => {
+      if (valor === undefined || valor === null) {
+        return
+      }
+      const label = String(valor).trim()
+      if (!label) {
+        return
+      }
+      const chave = normalizeKey(label)
+      if (!mapa.has(chave)) {
+        mapa.set(chave, label)
+      }
+    })
   })
 
   return Array.from(mapa.values()).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
@@ -211,14 +217,25 @@ function distribuirPorChave(lista, keySelector, fallback) {
   const mapa = new Map()
   lista.forEach((item) => {
     const bruto = keySelector(item)
-    const labelBase = bruto === undefined || bruto === null || bruto === '' ? fallback : bruto
-    const label = String(labelBase || fallback || 'Nao informado').trim() || fallback || 'Nao informado'
-    const chave = normalizeKey(label)
-    if (!mapa.has(chave)) {
-      mapa.set(chave, { label, total: 0 })
+    const valores = Array.isArray(bruto) && bruto.length > 0 ? bruto : [bruto]
+    if (!valores.length) {
+      const label = fallback || 'Nao informado'
+      const chave = normalizeKey(label)
+      if (!mapa.has(chave)) {
+        mapa.set(chave, { label, total: 0 })
+      }
+      mapa.get(chave).total += 1
+      return
     }
-    const atual = mapa.get(chave)
-    atual.total += 1
+    valores.forEach((valor) => {
+      const labelBase = valor === undefined || valor === null || valor === '' ? fallback : valor
+      const label = String(labelBase || fallback || 'Nao informado').trim() || fallback || 'Nao informado'
+      const chave = normalizeKey(label)
+      if (!mapa.has(chave)) {
+        mapa.set(chave, { label, total: 0 })
+      }
+      mapa.get(chave).total += 1
+    })
   })
 
   return Array.from(mapa.values()).sort(
@@ -336,7 +353,10 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     centrosServico: collectOptions(filtradosPorPeriodo, (item) => item?.centroServico ?? item?.setor ?? item?.local),
     tipos: collectOptions(filtradosPorPeriodo, (item) => item?.tipo),
     lesoes: collectOptions(filtradosPorPeriodo, (item) => item?.lesao),
-    partesLesionadas: collectOptions(filtradosPorPeriodo, (item) => item?.parteLesionada),
+    partesLesionadas: collectOptions(
+      filtradosPorPeriodo,
+      (item) => item?.partesLesionadas ?? (item?.parteLesionada ? [item.parteLesionada] : []),
+    ),
     agentes: collectOptions(filtradosPorPeriodo, (item) => item?.agente),
     cargos: collectOptions(filtradosPorPeriodo, (item) => item?.cargo),
   }
@@ -351,7 +371,9 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     if (!matchesFilter(acidente?.lesao, lesaoFiltro)) {
       return false
     }
-    if (!matchesFilter(acidente?.parteLesionada, parteFiltro)) {
+    if (
+      !matchesFilter(acidente?.partesLesionadas ?? (acidente?.parteLesionada ? [acidente.parteLesionada] : []), parteFiltro)
+    ) {
       return false
     }
     if (!matchesFilter(acidente?.agente, agenteFiltro)) {
@@ -383,7 +405,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
   }))
   const partesLesionadas = distribuirPorChave(
     listaFiltrada,
-    (item) => item?.parteLesionada,
+    (item) => item?.partesLesionadas ?? (item?.parteLesionada ? [item.parteLesionada] : []),
     'Nao informado'
   ).map((item) => ({
     parte_lesionada: item.label,

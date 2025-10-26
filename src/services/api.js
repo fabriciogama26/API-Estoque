@@ -40,6 +40,40 @@ const randomId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+const normalizePartesArray = (value) => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.map((item) => trim(item)).filter(Boolean)
+}
+
+async function ensureAcidentePartes(nomes) {
+  const lista = normalizePartesArray(nomes)
+  if (!lista.length) {
+    return []
+  }
+  try {
+    await execute(
+      supabase
+        .from('acidente_partes')
+        .upsert(
+          lista.map((nome, index) => ({
+            nome,
+            grupo: '',
+            subgrupo: '',
+            ordem: 1000 + index,
+            ativo: true,
+          })),
+          { onConflict: 'grupo,subgrupo,nome' },
+        ),
+      'Falha ao salvar partes lesionadas.',
+    )
+  } catch (error) {
+    console.warn('Nao foi possivel upsert partes lesionadas.', error)
+  }
+  return lista
+}
+
 function ensureSupabase() {
   if (!isSupabaseConfigured()) {
     throw new Error('Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
@@ -184,6 +218,10 @@ function mapAcidenteRecord(record) {
   }
   const centroServico =
     record.centroServico ?? record.centro_servico ?? record.setor ?? ''
+  const partes = normalizePartesArray(record.partes_lesionadas ?? record.partesLesionadas ?? [])
+  const partePrincipal = partes.length
+    ? partes[0]
+    : trim(record.parteLesionada ?? record.parte_lesionada ?? '')
   return {
     id: record.id,
     matricula: record.matricula ?? '',
@@ -196,7 +234,8 @@ function mapAcidenteRecord(record) {
     agente: record.agente ?? '',
     cid: record.cid ?? '',
     lesao: record.lesao ?? '',
-    parteLesionada: record.parteLesionada ?? record.parte_lesionada ?? '',
+    parteLesionada: partePrincipal,
+    partesLesionadas: partes,
     centroServico,
     setor: record.setor ?? centroServico,
     local: record.local ?? centroServico,
@@ -910,6 +949,29 @@ export const api = {
         .map((item) => item.nome.trim())
         .filter(Boolean)
     },
+    async parts() {
+      const data = await execute(
+        supabase
+          .from('acidente_partes')
+          .select('nome, grupo, subgrupo, ativo, ordem')
+          .order('grupo', { ascending: true })
+          .order('subgrupo', { ascending: true })
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
+        'Falha ao listar partes lesionadas.',
+      )
+      return (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => {
+          const nome = String(item.nome).trim()
+          const label = [item.grupo, item.subgrupo, nome]
+            .map((parte) => (parte ? String(parte).trim() : ''))
+            .filter(Boolean)
+            .join(' / ')
+          return { nome, label: label || nome }
+        })
+    },
+
     async agentTypes(agenteNome) {
       const nome = trim(agenteNome)
       if (!nome) {
@@ -962,6 +1024,7 @@ export const api = {
         .filter(Boolean)
     },
     async create(payload) {
+      const partes = normalizePartesArray(payload.partesLesionadas ?? payload.partes_lesionadas ?? [])
       const dados = {
         matricula: trim(payload.matricula),
         nome: trim(payload.nome),
@@ -969,7 +1032,7 @@ export const api = {
         tipo: trim(payload.tipo),
         agente: trim(payload.agente),
         lesao: trim(payload.lesao),
-        parteLesionada: trim(payload.parteLesionada),
+        parteLesionada: partes[0] ?? trim(payload.parteLesionada),
         centroServico: trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
         local: trim(payload.local) || trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
         data: payload.data ? new Date(payload.data).toISOString() : null,
@@ -980,8 +1043,8 @@ export const api = {
         cat: trim(payload.cat),
         observacao: trim(payload.observacao),
       }
-      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !dados.lesao || !dados.parteLesionada || !dados.centroServico || !dados.data) {
-        throw new Error('Preencha os campos obrigatórios do acidente.')
+      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !dados.lesao || !partes.length || !dados.centroServico || !dados.data) {
+        throw new Error('Preencha os campos obrigat?rios do acidente.')
       }
       const usuario = await resolveUsuarioResponsavel()
       const registro = await executeSingle(
@@ -990,25 +1053,31 @@ export const api = {
           .insert({
             ...dados,
             centro_servico: dados.centroServico,
+            partes_lesionadas: partes,
             registradoPor: usuario,
           })
           .select(),
         'Falha ao registrar acidente.'
       )
+      await ensureAcidentePartes(partes)
       return mapAcidenteRecord(registro)
     },
-    async update(id, payload) {
+
+async update(id, payload) {
       if (!id) {
-        throw new Error('ID obrigatório.')
+        throw new Error('ID obrigat?rio.')
       }
       const atual = await executeSingle(
         supabase.from('acidentes').select('*').eq('id', id),
         'Falha ao obter acidente.'
       )
       if (!atual) {
-        throw new Error('Acidente não encontrado.')
+        throw new Error('Acidente n?o encontrado.')
       }
 
+      const partes = normalizePartesArray(
+        payload.partesLesionadas ?? payload.partes_lesionadas ?? atual.partes_lesionadas ?? [],
+      )
       const dados = {
         matricula: trim(payload.matricula ?? atual.matricula),
         nome: trim(payload.nome ?? atual.nome),
@@ -1016,7 +1085,8 @@ export const api = {
         tipo: trim(payload.tipo ?? atual.tipo),
         agente: trim(payload.agente ?? atual.agente),
         lesao: trim(payload.lesao ?? atual.lesao),
-        parteLesionada: trim(payload.parteLesionada ?? atual.parteLesionada ?? atual.parte_lesionada ?? ''),
+        parteLesionada: partes[0] ?? trim(payload.parteLesionada ?? atual.parteLesionada ?? atual.parte_lesionada ?? ''),
+        partesLesionadas: partes,
         centroServico: trim(payload.centroServico ?? payload.centro_servico ?? atual.centro_servico ?? atual.setor ?? ''),
         local: trim(payload.local ?? atual.local ?? ''),
         data: payload.data ? new Date(payload.data).toISOString() : atual.data,
@@ -1028,6 +1098,10 @@ export const api = {
         observacao: trim(payload.observacao ?? atual.observacao ?? ''),
       }
 
+      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !dados.lesao || !partes.length || !dados.centroServico || !dados.data) {
+        throw new Error('Preencha os campos obrigat?rios do acidente.')
+      }
+
       const usuario = await resolveUsuarioResponsavel()
       const registro = await executeSingle(
         supabase
@@ -1035,6 +1109,7 @@ export const api = {
           .update({
             ...dados,
             centro_servico: dados.centroServico,
+            partes_lesionadas: partes,
             atualizadoPor: usuario,
             atualizadoEm: new Date().toISOString(),
           })
@@ -1042,9 +1117,11 @@ export const api = {
           .select(),
         'Falha ao atualizar acidente.'
       )
+      await ensureAcidentePartes(partes)
       return mapAcidenteRecord(registro)
     },
-    async dashboard(params = {}) {
+
+async dashboard(params = {}) {
       const acidentes = await carregarAcidentes()
       return montarDashboardAcidentes(acidentes, params)
     },

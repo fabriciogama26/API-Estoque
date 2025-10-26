@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 export function AcidentesForm({
   form,
   onChange,
@@ -18,14 +20,56 @@ export function AcidentesForm({
   tipos = [],
   tiposError,
   isLoadingTipos = false,
+  partes = [],
+  partesError,
+  isLoadingPartes = false,
 }) {
   const agenteOptions = Array.from(
     new Set([...(agentes || []), form.agente].filter(Boolean)),
   )
   const tipoOptions = Array.from(new Set([...(tipos || []), form.tipo].filter(Boolean)))
+  const parteOptions = Array.isArray(partes) ? partes : []
   const agenteListId = 'acidentes-agentes'
   const tipoListId = 'acidentes-tipos'
   const localListId = 'acidentes-locais'
+  const parteListId = 'acidentes-partes'
+  const [parteDraft, setParteDraft] = useState('')
+
+  const updatePartes = (lista) => {
+    onChange({ target: { name: 'partesLesionadas', value: lista } })
+  }
+
+  const handleAddParte = () => {
+    const value = parteDraft.trim()
+    if (!value) {
+      return
+    }
+    const atual = Array.isArray(form.partesLesionadas) ? form.partesLesionadas : []
+    if (atual.some((parte) => parte.toLowerCase() === value.toLowerCase())) {
+      setParteDraft('')
+      return
+    }
+    updatePartes([...atual, value])
+    setParteDraft('')
+  }
+
+  const handleParteKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault()
+      handleAddParte()
+    }
+  }
+
+  const handleRemoveParte = (parte) => {
+    const atual = Array.isArray(form.partesLesionadas) ? form.partesLesionadas : []
+    updatePartes(atual.filter((item) => item !== parte))
+  }
+
+  const handleParteBlur = () => {
+    if (parteDraft.trim()) {
+      handleAddParte()
+    }
+  }
 
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -163,8 +207,51 @@ export function AcidentesForm({
           <input name="lesao" value={form.lesao} onChange={onChange} placeholder="Entorse" required />
         </label>
         <label className="field">
-          <span>Parte Lesionada <span className="asterisco">*</span></span>
-          <input name="parteLesionada" value={form.parteLesionada} onChange={onChange} placeholder="Tornozelo" required />
+          <span>Partes lesionadas <span className="asterisco">*</span></span>
+          <div className="multi-select">
+            <div className="multi-select__chips">
+              {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
+                ? form.partesLesionadas.map((parte) => (
+                    <button
+                      type="button"
+                      key={parte}
+                      className="chip"
+                      onClick={() => handleRemoveParte(parte)}
+                    >
+                      {parte} <span aria-hidden="true">×</span>
+                    </button>
+                  ))
+                : <span className="multi-select__placeholder">Nenhuma parte adicionada</span>}
+            </div>
+            <div className="multi-select__input">
+              <input
+                value={parteDraft}
+                onChange={(event) => setParteDraft(event.target.value)}
+                onKeyDown={handleParteKeyDown}
+                onBlur={handleParteBlur}
+                list={parteListId}
+                placeholder={
+                  isLoadingPartes ? 'Carregando partes...' : 'Digite e pressione Enter para adicionar'
+                }
+                autoComplete="off"
+              />
+              <button type="button" className="button button--ghost" onClick={handleAddParte} disabled={!parteDraft.trim()}>
+                Adicionar
+              </button>
+            </div>
+          </div>
+          <datalist id={parteListId}>
+            {parteOptions.map((parte) => {
+              if (!parte) {
+                return null
+              }
+              if (typeof parte === 'string') {
+                return <option key={parte} value={parte} />
+              }
+              const key = parte.nome || parte.label || JSON.stringify(parte)
+              return <option key={key} value={parte.nome} label={parte.label ?? parte.nome} />
+            })}
+          </datalist>
         </label>
         <label className="field">
           <span>Centro de servico <span className="asterisco">*</span></span>
@@ -208,6 +295,7 @@ export function AcidentesForm({
       {agentesError ? <p className="feedback feedback--error">{agentesError}</p> : null}
       {tiposError ? <p className="feedback feedback--error">{tiposError}</p> : null}
       {locaisError ? <p className="feedback feedback--error">{locaisError}</p> : null}
+      {partesError ? <p className="feedback feedback--error">{partesError}</p> : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">
         <button type="submit" className="button button--primary" disabled={isSaving}>

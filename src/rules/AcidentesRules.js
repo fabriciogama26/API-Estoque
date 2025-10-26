@@ -22,6 +22,11 @@ export function resolveUsuarioNome(user) {
 export function validateAcidenteForm(form) {
   const centroServico = form.centroServico?.trim() || form.setor?.trim() || ''
   const local = form.local?.trim() || ''
+  const partesSelecionadas = Array.isArray(form.partesLesionadas)
+    ? form.partesLesionadas.filter((item) => item && item.trim())
+    : form.parteLesionada
+    ? [form.parteLesionada.trim()]
+    : []
 
   if (!form.nome.trim()) {
     return 'Informe o nome do colaborador.'
@@ -44,8 +49,8 @@ export function validateAcidenteForm(form) {
   if (!form.lesao.trim()) {
     return 'Informe a lesao.'
   }
-  if (!form.parteLesionada.trim()) {
-    return 'Informe a parte lesionada.'
+  if (partesSelecionadas.length === 0) {
+    return 'Informe ao menos uma parte lesionada.'
   }
   if (!centroServico) {
     return 'Informe o centro de servico.'
@@ -106,6 +111,11 @@ const sanitizeCentroServico = (value) => {
 export function createAcidentePayload(form, usuarioCadastro) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
   const local = form.local?.trim() || centroServico
+  const partes = Array.isArray(form.partesLesionadas)
+    ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)
+    : form.parteLesionada?.trim()
+    ? [form.parteLesionada.trim()]
+    : []
 
   return {
     matricula: form.matricula.trim(),
@@ -119,7 +129,8 @@ export function createAcidentePayload(form, usuarioCadastro) {
     agente: form.agente.trim(),
     cid: form.cid.trim(),
     lesao: form.lesao.trim(),
-    parteLesionada: form.parteLesionada.trim(),
+    parteLesionada: partes[0] || '',
+    partesLesionadas: partes,
     centroServico,
     setor: centroServico,
     local,
@@ -131,6 +142,11 @@ export function createAcidentePayload(form, usuarioCadastro) {
 export function updateAcidentePayload(form, usuarioResponsavel) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
   const local = form.local?.trim() || centroServico
+  const partes = Array.isArray(form.partesLesionadas)
+    ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)
+    : form.parteLesionada?.trim()
+    ? [form.parteLesionada.trim()]
+    : []
 
   return {
     matricula: form.matricula.trim(),
@@ -144,7 +160,8 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     agente: form.agente.trim(),
     cid: form.cid.trim(),
     lesao: form.lesao.trim(),
-    parteLesionada: form.parteLesionada.trim(),
+    parteLesionada: partes[0] || '',
+    partesLesionadas: partes,
     centroServico,
     setor: centroServico,
     local,
@@ -183,7 +200,7 @@ export function filterAcidentes(acidentes, filters) {
       acidente.agente,
       acidente.cid,
       acidente.lesao,
-      acidente.parteLesionada,
+      Array.isArray(acidente.partesLesionadas) ? acidente.partesLesionadas.join(' ') : acidente.parteLesionada,
       acidente.centroServico,
       acidente.setor,
       acidente.local,

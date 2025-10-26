@@ -11,7 +11,7 @@ export const ACIDENTES_FORM_DEFAULT = {
   agente: '',
   cid: '',
   lesao: '',
-  parteLesionada: '',
+  partesLesionadas: [],
   centroServico: '',
   setor: '',
   local: '',

@@ -66,6 +66,9 @@ export function AcidentesPage() {
   const [tipoOpcoes, setTipoOpcoes] = useState([])
   const [tiposError, setTiposError] = useState(null)
   const [isLoadingTipos, setIsLoadingTipos] = useState(false)
+  const [partesOpcoes, setPartesOpcoes] = useState([])
+  const [partesError, setPartesError] = useState(null)
+  const [isLoadingPartes, setIsLoadingPartes] = useState(false)
 
   const loadAcidentes = useCallback(async () => {
     setIsLoading(true)
@@ -107,6 +110,20 @@ export function AcidentesPage() {
     }
   }, [])
 
+  const loadPartes = useCallback(async () => {
+    setIsLoadingPartes(true)
+    setPartesError(null)
+    try {
+      const response = await api.acidentes.parts()
+      setPartesOpcoes(Array.isArray(response) ? response : [])
+    } catch (err) {
+      setPartesError(err.message)
+      setPartesOpcoes([])
+    } finally {
+      setIsLoadingPartes(false)
+    }
+  }, [])
+
   const loadLocais = useCallback(async () => {
     setIsLoadingLocais(true)
     setLocaisError(null)
@@ -136,6 +153,10 @@ export function AcidentesPage() {
   useEffect(() => {
     loadLocais()
   }, [loadLocais])
+
+  useEffect(() => {
+    loadPartes()
+  }, [loadPartes])
 
   useEffect(() => {
     const agenteNome = form.agente?.trim()
@@ -206,12 +227,12 @@ export function AcidentesPage() {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target
-      if (name === 'matricula') {
-        setForm((prev) => {
-          const next = { ...prev, matricula: value }
-          const pessoa = pessoasPorMatricula.get(value)
-          if (pessoa) {
-            next.nome = pessoa.nome ?? ''
+    if (name === 'matricula') {
+      setForm((prev) => {
+        const next = { ...prev, matricula: value }
+        const pessoa = pessoasPorMatricula.get(value)
+        if (pessoa) {
+          next.nome = pessoa.nome ?? ''
           next.cargo = pessoa.cargo ?? ''
           const centroServico = pessoa.centroServico ?? pessoa.setor ?? pessoa.local ?? ''
           next.centroServico = centroServico
@@ -237,6 +258,15 @@ export function AcidentesPage() {
     }
     if (name === 'tipo') {
       setForm((prev) => ({ ...prev, tipo: value }))
+      return
+    }
+    if (name === 'partesLesionadas') {
+      const lista = Array.isArray(value)
+        ? value.filter((item) => item && item.trim())
+        : typeof value === 'string' && value
+        ? [value.trim()].filter(Boolean)
+        : []
+      setForm((prev) => ({ ...prev, partesLesionadas: lista }))
       return
     }
     if (name === 'local') {
@@ -327,6 +357,12 @@ export function AcidentesPage() {
       centroServico: acidente.centroServico || acidente.setor || '',
       setor: acidente.centroServico || acidente.setor || '',
       local: resolveLocalDisponivel(acidente.local || acidente.centroServico || ''),
+      partesLesionadas:
+        Array.isArray(acidente.partesLesionadas) && acidente.partesLesionadas.length
+          ? acidente.partesLesionadas.slice()
+          : acidente.parteLesionada
+            ? [acidente.parteLesionada]
+            : [],
       cat: acidente.cat || '',
     })
     setTipoOpcoes([])
@@ -401,6 +437,9 @@ export function AcidentesPage() {
         tipos={tipoOpcoes}
         tiposError={tiposError}
         isLoadingTipos={isLoadingTipos}
+        partes={partesOpcoes}
+        partesError={partesError}
+        isLoadingPartes={isLoadingPartes}
       />
 
       <AcidentesFilters
