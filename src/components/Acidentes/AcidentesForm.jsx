@@ -23,6 +23,9 @@ export function AcidentesForm({
     new Set([...(agentes || []), form.agente].filter(Boolean)),
   )
   const tipoOptions = Array.from(new Set([...(tipos || []), form.tipo].filter(Boolean)))
+  const agenteListId = 'acidentes-agentes'
+  const tipoListId = 'acidentes-tipos'
+  const localListId = 'acidentes-locais'
 
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -110,47 +113,46 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Tipo <span className="asterisco">*</span></span>
-          <select
+          <input
             name="tipo"
             value={form.tipo}
             onChange={onChange}
+            list={tipoListId}
             required
-            disabled={!form.agente || (isLoadingTipos && !tipoOptions.length)}
-          >
-            <option value="">
-              {isLoadingTipos
+            disabled={!form.agente && !form.tipo}
+            placeholder={
+              isLoadingTipos
                 ? 'Carregando tipos...'
                 : form.agente
-                  ? tipoOptions.length
-                    ? 'Selecione o tipo'
-                    : 'Nenhum tipo cadastrado para o agente'
-                  : 'Selecione o agente primeiro'}
-            </option>
+                  ? 'Digite ou selecione o tipo'
+                  : 'Selecione o agente primeiro'
+            }
+            autoComplete="off"
+          />
+          <datalist id={tipoListId}>
             {tipoOptions.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {tipo}
-              </option>
+              <option key={tipo} value={tipo} />
             ))}
-          </select>
+          </datalist>
         </label>
         <label className="field">
           <span>Agente <span className="asterisco">*</span></span>
-          <select
+          <input
             name="agente"
             value={form.agente}
             onChange={onChange}
+            list={agenteListId}
             required
-            disabled={isLoadingAgentes && !agenteOptions.length}
-          >
-            <option value="">
-              {isLoadingAgentes ? 'Carregando agentes...' : 'Selecione o agente'}
-            </option>
+            placeholder={
+              isLoadingAgentes ? 'Carregando agentes...' : 'Digite ou selecione o agente'
+            }
+            autoComplete="off"
+          />
+          <datalist id={agenteListId}>
             {agenteOptions.map((agente) => (
-              <option key={agente} value={agente}>
-                {agente}
-              </option>
+              <option key={agente} value={agente} />
             ))}
-          </select>
+          </datalist>
         </label>
         <label className="field">
           <span>CID</span>
@@ -170,22 +172,24 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Local <span className="asterisco">*</span></span>
-          <select
+          <input
             name="local"
             value={form.local}
             onChange={onChange}
-            disabled={isLoadingLocais || locais.length === 0}
+            list={localListId}
             required
-          >
-            <option value="">
-              {isLoadingLocais ? 'Carregando locais...' : 'Selecione o local do acidente'}
-            </option>
+            placeholder={
+              isLoadingLocais
+                ? 'Carregando locais...'
+                : 'Digite ou selecione o local do acidente'
+            }
+            autoComplete="off"
+          />
+          <datalist id={localListId}>
             {locais.map((local) => (
-              <option key={local} value={local}>
-                {local}
-              </option>
+              <option key={local} value={local} />
             ))}
-          </select>
+          </datalist>
         </label>
         <label className="field">
           <span>CAT</span>

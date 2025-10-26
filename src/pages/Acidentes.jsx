@@ -327,8 +327,6 @@ export function AcidentesPage() {
       centroServico: acidente.centroServico || acidente.setor || '',
       setor: acidente.centroServico || acidente.setor || '',
       local: resolveLocalDisponivel(acidente.local || acidente.centroServico || ''),
-      agente: acidente.agente || '',
-      tipo: acidente.tipo || '',
       cat: acidente.cat || '',
     })
     setTipoOpcoes([])
