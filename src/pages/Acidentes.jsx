@@ -60,6 +60,12 @@ export function AcidentesPage() {
   const [locais, setLocais] = useState([])
   const [locaisError, setLocaisError] = useState(null)
   const [isLoadingLocais, setIsLoadingLocais] = useState(false)
+  const [agentes, setAgentes] = useState([])
+  const [agentesError, setAgentesError] = useState(null)
+  const [isLoadingAgentes, setIsLoadingAgentes] = useState(false)
+  const [tipos, setTipos] = useState([])
+  const [tiposError, setTiposError] = useState(null)
+  const [isLoadingTipos, setIsLoadingTipos] = useState(false)
 
   const loadAcidentes = useCallback(async () => {
     setIsLoading(true)
@@ -87,6 +93,20 @@ export function AcidentesPage() {
     }
   }, [])
 
+  const loadAgentes = useCallback(async () => {
+    setIsLoadingAgentes(true)
+    setAgentesError(null)
+    try {
+      const response = await api.acidentes.agents()
+      setAgentes(Array.isArray(response) ? response : [])
+    } catch (err) {
+      setAgentesError(err.message)
+      setAgentes([])
+    } finally {
+      setIsLoadingAgentes(false)
+    }
+  }, [])
+
   const loadLocais = useCallback(async () => {
     setIsLoadingLocais(true)
     setLocaisError(null)
@@ -110,8 +130,46 @@ export function AcidentesPage() {
   }, [loadPessoas])
 
   useEffect(() => {
+    loadAgentes()
+  }, [loadAgentes])
+
+  useEffect(() => {
     loadLocais()
   }, [loadLocais])
+
+  useEffect(() => {
+    const agenteNome = form.agente?.trim()
+    if (!agenteNome) {
+      setTipos([])
+      setTiposError(null)
+      setIsLoadingTipos(false)
+      return
+    }
+    let cancelado = false
+    setIsLoadingTipos(true)
+    setTiposError(null)
+    api.acidentes
+      .agentTypes(agenteNome)
+      .then((lista) => {
+        if (!cancelado) {
+          setTipos(Array.isArray(lista) ? lista : [])
+        }
+      })
+      .catch((err) => {
+        if (!cancelado) {
+          setTiposError(err.message)
+          setTipos([])
+        }
+      })
+      .finally(() => {
+        if (!cancelado) {
+          setIsLoadingTipos(false)
+        }
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [form.agente])
 
   const pessoasPorMatricula = useMemo(() => {
     const map = new Map()
@@ -148,12 +206,12 @@ export function AcidentesPage() {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target
-    if (name === 'matricula') {
-      setForm((prev) => {
-        const next = { ...prev, matricula: value }
-        const pessoa = pessoasPorMatricula.get(value)
-        if (pessoa) {
-          next.nome = pessoa.nome ?? ''
+      if (name === 'matricula') {
+        setForm((prev) => {
+          const next = { ...prev, matricula: value }
+          const pessoa = pessoasPorMatricula.get(value)
+          if (pessoa) {
+            next.nome = pessoa.nome ?? ''
           next.cargo = pessoa.cargo ?? ''
           const centroServico = pessoa.centroServico ?? pessoa.setor ?? pessoa.local ?? ''
           next.centroServico = centroServico
@@ -169,6 +227,16 @@ export function AcidentesPage() {
         }
         return next
       })
+      return
+    }
+    if (name === 'agente') {
+      setForm((prev) => ({ ...prev, agente: value, tipo: '' }))
+      setTipos([])
+      setTiposError(null)
+      return
+    }
+    if (name === 'tipo') {
+      setForm((prev) => ({ ...prev, tipo: value }))
       return
     }
     if (name === 'local') {
@@ -202,6 +270,9 @@ export function AcidentesPage() {
   const resetForm = () => {
     setForm({ ...ACIDENTES_FORM_DEFAULT })
     setEditingAcidente(null)
+    setTipos([])
+    setTiposError(null)
+    setIsLoadingTipos(false)
   }
 
   const handleSubmit = async (event) => {
@@ -256,8 +327,12 @@ export function AcidentesPage() {
       centroServico: acidente.centroServico || acidente.setor || '',
       setor: acidente.centroServico || acidente.setor || '',
       local: resolveLocalDisponivel(acidente.local || acidente.centroServico || ''),
+      agente: acidente.agente || '',
+      tipo: acidente.tipo || '',
       cat: acidente.cat || '',
     })
+    setTipos([])
+    setTiposError(null)
   }
 
   const cancelEdit = () => {
@@ -322,6 +397,12 @@ export function AcidentesPage() {
         locais={locais}
         locaisError={locaisError}
         isLoadingLocais={isLoadingLocais}
+        agentes={agentes}
+        agentesError={agentesError}
+        isLoadingAgentes={isLoadingAgentes}
+        tipos={tipos}
+        tiposError={tiposError}
+        isLoadingTipos={isLoadingTipos}
       />
 
       <AcidentesFilters

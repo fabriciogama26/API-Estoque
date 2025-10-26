@@ -12,7 +12,18 @@ export function AcidentesForm({
   locais = [],
   locaisError,
   isLoadingLocais = false,
+  agentes = [],
+  agentesError,
+  isLoadingAgentes = false,
+  tipos = [],
+  tiposError,
+  isLoadingTipos = false,
 }) {
+  const agenteOptions = Array.from(
+    new Set([...(agentes || []), form.agente].filter(Boolean)),
+  )
+  const tipoOptions = Array.from(new Set([...(tipos || []), form.tipo].filter(Boolean)))
+
   return (
     <form className="form" onSubmit={onSubmit}>
       <div className="form__grid form__grid--two">
@@ -99,11 +110,47 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Tipo <span className="asterisco">*</span></span>
-          <input name="tipo" value={form.tipo} onChange={onChange} placeholder="Queda" required />
+          <select
+            name="tipo"
+            value={form.tipo}
+            onChange={onChange}
+            required
+            disabled={!form.agente || (isLoadingTipos && !tipoOptions.length)}
+          >
+            <option value="">
+              {isLoadingTipos
+                ? 'Carregando tipos...'
+                : form.agente
+                  ? tipoOptions.length
+                    ? 'Selecione o tipo'
+                    : 'Nenhum tipo cadastrado para o agente'
+                  : 'Selecione o agente primeiro'}
+            </option>
+            {tipoOptions.map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {tipo}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Agente <span className="asterisco">*</span></span>
-          <input name="agente" value={form.agente} onChange={onChange} placeholder="Equipamento" required />
+          <select
+            name="agente"
+            value={form.agente}
+            onChange={onChange}
+            required
+            disabled={isLoadingAgentes && !agenteOptions.length}
+          >
+            <option value="">
+              {isLoadingAgentes ? 'Carregando agentes...' : 'Selecione o agente'}
+            </option>
+            {agenteOptions.map((agente) => (
+              <option key={agente} value={agente}>
+                {agente}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>CID</span>
@@ -154,6 +201,8 @@ export function AcidentesForm({
         </label>
       </div>
       {pessoasError ? <p className="feedback feedback--error">{pessoasError}</p> : null}
+      {agentesError ? <p className="feedback feedback--error">{agentesError}</p> : null}
+      {tiposError ? <p className="feedback feedback--error">{tiposError}</p> : null}
       {locaisError ? <p className="feedback feedback--error">{locaisError}</p> : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">

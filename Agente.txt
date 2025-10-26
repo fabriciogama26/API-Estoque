@@ -1,0 +1,141 @@
+1. Agente Químico
+
+Subtipos:
+
+Poeiras
+
+Fumos metálicos
+
+Névoas e névoas oleosas
+
+Vapores orgânicos
+
+Gases tóxicos
+
+Ácidos e bases fortes
+
+Produtos de limpeza agressivos
+
+Agrotóxicos e pesticidas
+
+Combustíveis e inflamáveis
+
+Resinas, colas, tintas e adesivos
+
+2. Agente Biológico
+
+Subtipos:
+
+Bactérias
+
+Vírus
+
+Fungos e esporos
+
+Parasitas
+
+Fluidos biológicos
+
+Materiais contaminados
+
+Animais e vetores
+
+Carcaças e resíduos de origem animal
+
+3. Agente Físico
+
+Subtipos:
+
+Ruído excessivo
+
+Vibração
+
+Temperaturas extremas
+
+Pressão anormal
+
+Radiação ionizante
+
+Radiação não ionizante
+
+Iluminação inadequada
+
+Corrente elétrica
+
+Umidade elevada ou seca excessiva
+
+Campos eletromagnéticos
+
+4. Agente Mecânico / de Acidente
+
+Subtipos:
+
+Máquinas e equipamentos com partes móveis
+
+Ferramentas manuais ou elétricas
+
+Queda de objetos ou materiais
+
+Escadas, andaimes e plataformas instáveis
+
+Pisos escorregadios, irregulares ou com obstáculos
+
+Veículos em movimento
+
+Perfurocortantes
+
+Animais
+
+Projeção de fragmentos ou partículas
+
+Falta de proteção, sinalização ou guarda-corpo
+
+Explosões, incêndios e curto-circuitos
+
+5. Agente Ergonômico
+
+Subtipos:
+
+Postura incorreta ou forçada
+
+Movimentos repetitivos
+
+Esforço físico intenso
+
+Levantamento e transporte manual de cargas
+
+Ritmo de trabalho acelerado
+
+Monotonia e repetitividade
+
+Jornada prolongada sem pausas
+
+Mobiliário inadequado
+
+Falta de conforto térmico ou visual
+
+Exigência cognitiva excessiva
+
+6. Agente Psicosocial
+
+Subtipos:
+
+Estresse ocupacional
+
+Assédio moral ou sexual
+
+Pressão por metas inalcançáveis
+
+Falta de reconhecimento
+
+Conflitos interpessoais ou hierárquicos
+
+Isolamento social
+
+Sobrecarga ou ambiguidade de função
+
+Clima organizacional negativo
+
+Trabalho noturno ou em revezamento
+
+Insegurança quanto à estabilidade no emprego

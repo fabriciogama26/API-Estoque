@@ -484,6 +484,80 @@ const gruposEpiPadrao = Array.from(
   .map((item) => (item ? String(item).trim() : ''))
   .filter(Boolean)
 
+const catalogoAcidenteAgentes = {
+  'Agente Quimico': [
+    'Poeiras',
+    'Fumos metalicos',
+    'Nevoas e nevoas oleosas',
+    'Vapores organicos',
+    'Gases toxicos',
+    'Acidos e bases fortes',
+    'Produtos de limpeza agressivos',
+    'Agrotoxicos e pesticidas',
+    'Combustiveis e inflamaveis',
+    'Resinas, colas, tintas e adesivos',
+  ],
+  'Agente Biologico': [
+    'Bacterias',
+    'Virus',
+    'Fungos e esporos',
+    'Parasitas',
+    'Fluidos biologicos',
+    'Materiais contaminados',
+    'Animais e vetores',
+    'Carcacas e residuos de origem animal',
+  ],
+  'Agente Fisico': [
+    'Ruido excessivo',
+    'Vibracao',
+    'Temperaturas extremas',
+    'Pressao anormal',
+    'Radiacao ionizante',
+    'Radiacao nao ionizante',
+    'Iluminacao inadequada',
+    'Corrente eletrica',
+    'Umidade elevada ou seca excessiva',
+    'Campos eletromagneticos',
+  ],
+  'Agente Mecanico / de Acidente': [
+    'Maquinas e equipamentos com partes moveis',
+    'Ferramentas manuais ou eletricas',
+    'Queda de objetos ou materiais',
+    'Escadas, andaimes e plataformas instaveis',
+    'Pisos escorregadios, irregulares ou com obstaculos',
+    'Veiculos em movimento',
+    'Perfurocortantes',
+    'Animais',
+    'Projecao de fragmentos ou particulas',
+    'Falta de protecao, sinalizacao ou guarda-corpo',
+    'Explosoes, incendios e curto-circuitos',
+  ],
+  'Agente Ergonomico': [
+    'Postura incorreta ou forcada',
+    'Movimentos repetitivos',
+    'Esforco fisico intenso',
+    'Levantamento e transporte manual de cargas',
+    'Ritmo de trabalho acelerado',
+    'Monotonia e repetitividade',
+    'Jornada prolongada sem pausas',
+    'Mobiliario inadequado',
+    'Falta de conforto termico ou visual',
+    'Exigencia cognitiva excessiva',
+  ],
+  'Agente Psicosocial': [
+    'Estresse ocupacional',
+    'Assedio moral ou sexual',
+    'Pressao por metas inalcancaveis',
+    'Falta de reconhecimento',
+    'Conflitos interpessoais ou hierarquicos',
+    'Isolamento social',
+    'Sobrecarga ou ambiguidade de funcao',
+    'Clima organizacional negativo',
+    'Trabalho noturno ou em revezamento',
+    'Inseguranca quanto a estabilidade no emprego',
+  ],
+}
+
 const sanitizeMaterialPayload = (payload = {}) => {
   const grupoMaterial = trim(payload.grupoMaterial)
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
@@ -1198,6 +1272,47 @@ const localApi = {
     },
   },
   acidentes: {
+    async agents() {
+      return readState((state) => {
+        const set = new Set(Object.keys(catalogoAcidenteAgentes))
+        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
+        lista.forEach((acidente) => {
+          const valor = acidente?.agente ? String(acidente.agente).trim() : ''
+          if (valor) {
+            set.add(valor)
+          }
+        })
+        return Array.from(set).sort((a, b) => a.localeCompare(b))
+      })
+    },
+    async agentTypes(agenteNome) {
+      const nome = trim(agenteNome)
+      if (!nome) {
+        return []
+      }
+      const base =
+        catalogoAcidenteAgentes[nome] ??
+        catalogoAcidenteAgentes[
+          Object.keys(catalogoAcidenteAgentes).find(
+            (chave) => normalizeKeyPart(chave) === normalizeKeyPart(nome),
+          ) ?? ''
+        ] ??
+        []
+      return readState((state) => {
+        const extras = Array.isArray(state.acidentes)
+          ? state.acidentes
+              .filter(
+                (acidente) =>
+                  normalizeKeyPart(acidente?.agente ?? '') === normalizeKeyPart(nome),
+              )
+              .map((acidente) => trim(acidente?.tipo ?? ''))
+              .filter(Boolean)
+          : []
+        return Array.from(new Set([...(base || []), ...extras])).sort((a, b) =>
+          a.localeCompare(b),
+        )
+      })
+    },
     async locals() {
       return readState((state) => {
         const set = new Set(locaisAcidentePadrao)

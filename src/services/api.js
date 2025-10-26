@@ -896,6 +896,57 @@ export const api = {
     async list() {
       return carregarAcidentes()
     },
+    async agents() {
+      const data = await execute(
+        supabase
+          .from('acidente_agentes')
+          .select('nome, ativo, ordem')
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
+        'Falha ao listar agentes de acidente.'
+      )
+      return (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => item.nome.trim())
+        .filter(Boolean)
+    },
+    async agentTypes(agenteNome) {
+      const nome = trim(agenteNome)
+      if (!nome) {
+        return []
+      }
+      const agente = await execute(
+        supabase
+          .from('acidente_agentes')
+          .select('id')
+          .eq('nome', nome)
+          .limit(1),
+        'Falha ao localizar agente de acidente.'
+      )
+      const agenteId = agente?.[0]?.id
+      if (!agenteId) {
+        return []
+      }
+      const data = await execute(
+        supabase
+          .from('acidente_tipos')
+          .select('nome, ativo, ordem')
+          .eq('agente_id', agenteId)
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
+        'Falha ao listar tipos de acidente.'
+      )
+      const tipos = new Set()
+      ;(data ?? []).forEach((item) => {
+        if (item && item.nome && item.ativo !== false) {
+          const tipoNome = String(item.nome).trim()
+          if (tipoNome) {
+            tipos.add(tipoNome)
+          }
+        }
+      })
+      return Array.from(tipos)
+    },
     async locals() {
       const data = await execute(
         supabase
