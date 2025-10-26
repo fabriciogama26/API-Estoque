@@ -34,6 +34,10 @@ Passo a Passo de Configuracao
 6. Desenvolvimento Local
    - `npx supabase db reset` roda migrations em um Postgres local via Docker (requer `supabase start`).
    - Use `supabase env pull`/`env push` se quiser sincronizar variaveis com o projeto.
+7. Recuperacao de Senha
+   - Em *Authentication > Templates* ative e personalize o email "Reset password".
+   - Configure o remetente e as URLs permitidas em *Authentication > Settings > Email* para que o link seja enviado.
+   - Opcionalmente defina `VITE_SUPABASE_PASSWORD_REDIRECT` com a pagina que recebera o fluxo de redefinicao.
 
 Observacoes Importantes
 -----------------------

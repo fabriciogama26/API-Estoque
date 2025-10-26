@@ -104,6 +104,13 @@ async function renderPdf({ html, url }: RenderInput): Promise<Uint8Array> {
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 402 || /free accounts come with 1,000 units\/?month/i.test(text)) {
+      throw new HttpError(
+        402,
+        "O limite mensal do servico de PDF foi atingido (planos gratuitos incluem 1.000 unidades/mes). Configure uma chave valida ou aguarde a renovacao do limite.",
+      );
+    }
+
     throw new HttpError(
       response.status,
       `Falha ao gerar PDF no Browserless (status ${response.status}). Detalhes: ${text}`,

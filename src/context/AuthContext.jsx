@@ -171,6 +171,42 @@ export function AuthProvider({ children }) {
     [hasSupabase, parseSupabaseUser]
   )
 
+  const recoverPassword = useCallback(
+    async (email) => {
+      const identifier = (email || '').trim()
+
+      if (!identifier) {
+        throw new Error('Informe o email utilizado no login para recuperar a senha.')
+      }
+
+      if (isLocalMode) {
+        throw new Error('Recuperacao de senha indisponivel no modo offline.')
+      }
+
+      if (!hasSupabase || !supabase) {
+        throw new Error(
+          'Supabase nao configurado. Configure as variaveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.'
+        )
+      }
+
+      const rawRedirect = import.meta?.env?.VITE_SUPABASE_PASSWORD_REDIRECT ?? ''
+      const redirectTo =
+        typeof rawRedirect === 'string' && rawRedirect.trim().length > 0 ? rawRedirect.trim() : undefined
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        identifier,
+        redirectTo ? { redirectTo } : undefined
+      )
+
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      return true
+    },
+    [hasSupabase]
+  )
+
   const logout = useCallback(async () => {
     if (!isLocalMode && hasSupabase && supabase) {
       await supabase.auth.signOut()
@@ -242,9 +278,10 @@ export function AuthProvider({ children }) {
       user,
       isAuthenticated: Boolean(user),
       login,
+      recoverPassword,
       logout,
     }),
-    [user, login, logout]
+    [user, login, recoverPassword, logout]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

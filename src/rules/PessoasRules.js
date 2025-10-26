@@ -19,11 +19,13 @@ function sanitizeDate(value) {
 
 export function createPessoaPayload(form, usuario) {
   const centroServico = sanitizeCampo(form.centroServico ?? form.local)
+  const setor = sanitizeCampo(form.setor ?? centroServico)
   return {
     nome: sanitizeCampo(form.nome),
     matricula: sanitizeCampo(form.matricula),
     centroServico,
     local: centroServico,
+    setor,
     cargo: sanitizeCampo(form.cargo),
     dataAdmissao: sanitizeDate(form.dataAdmissao),
     tipoExecucao: sanitizeCampo(form.tipoExecucao),
@@ -33,11 +35,13 @@ export function createPessoaPayload(form, usuario) {
 
 export function updatePessoaPayload(form, usuario) {
   const centroServico = sanitizeCampo(form.centroServico ?? form.local)
+  const setor = sanitizeCampo(form.setor ?? centroServico)
   return {
     nome: sanitizeCampo(form.nome),
     matricula: sanitizeCampo(form.matricula),
     centroServico,
     local: centroServico,
+    setor,
     cargo: sanitizeCampo(form.cargo),
     dataAdmissao: sanitizeDate(form.dataAdmissao),
     tipoExecucao: sanitizeCampo(form.tipoExecucao),
@@ -48,10 +52,15 @@ export function updatePessoaPayload(form, usuario) {
 export function filterPessoas(pessoas, filters) {
   const termo = filters.termo.trim().toLowerCase()
   const centroServicoFiltro = (filters.centroServico ?? filters.local ?? 'todos')
+  const setorFiltro = (filters.setor ?? 'todos')
 
   return pessoas.filter((pessoa) => {
     const centroServicoAtual = pessoa.centroServico ?? pessoa.local ?? ''
     if (centroServicoFiltro !== 'todos' && centroServicoAtual !== centroServicoFiltro) {
+      return false
+    }
+
+    if (setorFiltro !== 'todos' && (pessoa.setor ?? '') !== setorFiltro) {
       return false
     }
 
@@ -67,6 +76,7 @@ export function filterPessoas(pessoas, filters) {
       pessoa.nome || '',
       pessoa.matricula || '',
       centroServicoAtual,
+      pessoa.setor || '',
       pessoa.cargo || '',
       pessoa.tipoExecucao || '',
       pessoa.usuarioCadastro || '',
@@ -85,10 +95,14 @@ export function sortPessoasByNome(pessoas) {
 
 export function extractCentrosServico(pessoas) {
   return uniqueSorted(
-    pessoas.map((pessoa) => pessoa.centroServico ?? pessoa.local)
+    pessoas.map((pessoa) => pessoa.centroServico ?? pessoa.local ?? pessoa.setor)
   )
 }
 
 export function extractCargos(pessoas) {
   return uniqueSorted(pessoas.map((pessoa) => pessoa.cargo))
+}
+
+export function extractSetores(pessoas) {
+  return uniqueSorted(pessoas.map((pessoa) => pessoa.setor))
 }

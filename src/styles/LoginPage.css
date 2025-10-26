@@ -127,10 +127,10 @@
 /* Opções */
 .login-auth-card__options {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   font-size: 0.85rem;
-  color: rgba(226, 232, 240, 0.85);
+  color: #fff;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
@@ -143,6 +143,21 @@
 
 .login-checkbox input {
   accent-color: var(--color-accent); /* azul petróleo */
+}
+
+.login-auth-card__options .link-button {
+  color: #fff;
+  font-weight: 600;
+}
+
+.login-auth-card__options .link-button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.login-auth-card__options .link-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 
 /* Botão principal */
@@ -166,7 +181,7 @@
 .login-auth-card__footer {
   text-align: center;
   font-size: 0.82rem;
-  color: rgba(226, 232, 240, 0.72);
+  color: #fff;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;

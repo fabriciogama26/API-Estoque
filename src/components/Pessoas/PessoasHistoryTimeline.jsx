@@ -4,6 +4,7 @@ const FIELD_LABELS = {
   nome: 'Nome',
   matricula: 'Matricula',
   centroServico: 'Centro de servico',
+  setor: 'Setor',
   cargo: 'Cargo',
   dataAdmissao: 'Data de admissao',
   tipoExecucao: 'Tipo Execucao',
