@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 
 export function AcidentesForm({
   form,
@@ -209,20 +209,6 @@ export function AcidentesForm({
         <label className="field">
           <span>Partes lesionadas <span className="asterisco">*</span></span>
           <div className="multi-select">
-            <div className="multi-select__chips">
-              {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
-                ? form.partesLesionadas.map((parte) => (
-                    <button
-                      type="button"
-                      key={parte}
-                      className="chip"
-                      onClick={() => handleRemoveParte(parte)}
-                    >
-                      {parte} <span aria-hidden="true">×</span>
-                    </button>
-                  ))
-                : <span className="multi-select__placeholder">Nenhuma parte adicionada</span>}
-            </div>
             <div className="multi-select__input">
               <input
                 value={parteDraft}
@@ -235,9 +221,30 @@ export function AcidentesForm({
                 }
                 autoComplete="off"
               />
-              <button type="button" className="button button--ghost" onClick={handleAddParte} disabled={!parteDraft.trim()}>
+            </div>
+            <div className="multi-select__actions">
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleAddParte}
+                disabled={!parteDraft.trim()}
+              >
                 Adicionar
               </button>
+              <div className="multi-select__chips">
+                {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
+                  ? form.partesLesionadas.map((parte) => (
+                      <button
+                        type="button"
+                        key={parte}
+                        className="chip"
+                        onClick={() => handleRemoveParte(parte)}
+                      >
+                        {parte} <span aria-hidden="true">�-</span>
+                      </button>
+                    ))
+                  : <span className="multi-select__placeholder">Nenhuma parte adicionada</span>}
+              </div>
             </div>
           </div>
           <datalist id={parteListId}>
