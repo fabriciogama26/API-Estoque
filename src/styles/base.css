@@ -137,8 +137,16 @@ ul, ol {
   gap: 0.4rem;
   font-size: 0.95rem;
 }
+.field--full {
+  grid-column: 1 / -1;
+}
 .field > span {
   font-weight: 500;
+}
+.field__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-muted);
 }
 .field input,
 .field select,

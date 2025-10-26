@@ -34,6 +34,7 @@ export function AcidentesForm({
   const localListId = 'acidentes-locais'
   const parteListId = 'acidentes-partes'
   const [parteDraft, setParteDraft] = useState('')
+  const partesCount = Array.isArray(form.partesLesionadas) ? form.partesLesionadas.length : 0
 
   const updatePartes = (lista) => {
     onChange({ target: { name: 'partesLesionadas', value: lista } })
@@ -202,14 +203,24 @@ export function AcidentesForm({
           <span>CID</span>
           <input name="cid" value={form.cid} onChange={onChange} placeholder="S93" />
         </label>
-        <label className="field">
+        <label className="field field--full">
           <span>Lesao <span className="asterisco">*</span></span>
           <input name="lesao" value={form.lesao} onChange={onChange} placeholder="Entorse" required />
         </label>
-        <label className="field">
-          <span>Partes lesionadas <span className="asterisco">*</span></span>
-          <div className="multi-select">
-            <div className="multi-select__chips">
+        <label className="field field--full field--card">
+          <div className="field-card__header">
+            <div className="field-card__title">
+              <span>Partes lesionadas <span className="asterisco">*</span></span>
+              <p className="field__hint">Adicione cada região afetada para um registro completo.</p>
+            </div>
+            <span className="field-card__counter" aria-live="polite">
+              {partesCount
+                ? `${partesCount} selecionada${partesCount > 1 ? 's' : ''}`
+                : 'Nenhuma selecionada'}
+            </span>
+          </div>
+          <div className="multi-select multi-select--panel">
+            <div className="multi-select__chips" role="list">
               {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
                 ? form.partesLesionadas.map((parte) => (
                     <button
