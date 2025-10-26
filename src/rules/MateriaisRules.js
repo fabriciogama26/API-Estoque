@@ -12,8 +12,13 @@ const normalizeKeyPart = (value) =>
         .replace(/[\u0300-\u036f]/g, '')
     : ''
 
+const normalizeGrupoValor = (value) => {
+  const base = normalizeKeyPart(value)
+  return base.endsWith('s') ? base.slice(0, -1) : base
+}
+
 const isGrupo = (value, grupoReferencia) =>
-  normalizeKeyPart(value) === normalizeKeyPart(grupoReferencia)
+  normalizeGrupoValor(value) === normalizeGrupoValor(grupoReferencia)
 
 const sanitizeAlphanumeric = (value = '') => String(value).trim()
 

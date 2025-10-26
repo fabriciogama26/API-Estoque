@@ -722,6 +722,43 @@ export const api = {
         .map((item) => item.nome.trim())
         .filter(Boolean)
     },
+    async items(grupoNome) {
+      const nome = trim(grupoNome)
+      if (!nome) {
+        return []
+      }
+      const grupos = await execute(
+        supabase
+          .from('grupos_material')
+          .select('id')
+          .eq('nome', nome)
+          .limit(1),
+        'Falha ao localizar grupo de material.'
+      )
+      const grupoId = grupos?.[0]?.id
+      if (!grupoId) {
+        return []
+      }
+      const data = await execute(
+        supabase
+          .from('grupos_material_itens')
+          .select('nome, ativo, ordem')
+          .eq('grupo_id', grupoId)
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
+        'Falha ao listar EPIs do grupo.'
+      )
+      const itens = new Set()
+      ;(data ?? []).forEach((item) => {
+        if (item && item.nome && item.ativo !== false) {
+          const nomeItem = String(item.nome).trim()
+          if (nomeItem) {
+            itens.add(nomeItem)
+          }
+        }
+      })
+      return Array.from(itens)
+    },
   },
   entradas: {
     list: carregarEntradas,

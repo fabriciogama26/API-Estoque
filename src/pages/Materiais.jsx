@@ -50,6 +50,9 @@ export function MateriaisPage() {
   const [materialGroups, setMaterialGroups] = useState([])
   const [isLoadingGroups, setIsLoadingGroups] = useState(false)
   const [groupsError, setGroupsError] = useState(null)
+  const [materialItems, setMaterialItems] = useState([])
+  const [isLoadingItems, setIsLoadingItems] = useState(false)
+  const [itemsError, setItemsError] = useState(null)
 
   const loadMaterialGroups = useCallback(async () => {
     setIsLoadingGroups(true)
@@ -96,6 +99,40 @@ export function MateriaisPage() {
     loadMaterialGroups()
   }, [loadMaterialGroups])
 
+  useEffect(() => {
+    const grupo = form.grupoMaterial?.trim()
+    if (!grupo) {
+      setMaterialItems([])
+      setItemsError(null)
+      setIsLoadingItems(false)
+      return
+    }
+    let cancelado = false
+    setIsLoadingItems(true)
+    setItemsError(null)
+    api.materiais
+      .items(grupo)
+      .then((lista) => {
+        if (!cancelado) {
+          setMaterialItems(Array.isArray(lista) ? lista : [])
+        }
+      })
+      .catch((err) => {
+        if (!cancelado) {
+          setItemsError(err.message)
+          setMaterialItems([])
+        }
+      })
+      .finally(() => {
+        if (!cancelado) {
+          setIsLoadingItems(false)
+        }
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [form.grupoMaterial])
+
   const handleFormChange = (event) => {
     const { name, value } = event.target
 
@@ -109,19 +146,16 @@ export function MateriaisPage() {
       return
     }
 
-    if (name === 'nome') {
-      const sanitized = value.replace(/\d/g, '')
-      setForm((prev) => ({ ...prev, nome: sanitized }))
-      return
-    }
-
     if (name === 'grupoMaterial') {
       setForm((prev) => ({
         ...prev,
         grupoMaterial: value,
+        nome: '',
         numeroCalcado: isGrupo(value, GRUPO_MATERIAL_CALCADO) ? prev.numeroCalcado : '',
         numeroVestimenta: isGrupo(value, GRUPO_MATERIAL_VESTIMENTA) ? prev.numeroVestimenta : '',
       }))
+      setMaterialItems([])
+      setItemsError(null)
       return
     }
 
@@ -154,6 +188,9 @@ export function MateriaisPage() {
   const resetForm = () => {
     setEditingMaterial(null)
     setForm({ ...MATERIAIS_FORM_DEFAULT })
+    setMaterialItems([])
+    setItemsError(null)
+    setIsLoadingItems(false)
   }
 
   const handleSubmit = async (event) => {
@@ -240,6 +277,8 @@ export function MateriaisPage() {
       numeroCalcado: material.numeroCalcado || '',
       numeroVestimenta: material.numeroVestimenta || '',
     })
+    setItemsError(null)
+    setMaterialItems([])
   }
 
   const cancelEdit = () => {
@@ -275,6 +314,9 @@ export function MateriaisPage() {
         materialGroups={materialGroups}
         isLoadingGroups={isLoadingGroups}
         groupsError={groupsError}
+        materialItems={materialItems}
+        isLoadingItems={isLoadingItems}
+        itemsError={itemsError}
       />
 
       <MateriaisFilters
