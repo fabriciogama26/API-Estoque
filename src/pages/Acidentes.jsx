@@ -60,10 +60,10 @@ export function AcidentesPage() {
   const [locais, setLocais] = useState([])
   const [locaisError, setLocaisError] = useState(null)
   const [isLoadingLocais, setIsLoadingLocais] = useState(false)
-  const [agentes, setAgentes] = useState([])
+  const [agenteOpcoes, setAgenteOpcoes] = useState([])
   const [agentesError, setAgentesError] = useState(null)
   const [isLoadingAgentes, setIsLoadingAgentes] = useState(false)
-  const [tipos, setTipos] = useState([])
+  const [tipoOpcoes, setTipoOpcoes] = useState([])
   const [tiposError, setTiposError] = useState(null)
   const [isLoadingTipos, setIsLoadingTipos] = useState(false)
 
@@ -98,10 +98,10 @@ export function AcidentesPage() {
     setAgentesError(null)
     try {
       const response = await api.acidentes.agents()
-      setAgentes(Array.isArray(response) ? response : [])
+      setAgenteOpcoes(Array.isArray(response) ? response : [])
     } catch (err) {
       setAgentesError(err.message)
-      setAgentes([])
+      setAgenteOpcoes([])
     } finally {
       setIsLoadingAgentes(false)
     }
@@ -140,7 +140,7 @@ export function AcidentesPage() {
   useEffect(() => {
     const agenteNome = form.agente?.trim()
     if (!agenteNome) {
-      setTipos([])
+      setTipoOpcoes([])
       setTiposError(null)
       setIsLoadingTipos(false)
       return
@@ -152,13 +152,13 @@ export function AcidentesPage() {
       .agentTypes(agenteNome)
       .then((lista) => {
         if (!cancelado) {
-          setTipos(Array.isArray(lista) ? lista : [])
+          setTipoOpcoes(Array.isArray(lista) ? lista : [])
         }
       })
       .catch((err) => {
         if (!cancelado) {
           setTiposError(err.message)
-          setTipos([])
+          setTipoOpcoes([])
         }
       })
       .finally(() => {
@@ -231,7 +231,7 @@ export function AcidentesPage() {
     }
     if (name === 'agente') {
       setForm((prev) => ({ ...prev, agente: value, tipo: '' }))
-      setTipos([])
+      setTipoOpcoes([])
       setTiposError(null)
       return
     }
@@ -270,7 +270,7 @@ export function AcidentesPage() {
   const resetForm = () => {
     setForm({ ...ACIDENTES_FORM_DEFAULT })
     setEditingAcidente(null)
-    setTipos([])
+    setTipoOpcoes([])
     setTiposError(null)
     setIsLoadingTipos(false)
   }
@@ -331,7 +331,7 @@ export function AcidentesPage() {
       tipo: acidente.tipo || '',
       cat: acidente.cat || '',
     })
-    setTipos([])
+    setTipoOpcoes([])
     setTiposError(null)
   }
 
@@ -371,9 +371,9 @@ export function AcidentesPage() {
     [acidentes, filters],
   )
 
-  const tipos = useMemo(() => extractTipos(acidentes), [acidentes])
+  const tiposFiltro = useMemo(() => extractTipos(acidentes), [acidentes])
   const centrosServico = useMemo(() => extractCentrosServico(acidentes), [acidentes])
-  const agentes = useMemo(() => extractAgentes(acidentes), [acidentes])
+  const agentesFiltro = useMemo(() => extractAgentes(acidentes), [acidentes])
 
   return (
     <div className="stack">
@@ -397,19 +397,19 @@ export function AcidentesPage() {
         locais={locais}
         locaisError={locaisError}
         isLoadingLocais={isLoadingLocais}
-        agentes={agentes}
+        agentes={agenteOpcoes}
         agentesError={agentesError}
         isLoadingAgentes={isLoadingAgentes}
-        tipos={tipos}
+        tipos={tipoOpcoes}
         tiposError={tiposError}
         isLoadingTipos={isLoadingTipos}
       />
 
       <AcidentesFilters
         filters={filters}
-        tipos={tipos}
+        tipos={tiposFiltro}
         centrosServico={centrosServico}
-        agentes={agentes}
+        agentes={agentesFiltro}
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}
         onClear={handleFilterClear}
