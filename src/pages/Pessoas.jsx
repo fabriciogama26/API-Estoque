@@ -18,6 +18,7 @@ import {
   sortPessoasByNome,
   extractCentrosServico,
   extractCargos,
+  extractSetores,
 } from '../rules/PessoasRules.js'
 import { resolveUsuarioNome } from '../utils/PessoasUtils.js'
 
@@ -47,6 +48,10 @@ const buildPessoasQuery = (filters) => {
   const cargo = filters.cargo
   if (cargo && cargo.toLowerCase() !== 'todos') {
     query.cargo = cargo
+  }
+  const setor = filters.setor
+  if (setor && setor.toLowerCase() !== 'todos') {
+    query.setor = setor
   }
   return query
 }
@@ -155,6 +160,7 @@ export function PessoasPage() {
       matricula: pessoa.matricula || '',
       centroServico: pessoa.centroServico ?? pessoa.local ?? '',
       local: pessoa.centroServico ?? pessoa.local ?? '',
+      setor: pessoa.setor ?? '',
       cargo: pessoa.cargo || '',
       dataAdmissao: formatDateInputValue(pessoa.dataAdmissao),
       tipoExecucao: pessoa.tipoExecucao || '',
@@ -199,6 +205,7 @@ export function PessoasPage() {
   )
 
   const centrosServico = useMemo(() => extractCentrosServico(pessoasOptions), [pessoasOptions])
+  const setores = useMemo(() => extractSetores(pessoasOptions), [pessoasOptions])
   const cargos = useMemo(() => extractCargos(pessoasOptions), [pessoasOptions])
 
   return (
@@ -222,6 +229,7 @@ export function PessoasPage() {
       <PessoasFilters
         filters={filters}
         centrosServico={centrosServico}
+        setores={setores}
         cargos={cargos}
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}

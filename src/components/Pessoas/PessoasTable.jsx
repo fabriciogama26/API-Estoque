@@ -14,6 +14,7 @@ export function PessoasTable({ pessoas, onEdit, onHistory, editingId, isSaving, 
             <th>Nome</th>
             <th>Matricula</th>
             <th>Centro de servico</th>
+            <th>Setor</th>
             <th>Cargo</th>
             <th>Data de admissao</th>
             <th>Tipo Execucao</th>
@@ -28,6 +29,7 @@ export function PessoasTable({ pessoas, onEdit, onHistory, editingId, isSaving, 
               <td>{pessoa.nome}</td>
               <td>{pessoa.matricula || '-'}</td>
               <td>{pessoa.centroServico ?? pessoa.local ?? '-'}</td>
+              <td>{pessoa.setor || '-'}</td>
               <td>{pessoa.cargo || '-'}</td>
               <td>{formatDate(pessoa.dataAdmissao)}</td>
               <td>{pessoa.tipoExecucao || '-'}</td>

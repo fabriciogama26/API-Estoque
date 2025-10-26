@@ -125,12 +125,14 @@ function mapPessoaRecord(record) {
     return null
   }
   const centroServico =
-    record.centroServico ?? record.centro_servico ?? record.local ?? ''
+    record.centroServico ?? record.centro_servico ?? record.setor ?? record.local ?? ''
+  const setor = record.setor ?? centroServico
   return {
     id: record.id,
     nome: record.nome ?? '',
     matricula: record.matricula ?? '',
     centroServico,
+    setor,
     cargo: record.cargo ?? '',
     tipoExecucao: record.tipoExecucao ?? record.tipo_execucao ?? '',
     dataAdmissao: record.dataAdmissao ?? record.data_admissao ?? null,
@@ -213,6 +215,7 @@ function sanitizePessoaPayload(payload = {}) {
     nome: trim(payload.nome),
     matricula: trim(payload.matricula),
     centroServico: trim(payload.centroServico ?? payload.centro_servico ?? payload.local),
+    setor: trim(payload.setor ?? payload.setor_id ?? payload.centroServico ?? payload.centro_servico ?? payload.local),
     cargo: trim(payload.cargo),
     tipoExecucao: trim(payload.tipoExecucao ?? ''),
     dataAdmissao: sanitizeDate(payload.dataAdmissao),
@@ -481,6 +484,11 @@ export const api = {
         query = query.eq('centro_servico', centroServico)
       }
 
+      const setor = trim(params.setor ?? '')
+      if (setor) {
+        query = query.eq('setor', setor)
+      }
+
       const cargo = trim(params.cargo ?? '')
       if (cargo) {
         query = query.eq('cargo', cargo)
@@ -494,6 +502,7 @@ export const api = {
             `nome.ilike.${like}`,
             `matricula.ilike.${like}`,
             `centro_servico.ilike.${like}`,
+            `setor.ilike.${like}`,
             `cargo.ilike.${like}`,
             `tipoExecucao.ilike.${like}`,
             `usuarioCadastro.ilike.${like}`,
@@ -507,8 +516,8 @@ export const api = {
     },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
-      if (!dados.nome || !dados.matricula || !dados.centroServico || !dados.cargo) {
-        throw new Error('Preencha nome, matrícula, centro de serviço e cargo.')
+      if (!dados.nome || !dados.matricula || !dados.centroServico || !dados.setor || !dados.cargo) {
+        throw new Error('Preencha nome, matrícula, centro de serviço, setor e cargo.')
       }
 
       const usuario = await resolveUsuarioResponsavel()
@@ -521,6 +530,7 @@ export const api = {
             nome: dados.nome,
             matricula: dados.matricula,
             centro_servico: dados.centroServico,
+            setor: dados.setor || dados.centroServico,
             cargo: dados.cargo,
             tipoExecucao: dados.tipoExecucao || null,
             dataAdmissao: dados.dataAdmissao,
@@ -554,14 +564,22 @@ export const api = {
 
       const historico = Array.isArray(atual.historicoEdicao) ? [...atual.historicoEdicao] : []
       const camposAlterados = []
-      ;['nome', 'matricula', 'centroServico', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
+      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
         const chaveAtual =
           campo === 'centroServico'
             ? 'centro_servico'
+            : campo === 'setor'
+              ? 'setor'
             : campo === 'dataAdmissao'
               ? 'dataAdmissao'
               : campo
-        const valorAtual = atual[chaveAtual] ?? (campo === 'centroServico' ? atual.centroServico ?? atual.centro_servico ?? '' : '')
+        const valorAtual =
+          atual[chaveAtual] ??
+          (campo === 'centroServico'
+            ? atual.centroServico ?? atual.centro_servico ?? ''
+            : campo === 'setor'
+              ? atual.setor ?? atual.centro_servico ?? ''
+              : '')
         const valorNovo = dados[campo] ?? (campo === 'dataAdmissao' ? null : '')
         if (valorAtual !== valorNovo) {
           camposAlterados.push({
@@ -588,6 +606,7 @@ export const api = {
             nome: dados.nome,
             matricula: dados.matricula,
             centro_servico: dados.centroServico,
+            setor: dados.setor || dados.centroServico,
             cargo: dados.cargo,
             tipoExecucao: dados.tipoExecucao || null,
             dataAdmissao: dados.dataAdmissao,

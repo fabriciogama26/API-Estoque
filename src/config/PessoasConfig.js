@@ -2,6 +2,7 @@ export const PESSOAS_FORM_DEFAULT = {
   nome: '',
   matricula: '',
   centroServico: '',
+  setor: '',
   cargo: '',
   local: '',
   dataAdmissao: '',
@@ -11,6 +12,7 @@ export const PESSOAS_FORM_DEFAULT = {
 export const PESSOAS_FILTER_DEFAULT = {
   termo: '',
   centroServico: 'todos',
+  setor: 'todos',
   cargo: 'todos',
   local: 'todos',
 }
