@@ -21,6 +21,7 @@ export function resolveUsuarioNome(user) {
 
 export function validateAcidenteForm(form) {
   const centroServico = form.centroServico?.trim() || form.setor?.trim() || ''
+  const local = form.local?.trim() || ''
 
   if (!form.nome.trim()) {
     return 'Informe o nome do colaborador.'
@@ -48,6 +49,9 @@ export function validateAcidenteForm(form) {
   }
   if (!centroServico) {
     return 'Informe o centro de servico.'
+  }
+  if (!local) {
+    return 'Selecione o local do acidente.'
   }
   const hasHht = String(form.hht ?? '').trim() !== ''
   if (hasHht) {
@@ -101,7 +105,7 @@ const sanitizeCentroServico = (value) => {
 
 export function createAcidentePayload(form, usuarioCadastro) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
-  const local = form.local.trim() || centroServico
+  const local = form.local?.trim() || centroServico
 
   return {
     matricula: form.matricula.trim(),
@@ -126,7 +130,7 @@ export function createAcidentePayload(form, usuarioCadastro) {
 
 export function updateAcidentePayload(form, usuarioResponsavel) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
-  const local = form.local.trim() || centroServico
+  const local = form.local?.trim() || centroServico
 
   return {
     matricula: form.matricula.trim(),

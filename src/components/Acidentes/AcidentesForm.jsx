@@ -9,6 +9,9 @@ export function AcidentesForm({
   pessoas = [],
   pessoasError,
   isLoadingPessoas = false,
+  locais = [],
+  locaisError,
+  isLoadingLocais = false,
 }) {
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -119,8 +122,23 @@ export function AcidentesForm({
           <input name="centroServico" value={form.centroServico} readOnly placeholder="Ex: Operacao" required />
         </label>
         <label className="field">
-          <span>Local</span>
-          <input name="local" value={form.local} onChange={onChange} placeholder="Informe o local do acidente" />
+          <span>Local <span className="asterisco">*</span></span>
+          <select
+            name="local"
+            value={form.local}
+            onChange={onChange}
+            disabled={isLoadingLocais || locais.length === 0}
+            required
+          >
+            <option value="">
+              {isLoadingLocais ? 'Carregando locais...' : 'Selecione o local do acidente'}
+            </option>
+            {locais.map((local) => (
+              <option key={local} value={local}>
+                {local}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>CAT</span>
@@ -136,6 +154,7 @@ export function AcidentesForm({
         </label>
       </div>
       {pessoasError ? <p className="feedback feedback--error">{pessoasError}</p> : null}
+      {locaisError ? <p className="feedback feedback--error">{locaisError}</p> : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">
         <button type="submit" className="button button--primary" disabled={isSaving}>

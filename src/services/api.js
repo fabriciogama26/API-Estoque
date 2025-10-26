@@ -711,15 +711,16 @@ export const api = {
     async groups() {
       const data = await execute(
         supabase
-          .from('materiais')
-          .select('grupoMaterial')
-          .not('grupoMaterial', 'is', null)
-          .neq('grupoMaterial', '')
-          .order('grupoMaterial', { ascending: true }),
+          .from('grupos_material')
+          .select('nome, ativo, ordem')
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
         'Falha ao listar grupos de materiais.'
       )
-      const grupos = new Set((data ?? []).map((item) => item.grupoMaterial).filter(Boolean))
-      return Array.from(grupos)
+      return (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => item.nome.trim())
+        .filter(Boolean)
     },
   },
   entradas: {
@@ -857,6 +858,20 @@ export const api = {
   acidentes: {
     async list() {
       return carregarAcidentes()
+    },
+    async locals() {
+      const data = await execute(
+        supabase
+          .from('acidente_locais')
+          .select('nome, ativo, ordem')
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
+        'Falha ao listar locais de acidente.'
+      )
+      return (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => item.nome.trim())
+        .filter(Boolean)
     },
     async create(payload) {
       const dados = {

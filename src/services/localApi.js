@@ -185,6 +185,40 @@ const mapLocalAcidenteRecord = (acidente) => {
   }
 }
 
+const locaisAcidentePadrao = [
+  'Sala de aula',
+  'Laboratório de química',
+  'Laboratório de biologia',
+  'Laboratório de informática',
+  'Laboratório de radiologia',
+  'Clínica veterinária',
+  'Curral',
+  'Baias',
+  'Consultório médico',
+  'Centro cirúrgico',
+  'Farmácia',
+  'Refeitório',
+  'Cozinha',
+  'Corredor',
+  'Escada',
+  'Pátio',
+  'Banheiro',
+  'Biblioteca',
+  'Auditório',
+  'Sala administrativa',
+  'Estacionamento',
+  'Oficina de manutenção',
+  'Almoxarifado',
+  'Central de gás',
+  'Depósito de materiais',
+  'Praça',
+  'Garagem',
+  'Sala de máquinas',
+  'Abrigo de gerador',
+  'Poço de elevador',
+  'Laboratório de análises clínicas',
+]
+
 const mapLocalMaterialResumo = (material) => {
   if (!material || typeof material !== 'object') {
     return null
@@ -1071,6 +1105,21 @@ const localApi = {
     },
   },
   acidentes: {
+    async locals() {
+      return readState((state) => {
+        const set = new Set(locaisAcidentePadrao)
+        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
+        lista.forEach((acidente) => {
+          if (acidente && acidente.local) {
+            const valor = String(acidente.local).trim()
+            if (valor) {
+              set.add(valor)
+            }
+          }
+        })
+        return Array.from(set).sort((a, b) => a.localeCompare(b))
+      })
+    },
     async list() {
       return readState((state) => sortByDateDesc(state.acidentes.map(mapLocalAcidenteRecord), 'data'))
     },
