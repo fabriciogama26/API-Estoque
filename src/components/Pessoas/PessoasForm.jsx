@@ -21,6 +21,10 @@ export function PessoasForm({ form, onChange, onSubmit, isSaving, editingPessoa,
           />
         </label>
         <label className="field">
+          <span>Setor <span className="asterisco">*</span></span>
+          <input name="setor" value={form.setor} onChange={onChange} required placeholder="Ex: Almoxarifado" />
+        </label>
+        <label className="field">
           <span>Cargo <span className="asterisco">*</span></span>
           <input name="cargo" value={form.cargo} onChange={onChange} required placeholder="Tecnico de manutencao" />
         </label>

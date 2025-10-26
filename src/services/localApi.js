@@ -60,11 +60,13 @@ const createError = (status, message) => {
 
 const sanitizePessoaPayload = (payload = {}) => {
   const centroServico = trim(payload.centroServico ?? payload.local)
+  const setor = trim(payload.setor ?? centroServico)
   return {
     nome: trim(payload.nome),
     matricula: trim(payload.matricula),
     cargo: trim(payload.cargo),
     centroServico,
+    setor,
     dataAdmissao: toLocalDateIso(payload.dataAdmissao),
     tipoExecucao: trim(payload.tipoExecucao),
   }
@@ -74,6 +76,7 @@ const validatePessoaPayload = (payload) => {
   if (!payload.nome) throw createError(400, 'Nome obrigatorio.')
   if (!payload.matricula) throw createError(400, 'Matricula obrigatoria.')
   if (!payload.centroServico) throw createError(400, 'Centro de servico obrigatorio.')
+  if (!payload.setor) throw createError(400, 'Setor obrigatorio.')
   if (!payload.cargo) throw createError(400, 'Cargo obrigatorio.')
   if (!payload.tipoExecucao) throw createError(400, 'Tipo Execucao obrigatorio.')
 }
@@ -82,10 +85,12 @@ const mapLocalPessoaRecord = (pessoa) => {
   if (!pessoa || typeof pessoa !== 'object') {
     return pessoa
   }
-  const centroServico = pessoa.centroServico ?? pessoa.local ?? ''
+  const centroServico = pessoa.centroServico ?? pessoa.local ?? pessoa.setor ?? ''
+  const setor = pessoa.setor ?? centroServico
   return {
     ...pessoa,
     centroServico,
+    setor,
     local: pessoa.local ?? centroServico,
   }
 }
@@ -745,6 +750,7 @@ const localApi = {
           nome: dados.nome,
           matricula: dados.matricula,
           centroServico: dados.centroServico,
+          setor: dados.setor,
           local: dados.centroServico,
           cargo: dados.cargo,
           dataAdmissao: dados.dataAdmissao,
@@ -787,6 +793,7 @@ const localApi = {
           { campo: 'nome' },
           { campo: 'matricula' },
           { campo: 'centroServico', atualKey: 'centroServico' },
+          { campo: 'setor' },
           { campo: 'cargo' },
           { campo: 'dataAdmissao' },
           { campo: 'tipoExecucao' },
@@ -794,7 +801,12 @@ const localApi = {
 
         comparacoes.forEach(({ campo, atualKey }) => {
           const valorAtual = (atualKey ? atual[atualKey] : atual[campo]) || ''
-          const valorNovo = campo === 'centroServico' ? dados.centroServico : dados[campo]
+          const valorNovo =
+            campo === 'centroServico'
+              ? dados.centroServico
+              : campo === 'setor'
+                ? dados.setor
+                : dados[campo]
           if (valorAtual !== valorNovo) {
             camposAlterados.push({
               campo,
@@ -820,6 +832,7 @@ const localApi = {
           nome: dados.nome,
           matricula: dados.matricula,
           centroServico: dados.centroServico,
+          setor: dados.setor,
           local: dados.centroServico,
           cargo: dados.cargo,
           dataAdmissao: dados.dataAdmissao,
