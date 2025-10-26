@@ -88,6 +88,10 @@ export function EntradasPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (!form.dataEntrada) {
+      setError('Informe a data da entrada.')
+      return
+    }
     setIsSaving(true)
     setError(null)
     try {
@@ -95,7 +99,7 @@ export function EntradasPage() {
         materialId: form.materialId,
         quantidade: Number(form.quantidade),
         centroCusto: form.centroCusto.trim(),
-        dataEntrada: form.dataEntrada || undefined,
+        dataEntrada: form.dataEntrada,
         usuarioResponsavel: user?.name || user?.username || 'sistema',
       }
       await api.entradas.create(payload)
@@ -166,10 +170,10 @@ export function EntradasPage() {
               placeholder="Ex: CC-OPER"
             />
           </label>
-          <label className="field">
-            <span>Data da entrada</span>
-            <input type="date" name="dataEntrada" value={form.dataEntrada} onChange={handleChange} />
-          </label>
+        <label className="field">
+          <span>Data da entrada*</span>
+          <input type="date" name="dataEntrada" value={form.dataEntrada} onChange={handleChange} required />
+        </label>
         </div>
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">

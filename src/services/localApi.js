@@ -185,6 +185,40 @@ const mapLocalAcidenteRecord = (acidente) => {
   }
 }
 
+const locaisAcidentePadrao = [
+  'Sala de aula',
+  'Laboratório de química',
+  'Laboratório de biologia',
+  'Laboratório de informática',
+  'Laboratório de radiologia',
+  'Clínica veterinária',
+  'Curral',
+  'Baias',
+  'Consultório médico',
+  'Centro cirúrgico',
+  'Farmácia',
+  'Refeitório',
+  'Cozinha',
+  'Corredor',
+  'Escada',
+  'Pátio',
+  'Banheiro',
+  'Biblioteca',
+  'Auditório',
+  'Sala administrativa',
+  'Estacionamento',
+  'Oficina de manutenção',
+  'Almoxarifado',
+  'Central de gás',
+  'Depósito de materiais',
+  'Praça',
+  'Garagem',
+  'Sala de máquinas',
+  'Abrigo de gerador',
+  'Poço de elevador',
+  'Laboratório de análises clínicas',
+]
+
 const mapLocalMaterialResumo = (material) => {
   if (!material || typeof material !== 'object') {
     return null
@@ -440,13 +474,16 @@ const validateMaterialPayload = (payload) => {
   }
 }
 
-const sanitizeEntradaPayload = (payload = {}) => ({
-  materialId: trim(payload.materialId),
-  quantidade: Number(payload.quantidade ?? 0),
-  centroCusto: trim(payload.centroCusto),
-  dataEntrada: toIsoOrNull(payload.dataEntrada, true),
-  usuarioResponsavel: trim(payload.usuarioResponsavel) || 'sistema',
-})
+const sanitizeEntradaPayload = (payload = {}) => {
+  const dataEntrada = toIsoOrNull(payload.dataEntrada, false)
+  return {
+    materialId: trim(payload.materialId),
+    quantidade: Number(payload.quantidade ?? 0),
+    centroCusto: trim(payload.centroCusto),
+    dataEntrada,
+    usuarioResponsavel: trim(payload.usuarioResponsavel) || 'sistema',
+  }
+}
 
 const validateEntradaPayload = (payload) => {
   if (!payload.materialId) throw createError(400, 'Material obrigatorio.')
@@ -454,16 +491,22 @@ const validateEntradaPayload = (payload) => {
     throw createError(400, 'Quantidade deve ser maior que zero.')
   }
   if (!payload.centroCusto) throw createError(400, 'Centro de custo obrigatorio.')
+  if (!payload.dataEntrada) throw createError(400, 'Data de entrada obrigatoria.')
 }
 
-const sanitizeSaidaPayload = (payload = {}) => ({
-  pessoaId: trim(payload.pessoaId),
-  materialId: trim(payload.materialId),
-  quantidade: Number(payload.quantidade ?? 0),
-  dataEntrega: toIsoOrNull(payload.dataEntrega, true),
-  usuarioResponsavel: trim(payload.usuarioResponsavel) || 'sistema',
-  status: trim(payload.status) || 'entregue',
-})
+const sanitizeSaidaPayload = (payload = {}) => {
+  const dataEntrega = toIsoOrNull(payload.dataEntrega, false)
+  return {
+    pessoaId: trim(payload.pessoaId),
+    materialId: trim(payload.materialId),
+    quantidade: Number(payload.quantidade ?? 0),
+    centroCusto: trim(payload.centroCusto),
+    centroServico: trim(payload.centroServico),
+    dataEntrega,
+    usuarioResponsavel: trim(payload.usuarioResponsavel) || 'sistema',
+    status: trim(payload.status) || 'entregue',
+  }
+}
 
 const validateSaidaPayload = (payload) => {
   if (!payload.pessoaId) throw createError(400, 'Pessoa obrigatoria para saida.')
@@ -472,7 +515,7 @@ const validateSaidaPayload = (payload) => {
     throw createError(400, 'Quantidade deve ser maior que zero.')
   }
   if (!payload.centroCusto) throw createError(400, 'Centro de custo obrigatorio.')
-  if (!payload.centroServico) throw createError(400, 'Centro de servico obrigatorio.')
+  if (!payload.dataEntrega) throw createError(400, 'Data de entrega obrigatoria.')
 }
 
 const sanitizeOptional = (value) => {
@@ -1016,6 +1059,8 @@ const localApi = {
           throw createError(404, 'Material nao encontrado.')
         }
 
+        const centroServico = dados.centroServico || pessoa.centroServico || pessoa.local || ''
+
         const estoqueAtual = calcularSaldoMaterial(material.id, state.entradas, state.saidas, null)
         if (Number(dados.quantidade) > estoqueAtual) {
           throw createError(400, 'Quantidade informada maior que estoque disponivel.')
@@ -1026,6 +1071,7 @@ const localApi = {
         const saida = {
           id: randomId(),
           ...dados,
+          centroServico,
           dataTroca,
         }
 
@@ -1059,6 +1105,21 @@ const localApi = {
     },
   },
   acidentes: {
+    async locals() {
+      return readState((state) => {
+        const set = new Set(locaisAcidentePadrao)
+        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
+        lista.forEach((acidente) => {
+          if (acidente && acidente.local) {
+            const valor = String(acidente.local).trim()
+            if (valor) {
+              set.add(valor)
+            }
+          }
+        })
+        return Array.from(set).sort((a, b) => a.localeCompare(b))
+      })
+    },
     async list() {
       return readState((state) => sortByDateDesc(state.acidentes.map(mapLocalAcidenteRecord), 'data'))
     },

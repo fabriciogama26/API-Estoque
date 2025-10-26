@@ -14,12 +14,17 @@ class EntradaService {
       dataEntrada: payload.dataEntrada
     });
 
+    const dataEntrada = new Date(payload.dataEntrada);
+    if (Number.isNaN(dataEntrada.getTime())) {
+      throw new Error('Data de entrada invalida');
+    }
+
     const entrada = new EntradaMaterial({
       id: uuid(),
       materialId: material.id,
       quantidade: Number(payload.quantidade),
       centroCusto: payload.centroCusto || '',
-      dataEntrada: payload.dataEntrada || new Date().toISOString(),
+      dataEntrada: dataEntrada.toISOString(),
       usuarioResponsavel: payload.usuarioResponsavel || null
     });
 
@@ -72,6 +77,7 @@ class EntradaService {
 }
 
 module.exports = new EntradaService();
+
 
 
 

@@ -57,6 +57,9 @@ export function AcidentesPage() {
   const [pessoas, setPessoas] = useState([])
   const [pessoasError, setPessoasError] = useState(null)
   const [isLoadingPessoas, setIsLoadingPessoas] = useState(false)
+  const [locais, setLocais] = useState([])
+  const [locaisError, setLocaisError] = useState(null)
+  const [isLoadingLocais, setIsLoadingLocais] = useState(false)
 
   const loadAcidentes = useCallback(async () => {
     setIsLoading(true)
@@ -84,6 +87,20 @@ export function AcidentesPage() {
     }
   }, [])
 
+  const loadLocais = useCallback(async () => {
+    setIsLoadingLocais(true)
+    setLocaisError(null)
+    try {
+      const response = await api.acidentes.locals()
+      setLocais(Array.isArray(response) ? response : [])
+    } catch (err) {
+      setLocaisError(err.message)
+      setLocais([])
+    } finally {
+      setIsLoadingLocais(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadAcidentes()
   }, [loadAcidentes])
@@ -91,6 +108,10 @@ export function AcidentesPage() {
   useEffect(() => {
     loadPessoas()
   }, [loadPessoas])
+
+  useEffect(() => {
+    loadLocais()
+  }, [loadLocais])
 
   const pessoasPorMatricula = useMemo(() => {
     const map = new Map()
@@ -102,6 +123,28 @@ export function AcidentesPage() {
     })
     return map
   }, [pessoas])
+
+  const resolveLocalDisponivel = useCallback(
+    (valor) => {
+      const alvo = valor?.trim()
+      if (!alvo) {
+        return ''
+      }
+      const matchDireto = locais.find((item) => item === alvo)
+      if (matchDireto) {
+        return matchDireto
+      }
+      const normalizar = (texto) =>
+        texto
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+      const alvoNormalizado = normalizar(alvo)
+      return locais.find((item) => normalizar(item) === alvoNormalizado) ?? ''
+    },
+    [locais],
+  )
 
   const handleFormChange = (event) => {
     const { name, value } = event.target
@@ -115,7 +158,8 @@ export function AcidentesPage() {
           const centroServico = pessoa.centroServico ?? pessoa.setor ?? pessoa.local ?? ''
           next.centroServico = centroServico
           next.setor = centroServico
-          next.local = ''
+          const localBase = pessoa.local ?? centroServico
+          next.local = resolveLocalDisponivel(localBase)
         } else if (!value) {
           next.nome = ''
           next.cargo = ''
@@ -125,6 +169,10 @@ export function AcidentesPage() {
         }
         return next
       })
+      return
+    }
+    if (name === 'local') {
+      setForm((prev) => ({ ...prev, local: resolveLocalDisponivel(value) }))
       return
     }
     if (name === 'centroServico') {
@@ -207,7 +255,7 @@ export function AcidentesPage() {
         acidente.hht !== null && acidente.hht !== undefined ? String(acidente.hht) : '',
       centroServico: acidente.centroServico || acidente.setor || '',
       setor: acidente.centroServico || acidente.setor || '',
-      local: acidente.local || acidente.centroServico || '',
+      local: resolveLocalDisponivel(acidente.local || acidente.centroServico || ''),
       cat: acidente.cat || '',
     })
   }
@@ -271,6 +319,9 @@ export function AcidentesPage() {
         pessoas={pessoas}
         pessoasError={pessoasError}
         isLoadingPessoas={isLoadingPessoas}
+        locais={locais}
+        locaisError={locaisError}
+        isLoadingLocais={isLoadingLocais}
       />
 
       <AcidentesFilters

@@ -8,8 +8,8 @@ function validarEntrada({ material, quantidade, centroCusto, dataEntrada }) {
   if (!centroCusto || !String(centroCusto).trim()) {
     throw new Error('Centro de custo obrigatorio');
   }
-  if (dataEntrada && Number.isNaN(Date.parse(dataEntrada))) {
-    throw new Error('Data de entrada invalida');
+  if (!dataEntrada || Number.isNaN(Date.parse(dataEntrada))) {
+    throw new Error('Data de entrada obrigatoria e deve ser valida');
   }
 }
 

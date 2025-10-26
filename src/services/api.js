@@ -711,35 +711,49 @@ export const api = {
     async groups() {
       const data = await execute(
         supabase
-          .from('materiais')
-          .select('grupoMaterial')
-          .not('grupoMaterial', 'is', null)
-          .neq('grupoMaterial', '')
-          .order('grupoMaterial', { ascending: true }),
+          .from('grupos_material')
+          .select('nome, ativo, ordem')
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
         'Falha ao listar grupos de materiais.'
       )
-      const grupos = new Set((data ?? []).map((item) => item.grupoMaterial).filter(Boolean))
-      return Array.from(grupos)
+      return (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => item.nome.trim())
+        .filter(Boolean)
     },
   },
   entradas: {
     list: carregarEntradas,
-    async create(payload) {
-      const usuario = await resolveUsuarioResponsavel()
-      const dados = {
-        materialId: trim(payload.materialId),
-        quantidade: toNumber(payload.quantidade, null),
-        centroCusto: trim(payload.centroCusto),
-        dataEntrada: payload.dataEntrada ? new Date(payload.dataEntrada).toISOString() : new Date().toISOString(),
-        usuarioResponsavel: usuario,
-      }
-      if (!dados.materialId || !dados.quantidade || dados.quantidade <= 0 || !dados.centroCusto) {
-        throw new Error('Preencha material, quantidade (>0) e centro de custo.')
-      }
-      const registro = await executeSingle(
-        supabase
-          .from('entradas')
-          .insert({
+      async create(payload) {
+        const usuario = await resolveUsuarioResponsavel()
+        const materialId = trim(payload.materialId)
+        const quantidade = toNumber(payload.quantidade, null)
+        const centroCusto = trim(payload.centroCusto)
+        const dataEntradaRaw = trim(payload.dataEntrada)
+
+        if (!materialId || !quantidade || quantidade <= 0 || !centroCusto) {
+          throw new Error('Preencha material, quantidade (>0) e centro de custo.')
+        }
+        if (!dataEntradaRaw) {
+          throw new Error('Informe a data de entrada.')
+        }
+        const dataEntradaDate = new Date(dataEntradaRaw)
+        if (Number.isNaN(dataEntradaDate.getTime())) {
+          throw new Error('Data de entrada invalida.')
+        }
+
+        const dados = {
+          materialId,
+          quantidade,
+          centroCusto,
+          dataEntrada: dataEntradaDate.toISOString(),
+          usuarioResponsavel: usuario,
+        }
+        const registro = await executeSingle(
+          supabase
+            .from('entradas')
+            .insert({
             materialId: dados.materialId,
             quantidade: dados.quantidade,
             centro_custo: dados.centroCusto,
@@ -756,54 +770,62 @@ export const api = {
     list: carregarSaidas,
     async create(payload) {
       const usuario = await resolveUsuarioResponsavel()
-      const dados = {
-        pessoaId: trim(payload.pessoaId),
-        materialId: trim(payload.materialId),
-        quantidade: toNumber(payload.quantidade, null),
-        centroCusto: trim(payload.centroCusto),
-        centroServico: trim(payload.centroServico ?? payload.centro_servico ?? ''),
-        dataEntrega: payload.dataEntrega ? new Date(payload.dataEntrega).toISOString() : new Date().toISOString(),
-        status: trim(payload.status) || 'entregue',
-      }
-      if (!dados.pessoaId || !dados.materialId || !dados.quantidade || dados.quantidade <= 0) {
+      const pessoaId = trim(payload.pessoaId)
+      const materialId = trim(payload.materialId)
+      const quantidade = toNumber(payload.quantidade, null)
+      const centroCusto = trim(payload.centroCusto)
+      const centroServicoInput = trim(payload.centroServico ?? payload.centro_servico ?? '')
+      const dataEntregaRaw = trim(payload.dataEntrega)
+      const status = trim(payload.status) || 'entregue'
+
+      if (!pessoaId || !materialId || !quantidade || quantidade <= 0) {
         throw new Error('Preencha pessoa, material e quantidade (>0).')
+      }
+      if (!centroCusto) {
+        throw new Error('Informe o centro de custo.')
+      }
+      if (!dataEntregaRaw) {
+        throw new Error('Informe a data de entrega.')
+      }
+      const dataEntregaDate = new Date(dataEntregaRaw)
+      if (Number.isNaN(dataEntregaDate.getTime())) {
+        throw new Error('Data de entrega invalida.')
       }
 
       const pessoa = await executeSingle(
-        supabase.from('pessoas').select('centro_servico').eq('id', dados.pessoaId),
+        supabase.from('pessoas').select('centro_servico').eq('id', pessoaId),
         'Falha ao obter pessoa.'
       )
 
-      if (!dados.centroServico) {
-        dados.centroServico = pessoa?.centro_servico ?? ''
-      }
+      const centroServico = centroServicoInput || pessoa?.centro_servico || ''
 
       const material = await executeSingle(
-        supabase.from('materiais').select('id, validadeDias').eq('id', dados.materialId),
+        supabase.from('materiais').select('id, validadeDias').eq('id', materialId),
         'Falha ao obter material.'
       )
 
-      const estoqueDisponivel = await calcularSaldoMaterialAtual(dados.materialId)
-      if (dados.quantidade > estoqueDisponivel) {
+      const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId)
+      if (quantidade > estoqueDisponivel) {
         const error = new Error('Quantidade informada maior que o estoque disponível.')
         error.status = 400
         throw error
       }
 
-      const dataTroca = calcularDataTroca(dados.dataEntrega, material?.validadeDias)
+      const dataEntregaIso = dataEntregaDate.toISOString()
+      const dataTroca = calcularDataTroca(dataEntregaIso, material?.validadeDias)
 
       const registro = await executeSingle(
         supabase
           .from('saidas')
           .insert({
-            pessoaId: dados.pessoaId,
-            materialId: dados.materialId,
-            quantidade: dados.quantidade,
-            centro_custo: dados.centroCusto,
-            centro_servico: dados.centroServico,
-            dataEntrega: dados.dataEntrega,
+            pessoaId,
+            materialId,
+            quantidade,
+            centro_custo: centroCusto,
+            centro_servico: centroServico,
+            dataEntrega: dataEntregaIso,
             dataTroca,
-            status: dados.status,
+            status,
             usuarioResponsavel: usuario,
           })
           .select(),
@@ -836,6 +858,20 @@ export const api = {
   acidentes: {
     async list() {
       return carregarAcidentes()
+    },
+    async locals() {
+      const data = await execute(
+        supabase
+          .from('acidente_locais')
+          .select('nome, ativo, ordem')
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
+        'Falha ao listar locais de acidente.'
+      )
+      return (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => item.nome.trim())
+        .filter(Boolean)
     },
     async create(payload) {
       const dados = {

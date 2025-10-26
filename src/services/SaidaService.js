@@ -18,11 +18,15 @@ class SaidaService {
       dataEntrega: payload.dataEntrega,
       centroCusto: payload.centroCusto,
       centroServico: payload.centroServico,
-      estoqueDisponivel
+      estoqueDisponivel,
     });
 
-    const dataEntrega = payload.dataEntrega || new Date().toISOString();
-    const dataTroca = this.calcularDataTroca(dataEntrega, material.validadeDias);
+    const dataEntrega = new Date(payload.dataEntrega);
+    if (Number.isNaN(dataEntrega.getTime())) {
+      throw new Error('Data de entrega invalida');
+    }
+    const dataEntregaIso = dataEntrega.toISOString();
+    const dataTroca = this.calcularDataTroca(dataEntregaIso, material.validadeDias);
 
     const saida = new SaidaMaterial({
       id: uuid(),
@@ -31,14 +35,20 @@ class SaidaService {
       quantidade: Number(payload.quantidade),
       centroCusto: payload.centroCusto || '',
       centroServico: payload.centroServico || '',
-      dataEntrega,
+      dataEntrega: dataEntregaIso,
       dataTroca,
-      usuarioResponsavel: payload.usuarioResponsavel || null
+      status: payload.status || 'entregue',
+      usuarioResponsavel: payload.usuarioResponsavel || null,
     });
 
     repositories.saidas.create(saida);
 
-    return this.formatarRetorno(saida, material, pessoa, estoqueDisponivel - Number(payload.quantidade));
+    return this.formatarRetorno(
+      saida,
+      material,
+      pessoa,
+      estoqueDisponivel - Number(payload.quantidade)
+    );
   }
 
   listarSaidas() {
@@ -121,21 +131,19 @@ class SaidaService {
         nome: pessoa.nome,
         local: pessoa.local,
         centroServico: pessoa.centroServico || pessoa.local,
-        cargo: pessoa.cargo
+        cargo: pessoa.cargo,
       },
       material: {
         nome: material.nome,
         fabricante: material.fabricante,
         validadeDias: material.validadeDias,
         ca: material.ca,
-        valorUnitario: material.valorUnitario
+        valorUnitario: material.valorUnitario,
       },
-      estoqueAtual
+      estoqueAtual,
     };
   }
 }
 
 module.exports = new SaidaService();
-
-
 
