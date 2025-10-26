@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 
 export function AcidentesForm({
   form,
@@ -209,20 +209,6 @@ export function AcidentesForm({
         <label className="field">
           <span>Partes lesionadas <span className="asterisco">*</span></span>
           <div className="multi-select">
-            <div className="multi-select__chips">
-              {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
-                ? form.partesLesionadas.map((parte) => (
-                    <button
-                      type="button"
-                      key={parte}
-                      className="chip"
-                      onClick={() => handleRemoveParte(parte)}
-                    >
-                      {parte} <span aria-hidden="true">×</span>
-                    </button>
-                  ))
-                : <span className="multi-select__placeholder">Nenhuma parte adicionada</span>}
-            </div>
             <div className="multi-select__input">
               <input
                 value={parteDraft}
@@ -235,21 +221,45 @@ export function AcidentesForm({
                 }
                 autoComplete="off"
               />
-              <button type="button" className="button button--ghost" onClick={handleAddParte} disabled={!parteDraft.trim()}>
+            </div>
+            <div className="multi-select__actions">
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleAddParte}
+                disabled={!parteDraft.trim()}
+              >
                 Adicionar
               </button>
+              <div className="multi-select__chips">
+                {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
+                  ? form.partesLesionadas.map((parte, index) => (
+                      <button
+                        type="button"
+                        key={`${parte}-${index}`}
+                        className="chip"
+                        aria-label={`Remover ${parte}`}
+                        onClick={() => handleRemoveParte(parte)}
+                      >
+                        {parte} <span aria-hidden="true">x</span>
+                      </button>
+                    ))
+                  : <span className="multi-select__placeholder">Nenhuma parte adicionada</span>}
+              </div>
             </div>
           </div>
           <datalist id={parteListId}>
-            {parteOptions.map((parte) => {
+            {parteOptions.map((parte, index) => {
               if (!parte) {
                 return null
               }
               if (typeof parte === 'string') {
-                return <option key={parte} value={parte} />
+                return <option key={`${parte}-${index}`} value={parte} />
               }
-              const key = parte.nome || parte.label || JSON.stringify(parte)
-              return <option key={key} value={parte.nome} label={parte.label ?? parte.nome} />
+              const nome = parte.nome ?? ''
+              const label = parte.label ?? nome
+              const key = `${nome}-${parte.subgrupo ?? ''}-${index}`
+              return <option key={key} value={nome} label={label} />
             })}
           </datalist>
         </label>

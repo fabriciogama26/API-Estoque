@@ -85,9 +85,11 @@
 
 .multi-select__chips {
   display: flex;
+  flex: 1;
   flex-wrap: wrap;
   gap: 0.5rem;
   min-height: 1.5rem;
+  align-items: center;
 }
 
 .multi-select__placeholder {
@@ -97,15 +99,21 @@
 
 .multi-select__input {
   display: flex;
-  gap: 0.5rem;
 }
 
 .multi-select__input input {
   flex: 1;
 }
 
-.multi-select__input button {
-  white-space: nowrap;
+.multi-select__actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.multi-select__actions .button {
+  flex-shrink: 0;
 }
 
 .chip {
