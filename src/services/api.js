@@ -1047,12 +1047,13 @@ export const api = {
         throw new Error('Preencha os campos obrigat?rios do acidente.')
       }
       const usuario = await resolveUsuarioResponsavel()
+      const { centroServico: centroServicoDb, ...resto } = dados
       const registro = await executeSingle(
         supabase
           .from('acidentes')
           .insert({
-            ...dados,
-            centro_servico: dados.centroServico,
+            ...resto,
+            centro_servico: centroServicoDb,
             partes_lesionadas: partes,
             registradoPor: usuario,
           })
@@ -1103,12 +1104,13 @@ async update(id, payload) {
       }
 
       const usuario = await resolveUsuarioResponsavel()
+      const { centroServico: centroServicoDb, partesLesionadas: _partesIgnoradas, ...resto } = dados
       const registro = await executeSingle(
         supabase
           .from('acidentes')
           .update({
-            ...dados,
-            centro_servico: dados.centroServico,
+            ...resto,
+            centro_servico: centroServicoDb,
             partes_lesionadas: partes,
             atualizadoPor: usuario,
             atualizadoEm: new Date().toISOString(),

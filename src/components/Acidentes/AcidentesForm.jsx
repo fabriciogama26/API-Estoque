@@ -233,14 +233,15 @@ export function AcidentesForm({
               </button>
               <div className="multi-select__chips">
                 {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
-                  ? form.partesLesionadas.map((parte) => (
+                  ? form.partesLesionadas.map((parte, index) => (
                       <button
                         type="button"
-                        key={parte}
+                        key={`${parte}-${index}`}
                         className="chip"
+                        aria-label={`Remover ${parte}`}
                         onClick={() => handleRemoveParte(parte)}
                       >
-                        {parte} <span aria-hidden="true">�-</span>
+                        {parte} <span aria-hidden="true">x</span>
                       </button>
                     ))
                   : <span className="multi-select__placeholder">Nenhuma parte adicionada</span>}
@@ -248,15 +249,17 @@ export function AcidentesForm({
             </div>
           </div>
           <datalist id={parteListId}>
-            {parteOptions.map((parte) => {
+            {parteOptions.map((parte, index) => {
               if (!parte) {
                 return null
               }
               if (typeof parte === 'string') {
-                return <option key={parte} value={parte} />
+                return <option key={`${parte}-${index}`} value={parte} />
               }
-              const key = parte.nome || parte.label || JSON.stringify(parte)
-              return <option key={key} value={parte.nome} label={parte.label ?? parte.nome} />
+              const nome = parte.nome ?? ''
+              const label = parte.label ?? nome
+              const key = `${nome}-${parte.subgrupo ?? ''}-${index}`
+              return <option key={key} value={nome} label={label} />
             })}
           </datalist>
         </label>
