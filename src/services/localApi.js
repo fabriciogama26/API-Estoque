@@ -151,6 +151,7 @@ const ACIDENTE_HISTORY_FIELDS = [
   'tipo',
   'agente',
   'lesao',
+  'partesLesionadas',
   'parteLesionada',
   'centroServico',
   'local',
@@ -169,6 +170,9 @@ const normalizeHistoryValue = (value) => {
   if (typeof value === 'number' && Number.isNaN(value)) {
     return ''
   }
+  if (Array.isArray(value)) {
+    return value.map((item) => (item && String(item).trim()) || '').filter(Boolean).join(', ')
+  }
   return value
 }
 
@@ -177,11 +181,18 @@ const mapLocalAcidenteRecord = (acidente) => {
     return acidente
   }
   const centroServico = acidente.centroServico ?? acidente.setor ?? ''
+  const partes = Array.isArray(acidente.partesLesionadas)
+    ? acidente.partesLesionadas.filter((parte) => parte && parte.trim())
+    : acidente.parteLesionada
+    ? [acidente.parteLesionada]
+    : []
   return {
     ...acidente,
     centroServico,
     setor: acidente.setor ?? centroServico,
     local: acidente.local ?? centroServico,
+    partesLesionadas: partes,
+    parteLesionada: partes[0] ?? acidente.parteLesionada ?? '',
   }
 }
 
@@ -558,6 +569,108 @@ const catalogoAcidenteAgentes = {
   ],
 }
 
+const catalogoAcidentePartes = [
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Couro cabeludo' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Cranio' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Face' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Testa' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Olho direito' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Olho esquerdo' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Nariz' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Boca' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Bochecha direita' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Bochecha esquerda' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Queixo' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Ouvidos' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Orelha direita' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Orelha esquerda' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Mandibula' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Maxilar' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Dentes' },
+  { grupo: 'Cabeca', subgrupo: '', nome: 'Lingua' },
+  { grupo: 'Pescoco', subgrupo: '', nome: 'Regiao anterior (garganta)' },
+  { grupo: 'Pescoco', subgrupo: '', nome: 'Regiao posterior (nuca)' },
+  { grupo: 'Pescoco', subgrupo: '', nome: 'Traqueia' },
+  { grupo: 'Pescoco', subgrupo: '', nome: 'Pescoco lateral direito' },
+  { grupo: 'Pescoco', subgrupo: '', nome: 'Pescoco lateral esquerdo' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Toracica', nome: 'Torax anterior (peito)' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Toracica', nome: 'Torax posterior (costas superiores)' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Toracica', nome: 'Mamas' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Toracica', nome: 'Esterno' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Toracica', nome: 'Costelas direitas / esquerdas' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Toracica', nome: 'Pulmoes (internos)' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Toracica', nome: 'Coracao (interno)' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Abdome superior' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Abdome inferior' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Lado direito / esquerdo' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Figado' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Estomago' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Intestinos' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Baco' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Pancreas' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Abdominal', nome: 'Rins direito e esquerdo' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Lombar e Dorsal', nome: 'Coluna dorsal' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Lombar e Dorsal', nome: 'Coluna lombar' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Lombar e Dorsal', nome: 'Quadril direito' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Lombar e Dorsal', nome: 'Quadril esquerdo' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Lombar e Dorsal', nome: 'Nadega direita' },
+  { grupo: 'Tronco', subgrupo: 'Regiao Lombar e Dorsal', nome: 'Nadega esquerda' },
+  { grupo: 'Membros Superiores', subgrupo: 'Ombros e Bracos', nome: 'Ombro direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Ombros e Bracos', nome: 'Ombro esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Ombros e Bracos', nome: 'Braco direito (superior)' },
+  { grupo: 'Membros Superiores', subgrupo: 'Ombros e Bracos', nome: 'Braco esquerdo (superior)' },
+  { grupo: 'Membros Superiores', subgrupo: 'Cotovelos e Antebracos', nome: 'Cotovelo direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Cotovelos e Antebracos', nome: 'Cotovelo esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Cotovelos e Antebracos', nome: 'Antebraco direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Cotovelos e Antebracos', nome: 'Antebraco esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Punho direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Punho esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Mao direita' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Mao direita - Palma' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Mao direita - Dorso' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Polegar direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Indicador direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Medio direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Anelar direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Minimo direito' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Mao esquerda' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Mao esquerda - Palma' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Mao esquerda - Dorso' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Polegar esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Indicador esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Medio esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Anelar esquerdo' },
+  { grupo: 'Membros Superiores', subgrupo: 'Punhos e Maos', nome: 'Minimo esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Quadris e Coxas', nome: 'Quadril direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Quadris e Coxas', nome: 'Quadril esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Quadris e Coxas', nome: 'Coxa direita (anterior / posterior)' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Quadris e Coxas', nome: 'Coxa esquerda (anterior / posterior)' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Joelhos e Pernas', nome: 'Joelho direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Joelhos e Pernas', nome: 'Joelho esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Joelhos e Pernas', nome: 'Perna direita (anterior / posterior)' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Joelhos e Pernas', nome: 'Perna esquerda (anterior / posterior)' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Joelhos e Pernas', nome: 'Panturrilha direita' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Joelhos e Pernas', nome: 'Panturrilha esquerda' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Tornozelo direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Tornozelo esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Pe direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Pe direito - Dorso' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Pe direito - Planta' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Halux (dedao) direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '2o dedo direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '3o dedo direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '4o dedo direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '5o dedo direito' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Pe esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Pe esquerdo - Dorso' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Pe esquerdo - Planta' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: 'Halux (dedao) esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '2o dedo esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '3o dedo esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '4o dedo esquerdo' },
+  { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '5o dedo esquerdo' },
+];
+
 const sanitizeMaterialPayload = (payload = {}) => {
   const grupoMaterial = trim(payload.grupoMaterial)
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
@@ -678,6 +791,11 @@ const sanitizeOptional = (value) => {
 const sanitizeAcidentePayload = (payload = {}) => {
   const centroServico = trim(payload.centroServico ?? payload.setor)
   const local = trim(payload.local)
+  const partes = Array.isArray(payload.partesLesionadas)
+    ? payload.partesLesionadas.map((parte) => trim(parte)).filter(Boolean)
+    : payload.parteLesionada
+    ? [trim(payload.parteLesionada)]
+    : []
   return {
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
@@ -686,7 +804,8 @@ const sanitizeAcidentePayload = (payload = {}) => {
     tipo: trim(payload.tipo),
     agente: trim(payload.agente),
     lesao: trim(payload.lesao),
-    parteLesionada: trim(payload.parteLesionada),
+    parteLesionada: partes[0] ?? trim(payload.parteLesionada),
+    partesLesionadas: partes,
     centroServico,
     local: local || centroServico,
     diasPerdidos:
@@ -714,7 +833,12 @@ const validateAcidentePayload = (payload) => {
   if (!payload.tipo) throw createError(400, 'Tipo de acidente obrigatorio.')
   if (!payload.agente) throw createError(400, 'Agente causador obrigatorio.')
   if (!payload.lesao) throw createError(400, 'Lesao obrigatoria.')
-  if (!payload.parteLesionada) throw createError(400, 'Parte lesionada obrigatoria.')
+  const partesValidadas = Array.isArray(payload.partesLesionadas)
+    ? payload.partesLesionadas.filter((parte) => parte && parte.trim())
+    : payload.parteLesionada
+    ? [payload.parteLesionada.trim()]
+    : []
+  if (!partesValidadas.length) throw createError(400, 'Parte lesionada obrigatoria.')
   if (!payload.centroServico) throw createError(400, 'Centro de servico obrigatorio.')
   if (!payload.data) throw createError(400, 'Data do acidente obrigatoria.')
   if (!Number.isInteger(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
@@ -1272,6 +1396,37 @@ const localApi = {
     },
   },
   acidentes: {
+    async parts() {
+      return readState((state) => {
+        const mapa = new Map()
+        catalogoAcidentePartes.forEach(({ nome, grupo, subgrupo }) => {
+          const label = [grupo, subgrupo, nome].filter(Boolean).join(' / ')
+          const chave = normalizeKeyPart(nome)
+          if (!mapa.has(chave)) {
+            mapa.set(chave, { nome, label: label || nome })
+          }
+        })
+        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
+        lista.forEach((acidente) => {
+          const partes = Array.isArray(acidente.partesLesionadas)
+            ? acidente.partesLesionadas
+            : acidente.parteLesionada
+            ? [acidente.parteLesionada]
+            : []
+          partes.forEach((parte) => {
+            const nome = String(parte || '').trim()
+            if (!nome) {
+              return
+            }
+            const chave = normalizeKeyPart(nome)
+            if (!mapa.has(chave)) {
+              mapa.set(chave, { nome, label: nome })
+            }
+          })
+        })
+        return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }))
+      })
+    },
     async agents() {
       return readState((state) => {
         const set = new Set(Object.keys(catalogoAcidenteAgentes))
@@ -1362,6 +1517,7 @@ const localApi = {
           agente: dados.agente,
           lesao: dados.lesao,
           parteLesionada: dados.parteLesionada,
+          partesLesionadas: dados.partesLesionadas,
           centroServico: centroServicoBase,
           setor: centroServicoBase,
           local: localBase,

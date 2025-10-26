@@ -55,12 +55,19 @@ export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSavi
               historyState?.isLoading && historyState?.acidente?.id === acidente.id
             )
             const disableHistory = isSaving || isHistoryLoading || typeof onHistory !== 'function'
+            const partesSelecionadas = Array.isArray(acidente.partesLesionadas)
+              ? acidente.partesLesionadas.filter(Boolean)
+              : acidente.parteLesionada
+                ? [acidente.parteLesionada]
+                : []
             return (
               <tr key={acidente.id}>
                 <td>
                   <strong>{acidente.nome}</strong>
-                  {acidente.parteLesionada ? (
-                    <div className="data-table__muted">Parte lesionada: {acidente.parteLesionada}</div>
+                  {partesSelecionadas.length ? (
+                    <div className="data-table__muted">
+                      Partes lesionadas: {partesSelecionadas.join(', ')}
+                    </div>
                   ) : null}
                   {acidente.lesao ? (
                     <div className="data-table__muted">Lesao: {acidente.lesao}</div>

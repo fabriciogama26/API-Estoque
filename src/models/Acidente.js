@@ -12,6 +12,7 @@ class Acidente {
     agente,
     lesao,
     parteLesionada,
+    partesLesionadas = [],
     centroServico,
     setor,
     local,
@@ -34,7 +35,13 @@ class Acidente {
     this.tipo = tipo
     this.agente = agente
     this.lesao = lesao
-    this.parteLesionada = parteLesionada
+    const partes = Array.isArray(partesLesionadas)
+      ? partesLesionadas.filter((parte) => parte && String(parte).trim())
+      : parteLesionada
+      ? [parteLesionada]
+      : []
+    this.partesLesionadas = partes
+    this.parteLesionada = parteLesionada ?? partes[0] ?? ''
     const resolvedCentroServico = centroServico ?? setor ?? ''
     this.centroServico = resolvedCentroServico
     this.setor = resolvedCentroServico

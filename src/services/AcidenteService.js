@@ -124,9 +124,20 @@ function sanitizeOptionalIntegerString(value, fieldName = 'Valor') {
   return sanitized;
 }
 
+function sanitizePartesArray(value, fallback = []) {
+  const origem = Array.isArray(value) ? value : value ? [value] : fallback;
+  if (!origem) {
+    return [];
+  }
+  return origem
+    .map((item) => sanitizeOptionalString(item))
+    .filter((item) => item !== undefined && item !== null && item !== '');
+}
+
 class AcidenteService {
   criarAcidente(payload = {}) {
     const dadosPessoa = obterDadosPessoa(payload.matricula, payload);
+    const partes = sanitizePartesArray(payload.partesLesionadas, payload.parteLesionada);
 
     const dadosObrigatorios = {
       ...dadosPessoa,
@@ -134,7 +145,8 @@ class AcidenteService {
       tipo: sanitizeRequiredString(payload.tipo),
       agente: sanitizeRequiredString(payload.agente),
       lesao: sanitizeRequiredString(payload.lesao),
-      parteLesionada: sanitizeRequiredString(payload.parteLesionada),
+      parteLesionada: partes[0] || '',
+      partesLesionadas: partes,
       diasPerdidos: sanitizeNonNegativeInteger(payload.diasPerdidos, {
         defaultValue: 0,
         fieldName: 'Dias perdidos',
@@ -196,7 +208,18 @@ class AcidenteService {
       }
     };
 
-    ['nome', 'cargo', 'tipo', 'agente', 'lesao', 'parteLesionada'].forEach((campo) => assignCampo(campo));
+    if (payload.partesLesionadas !== undefined) {
+      const partesAtualizadas = sanitizePartesArray(payload.partesLesionadas);
+      updates.partesLesionadas = partesAtualizadas;
+      updates.parteLesionada =
+        partesAtualizadas[0] ?? sanitizeUpdatableString(payload.parteLesionada ?? atual.parteLesionada);
+    } else if (payload.parteLesionada !== undefined) {
+      const parteUnica = sanitizeUpdatableString(payload.parteLesionada);
+      updates.parteLesionada = parteUnica;
+      updates.partesLesionadas = parteUnica ? [parteUnica] : [];
+    }
+
+    ['nome', 'cargo', 'tipo', 'agente', 'lesao'].forEach((campo) => assignCampo(campo));
 
     const centroServicoOverride = sanitizeUpdatableString(payload.centroServico ?? payload.setor);
     if (centroServicoOverride !== undefined) {
@@ -247,6 +270,14 @@ class AcidenteService {
     const merged = {
       ...atual,
       ...updates,
+      partesLesionadas:
+        updates.partesLesionadas ??
+        atual.partesLesionadas ??
+        (atual.parteLesionada ? [atual.parteLesionada] : []),
+      parteLesionada:
+        (updates.partesLesionadas && updates.partesLesionadas[0]) ??
+        updates.parteLesionada ??
+        atual.parteLesionada,
       centroServico: updates.centroServico ?? atual.centroServico ?? atual.setor,
       setor: updates.setor ?? atual.setor ?? atual.centroServico,
       local: updates.local ?? atual.local ?? null,

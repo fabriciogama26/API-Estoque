@@ -6,6 +6,7 @@ const FIELD_LABELS = {
   tipo: 'Tipo',
   agente: 'Agente',
   lesao: 'Lesao',
+  partesLesionadas: 'Partes lesionadas',
   parteLesionada: 'Parte lesionada',
   centroServico: 'Centro de servico',
   local: 'Local',
@@ -45,6 +46,9 @@ const formatValue = (campo, valor) => {
   }
   if (campo === 'data') {
     return formatDate(valor)
+  }
+  if (Array.isArray(valor)) {
+    return valor.length ? valor.join(', ') : '-'
   }
   return valor
 }
