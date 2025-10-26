@@ -1,0 +1,155 @@
+1. Agente Químico
+
+Queimadura química
+
+Irritação cutânea
+
+Dermatite de contato
+
+Sensibilização alérgica
+
+Corrosão tecidual
+
+Necrose
+
+Intoxicação aguda
+
+Intoxicação crônica
+
+Lesão ocular química
+
+Lesão respiratória por vapores tóxicos
+
+Edema pulmonar químico
+
+Lesão hepática 
+
+Renal por exposição prolongada
+
+2. Agente Biológico
+
+Infecção local
+
+Infecção sistêmica
+
+Hepatite viral
+
+HIV / AIDS
+
+Leptospirose
+
+Raiva
+
+Tétano
+
+Micoses e dermatofitoses
+
+Toxoplasmose
+
+Brucelose
+
+Outras zoonoses
+
+Reação alérgica a agentes biológicos
+
+3. Agente Físico
+
+Queimadura térmica
+
+Queimadura elétrica
+
+Choque elétrico
+
+Queimadura por radiação
+
+Lesão por frio
+
+Lesão por calor
+
+Barotrauma
+
+Lesão por ruído
+
+Lesão por vibração
+
+Cansaço visual 
+
+Ofuscamento por iluminação inadequada
+
+4. Agente Mecânico / de Acidente
+
+Corte 
+
+Laceração
+
+Perfuração 
+
+Puntura
+
+Escoriação 
+
+Abrasão
+
+Contusão
+
+Fratura
+
+Luxação 
+
+Entorse
+
+Amputação parcial ou total
+
+Esguicho de partículas nos olhos
+
+Lesão por esmagamento
+
+Queda com impacto corporal
+
+Lesão por objeto projetado ou em movimento
+
+Perfurocortante contaminado
+
+Lesão por animal
+
+Politraumatismo
+
+5. Agente Ergonômico
+
+Lombalgia
+
+Cervicalgia
+
+Tendinite 
+
+Tenossinovite
+
+Bursite
+
+Síndrome do túnel do carpo
+
+Epicondilite lateral / medial
+
+Fadiga muscular
+
+Contraturas e dores miofasciais
+
+Hérnia de disco
+
+Distúrbios osteomusculares relacionados ao trabalho (DORT/LER)
+
+6. Agente Psicosocial
+
+Estresse ocupacional agudo ou crônico
+
+Síndrome de Burnout
+
+Ansiedade ocupacional
+
+Depressão relacionada ao trabalho
+
+Transtorno do sono
+
+Transtorno pós-traumático
+
+Distúrbios cognitivos
