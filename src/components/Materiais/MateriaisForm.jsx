@@ -9,7 +9,12 @@ const normalize = (value) =>
         .replace(/[\u0300-\u036f]/g, '')
     : ''
 
-const isGrupo = (value, target) => normalize(value) === normalize(target)
+const normalizeGrupo = (value) => {
+  const base = normalize(value)
+  return base.endsWith('s') ? base.slice(0, -1) : base
+}
+
+const isGrupo = (value, target) => normalizeGrupo(value) === normalizeGrupo(target)
 
 export function MateriaisForm({
   form,
@@ -22,11 +27,17 @@ export function MateriaisForm({
   materialGroups = [],
   isLoadingGroups = false,
   groupsError = null,
+  materialItems = [],
+  isLoadingItems = false,
+  itemsError = null,
 }) {
   const isCalcado = isGrupo(form.grupoMaterial, GRUPO_MATERIAL_CALCADO)
   const isVestimenta = isGrupo(form.grupoMaterial, GRUPO_MATERIAL_VESTIMENTA)
   const groupOptions = Array.from(
     new Set([...(materialGroups || []), form.grupoMaterial].filter(Boolean))
+  )
+  const itemOptions = Array.from(
+    new Set([...(materialItems || []), form.nome].filter(Boolean))
   )
 
   return (
@@ -34,13 +45,28 @@ export function MateriaisForm({
       <div className="form__grid form__grid--two">
         <label className="field">
           <span>EPI <span className="asterisco">*</span></span>
-          <input
+          <select
             name="nome"
             value={form.nome}
             onChange={onChange}
             required
-            placeholder="Capacete"
-          />
+            disabled={!form.grupoMaterial || (isLoadingItems && !itemOptions.length)}
+          >
+            <option value="">
+              {isLoadingItems
+                ? 'Carregando EPIs...'
+                : form.grupoMaterial
+                  ? itemOptions.length
+                    ? 'Selecione o EPI'
+                    : 'Nenhum EPI cadastrado para o grupo'
+                  : 'Selecione um grupo primeiro'}
+            </option>
+            {itemOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Fabricante <span className="asterisco">*</span></span>
@@ -134,6 +160,7 @@ export function MateriaisForm({
         </label>
       </div>
       {groupsError ? <p className="feedback feedback--error">{groupsError}</p> : null}
+      {itemsError ? <p className="feedback feedback--error">{itemsError}</p> : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">
         <button type="submit" className="button button--primary" disabled={isSaving}>

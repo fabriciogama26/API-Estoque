@@ -376,7 +376,12 @@ const normalizeKeyPart = (value) =>
         .replace(/[\u0300-\u036f]/g, '')
     : ''
 
-const isGrupo = (value, target) => normalizeKeyPart(value) === normalizeKeyPart(target)
+const normalizeGrupoLocal = (value) => {
+  const base = normalizeKeyPart(value)
+  return base.endsWith('s') ? base.slice(0, -1) : base
+}
+
+const isGrupo = (value, target) => normalizeGrupoLocal(value) === normalizeGrupoLocal(target)
 
 const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
   if (isGrupo(grupoMaterial, 'Calçado')) {
@@ -396,7 +401,71 @@ const buildChaveUnica = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) 
     normalizeKeyPart(numeroEspecifico),
   ].join('||')
 
-const gruposEpiPadrao = (() => {
+const catalogoGruposMateriais = {
+  Vestimentas: [
+    'Camisa manga longa',
+    'Camisa manga curta',
+    'Calça de brim',
+    'Jaleco hospitalar',
+    'Avental PVC',
+    'Macacão de proteção química',
+    'Capote descartável',
+    'Touca descartável',
+    'Avental de chumbo (radiologia)',
+    'Colete refletivo',
+    'Capa de chuva',
+    'Colete salva-vidas',
+  ],
+  'Calçados': [
+    'Botina de segurança bico plástico',
+    'Botina de segurança bico de aço',
+    'Sapato hospitalar fechado',
+    'Tênis antiderrapante',
+    'Bota de borracha cano longo',
+    'Bota de PVC',
+  ],
+  'Proteção das Mãos': [
+    'Luva de vaqueta',
+    'Luva nitrílica',
+    'Luva de látex',
+    'Luva térmica',
+    'Luva de raspa',
+    'Luva de procedimento',
+    'Luva descartável',
+  ],
+  'Proteção da Cabeça e Face': [
+    'Capacete de segurança',
+    'Protetor facial',
+    'Óculos de segurança incolor',
+    'Óculos de segurança fumê',
+    'Máscara facial',
+    'Máscara cirúrgica',
+    'Máscara com filtro',
+    'Escudo facial',
+  ],
+  'Proteção Auditiva': [
+    'Protetor auricular tipo plug',
+    'Protetor auricular tipo concha',
+  ],
+  'Proteção Respiratória': [
+    'Respirador semifacial',
+    'Respirador purificador de ar',
+    'Máscara de carvão ativado',
+  ],
+  'Proteção contra Quedas': [
+    'Cinto de segurança tipo paraquedista',
+    'Talabarte com absorvedor de energia',
+    'Trava quedas',
+    'Cordas de ancoragem',
+  ],
+  Outros: [
+    'Creme protetor solar',
+    'Creme de proteção dérmica',
+    'Protetor de nuca',
+  ],
+}
+
+const gruposEpiFonte = (() => {
   if (Array.isArray(gruposEpi)) {
     return gruposEpi
   }
@@ -405,6 +474,13 @@ const gruposEpiPadrao = (() => {
   }
   return []
 })()
+
+const gruposEpiPadrao = Array.from(
+  new Set([
+    ...Object.keys(catalogoGruposMateriais),
+    ...gruposEpiFonte.map((item) => (item ? String(item).trim() : '')),
+  ]),
+)
   .map((item) => (item ? String(item).trim() : ''))
   .filter(Boolean)
 
@@ -917,6 +993,23 @@ const localApi = {
           .filter(Boolean)
           .forEach((grupo) => set.add(grupo))
         return Array.from(set).sort((a, b) => a.localeCompare(b))
+      })
+    },
+    async items(grupoNome) {
+      const nome = trim(grupoNome)
+      if (!nome) {
+        return []
+      }
+      const base =
+        Object.prototype.hasOwnProperty.call(catalogoGruposMateriais, nome)
+          ? catalogoGruposMateriais[nome]
+          : []
+      return readState((state) => {
+        const extras = state.materiais
+          .filter((material) => normalizeKeyPart(material.grupoMaterial) === normalizeKeyPart(nome))
+          .map((material) => trim(material.nome))
+          .filter(Boolean)
+        return Array.from(new Set([...(base || []), ...extras])).sort((a, b) => a.localeCompare(b))
       })
     },
     async create(payload) {

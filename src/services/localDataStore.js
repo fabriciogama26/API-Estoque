@@ -22,7 +22,12 @@ const normalizeKeyPart = (value) =>
         .replace(/[\u0300-\u036f]/g, '')
     : ''
 
-const isGrupoLocal = (value, target) => normalizeKeyPart(value) === normalizeKeyPart(target)
+const normalizeGrupoLocal = (value) => {
+  const base = normalizeKeyPart(value)
+  return base.endsWith('s') ? base.slice(0, -1) : base
+}
+
+const isGrupoLocal = (value, target) => normalizeGrupoLocal(value) === normalizeGrupoLocal(target)
 
 const sanitizeDigitsLocal = (value = '') => String(value).replace(/\D/g, '')
 
