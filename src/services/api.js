@@ -1,4 +1,4 @@
-ï»¿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import {
   montarEstoqueAtual,
   montarDashboard,
@@ -105,6 +105,45 @@ const normalizeHistoryValue = (value) => {
   return value.toString().trim()
 }
 
+const normalizePessoaHistorico = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  return lista
+    .map((registro) => {
+      if (!registro || typeof registro !== 'object') {
+        return null
+      }
+
+      const camposOrigem = registro.camposAlterados ?? registro.campos_alterados ?? []
+      const campos = Array.isArray(camposOrigem)
+        ? camposOrigem
+            .map((campo) => {
+              if (!campo || typeof campo !== 'object') {
+                return null
+              }
+              const nomeOriginal = campo.campo ?? campo.nome ?? ''
+              const nomeNormalizado = nomeOriginal === 'local' ? 'centroServico' : nomeOriginal
+              return {
+                campo: nomeNormalizado,
+                de: campo.de ?? campo.valorAnterior ?? campo.de_valor ?? '',
+                para: campo.para ?? campo.valorAtual ?? campo.para_valor ?? '',
+              }
+            })
+            .filter(Boolean)
+        : []
+
+      return {
+        id: registro.id ?? registro.history_id ?? registro.entry_id ?? randomId(),
+        dataEdicao: registro.dataEdicao ?? registro.data_edicao ?? registro.data ?? null,
+        usuarioResponsavel:
+          registro.usuarioResponsavel ?? registro.usuario_responsavel ?? registro.usuario ?? 'sistema',
+        camposAlterados: campos,
+      }
+    })
+    .filter(Boolean)
+}
+
 async function ensureAcidentePartes(nomes) {
   const lista = normalizeStringArray(nomes)
   if (!lista.length) {
@@ -194,7 +233,7 @@ async function ensureAcidenteLesoes(agenteNome, nomes) {
 
 function ensureSupabase() {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase nÃ£o configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
+    throw new Error('Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
   }
 }
 
@@ -232,7 +271,7 @@ async function resolveUsuarioResponsavel() {
   const { data } = await supabase.auth.getSession()
   const user = data?.session?.user
   if (!user) {
-    return 'anÃ´nimo'
+    return 'anônimo'
   }
   const metadata = user.user_metadata ?? {}
   return (
@@ -242,7 +281,7 @@ async function resolveUsuarioResponsavel() {
     user.email ||
     user.phone ||
     user.id ||
-    'anÃ´nimo'
+    'anônimo'
   )
 }
 
@@ -297,6 +336,12 @@ function mapPessoaRecord(record) {
   )
   const centroCusto = resolveTextValue(centroCustoRel ?? record.centro_custo ?? centroServico)
 
+  const historicoRaw =
+    record.historicoEdicao ??
+    record.historico_edicao ??
+    record.pessoas_historico ??
+    []
+
   return {
     id: record.id,
     nome: record.nome ?? '',
@@ -316,9 +361,7 @@ function mapPessoaRecord(record) {
     usuarioEdicao: resolveTextValue(record.usuarioEdicao ?? record.usuario_edicao ?? ''),
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
-    historicoEdicao: Array.isArray(record.historicoEdicao ?? record.historico_edicao)
-      ? record.historicoEdicao ?? record.historico_edicao
-      : [],
+    historicoEdicao: normalizePessoaHistorico(historicoRaw),
   }
 }
 
@@ -479,7 +522,6 @@ async function carregarPessoas() {
         "usuarioEdicao",
         "criadoEm",
         "atualizadoEm",
-        "historicoEdicao",
         centro_servico_id,
         setor_id,
         cargo_id,
@@ -702,7 +744,6 @@ export const api = {
           "usuarioEdicao",
           "criadoEm",
           "atualizadoEm",
-          "historicoEdicao",
           centro_servico_id,
           setor_id,
           cargo_id,
@@ -721,20 +762,20 @@ export const api = {
         const centroId = await resolveReferenceId(
           'centros_servico',
           centroServico,
-          'Centro de serviÃ§o invÃ¡lido para filtro.'
+          'Centro de serviço inválido para filtro.'
         )
         query = query.eq('centro_servico_id', centroId)
       }
 
       const setor = trim(params.setor ?? '')
       if (setor && setor.toLowerCase() !== 'todos') {
-        const setorId = await resolveReferenceId('setores', setor, 'Setor invÃ¡lido para filtro.')
+        const setorId = await resolveReferenceId('setores', setor, 'Setor inválido para filtro.')
         query = query.eq('setor_id', setorId)
       }
 
       const cargo = trim(params.cargo ?? '')
       if (cargo && cargo.toLowerCase() !== 'todos') {
-        const cargoId = await resolveReferenceId('cargos', cargo, 'Cargo invÃ¡lido para filtro.')
+        const cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inválido para filtro.')
         query = query.eq('cargo_id', cargoId)
       }
 
@@ -743,7 +784,7 @@ export const api = {
         const tipoId = await resolveReferenceId(
           'tipo_execucao',
           tipoExecucaoFiltro.toUpperCase(),
-          'Tipo de execuÃ§Ã£o invÃ¡lido para filtro.'
+          'Tipo de execução inválido para filtro.'
         )
         query = query.eq('tipo_execucao_id', tipoId)
       }
@@ -771,7 +812,7 @@ export const api = {
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
       if (!dados.nome || !dados.matricula || !dados.centroServico || !dados.setor || !dados.cargo) {
-        throw new Error('Preencha nome, matrÃ­cula, centro de serviÃ§o, setor e cargo.')
+        throw new Error('Preencha nome, matrícula, centro de serviço, setor e cargo.')
       }
 
       const usuario = await resolveUsuarioResponsavel()
@@ -787,12 +828,11 @@ export const api = {
             setor: dados.setor || dados.centroServico,
             cargo: dados.cargo,
             tipoExecucao: dados.tipoExecucao || null,
-            dataAdmissao: dados.dataAdmissao,
-            usuarioCadastro: usuario,
-            historicoEdicao: [],
-            criadoEm: agora,
-            atualizadoEm: null,
-          })
+          dataAdmissao: dados.dataAdmissao,
+          usuarioCadastro: usuario,
+          criadoEm: agora,
+          atualizadoEm: null,
+        })
           .select(),
         'Falha ao criar pessoa.'
       )
@@ -801,7 +841,7 @@ export const api = {
     },
     async update(id, payload) {
       if (!id) {
-        throw new Error('ID obrigatÃ³rio.')
+        throw new Error('ID obrigatório.')
       }
 
       const atual = await executeSingle(
@@ -809,14 +849,13 @@ export const api = {
         'Falha ao obter pessoa.'
       )
       if (!atual) {
-        throw new Error('Pessoa nÃ£o encontrada.')
+        throw new Error('Pessoa não encontrada.')
       }
 
       const dados = sanitizePessoaPayload(payload)
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
 
-      const historico = Array.isArray(atual.historicoEdicao) ? [...atual.historicoEdicao] : []
       const camposAlterados = []
       ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
         const chaveAtual =
@@ -845,12 +884,17 @@ export const api = {
       })
 
       if (camposAlterados.length > 0) {
-        historico.push({
-          id: randomId(),
-          dataEdicao: agora,
-          usuarioResponsavel: usuario,
-          camposAlterados,
-        })
+        await execute(
+          supabase
+            .from('pessoas_historico')
+            .insert({
+              pessoa_id: id,
+              data_edicao: agora,
+              usuario_responsavel: usuario,
+              campos_alterados: camposAlterados,
+            }),
+          'Falha ao registrar histórico de edição.',
+        )
       }
 
       const registro = await executeSingle(
@@ -866,7 +910,6 @@ export const api = {
             dataAdmissao: dados.dataAdmissao,
             atualizadoEm: agora,
             usuarioEdicao: usuario,
-            historicoEdicao: historico,
           })
           .eq('id', id)
           .select(),
@@ -883,11 +926,15 @@ export const api = {
       return mapPessoaRecord(pessoa)
     },
     async history(id) {
-      const pessoa = await executeSingle(
-        supabase.from('pessoas').select('historicoEdicao').eq('id', id),
-        'Falha ao obter histÃ³rico.'
+      const registros = await execute(
+        supabase
+          .from('pessoas_historico')
+          .select('id, data_edicao, usuario_responsavel, campos_alterados')
+          .eq('pessoa_id', id)
+          .order('data_edicao', { ascending: true }),
+        'Falha ao obter histórico.'
       )
-      return Array.isArray(pessoa?.historicoEdicao) ? pessoa.historicoEdicao : []
+      return normalizePessoaHistorico(registros ?? [])
     },
   },
   materiais: {
@@ -919,7 +966,7 @@ export const api = {
     },
     async update(id, payload) {
       if (!id) {
-        throw new Error('ID obrigatÃ³rio.')
+        throw new Error('ID obrigatório.')
       }
       const dados = sanitizeMaterialPayload(payload)
       const usuario = await resolveUsuarioResponsavel()
@@ -952,7 +999,7 @@ export const api = {
           .select('*')
           .eq('materialId', id)
           .order('criadoEm', { ascending: false }),
-        'Falha ao obter histÃ³rico de preÃ§os.'
+        'Falha ao obter histórico de preços.'
       )
       return (data ?? []).map((registro) => ({
         id: registro.id,
@@ -1097,7 +1144,7 @@ export const api = {
 
       const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId)
       if (quantidade > estoqueDisponivel) {
-        const error = new Error('Quantidade informada maior que o estoque disponÃ­vel.')
+        const error = new Error('Quantidade informada maior que o estoque disponível.')
         error.status = 400
         throw error
       }
@@ -1468,14 +1515,14 @@ export const api = {
       if (historicoRegistro) {
         await execute(
           supabase.from('acidente_historico').insert(historicoRegistro),
-          'Falha ao registrar histÃ³rico do acidente.'
+          'Falha ao registrar histórico do acidente.'
         )
       }
       return mapAcidenteRecord(registro)
     },
     async history(id) {
       if (!id) {
-        throw new Error('ID obrigatÃ³rio.')
+        throw new Error('ID obrigatório.')
       }
       const data = await execute(
         supabase
@@ -1483,7 +1530,7 @@ export const api = {
           .select('id, data_edicao, usuario_responsavel, campos_alterados')
           .eq('acidente_id', id)
           .order('data_edicao', { ascending: false }),
-        'Falha ao obter histÃ³rico do acidente.'
+        'Falha ao obter histórico do acidente.'
       )
       return (data ?? []).map((item) => ({
         id: item.id,
@@ -1505,7 +1552,7 @@ async dashboard(params = {}) {
       const matricula = trim(params.matricula)
       const nome = trim(params.nome)
       if (!matricula && !nome) {
-        throw new Error('Informe a matrÃ­cula ou o nome do colaborador.')
+        throw new Error('Informe a matrícula ou o nome do colaborador.')
       }
 
       let pessoa = null
@@ -1525,7 +1572,7 @@ async dashboard(params = {}) {
       }
 
       if (!pessoa) {
-        throw new Error('Colaborador nÃ£o encontrado.')
+        throw new Error('Colaborador não encontrado.')
       }
 
       const saidas = await execute(
@@ -1579,7 +1626,7 @@ async function resolveReferenceId(table, value, errorMessage) {
 
   const id = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
   if (!id) {
-    throw new Error(errorMessage ?? ('Valor "' + nome + '" nÃ£o encontrado.'))
+    throw new Error(errorMessage ?? ('Valor "' + nome + '" não encontrado.'))
   }
   return id
 }
@@ -1588,28 +1635,28 @@ async function resolvePessoaReferencias(dados) {
   const centroServicoId = await resolveReferenceId(
     'centros_servico',
     dados.centroServico,
-    'Selecione um centro de serviÃ§o vÃ¡lido.'
+    'Selecione um centro de serviço válido.'
   )
   const setorNome = dados.setor || dados.centroServico
   const setorId = await resolveReferenceId(
     'setores',
     setorNome,
-    'Selecione um setor vÃ¡lido.'
+    'Selecione um setor válido.'
   )
   const cargoId = await resolveReferenceId(
     'cargos',
     dados.cargo,
-    'Selecione um cargo vÃ¡lido.'
+    'Selecione um cargo válido.'
   )
   const centroCustoId = await resolveReferenceId(
     'centros_custo',
     dados.centroServico,
-    'Selecione um centro de custo vÃ¡lido.'
+    'Selecione um centro de custo válido.'
   )
   const tipoExecucaoId = await resolveReferenceId(
     'tipo_execucao',
     dados.tipoExecucao || 'PROPRIO',
-    'Selecione o tipo de execuÃ§Ã£o.'
+    'Selecione o tipo de execução.'
   )
   return {
     centroServicoId,
