@@ -151,6 +151,7 @@ const ACIDENTE_HISTORY_FIELDS = [
   'tipo',
   'agente',
   'lesao',
+  'lesoes',
   'partesLesionadas',
   'parteLesionada',
   'centroServico',
@@ -186,11 +187,19 @@ const mapLocalAcidenteRecord = (acidente) => {
     : acidente.parteLesionada
     ? [acidente.parteLesionada]
     : []
+  const lesoes =
+    Array.isArray(acidente.lesoes) && acidente.lesoes.length > 0
+      ? acidente.lesoes.map((lesao) => (lesao && String(lesao).trim()) || '').filter(Boolean)
+      : acidente.lesao
+      ? [String(acidente.lesao).trim()].filter(Boolean)
+      : []
   return {
     ...acidente,
     centroServico,
     setor: acidente.setor ?? centroServico,
     local: acidente.local ?? centroServico,
+    lesoes,
+    lesao: lesoes[0] ?? acidente.lesao ?? '',
     partesLesionadas: partes,
     parteLesionada: partes[0] ?? acidente.parteLesionada ?? '',
   }
@@ -386,6 +395,9 @@ const normalizeKeyPart = (value) =>
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
     : ''
+
+const buildLesaoKey = (agente, nome) =>
+  `${normalizeKeyPart(agente)}::${normalizeKeyPart(nome)}`
 
 const normalizeGrupoLocal = (value) => {
   const base = normalizeKeyPart(value)
@@ -671,6 +683,81 @@ const catalogoAcidentePartes = [
   { grupo: 'Membros Inferiores', subgrupo: 'Tornozelos e Pes', nome: '5o dedo esquerdo' },
 ];
 
+const catalogoAcidenteLesoes = [
+  { agente: 'Agente Quimico', nome: 'Queimadura quimica', ordem: 1 },
+  { agente: 'Agente Quimico', nome: 'Irritacao cutanea', ordem: 2 },
+  { agente: 'Agente Quimico', nome: 'Dermatite de contato', ordem: 3 },
+  { agente: 'Agente Quimico', nome: 'Sensibilizacao alergica', ordem: 4 },
+  { agente: 'Agente Quimico', nome: 'Corrosao tecidual', ordem: 5 },
+  { agente: 'Agente Quimico', nome: 'Necrose', ordem: 6 },
+  { agente: 'Agente Quimico', nome: 'Intoxicacao aguda', ordem: 7 },
+  { agente: 'Agente Quimico', nome: 'Intoxicacao cronica', ordem: 8 },
+  { agente: 'Agente Quimico', nome: 'Lesao ocular quimica', ordem: 9 },
+  { agente: 'Agente Quimico', nome: 'Lesao respiratoria por vapores toxicos', ordem: 10 },
+  { agente: 'Agente Quimico', nome: 'Edema pulmonar quimico', ordem: 11 },
+  { agente: 'Agente Quimico', nome: 'Lesao hepatica', ordem: 12 },
+  { agente: 'Agente Quimico', nome: 'Lesao renal por exposicao prolongada', ordem: 13 },
+  { agente: 'Agente Biologico', nome: 'Infeccao local', ordem: 1 },
+  { agente: 'Agente Biologico', nome: 'Infeccao sistemica', ordem: 2 },
+  { agente: 'Agente Biologico', nome: 'Hepatite viral', ordem: 3 },
+  { agente: 'Agente Biologico', nome: 'HIV / AIDS', ordem: 4 },
+  { agente: 'Agente Biologico', nome: 'Leptospirose', ordem: 5 },
+  { agente: 'Agente Biologico', nome: 'Raiva', ordem: 6 },
+  { agente: 'Agente Biologico', nome: 'Tetano', ordem: 7 },
+  { agente: 'Agente Biologico', nome: 'Micoses e dermatofitoses', ordem: 8 },
+  { agente: 'Agente Biologico', nome: 'Toxoplasmose', ordem: 9 },
+  { agente: 'Agente Biologico', nome: 'Brucelose', ordem: 10 },
+  { agente: 'Agente Biologico', nome: 'Outras zoonoses', ordem: 11 },
+  { agente: 'Agente Biologico', nome: 'Reacao alergica a agentes biologicos', ordem: 12 },
+  { agente: 'Agente Fisico', nome: 'Queimadura termica', ordem: 1 },
+  { agente: 'Agente Fisico', nome: 'Queimadura eletrica', ordem: 2 },
+  { agente: 'Agente Fisico', nome: 'Choque eletrico', ordem: 3 },
+  { agente: 'Agente Fisico', nome: 'Queimadura por radiacao', ordem: 4 },
+  { agente: 'Agente Fisico', nome: 'Lesao por frio', ordem: 5 },
+  { agente: 'Agente Fisico', nome: 'Lesao por calor', ordem: 6 },
+  { agente: 'Agente Fisico', nome: 'Barotrauma', ordem: 7 },
+  { agente: 'Agente Fisico', nome: 'Lesao por ruido', ordem: 8 },
+  { agente: 'Agente Fisico', nome: 'Lesao por vibracao', ordem: 9 },
+  { agente: 'Agente Fisico', nome: 'Cansaco visual', ordem: 10 },
+  { agente: 'Agente Fisico', nome: 'Ofuscamento por iluminacao inadequada', ordem: 11 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Corte', ordem: 1 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Laceracao', ordem: 2 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Perfuracao', ordem: 3 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Puntura', ordem: 4 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Escoriacao', ordem: 5 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Abrasao', ordem: 6 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Contusao', ordem: 7 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Fratura', ordem: 8 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Luxacao', ordem: 9 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Entorse', ordem: 10 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Amputacao parcial ou total', ordem: 11 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Esguicho de particulas nos olhos', ordem: 12 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Lesao por esmagamento', ordem: 13 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Queda com impacto corporal', ordem: 14 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Lesao por objeto projetado ou em movimento', ordem: 15 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Perfurocortante contaminado', ordem: 16 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Lesao por animal', ordem: 17 },
+  { agente: 'Agente Mecanico / de Acidente', nome: 'Politraumatismo', ordem: 18 },
+  { agente: 'Agente Ergonomico', nome: 'Lombalgia', ordem: 1 },
+  { agente: 'Agente Ergonomico', nome: 'Cervicalgia', ordem: 2 },
+  { agente: 'Agente Ergonomico', nome: 'Tendinite', ordem: 3 },
+  { agente: 'Agente Ergonomico', nome: 'Tenossinovite', ordem: 4 },
+  { agente: 'Agente Ergonomico', nome: 'Bursite', ordem: 5 },
+  { agente: 'Agente Ergonomico', nome: 'Sindrome do tunel do carpo', ordem: 6 },
+  { agente: 'Agente Ergonomico', nome: 'Epicondilite lateral / medial', ordem: 7 },
+  { agente: 'Agente Ergonomico', nome: 'Fadiga muscular', ordem: 8 },
+  { agente: 'Agente Ergonomico', nome: 'Contraturas e dores miofasciais', ordem: 9 },
+  { agente: 'Agente Ergonomico', nome: 'Hernia de disco', ordem: 10 },
+  { agente: 'Agente Ergonomico', nome: 'Disturbios osteomusculares relacionados ao trabalho (DORT/LER)', ordem: 11 },
+  { agente: 'Agente Psicosocial', nome: 'Estresse ocupacional agudo ou cronico', ordem: 1 },
+  { agente: 'Agente Psicosocial', nome: 'Sindrome de Burnout', ordem: 2 },
+  { agente: 'Agente Psicosocial', nome: 'Ansiedade ocupacional', ordem: 3 },
+  { agente: 'Agente Psicosocial', nome: 'Depressao relacionada ao trabalho', ordem: 4 },
+  { agente: 'Agente Psicosocial', nome: 'Transtorno do sono', ordem: 5 },
+  { agente: 'Agente Psicosocial', nome: 'Transtorno pos-traumatico', ordem: 6 },
+  { agente: 'Agente Psicosocial', nome: 'Disturbios cognitivos', ordem: 7 },
+];
+
 const sanitizeMaterialPayload = (payload = {}) => {
   const grupoMaterial = trim(payload.grupoMaterial)
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
@@ -796,6 +883,11 @@ const sanitizeAcidentePayload = (payload = {}) => {
     : payload.parteLesionada
     ? [trim(payload.parteLesionada)]
     : []
+  const lesoes = Array.isArray(payload.lesoes)
+    ? payload.lesoes.map((lesao) => trim(lesao)).filter(Boolean)
+    : payload.lesao
+    ? [trim(payload.lesao)]
+    : []
   return {
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
@@ -803,7 +895,8 @@ const sanitizeAcidentePayload = (payload = {}) => {
     data: toIsoOrNull(payload.data, false),
     tipo: trim(payload.tipo),
     agente: trim(payload.agente),
-    lesao: trim(payload.lesao),
+    lesao: lesoes[0] ?? trim(payload.lesao),
+    lesoes,
     parteLesionada: partes[0] ?? trim(payload.parteLesionada),
     partesLesionadas: partes,
     centroServico,
@@ -832,7 +925,12 @@ const validateAcidentePayload = (payload) => {
   if (!payload.cargo) throw createError(400, 'Cargo obrigatorio.')
   if (!payload.tipo) throw createError(400, 'Tipo de acidente obrigatorio.')
   if (!payload.agente) throw createError(400, 'Agente causador obrigatorio.')
-  if (!payload.lesao) throw createError(400, 'Lesao obrigatoria.')
+  const lesoesValidadas = Array.isArray(payload.lesoes)
+    ? payload.lesoes.map((lesao) => (lesao ? lesao.trim() : '')).filter(Boolean)
+    : payload.lesao
+    ? [payload.lesao.trim()]
+    : []
+  if (!lesoesValidadas.length) throw createError(400, 'Lesao obrigatoria.')
   const partesValidadas = Array.isArray(payload.partesLesionadas)
     ? payload.partesLesionadas.filter((parte) => parte && parte.trim())
     : payload.parteLesionada
@@ -1427,6 +1525,67 @@ const localApi = {
         return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }))
       })
     },
+    async lesions(agenteNome) {
+      const filtro = trim(agenteNome)
+      const filtroNormalizado = normalizeKeyPart(filtro)
+      return readState((state) => {
+        const mapa = new Map()
+        const adicionar = (agente, nome, ordem = 1000) => {
+          const chave = buildLesaoKey(agente, nome)
+          if (mapa.has(chave)) {
+            const existente = mapa.get(chave)
+            const ordemAtual = existente.ordem ?? 1000
+            const novaOrdem = ordem ?? 1000
+            existente.ordem = Math.min(ordemAtual, novaOrdem)
+            return
+          }
+          mapa.set(chave, {
+            agente,
+            nome,
+            label: nome,
+            ordem,
+          })
+        }
+
+        catalogoAcidenteLesoes
+          .filter((item) => !filtro || normalizeKeyPart(item.agente) === filtroNormalizado)
+          .forEach((item) => adicionar(item.agente, item.nome, item.ordem ?? 1000))
+
+        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
+        lista.forEach((acidente) => {
+          const agente = trim(acidente?.agente ?? '')
+          if (!agente) {
+            return
+          }
+          if (filtro && normalizeKeyPart(agente) !== filtroNormalizado) {
+            return
+          }
+          const origem =
+            Array.isArray(acidente.lesoes) && acidente.lesoes.length
+              ? acidente.lesoes
+              : acidente.lesao
+              ? [acidente.lesao]
+              : []
+          origem.forEach((nome) => {
+            const valor = trim(nome)
+            if (!valor) {
+              return
+            }
+            adicionar(agente, valor, 1000)
+          })
+        })
+
+        return Array.from(mapa.values()).sort((a, b) => {
+          if (!filtro && a.agente !== b.agente) {
+            return a.agente.localeCompare(b.agente)
+          }
+          if ((a.ordem ?? 1000) !== (b.ordem ?? 1000)) {
+            return (a.ordem ?? 1000) - (b.ordem ?? 1000)
+          }
+          return a.nome.localeCompare(b.nome)
+        })
+      })
+    },
     async agents() {
       return readState((state) => {
         const set = new Set(Object.keys(catalogoAcidenteAgentes))
@@ -1516,6 +1675,7 @@ const localApi = {
           tipo: dados.tipo,
           agente: dados.agente,
           lesao: dados.lesao,
+          lesoes: dados.lesoes,
           parteLesionada: dados.parteLesionada,
           partesLesionadas: dados.partesLesionadas,
           centroServico: centroServicoBase,

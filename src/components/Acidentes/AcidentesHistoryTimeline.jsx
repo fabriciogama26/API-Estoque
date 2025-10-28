@@ -6,6 +6,7 @@ const FIELD_LABELS = {
   tipo: 'Tipo',
   agente: 'Agente',
   lesao: 'Lesao',
+  lesoes: 'Lesoes',
   partesLesionadas: 'Partes lesionadas',
   parteLesionada: 'Parte lesionada',
   centroServico: 'Centro de servico',

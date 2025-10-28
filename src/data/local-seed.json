@@ -145,6 +145,7 @@
       "tipo": "Queda",
       "agente": "Escada",
       "lesao": "Torcicolo",
+      "lesoes": ["Torcicolo"],
       "parteLesionada": "Pescoco",
       "setor": "Almoxarifado",
       "local": "Deposito 1",
