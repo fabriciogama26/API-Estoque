@@ -203,14 +203,40 @@ function resolveEmpresaInfo() {
 function normalizePessoaHistorico(lista) {
   if (!Array.isArray(lista)) {
     return []
-  return lista.map((registro) => ({
-    ...registro,
-    camposAlterados: Array.isArray(registro.camposAlterados)
-      ? registro.camposAlterados.map((campo) =>
-          campo?.campo === 'local' ? { ...campo, campo: 'centroServico' } : campo
-        )
-      : [],
-  }))
+  }
+  return lista
+    .map((registro) => {
+      if (!registro || typeof registro !== 'object') {
+        return null
+      }
+
+      const camposOrigem = registro.camposAlterados ?? registro.campos_alterados ?? []
+      const campos = Array.isArray(camposOrigem)
+        ? camposOrigem
+            .map((campo) => {
+              if (!campo || typeof campo !== 'object') {
+                return null
+              }
+              const nomeOriginal = campo.campo ?? campo.nome ?? ''
+              const nomeNormalizado = nomeOriginal === 'local' ? 'centroServico' : nomeOriginal
+              return {
+                campo: nomeNormalizado,
+                de: campo.de ?? campo.valorAnterior ?? campo.de_valor ?? '',
+                para: campo.para ?? campo.valorAtual ?? campo.para_valor ?? '',
+              }
+            })
+            .filter(Boolean)
+        : []
+
+      return {
+        id: registro.id ?? registro.history_id ?? registro.entry_id ?? randomId(),
+        dataEdicao: registro.dataEdicao ?? registro.data_edicao ?? registro.data ?? null,
+        usuarioResponsavel:
+          registro.usuarioResponsavel ?? registro.usuario_responsavel ?? registro.usuario ?? 'sistema',
+        camposAlterados: campos,
+      }
+    })
+    .filter(Boolean)
 }
 
 async function ensureMatriculaDisponivel(matricula, ignoreId) {
@@ -770,7 +796,6 @@ export const PessoasOperations = {
           criadoEm: agora,
           atualizadoEm: null,
           usuarioEdicao: null,
-          historicoEdicao: [],
         })
         .select(),
       'Falha ao criar pessoa.'
@@ -790,6 +815,9 @@ export const PessoasOperations = {
     const dados = sanitizePessoaPayload(payload)
     validatePessoaPayload(dados)
     await ensureMatriculaDisponivel(dados.matricula, id)
+
+    const usuario = resolveUsuarioNome(user)
+    const agora = nowIso()
 
     const camposAlterados = []
     const comparacoes = [
@@ -811,17 +839,18 @@ export const PessoasOperations = {
       }
     })
 
-    const historicoAtual = Array.isArray(atual.historicoEdicao) ? atual.historicoEdicao.slice() : []
-    const usuario = resolveUsuarioNome(user)
-    const agora = nowIso()
-
     if (camposAlterados.length > 0) {
-      historicoAtual.push({
-        id: randomId(),
-        dataEdicao: agora,
-        usuarioResponsavel: usuario,
-        camposAlterados,
-      })
+      await execute(
+        supabaseAdmin
+          .from('pessoas_historico')
+          .insert({
+            pessoa_id: id,
+            data_edicao: agora,
+            usuario_responsavel: usuario,
+            campos_alterados: camposAlterados,
+          }),
+        'Falha ao registrar histórico de edição.',
+      )
     }
 
     const pessoaAtualizada = await executeSingle(
@@ -834,7 +863,6 @@ export const PessoasOperations = {
           cargo: dados.cargo,
           atualizadoEm: agora,
           usuarioEdicao: usuario,
-          historicoEdicao: historicoAtual,
         })
         .eq('id', id)
         .select(),
@@ -851,11 +879,16 @@ export const PessoasOperations = {
     return mapPessoaRecord(pessoa)
   },
   async history(id) {
-    const pessoa = await executeMaybeSingle(
-      supabaseAdmin.from('pessoas').select('historicoEdicao').eq('id', id),
-      'Falha ao obter hist?rico.'
-    )
-    return normalizePessoaHistorico(pessoa?.historicoEdicao ?? [])
+    const registros =
+      (await execute(
+        supabaseAdmin
+          .from('pessoas_historico')
+          .select('id, data_edicao, usuario_responsavel, campos_alterados')
+          .eq('pessoa_id', id)
+          .order('data_edicao', { ascending: true }),
+        'Falha ao obter hist?rico.'
+      )) ?? []
+    return normalizePessoaHistorico(registros)
   },
 }
 
