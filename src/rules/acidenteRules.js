@@ -11,6 +11,7 @@ function validarDadosObrigatorios({
   tipo,
   agente,
   lesao,
+  lesoes,
   parteLesionada,
   partesLesionadas,
   centroServico,
@@ -21,7 +22,12 @@ function validarDadosObrigatorios({
   validarCampoObrigatorio(cargo, 'Cargo obrigatorio');
   validarCampoObrigatorio(tipo, 'Tipo de acidente obrigatorio');
   validarCampoObrigatorio(agente, 'Agente causador obrigatorio');
-  validarCampoObrigatorio(lesao, 'Lesao obrigatoria');
+  if (Array.isArray(lesoes) && lesoes.length > 0) {
+    const primeiraLesao = lesoes.find((item) => String(item || '').trim());
+    validarCampoObrigatorio(primeiraLesao, 'Lesao obrigatoria');
+  } else {
+    validarCampoObrigatorio(lesao, 'Lesao obrigatoria');
+  }
   if (Array.isArray(partesLesionadas) && partesLesionadas.length > 0) {
     const primeiraParte = partesLesionadas.find((parte) => String(parte || '').trim());
     validarCampoObrigatorio(

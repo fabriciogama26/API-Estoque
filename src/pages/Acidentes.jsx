@@ -66,6 +66,9 @@ export function AcidentesPage() {
   const [tipoOpcoes, setTipoOpcoes] = useState([])
   const [tiposError, setTiposError] = useState(null)
   const [isLoadingTipos, setIsLoadingTipos] = useState(false)
+  const [lesaoOpcoes, setLesaoOpcoes] = useState([])
+  const [lesoesError, setLesoesError] = useState(null)
+  const [isLoadingLesoes, setIsLoadingLesoes] = useState(false)
   const [partesOpcoes, setPartesOpcoes] = useState([])
   const [partesError, setPartesError] = useState(null)
   const [isLoadingPartes, setIsLoadingPartes] = useState(false)
@@ -159,6 +162,51 @@ export function AcidentesPage() {
   }, [loadPartes])
 
   useEffect(() => {
+    let cancelado = false
+    const nomeAgente = (form.agente ?? '').trim()
+    if (!nomeAgente) {
+      setLesaoOpcoes([])
+      setLesoesError(null)
+      setIsLoadingLesoes(false)
+      return () => {
+        cancelado = true
+      }
+    }
+    const fetchLesoes = async () => {
+      const fetcher = api?.acidentes?.lesions
+      if (typeof fetcher !== 'function') {
+        if (!cancelado) {
+          setLesaoOpcoes([])
+          setLesoesError(null)
+          setIsLoadingLesoes(false)
+        }
+        return
+      }
+      setIsLoadingLesoes(true)
+      setLesoesError(null)
+      try {
+        const response = await fetcher(nomeAgente)
+        if (!cancelado) {
+          setLesaoOpcoes(Array.isArray(response) ? response : [])
+        }
+      } catch (err) {
+        if (!cancelado) {
+          setLesoesError(err.message)
+          setLesaoOpcoes([])
+        }
+      } finally {
+        if (!cancelado) {
+          setIsLoadingLesoes(false)
+        }
+      }
+    }
+    fetchLesoes()
+    return () => {
+      cancelado = true
+    }
+  }, [form.agente, api])
+
+  useEffect(() => {
     const agenteNome = form.agente?.trim()
     if (!agenteNome) {
       setTipoOpcoes([])
@@ -201,6 +249,18 @@ export function AcidentesPage() {
       map.set(String(pessoa.matricula), pessoa)
     })
     return map
+  }, [pessoas])
+
+  const centrosServicoPessoas = useMemo(() => {
+    const valores = new Set()
+    pessoas.forEach((pessoa) => {
+      const centro = (pessoa?.centroServico ?? pessoa?.setor ?? '').trim()
+      if (!centro) {
+        return
+      }
+      valores.add(centro)
+    })
+    return Array.from(valores).sort((a, b) => a.localeCompare(b))
   }, [pessoas])
 
   const resolveLocalDisponivel = useCallback(
@@ -251,13 +311,28 @@ export function AcidentesPage() {
       return
     }
     if (name === 'agente') {
-      setForm((prev) => ({ ...prev, agente: value, tipo: '' }))
+      setForm((prev) => ({
+        ...prev,
+        agente: value,
+        tipo: '',
+        lesoes: [],
+        lesao: '',
+      }))
       setTipoOpcoes([])
       setTiposError(null)
       return
     }
     if (name === 'tipo') {
       setForm((prev) => ({ ...prev, tipo: value }))
+      return
+    }
+    if (name === 'lesoes') {
+      const lista = Array.isArray(value)
+        ? value.filter((item) => item && item.trim())
+        : typeof value === 'string' && value
+          ? [value.trim()].filter(Boolean)
+          : []
+      setForm((prev) => ({ ...prev, lesoes: lista, lesao: lista[0] ?? '' }))
       return
     }
     if (name === 'partesLesionadas') {
@@ -303,6 +378,7 @@ export function AcidentesPage() {
     setTipoOpcoes([])
     setTiposError(null)
     setIsLoadingTipos(false)
+    setLesoesError(null)
   }
 
   const handleSubmit = async (event) => {
@@ -339,6 +415,12 @@ export function AcidentesPage() {
 
   const startEdit = (acidente) => {
     setEditingAcidente(acidente)
+    const lesoesSelecionadas =
+      Array.isArray(acidente.lesoes) && acidente.lesoes.length
+        ? acidente.lesoes.slice()
+        : acidente.lesao
+          ? [acidente.lesao]
+          : []
     setForm({
       matricula: acidente.matricula || '',
       nome: acidente.nome || '',
@@ -350,7 +432,8 @@ export function AcidentesPage() {
       tipo: acidente.tipo || '',
       agente: acidente.agente || '',
       cid: acidente.cid || '',
-      lesao: acidente.lesao || '',
+      lesao: lesoesSelecionadas[0] || '',
+      lesoes: lesoesSelecionadas,
       parteLesionada: acidente.parteLesionada || '',
       hht:
         acidente.hht !== null && acidente.hht !== undefined ? String(acidente.hht) : '',
@@ -437,10 +520,14 @@ export function AcidentesPage() {
         tipos={tipoOpcoes}
         tiposError={tiposError}
         isLoadingTipos={isLoadingTipos}
-        partes={partesOpcoes}
-        partesError={partesError}
-        isLoadingPartes={isLoadingPartes}
-      />
+      lesoes={lesaoOpcoes}
+      lesoesError={lesoesError}
+      isLoadingLesoes={isLoadingLesoes}
+      partes={partesOpcoes}
+      partesError={partesError}
+      isLoadingPartes={isLoadingPartes}
+      centrosServico={centrosServicoPessoas}
+    />
 
       <AcidentesFilters
         filters={filters}

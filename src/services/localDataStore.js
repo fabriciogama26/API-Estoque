@@ -137,6 +137,12 @@ function normalizeState(state) {
     }
     const centroServico = acidente.centroServico ?? acidente.setor ?? ''
     const historicoEdicao = Array.isArray(acidente.historicoEdicao) ? acidente.historicoEdicao.slice() : []
+    const lesoes =
+      Array.isArray(acidente.lesoes) && acidente.lesoes.length > 0
+        ? acidente.lesoes.map((lesao) => (lesao && String(lesao).trim()) || '').filter(Boolean)
+        : acidente.lesao
+        ? [String(acidente.lesao).trim()].filter(Boolean)
+        : []
     const partes =
       Array.isArray(acidente.partesLesionadas) && acidente.partesLesionadas.length > 0
         ? acidente.partesLesionadas.map((parte) => (parte && String(parte).trim()) || '').filter(Boolean)
@@ -148,6 +154,8 @@ function normalizeState(state) {
       centroServico,
       setor: acidente.setor ?? centroServico,
       local: acidente.local ?? centroServico,
+      lesoes,
+      lesao: lesoes[0] ?? acidente.lesao ?? '',
       partesLesionadas: partes,
       parteLesionada: partes[0] ?? acidente.parteLesionada ?? '',
       historicoEdicao,

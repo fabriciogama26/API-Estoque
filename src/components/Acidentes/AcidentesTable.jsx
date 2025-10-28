@@ -60,6 +60,11 @@ export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSavi
               : acidente.parteLesionada
                 ? [acidente.parteLesionada]
                 : []
+            const lesoesSelecionadas = Array.isArray(acidente.lesoes)
+              ? acidente.lesoes.filter(Boolean)
+              : acidente.lesao
+                ? [acidente.lesao]
+                : []
             return (
               <tr key={acidente.id}>
                 <td>
@@ -69,8 +74,10 @@ export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSavi
                       Partes lesionadas: {partesSelecionadas.join(', ')}
                     </div>
                   ) : null}
-                  {acidente.lesao ? (
-                    <div className="data-table__muted">Lesao: {acidente.lesao}</div>
+                  {lesoesSelecionadas.length ? (
+                    <div className="data-table__muted">
+                      Lesoes: {lesoesSelecionadas.join(', ')}
+                    </div>
                   ) : null}
                 </td>
                 <td>{acidente.matricula || '-'}</td>

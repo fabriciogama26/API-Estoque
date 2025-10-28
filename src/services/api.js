@@ -40,15 +40,73 @@ const randomId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-const normalizePartesArray = (value) => {
+const normalizeStringArray = (value) => {
   if (!Array.isArray(value)) {
     return []
   }
   return value.map((item) => trim(item)).filter(Boolean)
 }
 
+const resolveTextValue = (value) => {
+  if (value === undefined || value === null) {
+    return ''
+  }
+  if (typeof value === 'string') {
+    return value.trim()
+  }
+  if (typeof value === 'object') {
+    if (typeof value.nome === 'string') {
+      return value.nome.trim()
+    }
+    if (typeof value.label === 'string') {
+      return value.label.trim()
+    }
+    if (typeof value.descricao === 'string') {
+      return value.descricao.trim()
+    }
+  }
+  return String(value).trim()
+}
+
+const ACIDENTE_HISTORY_FIELDS = [
+  'matricula',
+  'nome',
+  'cargo',
+  'data',
+  'tipo',
+  'agente',
+  'lesao',
+  'lesoes',
+  'partesLesionadas',
+  'parteLesionada',
+  'centroServico',
+  'local',
+  'diasPerdidos',
+  'diasDebitados',
+  'hht',
+  'cid',
+  'cat',
+  'observacao',
+]
+
+const normalizeHistoryValue = (value) => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => ((item ?? '').toString().trim())).filter(Boolean).join(', ')
+  }
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+  if (typeof value === 'number' && Number.isNaN(value)) {
+    return ''
+  }
+  return value.toString().trim()
+}
+
 async function ensureAcidentePartes(nomes) {
-  const lista = normalizePartesArray(nomes)
+  const lista = normalizeStringArray(nomes)
   if (!lista.length) {
     return []
   }
@@ -70,6 +128,66 @@ async function ensureAcidentePartes(nomes) {
     )
   } catch (error) {
     console.warn('Nao foi possivel upsert partes lesionadas.', error)
+  }
+  return lista
+}
+
+async function resolveAgenteId(agenteNome) {
+  const nome = trim(agenteNome)
+  if (!nome) {
+    return null
+  }
+  try {
+    ensureSupabase()
+    const { data, error } = await supabase
+      .from('acidente_agentes')
+      .select('id, nome')
+      .eq('nome', nome)
+      .limit(1)
+    if (error) {
+      throw error
+    }
+    if (Array.isArray(data) && data.length === 1) {
+      return data[0]?.id ?? null
+    }
+    const { data: fallback, error: fallbackError } = await supabase
+      .from('acidente_agentes')
+      .select('id, nome')
+      .ilike('nome', nome)
+      .limit(1)
+    if (fallbackError) {
+      throw fallbackError
+    }
+    return Array.isArray(fallback) && fallback.length === 1 ? fallback[0]?.id ?? null : null
+  } catch (lookupError) {
+    console.warn('Nao foi possivel localizar agente para lesoes.', lookupError)
+    return null
+  }
+}
+
+async function ensureAcidenteLesoes(agenteNome, nomes) {
+  const lista = normalizeStringArray(nomes)
+  const agenteId = await resolveAgenteId(agenteNome)
+  if (!lista.length || !agenteId) {
+    return lista
+  }
+  try {
+    await execute(
+      supabase
+        .from('acidente_lesoes')
+        .upsert(
+          lista.map((nome, index) => ({
+            agente_id: agenteId,
+            nome,
+            ordem: 1000 + index,
+            ativo: true,
+          })),
+          { onConflict: 'agente_id,nome' },
+        ),
+      'Falha ao salvar lesoes.',
+    )
+  } catch (error) {
+    console.warn('Nao foi possivel upsert lesoes.', error)
   }
   return lista
 }
@@ -158,20 +276,44 @@ function mapPessoaRecord(record) {
   if (!record) {
     return null
   }
-  const centroServico =
-    record.centroServico ?? record.centro_servico ?? record.setor ?? record.local ?? ''
-  const setor = record.setor ?? centroServico
+  const centroServicoRel = record.centros_servico ?? record.centro_servico_rel
+  const setorRel = record.setores ?? record.setor_rel
+  const cargoRel = record.cargos ?? record.cargo_rel
+  const centroCustoRel = record.centros_custo ?? record.centro_custo_rel
+  const tipoExecucaoRel = record.tipo_execucao ?? record.tipo_execucao_rel
+
+  const centroServico = resolveTextValue(
+    record.centroServico ??
+      record.centro_servico ??
+      centroServicoRel ??
+      record.setor ??
+      record.local ??
+      '',
+  )
+  const setor = resolveTextValue(record.setor ?? setorRel ?? centroServico)
+  const cargo = resolveTextValue(record.cargo ?? cargoRel ?? '')
+  const tipoExecucao = resolveTextValue(
+    record.tipoExecucao ?? record.tipo_execucao ?? tipoExecucaoRel ?? '',
+  )
+  const centroCusto = resolveTextValue(centroCustoRel ?? record.centro_custo ?? centroServico)
+
   return {
     id: record.id,
     nome: record.nome ?? '',
     matricula: record.matricula ?? '',
     centroServico,
+    centroServicoId: record.centro_servico_id ?? centroServicoRel?.id ?? null,
     setor,
-    cargo: record.cargo ?? '',
-    tipoExecucao: record.tipoExecucao ?? record.tipo_execucao ?? '',
+    setorId: record.setor_id ?? setorRel?.id ?? null,
+    cargo,
+    cargoId: record.cargo_id ?? cargoRel?.id ?? null,
+    centroCusto,
+    centroCustoId: record.centro_custo_id ?? centroCustoRel?.id ?? null,
+    tipoExecucao,
+    tipoExecucaoId: record.tipo_execucao_id ?? tipoExecucaoRel?.id ?? null,
     dataAdmissao: record.dataAdmissao ?? record.data_admissao ?? null,
-    usuarioCadastro: record.usuarioCadastro ?? record.usuario_cadastro ?? '',
-    usuarioEdicao: record.usuarioEdicao ?? record.usuario_edicao ?? '',
+    usuarioCadastro: resolveTextValue(record.usuarioCadastro ?? record.usuario_cadastro ?? ''),
+    usuarioEdicao: resolveTextValue(record.usuarioEdicao ?? record.usuario_edicao ?? ''),
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
     historicoEdicao: Array.isArray(record.historicoEdicao ?? record.historico_edicao)
@@ -188,7 +330,7 @@ function mapEntradaRecord(record) {
     id: record.id,
     materialId: record.materialId ?? record.material_id ?? null,
     quantidade: toNumber(record.quantidade),
-    centroCusto: record.centroCusto ?? record.centro_custo ?? '',
+    centroCusto: resolveTextValue(record.centroCusto ?? record.centro_custo ?? ''),
     dataEntrada: record.dataEntrada ?? record.data_entrada ?? null,
     usuarioResponsavel: record.usuarioResponsavel ?? record.usuario_responsavel ?? '',
   }
@@ -203,8 +345,8 @@ function mapSaidaRecord(record) {
     materialId: record.materialId ?? record.material_id ?? null,
     pessoaId: record.pessoaId ?? record.pessoa_id ?? null,
     quantidade: toNumber(record.quantidade),
-    centroCusto: record.centroCusto ?? record.centro_custo ?? '',
-    centroServico: record.centroServico ?? record.centro_servico ?? '',
+    centroCusto: resolveTextValue(record.centroCusto ?? record.centro_custo ?? ''),
+    centroServico: resolveTextValue(record.centroServico ?? record.centro_servico ?? ''),
     dataEntrega: record.dataEntrega ?? record.data_entrega ?? null,
     dataTroca: record.dataTroca ?? record.data_troca ?? null,
     status: record.status ?? '',
@@ -216,12 +358,21 @@ function mapAcidenteRecord(record) {
   if (!record) {
     return null
   }
-  const centroServico =
-    record.centroServico ?? record.centro_servico ?? record.setor ?? ''
-  const partes = normalizePartesArray(record.partes_lesionadas ?? record.partesLesionadas ?? [])
+  const centroServico = resolveTextValue(
+    record.centroServico ?? record.centro_servico ?? record.setor ?? '',
+  )
+  const partes = normalizeStringArray(record.partes_lesionadas ?? record.partesLesionadas ?? [])
   const partePrincipal = partes.length
     ? partes[0]
     : trim(record.parteLesionada ?? record.parte_lesionada ?? '')
+  let lesoes = normalizeStringArray(record.lesoes ?? record.lesoesRegistradas ?? [])
+  if (!lesoes.length) {
+    const unica = trim(record.lesao ?? '')
+    if (unica) {
+      lesoes = [unica]
+    }
+  }
+  const lesaoPrincipal = lesoes[0] ?? ''
   return {
     id: record.id,
     matricula: record.matricula ?? '',
@@ -233,12 +384,13 @@ function mapAcidenteRecord(record) {
     tipo: record.tipo ?? '',
     agente: record.agente ?? '',
     cid: record.cid ?? '',
-    lesao: record.lesao ?? '',
+    lesao: lesaoPrincipal,
+    lesoes,
     parteLesionada: partePrincipal,
     partesLesionadas: partes,
     centroServico,
-    setor: record.setor ?? centroServico,
-    local: record.local ?? centroServico,
+    setor: resolveTextValue(record.setor ?? centroServico),
+    local: resolveTextValue(record.local ?? centroServico),
     cat: record.cat ?? null,
     observacao: record.observacao ?? '',
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
@@ -256,7 +408,7 @@ function sanitizePessoaPayload(payload = {}) {
     centroServico: trim(payload.centroServico ?? payload.centro_servico ?? payload.local),
     setor: trim(payload.setor ?? payload.setor_id ?? payload.centroServico ?? payload.centro_servico ?? payload.local),
     cargo: trim(payload.cargo),
-    tipoExecucao: trim(payload.tipoExecucao ?? ''),
+    tipoExecucao: trim(payload.tipoExecucao ?? '').toUpperCase(),
     dataAdmissao: sanitizeDate(payload.dataAdmissao),
   }
 }
@@ -316,7 +468,30 @@ async function carregarMateriais() {
 
 async function carregarPessoas() {
   const data = await execute(
-    supabase.from('pessoas').select('*').order('nome', { ascending: true }),
+    supabase
+      .from('pessoas')
+      .select(`
+        id,
+        nome,
+        matricula,
+        "dataAdmissao",
+        "usuarioCadastro",
+        "usuarioEdicao",
+        "criadoEm",
+        "atualizadoEm",
+        "historicoEdicao",
+        centro_servico_id,
+        setor_id,
+        cargo_id,
+        centro_custo_id,
+        tipo_execucao_id,
+        centros_servico ( id, nome ),
+        setores ( id, nome ),
+        cargos ( id, nome ),
+        centros_custo ( id, nome ),
+        tipo_execucao ( id, nome )
+      `)
+      .order('nome', { ascending: true }),
     'Falha ao listar pessoas.'
   )
   return (data ?? []).map(mapPessoaRecord)
@@ -516,21 +691,61 @@ export const api = {
   },
   pessoas: {
     async list(params = {}) {
-      let query = supabase.from('pessoas').select('*').order('nome', { ascending: true })
+      let query = supabase
+        .from('pessoas')
+        .select(`
+          id,
+          nome,
+          matricula,
+          "dataAdmissao",
+          "usuarioCadastro",
+          "usuarioEdicao",
+          "criadoEm",
+          "atualizadoEm",
+          "historicoEdicao",
+          centro_servico_id,
+          setor_id,
+          cargo_id,
+          centro_custo_id,
+          tipo_execucao_id,
+          centros_servico ( id, nome ),
+          setores ( id, nome ),
+          cargos ( id, nome ),
+          centros_custo ( id, nome ),
+          tipo_execucao ( id, nome )
+        `)
+        .order('nome', { ascending: true })
 
       const centroServico = trim(params.centroServico ?? params.local ?? '')
-      if (centroServico) {
-        query = query.eq('centro_servico', centroServico)
+      if (centroServico && centroServico.toLowerCase() !== 'todos') {
+        const centroId = await resolveReferenceId(
+          'centros_servico',
+          centroServico,
+          'Centro de serviço inválido para filtro.'
+        )
+        query = query.eq('centro_servico_id', centroId)
       }
 
       const setor = trim(params.setor ?? '')
-      if (setor) {
-        query = query.eq('setor', setor)
+      if (setor && setor.toLowerCase() !== 'todos') {
+        const setorId = await resolveReferenceId('setores', setor, 'Setor inválido para filtro.')
+        query = query.eq('setor_id', setorId)
       }
 
       const cargo = trim(params.cargo ?? '')
-      if (cargo) {
-        query = query.eq('cargo', cargo)
+      if (cargo && cargo.toLowerCase() !== 'todos') {
+        const cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inválido para filtro.')
+        query = query.eq('cargo_id', cargoId)
+      }
+
+      const tipoExecucaoFiltro = trim(params.tipoExecucao ?? '')
+      if (tipoExecucaoFiltro && tipoExecucaoFiltro.toLowerCase() !== 'todos') {
+        const tipoId = await resolveReferenceId(
+          'tipo_execucao',
+          tipoExecucaoFiltro.toUpperCase(),
+          'Tipo de execução inválido para filtro.'
+        )
+        query = query.eq('tipo_execucao_id', tipoId)
       }
 
       const termo = trim(params.termo)
@@ -540,12 +755,12 @@ export const api = {
           [
             `nome.ilike.${like}`,
             `matricula.ilike.${like}`,
-            `centro_servico.ilike.${like}`,
-            `setor.ilike.${like}`,
-            `cargo.ilike.${like}`,
-            `tipoExecucao.ilike.${like}`,
-            `usuarioCadastro.ilike.${like}`,
-            `usuarioEdicao.ilike.${like}`,
+            `centros_servico.nome.ilike.${like}`,
+            `setores.nome.ilike.${like}`,
+            `cargos.nome.ilike.${like}`,
+            `tipo_execucao.nome.ilike.${like}`,
+            `"usuarioCadastro".ilike.${like}`,
+            `"usuarioEdicao".ilike.${like}`,
           ].join(',')
         )
       }
@@ -972,6 +1187,40 @@ export const api = {
         })
     },
 
+    async lesions(agenteNome) {
+      const nomeAgente = trim(agenteNome)
+      let agenteId = null
+      if (nomeAgente) {
+        agenteId = await resolveAgenteId(nomeAgente)
+      }
+      let query = supabase
+        .from('acidente_lesoes')
+        .select('agente_id, nome, ativo, ordem, agente:acidente_agentes(nome)')
+        .order('ordem', { ascending: true, nullsFirst: false })
+        .order('nome', { ascending: true })
+      if (agenteId) {
+        query = query.eq('agente_id', agenteId)
+      }
+      const data = await execute(query, 'Falha ao listar lesoes de acidente.')
+      const lista = (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => {
+          const nome = String(item.nome).trim()
+          const agente = String(item?.agente?.nome ?? '').trim()
+          return {
+            nome,
+            agente,
+            agenteId: item.agente_id ?? null,
+            label: nome,
+          }
+        })
+      if (nomeAgente && !agenteId) {
+        const alvo = nomeAgente.toLowerCase()
+        return lista.filter((item) => (item.agente ?? '').toLowerCase() === alvo)
+      }
+      return lista
+    },
+
     async agentTypes(agenteNome) {
       const nome = trim(agenteNome)
       if (!nome) {
@@ -1024,15 +1273,30 @@ export const api = {
         .filter(Boolean)
     },
     async create(payload) {
-      const partes = normalizePartesArray(payload.partesLesionadas ?? payload.partes_lesionadas ?? [])
+      const partes = normalizeStringArray(payload.partesLesionadas ?? payload.partes_lesionadas ?? [])
+      let lesoes = normalizeStringArray(
+        payload.lesoes ??
+          payload.lesoes_list ??
+          payload.lesoesSelecionadas ??
+          payload.lesoesSelecionada ??
+          [],
+      )
+      if (!lesoes.length) {
+        const unica = trim(payload.lesao ?? '')
+        if (unica) {
+          lesoes = [unica]
+        }
+      }
+      const lesaoPrincipal = lesoes[0] ?? ''
+      const partePrincipal = partes[0] ?? trim(payload.parteLesionada)
       const dados = {
         matricula: trim(payload.matricula),
         nome: trim(payload.nome),
         cargo: trim(payload.cargo),
         tipo: trim(payload.tipo),
         agente: trim(payload.agente),
-        lesao: trim(payload.lesao),
-        parteLesionada: partes[0] ?? trim(payload.parteLesionada),
+        lesao: lesaoPrincipal,
+        lesoes,
         centroServico: trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
         local: trim(payload.local) || trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
         data: payload.data ? new Date(payload.data).toISOString() : null,
@@ -1042,29 +1306,38 @@ export const api = {
         cid: trim(payload.cid),
         cat: trim(payload.cat),
         observacao: trim(payload.observacao),
+        partesLesionadas: partes,
+        partePrincipal,
       }
-      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !dados.lesao || !partes.length || !dados.centroServico || !dados.data) {
-        throw new Error('Preencha os campos obrigat?rios do acidente.')
+      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
+        throw new Error('Preencha os campos obrigatorios do acidente.')
       }
       const usuario = await resolveUsuarioResponsavel()
-      const { centroServico: centroServicoDb, ...resto } = dados
+      await ensureAcidentePartes(partes)
+      await ensureAcidenteLesoes(dados.agente, lesoes)
+      const {
+        centroServico: centroServicoDb,
+        partesLesionadas: partesPayload,
+        lesao: _lesaoPrincipal,
+        partePrincipal: _partePrincipal,
+        ...resto
+      } = dados
       const registro = await executeSingle(
         supabase
           .from('acidentes')
           .insert({
             ...resto,
             centro_servico: centroServicoDb,
-            partes_lesionadas: partes,
+            partes_lesionadas: partesPayload,
             registradoPor: usuario,
           })
           .select(),
         'Falha ao registrar acidente.'
       )
-      await ensureAcidentePartes(partes)
       return mapAcidenteRecord(registro)
     },
 
-async update(id, payload) {
+    async update(id, payload) {
       if (!id) {
         throw new Error('ID obrigat?rio.')
       }
@@ -1076,17 +1349,35 @@ async update(id, payload) {
         throw new Error('Acidente n?o encontrado.')
       }
 
-      const partes = normalizePartesArray(
+      const partes = normalizeStringArray(
         payload.partesLesionadas ?? payload.partes_lesionadas ?? atual.partes_lesionadas ?? [],
       )
+      let lesoes = normalizeStringArray(
+        payload.lesoes ??
+          payload.lesoes_list ??
+          payload.lesoesSelecionadas ??
+          payload.lesoesSelecionada ??
+          atual.lesoes ??
+          [],
+      )
+      if (!lesoes.length) {
+        const unica = trim(payload.lesao ?? '')
+        if (unica) {
+          lesoes = [unica]
+        }
+      }
+      const lesaoPrincipal = lesoes[0] ?? ''
+      const partePrincipal =
+        partes[0] ??
+        trim(payload.parteLesionada ?? atual.parteLesionada ?? atual.parte_lesionada ?? '')
       const dados = {
         matricula: trim(payload.matricula ?? atual.matricula),
         nome: trim(payload.nome ?? atual.nome),
         cargo: trim(payload.cargo ?? atual.cargo),
         tipo: trim(payload.tipo ?? atual.tipo),
         agente: trim(payload.agente ?? atual.agente),
-        lesao: trim(payload.lesao ?? atual.lesao),
-        parteLesionada: partes[0] ?? trim(payload.parteLesionada ?? atual.parteLesionada ?? atual.parte_lesionada ?? ''),
+        lesao: lesaoPrincipal,
+        lesoes,
         partesLesionadas: partes,
         centroServico: trim(payload.centroServico ?? payload.centro_servico ?? atual.centro_servico ?? atual.setor ?? ''),
         local: trim(payload.local ?? atual.local ?? ''),
@@ -1097,30 +1388,111 @@ async update(id, payload) {
         cid: trim(payload.cid ?? atual.cid ?? ''),
         cat: trim(payload.cat ?? atual.cat ?? ''),
         observacao: trim(payload.observacao ?? atual.observacao ?? ''),
+        partePrincipal,
       }
 
-      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !dados.lesao || !partes.length || !dados.centroServico || !dados.data) {
-        throw new Error('Preencha os campos obrigat?rios do acidente.')
+      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
+        throw new Error('Preencha os campos obrigatorios do acidente.')
       }
 
       const usuario = await resolveUsuarioResponsavel()
-      const { centroServico: centroServicoDb, partesLesionadas: _partesIgnoradas, ...resto } = dados
+      await ensureAcidentePartes(partes)
+      await ensureAcidenteLesoes(dados.agente, lesoes)
+
+      const antigo = mapAcidenteRecord(atual)
+      const novoComparacao = {
+        matricula: dados.matricula,
+        nome: dados.nome,
+        cargo: dados.cargo,
+        data: dados.data,
+        tipo: dados.tipo,
+        agente: dados.agente,
+        lesao: lesaoPrincipal,
+        lesoes,
+        partesLesionadas: partes,
+        parteLesionada: partePrincipal ?? '',
+        centroServico: dados.centroServico,
+        local: dados.local,
+        diasPerdidos: dados.diasPerdidos,
+        diasDebitados: dados.diasDebitados,
+        hht: dados.hht,
+        cid: dados.cid,
+        cat: dados.cat,
+        observacao: dados.observacao,
+      }
+      const camposAlterados = []
+      ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
+        const valorAtual = normalizeHistoryValue(antigo[campo])
+        const valorNovo = normalizeHistoryValue(novoComparacao[campo])
+        if (valorAtual !== valorNovo) {
+          camposAlterados.push({
+            campo,
+            de: valorAtual,
+            para: valorNovo,
+          })
+        }
+      })
+      const agora = new Date().toISOString()
+      const historicoRegistro =
+        camposAlterados.length > 0
+          ? {
+              acidente_id: id,
+              data_edicao: agora,
+              usuario_responsavel: usuario,
+              campos_alterados: camposAlterados,
+            }
+          : null
+
+      const {
+        centroServico: centroServicoDb,
+        partesLesionadas: partesPayload,
+        lesao: _lesaoPrincipal,
+        partePrincipal: _partePrincipal,
+        ...resto
+      } = dados
       const registro = await executeSingle(
         supabase
           .from('acidentes')
           .update({
             ...resto,
             centro_servico: centroServicoDb,
-            partes_lesionadas: partes,
+            partes_lesionadas: partesPayload,
             atualizadoPor: usuario,
-            atualizadoEm: new Date().toISOString(),
+            atualizadoEm: agora,
           })
           .eq('id', id)
           .select(),
         'Falha ao atualizar acidente.'
       )
       await ensureAcidentePartes(partes)
+      if (historicoRegistro) {
+        await execute(
+          supabase.from('acidente_historico').insert(historicoRegistro),
+          'Falha ao registrar histórico do acidente.'
+        )
+      }
       return mapAcidenteRecord(registro)
+    },
+    async history(id) {
+      if (!id) {
+        throw new Error('ID obrigatório.')
+      }
+      const data = await execute(
+        supabase
+          .from('acidente_historico')
+          .select('id, data_edicao, usuario_responsavel, campos_alterados')
+          .eq('acidente_id', id)
+          .order('data_edicao', { ascending: false }),
+        'Falha ao obter histórico do acidente.'
+      )
+      return (data ?? []).map((item) => ({
+        id: item.id,
+        dataEdicao: item.data_edicao ?? item.dataEdicao ?? null,
+        usuarioResponsavel: item.usuario_responsavel ?? item.usuarioResponsavel ?? '',
+        camposAlterados: Array.isArray(item.campos_alterados ?? item.camposAlterados)
+          ? item.campos_alterados ?? item.camposAlterados
+          : [],
+      }))
     },
 
 async dashboard(params = {}) {
@@ -1191,6 +1563,67 @@ async dashboard(params = {}) {
     },
   },
 }
+
+
+
+async function resolveReferenceId(table, value, errorMessage) {
+  const nome = trim(value)
+  if (!nome) {
+    throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
+  }
+
+  const data = await execute(
+    supabase.from(table).select('id').eq('nome', nome).limit(1),
+    'Falha ao consultar ' + table + '.'
+  )
+
+  const id = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
+  if (!id) {
+    throw new Error(errorMessage ?? ('Valor "' + nome + '" não encontrado.'))
+  }
+  return id
+}
+
+async function resolvePessoaReferencias(dados) {
+  const centroServicoId = await resolveReferenceId(
+    'centros_servico',
+    dados.centroServico,
+    'Selecione um centro de serviço válido.'
+  )
+  const setorNome = dados.setor || dados.centroServico
+  const setorId = await resolveReferenceId(
+    'setores',
+    setorNome,
+    'Selecione um setor válido.'
+  )
+  const cargoId = await resolveReferenceId(
+    'cargos',
+    dados.cargo,
+    'Selecione um cargo válido.'
+  )
+  const centroCustoId = await resolveReferenceId(
+    'centros_custo',
+    dados.centroServico,
+    'Selecione um centro de custo válido.'
+  )
+  const tipoExecucaoId = await resolveReferenceId(
+    'tipo_execucao',
+    dados.tipoExecucao || 'PROPRIO',
+    'Selecione o tipo de execução.'
+  )
+  return {
+    centroServicoId,
+    setorId,
+    cargoId,
+    centroCustoId,
+    tipoExecucaoId,
+  }
+}
+
+
+
+
+
 
 
 

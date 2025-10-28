@@ -124,27 +124,43 @@ function sanitizeOptionalIntegerString(value, fieldName = 'Valor') {
   return sanitized;
 }
 
-function sanitizePartesArray(value, fallback = []) {
-  const origem = Array.isArray(value) ? value : value ? [value] : fallback;
-  if (!origem) {
-    return [];
-  }
+function sanitizeStringArray(value, fallback = []) {
+  const origem = Array.isArray(value)
+    ? value
+    : value !== undefined && value !== null
+    ? [value]
+    : Array.isArray(fallback)
+    ? fallback
+    : fallback !== undefined && fallback !== null
+    ? [fallback]
+    : [];
   return origem
     .map((item) => sanitizeOptionalString(item))
     .filter((item) => item !== undefined && item !== null && item !== '');
 }
 
+const sanitizePartesArray = (value, fallback = []) => sanitizeStringArray(value, fallback);
+const sanitizeLesoesArray = (value, fallback = []) => sanitizeStringArray(value, fallback);
+
 class AcidenteService {
   criarAcidente(payload = {}) {
     const dadosPessoa = obterDadosPessoa(payload.matricula, payload);
     const partes = sanitizePartesArray(payload.partesLesionadas, payload.parteLesionada);
+    const lesoes = sanitizeLesoesArray(payload.lesoes, payload.lesao);
+
+    if (!lesoes.length) {
+      const error = new Error('Lesao obrigatoria');
+      error.status = 400;
+      throw error;
+    }
 
     const dadosObrigatorios = {
       ...dadosPessoa,
       data: sanitizeRequiredString(payload.data),
       tipo: sanitizeRequiredString(payload.tipo),
       agente: sanitizeRequiredString(payload.agente),
-      lesao: sanitizeRequiredString(payload.lesao),
+      lesao: lesoes[0],
+      lesoes,
       parteLesionada: partes[0] || '',
       partesLesionadas: partes,
       diasPerdidos: sanitizeNonNegativeInteger(payload.diasPerdidos, {
@@ -219,7 +235,18 @@ class AcidenteService {
       updates.partesLesionadas = parteUnica ? [parteUnica] : [];
     }
 
-    ['nome', 'cargo', 'tipo', 'agente', 'lesao'].forEach((campo) => assignCampo(campo));
+    if (payload.lesoes !== undefined) {
+      const lesoesAtualizadas = sanitizeLesoesArray(payload.lesoes, payload.lesao ?? atual.lesao);
+      updates.lesoes = lesoesAtualizadas;
+      updates.lesao =
+        lesoesAtualizadas[0] ?? sanitizeUpdatableString(payload.lesao ?? atual.lesao);
+    } else if (payload.lesao !== undefined) {
+      const lesaoUnica = sanitizeUpdatableString(payload.lesao);
+      updates.lesao = lesaoUnica;
+      updates.lesoes = lesaoUnica ? [lesaoUnica] : [];
+    }
+
+    ['nome', 'cargo', 'tipo', 'agente'].forEach((campo) => assignCampo(campo));
 
     const centroServicoOverride = sanitizeUpdatableString(payload.centroServico ?? payload.setor);
     if (centroServicoOverride !== undefined) {
@@ -270,6 +297,14 @@ class AcidenteService {
     const merged = {
       ...atual,
       ...updates,
+      lesoes:
+        updates.lesoes ??
+        atual.lesoes ??
+        (atual.lesao ? [atual.lesao] : []),
+      lesao:
+        (updates.lesoes && updates.lesoes.length ? updates.lesoes[0] : undefined) ??
+        updates.lesao ??
+        atual.lesao,
       partesLesionadas:
         updates.partesLesionadas ??
         atual.partesLesionadas ??

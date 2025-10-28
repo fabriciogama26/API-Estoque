@@ -11,6 +11,7 @@ class Acidente {
     tipo,
     agente,
     lesao,
+    lesoes = [],
     parteLesionada,
     partesLesionadas = [],
     centroServico,
@@ -34,7 +35,13 @@ class Acidente {
     this.hht = hht ?? null
     this.tipo = tipo
     this.agente = agente
-    this.lesao = lesao
+    const listaLesoes = Array.isArray(lesoes)
+      ? lesoes.filter((item) => item && String(item).trim())
+      : lesao
+      ? [lesao]
+      : []
+    this.lesoes = listaLesoes
+    this.lesao = listaLesoes[0] ?? (lesao ? String(lesao).trim() : '')
     const partes = Array.isArray(partesLesionadas)
       ? partesLesionadas.filter((parte) => parte && String(parte).trim())
       : parteLesionada

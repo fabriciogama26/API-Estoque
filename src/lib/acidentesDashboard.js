@@ -352,7 +352,10 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
   const availableOptions = {
     centrosServico: collectOptions(filtradosPorPeriodo, (item) => item?.centroServico ?? item?.setor ?? item?.local),
     tipos: collectOptions(filtradosPorPeriodo, (item) => item?.tipo),
-    lesoes: collectOptions(filtradosPorPeriodo, (item) => item?.lesao),
+    lesoes: collectOptions(
+      filtradosPorPeriodo,
+      (item) => item?.lesoes ?? (item?.lesao ? [item.lesao] : []),
+    ),
     partesLesionadas: collectOptions(
       filtradosPorPeriodo,
       (item) => item?.partesLesionadas ?? (item?.parteLesionada ? [item.parteLesionada] : []),
@@ -368,7 +371,12 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     if (!matchesFilter(acidente?.tipo, tipoFiltro)) {
       return false
     }
-    if (!matchesFilter(acidente?.lesao, lesaoFiltro)) {
+    if (
+      !matchesFilter(
+        acidente?.lesoes ?? (acidente?.lesao ? [acidente.lesao] : []),
+        lesaoFiltro,
+      )
+    ) {
       return false
     }
     if (

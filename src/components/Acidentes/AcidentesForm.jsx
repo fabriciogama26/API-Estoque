@@ -20,23 +20,108 @@ export function AcidentesForm({
   tipos = [],
   tiposError,
   isLoadingTipos = false,
+  lesoes = [],
+  lesoesError,
+  isLoadingLesoes = false,
   partes = [],
   partesError,
   isLoadingPartes = false,
+  centrosServico = [],
 }) {
   const agenteOptions = Array.from(
     new Set([...(agentes || []), form.agente].filter(Boolean)),
   )
   const tipoOptions = Array.from(new Set([...(tipos || []), form.tipo].filter(Boolean)))
+  const lesaoOptions = Array.isArray(lesoes) ? lesoes : []
   const parteOptions = Array.isArray(partes) ? partes : []
   const agenteListId = 'acidentes-agentes'
   const tipoListId = 'acidentes-tipos'
   const localListId = 'acidentes-locais'
+  const lesaoListId = 'acidentes-lesoes'
   const parteListId = 'acidentes-partes'
+  const centroServicoListId = 'acidentes-centros-servico'
+  const centroServicoOptions = Array.from(
+    new Set([...(centrosServico || []), form.centroServico].filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b))
+  const [lesaoDraft, setLesaoDraft] = useState('')
   const [parteDraft, setParteDraft] = useState('')
+
+  const currentLesoes =
+    Array.isArray(form.lesoes) && form.lesoes.length
+      ? form.lesoes
+      : form.lesao
+        ? [form.lesao]
+        : []
+
+  const lesaoSuggestions = (() => {
+    const suggestions = []
+    const seen = new Set()
+    const add = (nome, label) => {
+      const valor = (nome ?? '').trim()
+      if (!valor) {
+        return
+      }
+      const chave = valor.toLowerCase()
+      if (seen.has(chave)) {
+        return
+      }
+      seen.add(chave)
+      suggestions.push({ nome: valor, label: (label ?? valor).trim() || valor })
+    }
+    lesaoOptions.forEach((item, index) => {
+      if (typeof item === 'string') {
+        add(item, item)
+        return
+      }
+      if (item && typeof item === 'object') {
+        const nome = item.nome ?? item.label ?? ''
+        const label = item.label ?? nome ?? ''
+        add(nome, label)
+      }
+    })
+    currentLesoes.forEach((nome) => add(nome, nome))
+    return suggestions
+  })()
+
+  const updateLesoes = (lista) => {
+    onChange({ target: { name: 'lesoes', value: lista } })
+    onChange({ target: { name: 'lesao', value: lista[0] ?? '' } })
+  }
 
   const updatePartes = (lista) => {
     onChange({ target: { name: 'partesLesionadas', value: lista } })
+  }
+
+  const handleAddLesao = () => {
+    const value = lesaoDraft.trim()
+    if (!value) {
+      return
+    }
+    const atual = currentLesoes
+    if (atual.some((lesao) => lesao.toLowerCase() === value.toLowerCase())) {
+      setLesaoDraft('')
+      return
+    }
+    updateLesoes([...atual, value])
+    setLesaoDraft('')
+  }
+
+  const handleLesaoKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault()
+      handleAddLesao()
+    }
+  }
+
+  const handleRemoveLesao = (lesao) => {
+    const atual = currentLesoes
+    updateLesoes(atual.filter((item) => item !== lesao))
+  }
+
+  const handleLesaoBlur = () => {
+    if (lesaoDraft.trim()) {
+      handleAddLesao()
+    }
   }
 
   const handleAddParte = () => {
@@ -203,8 +288,57 @@ export function AcidentesForm({
           <input name="cid" value={form.cid} onChange={onChange} placeholder="S93" />
         </label>
         <label className="field">
-          <span>Lesao <span className="asterisco">*</span></span>
-          <input name="lesao" value={form.lesao} onChange={onChange} placeholder="Entorse" required />
+          <span>Lesoes <span className="asterisco">*</span></span>
+          <div className="multi-select">
+            <div className="multi-select__input">
+              <input
+                value={lesaoDraft}
+                onChange={(event) => setLesaoDraft(event.target.value)}
+                onKeyDown={handleLesaoKeyDown}
+                onBlur={handleLesaoBlur}
+                list={lesaoListId}
+                placeholder={
+                  isLoadingLesoes
+                    ? 'Carregando lesoes...'
+                    : 'Digite e pressione Enter para adicionar'
+                }
+                autoComplete="off"
+              />
+            </div>
+            <div className="multi-select__actions">
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleAddLesao}
+                disabled={!lesaoDraft.trim()}
+              >
+                Adicionar
+              </button>
+              <div className="multi-select__chips">
+                {currentLesoes.length ? (
+                  currentLesoes.map((lesao, index) => (
+                    <button
+                      type="button"
+                      key={`${lesao}-${index}`}
+                      className="chip"
+                      aria-label={`Remover ${lesao}`}
+                      onClick={() => handleRemoveLesao(lesao)}
+                    >
+                      {lesao} <span aria-hidden="true">x</span>
+                    </button>
+                  ))
+                ) : (
+                  <span className="multi-select__placeholder">Nenhuma lesao adicionada</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <input type="hidden" name="lesao" value={form.lesao} readOnly />
+          <datalist id={lesaoListId}>
+            {lesaoSuggestions.map((item, index) => (
+              <option key={`${item.nome}-${index}`} value={item.nome} label={item.label} />
+            ))}
+          </datalist>
         </label>
         <label className="field">
           <span>Partes lesionadas <span className="asterisco">*</span></span>
@@ -265,7 +399,24 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Centro de servico <span className="asterisco">*</span></span>
-          <input name="centroServico" value={form.centroServico} readOnly placeholder="Ex: Operacao" required />
+          <input
+            name="centroServico"
+            value={form.centroServico}
+            onChange={onChange}
+            list={centroServicoListId}
+            required
+            placeholder={
+              isLoadingPessoas
+                ? 'Carregando centros...'
+                : 'Digite ou selecione o centro de servico'
+            }
+            autoComplete="off"
+          />
+          <datalist id={centroServicoListId}>
+            {centroServicoOptions.map((centro) => (
+              <option key={centro} value={centro} />
+            ))}
+          </datalist>
         </label>
         <label className="field">
           <span>Local <span className="asterisco">*</span></span>
@@ -305,6 +456,7 @@ export function AcidentesForm({
       {agentesError ? <p className="feedback feedback--error">{agentesError}</p> : null}
       {tiposError ? <p className="feedback feedback--error">{tiposError}</p> : null}
       {locaisError ? <p className="feedback feedback--error">{locaisError}</p> : null}
+      {lesoesError ? <p className="feedback feedback--error">{lesoesError}</p> : null}
       {partesError ? <p className="feedback feedback--error">{partesError}</p> : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">

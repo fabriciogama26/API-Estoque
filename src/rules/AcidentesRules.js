@@ -22,6 +22,11 @@ export function resolveUsuarioNome(user) {
 export function validateAcidenteForm(form) {
   const centroServico = form.centroServico?.trim() || form.setor?.trim() || ''
   const local = form.local?.trim() || ''
+  const lesoesSelecionadas = Array.isArray(form.lesoes)
+    ? form.lesoes.filter((item) => item && item.trim())
+    : form.lesao
+    ? [form.lesao.trim()]
+    : []
   const partesSelecionadas = Array.isArray(form.partesLesionadas)
     ? form.partesLesionadas.filter((item) => item && item.trim())
     : form.parteLesionada
@@ -46,8 +51,8 @@ export function validateAcidenteForm(form) {
   if (!form.agente.trim()) {
     return 'Informe o agente do acidente.'
   }
-  if (!form.lesao.trim()) {
-    return 'Informe a lesao.'
+  if (lesoesSelecionadas.length === 0) {
+    return 'Informe ao menos uma lesao.'
   }
   if (partesSelecionadas.length === 0) {
     return 'Informe ao menos uma parte lesionada.'
@@ -111,6 +116,22 @@ const sanitizeCentroServico = (value) => {
 export function createAcidentePayload(form, usuarioCadastro) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
   const local = form.local?.trim() || centroServico
+  const lesoes = []
+  const addLesao = (valor) => {
+    const nome = (valor ?? '').trim()
+    if (!nome) {
+      return
+    }
+    const chave = nome.toLowerCase()
+    if (lesoes.some((item) => item.toLowerCase() === chave)) {
+      return
+    }
+    lesoes.push(nome)
+  }
+  if (Array.isArray(form.lesoes)) {
+    form.lesoes.forEach(addLesao)
+  }
+  addLesao(form.lesao)
   const partes = Array.isArray(form.partesLesionadas)
     ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)
     : form.parteLesionada?.trim()
@@ -128,7 +149,8 @@ export function createAcidentePayload(form, usuarioCadastro) {
     tipo: form.tipo.trim(),
     agente: form.agente.trim(),
     cid: form.cid.trim(),
-    lesao: form.lesao.trim(),
+    lesoes,
+    lesao: lesoes[0] || '',
     parteLesionada: partes[0] || '',
     partesLesionadas: partes,
     centroServico,
@@ -142,6 +164,22 @@ export function createAcidentePayload(form, usuarioCadastro) {
 export function updateAcidentePayload(form, usuarioResponsavel) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
   const local = form.local?.trim() || centroServico
+  const lesoes = []
+  const addLesao = (valor) => {
+    const nome = (valor ?? '').trim()
+    if (!nome) {
+      return
+    }
+    const chave = nome.toLowerCase()
+    if (lesoes.some((item) => item.toLowerCase() === chave)) {
+      return
+    }
+    lesoes.push(nome)
+  }
+  if (Array.isArray(form.lesoes)) {
+    form.lesoes.forEach(addLesao)
+  }
+  addLesao(form.lesao)
   const partes = Array.isArray(form.partesLesionadas)
     ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)
     : form.parteLesionada?.trim()
@@ -159,7 +197,8 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     tipo: form.tipo.trim(),
     agente: form.agente.trim(),
     cid: form.cid.trim(),
-    lesao: form.lesao.trim(),
+    lesoes,
+    lesao: lesoes[0] || '',
     parteLesionada: partes[0] || '',
     partesLesionadas: partes,
     centroServico,
@@ -188,6 +227,26 @@ export function filterAcidentes(acidentes, filters) {
       return false
     }
 
+    if (filters.lesao && filters.lesao !== 'todos') {
+      const normalizar = (texto) =>
+        String(texto ?? '')
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+      const alvoLesao = normalizar(filters.lesao)
+      const listaLesoes =
+        Array.isArray(acidente.lesoes) && acidente.lesoes.length
+          ? acidente.lesoes
+          : acidente.lesao
+            ? [acidente.lesao]
+            : []
+      const possuiLesao = listaLesoes.some((item) => normalizar(item) === alvoLesao)
+      if (!possuiLesao) {
+        return false
+      }
+    }
+
     if (!termo) {
       return true
     }
@@ -199,7 +258,7 @@ export function filterAcidentes(acidentes, filters) {
       acidente.tipo,
       acidente.agente,
       acidente.cid,
-      acidente.lesao,
+      Array.isArray(acidente.lesoes) ? acidente.lesoes.join(' ') : acidente.lesao,
       Array.isArray(acidente.partesLesionadas) ? acidente.partesLesionadas.join(' ') : acidente.parteLesionada,
       acidente.centroServico,
       acidente.setor,
