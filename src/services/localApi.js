@@ -7,7 +7,13 @@ import {
 } from '../lib/estoque.js'
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
 import gruposEpi from '../data/grupos-epi.json'
-import { filterPessoas } from '../rules/PessoasRules.js'
+import {
+  filterPessoas,
+  extractCentrosServico,
+  extractCargos,
+  extractSetores,
+  extractTiposExecucao,
+} from '../rules/PessoasRules.js'
 
 const nowIso = () => new Date().toISOString()
 
@@ -79,6 +85,17 @@ const validatePessoaPayload = (payload) => {
   if (!payload.setor) throw createError(400, 'Setor obrigatorio.')
   if (!payload.cargo) throw createError(400, 'Cargo obrigatorio.')
   if (!payload.tipoExecucao) throw createError(400, 'Tipo Execucao obrigatorio.')
+}
+
+const mapDomainOption = (valor, index) => {
+  const nome = trim(valor)
+  if (!nome) {
+    return null
+  }
+  return {
+    id: `local-${index}`,
+    nome,
+  }
 }
 
 const mapLocalPessoaRecord = (pessoa) => {
@@ -1785,6 +1802,21 @@ const localApi = {
         const historico = Array.isArray(acidente.historicoEdicao) ? acidente.historicoEdicao.slice() : []
         return sortByDateDesc(normalizeAcidenteHistory(historico), 'dataEdicao')
       })
+    },
+  },
+  references: {
+    async pessoas() {
+      const snapshot = readState((state) => state.pessoas || [])
+      const mapLista = (lista) =>
+        (Array.isArray(lista) ? lista : [])
+          .map((valor, index) => mapDomainOption(valor, index))
+          .filter(Boolean)
+      return {
+        centrosServico: mapLista(extractCentrosServico(snapshot)),
+        setores: mapLista(extractSetores(snapshot)),
+        cargos: mapLista(extractCargos(snapshot)),
+        tiposExecucao: mapLista(extractTiposExecucao(snapshot)),
+      }
     },
   },
   documentos: {

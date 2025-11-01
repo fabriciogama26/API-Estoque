@@ -144,6 +144,20 @@ const normalizePessoaHistorico = (lista) => {
     .filter(Boolean)
 }
 
+const normalizeDomainOptions = (lista) =>
+  (Array.isArray(lista) ? lista : [])
+    .map((item) => {
+      const nome = resolveTextValue(item?.nome ?? '')
+      if (!nome) {
+        return null
+      }
+      return {
+        id: item?.id ?? null,
+        nome,
+      }
+    })
+    .filter(Boolean)
+
 async function ensureAcidentePartes(nomes) {
   const lista = normalizeStringArray(nomes)
   if (!lista.length) {
@@ -812,11 +826,12 @@ export const api = {
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
       if (!dados.nome || !dados.matricula || !dados.centroServico || !dados.setor || !dados.cargo) {
-        throw new Error('Preencha nome, matrícula, centro de serviço, setor e cargo.')
+        throw new Error('Preencha nome, matricula, centro de servico, setor e cargo.')
       }
 
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
+      const referencias = await resolvePessoaReferencias(dados)
 
       const registro = await executeSingle(
         supabase
@@ -824,61 +839,108 @@ export const api = {
           .insert({
             nome: dados.nome,
             matricula: dados.matricula,
-            centro_servico: dados.centroServico,
-            setor: dados.setor || dados.centroServico,
-            cargo: dados.cargo,
-            tipoExecucao: dados.tipoExecucao || null,
-          dataAdmissao: dados.dataAdmissao,
-          usuarioCadastro: usuario,
-          criadoEm: agora,
-          atualizadoEm: null,
-        })
-          .select(),
+            centro_servico_id: referencias.centroServicoId,
+            setor_id: referencias.setorId,
+            cargo_id: referencias.cargoId,
+            centro_custo_id: referencias.centroCustoId,
+            tipo_execucao_id: referencias.tipoExecucaoId,
+            dataAdmissao: dados.dataAdmissao,
+            usuarioCadastro: usuario,
+            criadoEm: agora,
+            atualizadoEm: null,
+          })
+          .select(`
+            id,
+            nome,
+            matricula,
+            "dataAdmissao",
+            "usuarioCadastro",
+            "usuarioEdicao",
+            "criadoEm",
+            "atualizadoEm",
+            centro_servico_id,
+            setor_id,
+            cargo_id,
+            centro_custo_id,
+            tipo_execucao_id,
+            centros_servico ( id, nome ),
+            setores ( id, nome ),
+            cargos ( id, nome ),
+            centros_custo ( id, nome ),
+            tipo_execucao ( id, nome )
+          `),
         'Falha ao criar pessoa.'
       )
 
       return mapPessoaRecord(registro)
     },
+
     async update(id, payload) {
       if (!id) {
-        throw new Error('ID obrigatório.')
+        throw new Error('ID obrigatorio.')
       }
 
-      const atual = await executeSingle(
-        supabase.from('pessoas').select('*').eq('id', id),
+      const atualRaw = await executeSingle(
+        supabase
+          .from('pessoas')
+          .select(`
+            id,
+            nome,
+            matricula,
+            "dataAdmissao",
+            "usuarioCadastro",
+            "usuarioEdicao",
+            "criadoEm",
+            "atualizadoEm",
+            centro_servico_id,
+            setor_id,
+            cargo_id,
+            centro_custo_id,
+            tipo_execucao_id,
+            centros_servico ( id, nome ),
+            setores ( id, nome ),
+            cargos ( id, nome ),
+            centros_custo ( id, nome ),
+            tipo_execucao ( id, nome )
+          `)
+          .eq('id', id),
         'Falha ao obter pessoa.'
       )
-      if (!atual) {
-        throw new Error('Pessoa não encontrada.')
+      if (!atualRaw) {
+        throw new Error('Pessoa nao encontrada.')
       }
 
+      const atual = mapPessoaRecord(atualRaw)
       const dados = sanitizePessoaPayload(payload)
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
 
+      const normalizeDateValue = (value) => {
+        if (!value) {
+          return null
+        }
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) {
+          return null
+        }
+        return date.toISOString()
+      }
+
       const camposAlterados = []
       ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
-        const chaveAtual =
-          campo === 'centroServico'
-            ? 'centro_servico'
-            : campo === 'setor'
-              ? 'setor'
-            : campo === 'dataAdmissao'
-              ? 'dataAdmissao'
-              : campo
         const valorAtual =
-          atual[chaveAtual] ??
-          (campo === 'centroServico'
-            ? atual.centroServico ?? atual.centro_servico ?? ''
-            : campo === 'setor'
-              ? atual.setor ?? atual.centro_servico ?? ''
-              : '')
-        const valorNovo = dados[campo] ?? (campo === 'dataAdmissao' ? null : '')
+          campo === 'dataAdmissao'
+            ? normalizeDateValue(atual.dataAdmissao)
+            : resolveTextValue(atual[campo] ?? '')
+        const valorNovo =
+          campo === 'dataAdmissao'
+            ? normalizeDateValue(dados.dataAdmissao)
+            : resolveTextValue(dados[campo] ?? '')
         if (valorAtual !== valorNovo) {
           camposAlterados.push({
             campo,
-            de: valorAtual,
-            para: valorNovo,
+            de: valorAtual ?? '',
+            para: valorNovo ?? '',
           })
         }
       })
@@ -893,27 +955,56 @@ export const api = {
               usuario_responsavel: usuario,
               campos_alterados: camposAlterados,
             }),
-          'Falha ao registrar histórico de edição.',
+          'Falha ao registrar historico de edicao.'
         )
       }
 
-      const registro = await executeSingle(
+      const referencias = await resolvePessoaReferencias(dados)
+
+      await execute(
         supabase
           .from('pessoas')
           .update({
             nome: dados.nome,
             matricula: dados.matricula,
-            centro_servico: dados.centroServico,
-            setor: dados.setor || dados.centroServico,
-            cargo: dados.cargo,
-            tipoExecucao: dados.tipoExecucao || null,
+            centro_servico_id: referencias.centroServicoId,
+            setor_id: referencias.setorId,
+            cargo_id: referencias.cargoId,
+            centro_custo_id: referencias.centroCustoId,
+            tipo_execucao_id: referencias.tipoExecucaoId,
             dataAdmissao: dados.dataAdmissao,
             atualizadoEm: agora,
             usuarioEdicao: usuario,
           })
-          .eq('id', id)
-          .select(),
+          .eq('id', id),
         'Falha ao atualizar pessoa.'
+      )
+
+      const registro = await executeSingle(
+        supabase
+          .from('pessoas')
+          .select(`
+            id,
+            nome,
+            matricula,
+            "dataAdmissao",
+            "usuarioCadastro",
+            "usuarioEdicao",
+            "criadoEm",
+            "atualizadoEm",
+            centro_servico_id,
+            setor_id,
+            cargo_id,
+            centro_custo_id,
+            tipo_execucao_id,
+            centros_servico ( id, nome ),
+            setores ( id, nome ),
+            cargos ( id, nome ),
+            centros_custo ( id, nome ),
+            tipo_execucao ( id, nome )
+          `)
+          .eq('id', id),
+        'Falha ao obter pessoa.'
       )
 
       return mapPessoaRecord(registro)
@@ -1545,6 +1636,34 @@ export const api = {
 async dashboard(params = {}) {
       const acidentes = await carregarAcidentes()
       return montarDashboardAcidentes(acidentes, params)
+    },
+  },
+  references: {
+    async pessoas() {
+      const [centros, setores, cargos, tipos] = await Promise.all([
+        execute(
+          supabase.from('centros_servico').select('id, nome').order('nome'),
+          'Falha ao carregar centros de servico.'
+        ),
+        execute(
+          supabase.from('setores').select('id, nome').order('nome'),
+          'Falha ao carregar setores.'
+        ),
+        execute(
+          supabase.from('cargos').select('id, nome').order('nome'),
+          'Falha ao carregar cargos.'
+        ),
+        execute(
+          supabase.from('tipo_execucao').select('id, nome').order('nome'),
+          'Falha ao carregar tipos de execucao.'
+        ),
+      ])
+      return {
+        centrosServico: normalizeDomainOptions(centros),
+        setores: normalizeDomainOptions(setores),
+        cargos: normalizeDomainOptions(cargos),
+        tiposExecucao: normalizeDomainOptions(tipos),
+      }
     },
   },
   documentos: {
