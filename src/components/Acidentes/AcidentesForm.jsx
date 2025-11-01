@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export function AcidentesForm({
   form,
@@ -28,23 +28,89 @@ export function AcidentesForm({
   isLoadingPartes = false,
   centrosServico = [],
 }) {
-  const agenteOptions = Array.from(
-    new Set([...(agentes || []), form.agente].filter(Boolean)),
-  )
-  const tipoOptions = Array.from(new Set([...(tipos || []), form.tipo].filter(Boolean)))
+  const normalizeText = (value) => (typeof value === 'string' ? value.trim() : '')
+
+  const [novaLesao, setNovaLesao] = useState('')
+  const [novaParte, setNovaParte] = useState('')
+  const [novoAgente, setNovoAgente] = useState('')
+  const [novoTipo, setNovoTipo] = useState('')
+  const [agentesAdicionados, setAgentesAdicionados] = useState([])
+  const [tiposAdicionados, setTiposAdicionados] = useState([])
+
+  useEffect(() => {
+    setTiposAdicionados([])
+    setNovoTipo('')
+  }, [form.agente])
+
+  const pessoaOptions = (() => {
+    const map = new Map()
+    if (Array.isArray(pessoas)) {
+      pessoas.forEach((pessoa) => {
+        const value =
+          pessoa?.matricula !== undefined && pessoa?.matricula !== null
+            ? String(pessoa.matricula)
+            : ''
+        const nome = normalizeText(pessoa?.nome) || 'Sem nome'
+        if (!value) {
+          return
+        }
+        if (!map.has(value)) {
+          map.set(value, `${value} - ${nome}`)
+        }
+      })
+    }
+    const matriculaAtual = normalizeText(form.matricula)
+    if (matriculaAtual && !map.has(matriculaAtual)) {
+      const labelNome = normalizeText(form.nome) || 'Sem nome'
+      map.set(matriculaAtual, `${matriculaAtual} - ${labelNome}`)
+    }
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  })()
+
+  const agenteOptions = (() => {
+    const map = new Map()
+    const addOption = (valor) => {
+      const nome = normalizeText(valor)
+      if (!nome) {
+        return
+      }
+      const chave = nome.toLocaleLowerCase('pt-BR')
+      if (!map.has(chave)) {
+        map.set(chave, nome)
+      }
+    }
+    agentesAdicionados.forEach(addOption)
+    if (Array.isArray(agentes)) {
+      agentes.forEach(addOption)
+    }
+    addOption(form.agente)
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  })()
+
+  const tipoOptions = (() => {
+    const map = new Map()
+    const addOption = (valor) => {
+      const nome = normalizeText(valor)
+      if (!nome) {
+        return
+      }
+      const chave = nome.toLocaleLowerCase('pt-BR')
+      if (!map.has(chave)) {
+        map.set(chave, nome)
+      }
+    }
+    tiposAdicionados.forEach(addOption)
+    if (Array.isArray(tipos)) {
+      tipos.forEach(addOption)
+    }
+    addOption(form.tipo)
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  })()
+
   const lesaoOptions = Array.isArray(lesoes) ? lesoes : []
   const parteOptions = Array.isArray(partes) ? partes : []
-  const agenteListId = 'acidentes-agentes'
-  const tipoListId = 'acidentes-tipos'
-  const localListId = 'acidentes-locais'
-  const lesaoListId = 'acidentes-lesoes'
-  const parteListId = 'acidentes-partes'
-  const centroServicoListId = 'acidentes-centros-servico'
-  const centroServicoOptions = Array.from(
-    new Set([...(centrosServico || []), form.centroServico].filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b))
-  const [lesaoDraft, setLesaoDraft] = useState('')
-  const [parteDraft, setParteDraft] = useState('')
 
   const currentLesoes =
     Array.isArray(form.lesoes) && form.lesoes.length
@@ -53,35 +119,73 @@ export function AcidentesForm({
         ? [form.lesao]
         : []
 
-  const lesaoSuggestions = (() => {
-    const suggestions = []
-    const seen = new Set()
-    const add = (nome, label) => {
-      const valor = (nome ?? '').trim()
-      if (!valor) {
-        return
-      }
-      const chave = valor.toLowerCase()
-      if (seen.has(chave)) {
-        return
-      }
-      seen.add(chave)
-      suggestions.push({ nome: valor, label: (label ?? valor).trim() || valor })
-    }
-    lesaoOptions.forEach((item, index) => {
+  const currentPartes = Array.isArray(form.partesLesionadas)
+    ? form.partesLesionadas
+    : form.parteLesionada
+      ? [form.parteLesionada]
+      : []
+
+  const lesaoSelectOptions = (() => {
+    const map = new Map()
+    lesaoOptions.forEach((item) => {
       if (typeof item === 'string') {
-        add(item, item)
+        const nome = normalizeText(item)
+        if (nome && !map.has(nome.toLowerCase())) {
+          map.set(nome.toLowerCase(), { value: nome, label: nome })
+        }
         return
       }
       if (item && typeof item === 'object') {
-        const nome = item.nome ?? item.label ?? ''
-        const label = item.label ?? nome ?? ''
-        add(nome, label)
+        const nome = normalizeText(item.nome ?? item.label)
+        const label = normalizeText(item.label) || nome
+        if (nome && !map.has(nome.toLowerCase())) {
+          map.set(nome.toLowerCase(), { value: nome, label: label || nome })
+        }
       }
     })
-    currentLesoes.forEach((nome) => add(nome, nome))
-    return suggestions
+    currentLesoes.forEach((lesao) => {
+      const nome = normalizeText(lesao)
+      if (nome && !map.has(nome.toLowerCase())) {
+        map.set(nome.toLowerCase(), { value: nome, label: nome })
+      }
+    })
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   })()
+
+  const parteSelectOptions = (() => {
+    const map = new Map()
+    parteOptions.forEach((item) => {
+      if (typeof item === 'string') {
+        const nome = normalizeText(item)
+        if (nome && !map.has(nome.toLowerCase())) {
+          map.set(nome.toLowerCase(), { value: nome, label: nome })
+        }
+        return
+      }
+      if (item && typeof item === 'object') {
+        const nome = normalizeText(item.nome ?? item.label)
+        const label = normalizeText(item.label) || nome
+        if (nome && !map.has(nome.toLowerCase())) {
+          map.set(nome.toLowerCase(), { value: nome, label: label || nome })
+        }
+      }
+    })
+    currentPartes.forEach((parte) => {
+      const nome = normalizeText(parte)
+      if (nome && !map.has(nome.toLowerCase())) {
+        map.set(nome.toLowerCase(), { value: nome, label: nome })
+      }
+    })
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  })()
+
+  const centroServicoOptions = Array.from(
+    new Set([...(centrosServico || []), form.centroServico].map(normalizeText).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+
+  const localOptions = Array.from(
+    new Set([...(locais || []), form.local].map(normalizeText).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'))
 
   const updateLesoes = (lista) => {
     onChange({ target: { name: 'lesoes', value: lista } })
@@ -92,102 +196,204 @@ export function AcidentesForm({
     onChange({ target: { name: 'partesLesionadas', value: lista } })
   }
 
-  const handleAddLesao = () => {
-    const value = lesaoDraft.trim()
-    if (!value) {
+  const adicionarNovoAgente = () => {
+    const valor = normalizeText(novoAgente)
+    if (!valor) {
       return
     }
-    const atual = currentLesoes
-    if (atual.some((lesao) => lesao.toLowerCase() === value.toLowerCase())) {
-      setLesaoDraft('')
-      return
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    const listaAtual = [
+      ...agentesAdicionados,
+      ...(Array.isArray(agentes) ? agentes : []),
+      form.agente,
+    ]
+    const jaExiste = listaAtual.some(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
+    )
+    if (!jaExiste) {
+      setAgentesAdicionados((prev) => [...prev, valor])
     }
-    updateLesoes([...atual, value])
-    setLesaoDraft('')
+    onChange({ target: { name: 'agente', value: valor } })
+    setNovoAgente('')
   }
 
-  const handleLesaoKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ',') {
+  const adicionarNovoTipo = () => {
+    const valor = normalizeText(novoTipo)
+    if (!valor) {
+      return
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    const listaAtual = [
+      ...tiposAdicionados,
+      ...(Array.isArray(tipos) ? tipos : []),
+      form.tipo,
+    ]
+    const jaExiste = listaAtual.some(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
+    )
+    if (!jaExiste) {
+      setTiposAdicionados((prev) => [...prev, valor])
+    }
+    onChange({ target: { name: 'tipo', value: valor } })
+    setNovoTipo('')
+  }
+
+  const removerLesao = (lesaoParaRemover) => {
+    const atualizadas = currentLesoes.filter((lesao) => lesao !== lesaoParaRemover)
+    updateLesoes(atualizadas)
+  }
+
+  const removerParte = (parteParaRemover) => {
+    const atualizadas = currentPartes.filter((parte) => parte !== parteParaRemover)
+    updatePartes(atualizadas)
+  }
+
+  const handleLesoesSelectChange = (event) => {
+    const selecionadas = Array.from(event.target.selectedOptions || []).map((option) => option.value)
+    updateLesoes(selecionadas)
+  }
+
+  const handlePartesSelectChange = (event) => {
+    const selecionadas = Array.from(event.target.selectedOptions || []).map((option) => option.value)
+    updatePartes(selecionadas)
+  }
+
+  const multiSelectSize = (lista) => {
+    const quantidade = Array.isArray(lista) ? lista.length : 0
+    if (quantidade === 0) {
+      return 3
+    }
+    return Math.min(6, Math.max(3, quantidade))
+  }
+
+  const lesoesSelectSize = multiSelectSize(lesaoSelectOptions)
+  const partesSelectSize = multiSelectSize(parteSelectOptions)
+
+  const adicionarNovaLesao = () => {
+    const valor = normalizeText(novaLesao)
+    if (!valor) {
+      return
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    if (currentLesoes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
+      setNovaLesao('')
+      return
+    }
+    updateLesoes([...currentLesoes, valor])
+    setNovaLesao('')
+  }
+
+  const adicionarNovaParte = () => {
+    const valor = normalizeText(novaParte)
+    if (!valor) {
+      return
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    if (currentPartes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
+      setNovaParte('')
+      return
+    }
+    updatePartes([...currentPartes, valor])
+    setNovaParte('')
+  }
+
+  const handleNovaLesaoKeyDown = (event) => {
+    if (event.key === 'Enter') {
       event.preventDefault()
-      handleAddLesao()
+      adicionarNovaLesao()
     }
   }
 
-  const handleRemoveLesao = (lesao) => {
-    const atual = currentLesoes
-    updateLesoes(atual.filter((item) => item !== lesao))
-  }
-
-  const handleLesaoBlur = () => {
-    if (lesaoDraft.trim()) {
-      handleAddLesao()
-    }
-  }
-
-  const handleAddParte = () => {
-    const value = parteDraft.trim()
-    if (!value) {
-      return
-    }
-    const atual = Array.isArray(form.partesLesionadas) ? form.partesLesionadas : []
-    if (atual.some((parte) => parte.toLowerCase() === value.toLowerCase())) {
-      setParteDraft('')
-      return
-    }
-    updatePartes([...atual, value])
-    setParteDraft('')
-  }
-
-  const handleParteKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ',') {
+  const handleNovaParteKeyDown = (event) => {
+    if (event.key === 'Enter') {
       event.preventDefault()
-      handleAddParte()
+      adicionarNovaParte()
     }
   }
 
-  const handleRemoveParte = (parte) => {
-    const atual = Array.isArray(form.partesLesionadas) ? form.partesLesionadas : []
-    updatePartes(atual.filter((item) => item !== parte))
-  }
-
-  const handleParteBlur = () => {
-    if (parteDraft.trim()) {
-      handleAddParte()
+  const handleNovoAgenteKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarNovoAgente()
     }
   }
+
+  const handleNovoTipoKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarNovoTipo()
+    }
+  }
+
+  const handleNovaLesaoBlur = () => {
+    if (normalizeText(novaLesao)) {
+      adicionarNovaLesao()
+    }
+  }
+
+  const handleNovaParteBlur = () => {
+    if (normalizeText(novaParte)) {
+      adicionarNovaParte()
+    }
+  }
+
+  const handleNovoAgenteBlur = () => {
+    if (normalizeText(novoAgente)) {
+      adicionarNovoAgente()
+    }
+  }
+
+  const handleNovoTipoBlur = () => {
+    if (normalizeText(novoTipo)) {
+      adicionarNovoTipo()
+    }
+  }
+
+  const podeAdicionarLesao = Boolean(normalizeText(novaLesao))
+  const podeAdicionarParte = Boolean(normalizeText(novaParte))
+  const podeAdicionarAgente = Boolean(normalizeText(novoAgente))
+  const podeAdicionarTipo = Boolean(normalizeText(novoTipo))
+
+  const matriculaPlaceholder = isLoadingPessoas ? 'Carregando matriculas...' : 'Selecione a matricula'
+  const agentePlaceholder = isLoadingAgentes ? 'Carregando agentes...' : 'Selecione o agente'
+  const tipoPlaceholder = isLoadingTipos
+    ? 'Carregando tipos...'
+    : form.agente
+      ? 'Selecione o tipo'
+      : 'Selecione o agente primeiro'
+  const centroServicoPlaceholder = isLoadingPessoas
+    ? 'Carregando centros...'
+    : 'Selecione o centro de servico'
+  const localPlaceholder = isLoadingLocais ? 'Carregando locais...' : 'Selecione o local do acidente'
+  const lesoesPlaceholder = isLoadingLesoes ? 'Carregando lesoes...' : 'Selecione as lesoes'
+  const partesPlaceholder = isLoadingPartes ? 'Carregando partes...' : 'Selecione as partes lesionadas'
+
+  const shouldDisableMatricula = isLoadingPessoas && pessoaOptions.length === 0
+  const shouldDisableTipo = !form.agente && !form.tipo
+  const shouldDisableCentroServico = isLoadingPessoas && centroServicoOptions.length === 0
+  const shouldDisableLocal = isLoadingLocais && localOptions.length === 0
+  const shouldDisableLesoes = isLoadingLesoes && lesaoSelectOptions.length === 0
+  const shouldDisablePartes = isLoadingPartes && parteSelectOptions.length === 0
 
   return (
     <form className="form" onSubmit={onSubmit}>
       <div className="form__grid form__grid--two">
         <label className="field">
           <span>Matricula <span className="asterisco">*</span></span>
-          <input
+          <select
             name="matricula"
             value={form.matricula}
             onChange={onChange}
-            list="acidentes-matriculas"
-            placeholder="Digite ou selecione a matricula"
             required
-            disabled={isLoadingPessoas}
-            autoComplete="off"
-            inputMode="numeric"
-          />
-          <datalist id="acidentes-matriculas">
-            {pessoas.map((pessoa) => {
-              const value =
-                pessoa?.matricula !== undefined && pessoa?.matricula !== null
-                  ? String(pessoa.matricula)
-                  : ''
-              if (!value) {
-                return null
-              }
-              return (
-                <option key={value} value={value}>
-                  {value} - {pessoa?.nome ?? 'Sem nome'}
-                </option>
-              )
-            })}
-          </datalist>
+            disabled={shouldDisableMatricula}
+          >
+            <option value="">{matriculaPlaceholder}</option>
+            {pessoaOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Nome <span className="asterisco">*</span></span>
@@ -242,46 +448,81 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Tipo <span className="asterisco">*</span></span>
-          <input
-            name="tipo"
-            value={form.tipo}
-            onChange={onChange}
-            list={tipoListId}
-            required
-            disabled={!form.agente && !form.tipo}
-            placeholder={
-              isLoadingTipos
-                ? 'Carregando tipos...'
-                : form.agente
-                  ? 'Digite ou selecione o tipo'
-                  : 'Selecione o agente primeiro'
-            }
-            autoComplete="off"
-          />
-          <datalist id={tipoListId}>
-            {tipoOptions.map((tipo) => (
-              <option key={tipo} value={tipo} />
-            ))}
-          </datalist>
+          <div className="select-with-actions">
+            <select
+              name="tipo"
+              value={form.tipo}
+              onChange={onChange}
+              required
+              disabled={shouldDisableTipo}
+            >
+              <option value="">{tipoPlaceholder}</option>
+              {tipoOptions.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo}
+                </option>
+              ))}
+            </select>
+            <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novoTipo}
+                  onChange={(event) => setNovoTipo(event.target.value)}
+                  onKeyDown={handleNovoTipoKeyDown}
+                  onBlur={handleNovoTipoBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={shouldDisableTipo || isLoadingTipos}
+                />
+              </div>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={adicionarNovoTipo}
+                disabled={!podeAdicionarTipo || shouldDisableTipo}
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
         </label>
         <label className="field">
           <span>Agente <span className="asterisco">*</span></span>
-          <input
-            name="agente"
-            value={form.agente}
-            onChange={onChange}
-            list={agenteListId}
-            required
-            placeholder={
-              isLoadingAgentes ? 'Carregando agentes...' : 'Digite ou selecione o agente'
-            }
-            autoComplete="off"
-          />
-          <datalist id={agenteListId}>
-            {agenteOptions.map((agente) => (
-              <option key={agente} value={agente} />
-            ))}
-          </datalist>
+          <div className="select-with-actions">
+            <select
+              name="agente"
+              value={form.agente}
+              onChange={onChange}
+              required
+              disabled={isLoadingAgentes && agenteOptions.length === 0}
+            >
+              <option value="">{agentePlaceholder}</option>
+              {agenteOptions.map((agente) => (
+                <option key={agente} value={agente}>
+                  {agente}
+                </option>
+              ))}
+            </select>
+            <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novoAgente}
+                  onChange={(event) => setNovoAgente(event.target.value)}
+                  onKeyDown={handleNovoAgenteKeyDown}
+                  onBlur={handleNovoAgenteBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingAgentes}
+                />
+              </div>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={adicionarNovoAgente}
+                disabled={!podeAdicionarAgente}
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
         </label>
         <label className="field">
           <span>CID</span>
@@ -290,154 +531,161 @@ export function AcidentesForm({
         <label className="field">
           <span>Lesoes <span className="asterisco">*</span></span>
           <div className="multi-select">
-            <div className="multi-select__input">
-              <input
-                value={lesaoDraft}
-                onChange={(event) => setLesaoDraft(event.target.value)}
-                onKeyDown={handleLesaoKeyDown}
-                onBlur={handleLesaoBlur}
-                list={lesaoListId}
-                placeholder={
-                  isLoadingLesoes
-                    ? 'Carregando lesoes...'
-                    : 'Digite e pressione Enter para adicionar'
-                }
-                autoComplete="off"
-              />
-            </div>
+            <select
+              name="lesoes"
+              value={currentLesoes}
+              onChange={handleLesoesSelectChange}
+              multiple
+              required
+              size={lesoesSelectSize}
+              disabled={shouldDisableLesoes}
+            >
+              {lesaoSelectOptions.length === 0 ? (
+                <option value="" disabled>
+                  {lesoesPlaceholder}
+                </option>
+              ) : null}
+              {lesaoSelectOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novaLesao}
+                  onChange={(event) => setNovaLesao(event.target.value)}
+                  onKeyDown={handleNovaLesaoKeyDown}
+                  onBlur={handleNovaLesaoBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingLesoes}
+                />
+              </div>
               <button
                 type="button"
                 className="button button--ghost"
-                onClick={handleAddLesao}
-                disabled={!lesaoDraft.trim()}
+                onClick={adicionarNovaLesao}
+                disabled={!podeAdicionarLesao}
               >
                 Adicionar
               </button>
-              <div className="multi-select__chips">
-                {currentLesoes.length ? (
-                  currentLesoes.map((lesao, index) => (
-                    <button
-                      type="button"
-                      key={`${lesao}-${index}`}
-                      className="chip"
-                      aria-label={`Remover ${lesao}`}
-                      onClick={() => handleRemoveLesao(lesao)}
-                    >
-                      {lesao} <span aria-hidden="true">x</span>
-                    </button>
-                  ))
-                ) : (
-                  <span className="multi-select__placeholder">Nenhuma lesao adicionada</span>
-                )}
-              </div>
+            </div>
+            <div className="multi-select__chips">
+              {currentLesoes.length ? (
+                currentLesoes.map((lesao) => (
+                  <button
+                    type="button"
+                    key={lesao}
+                    className="chip"
+                    onClick={() => removerLesao(lesao)}
+                    aria-label={`Remover ${lesao}`}
+                  >
+                    {lesao} <span aria-hidden="true">x</span>
+                  </button>
+                ))
+              ) : (
+                <span className="multi-select__placeholder">Nenhuma lesao adicionada</span>
+              )}
             </div>
           </div>
           <input type="hidden" name="lesao" value={form.lesao} readOnly />
-          <datalist id={lesaoListId}>
-            {lesaoSuggestions.map((item, index) => (
-              <option key={`${item.nome}-${index}`} value={item.nome} label={item.label} />
-            ))}
-          </datalist>
         </label>
         <label className="field">
           <span>Partes lesionadas <span className="asterisco">*</span></span>
           <div className="multi-select">
-            <div className="multi-select__input">
-              <input
-                value={parteDraft}
-                onChange={(event) => setParteDraft(event.target.value)}
-                onKeyDown={handleParteKeyDown}
-                onBlur={handleParteBlur}
-                list={parteListId}
-                placeholder={
-                  isLoadingPartes ? 'Carregando partes...' : 'Digite e pressione Enter para adicionar'
-                }
-                autoComplete="off"
-              />
-            </div>
+            <select
+              name="partesLesionadas"
+              value={currentPartes}
+              onChange={handlePartesSelectChange}
+              multiple
+              required
+              size={partesSelectSize}
+              disabled={shouldDisablePartes}
+            >
+              {parteSelectOptions.length === 0 ? (
+                <option value="" disabled>
+                  {partesPlaceholder}
+                </option>
+              ) : null}
+              {parteSelectOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novaParte}
+                  onChange={(event) => setNovaParte(event.target.value)}
+                  onKeyDown={handleNovaParteKeyDown}
+                  onBlur={handleNovaParteBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingPartes}
+                />
+              </div>
               <button
                 type="button"
                 className="button button--ghost"
-                onClick={handleAddParte}
-                disabled={!parteDraft.trim()}
+                onClick={adicionarNovaParte}
+                disabled={!podeAdicionarParte}
               >
                 Adicionar
               </button>
-              <div className="multi-select__chips">
-                {Array.isArray(form.partesLesionadas) && form.partesLesionadas.length
-                  ? form.partesLesionadas.map((parte, index) => (
-                      <button
-                        type="button"
-                        key={`${parte}-${index}`}
-                        className="chip"
-                        aria-label={`Remover ${parte}`}
-                        onClick={() => handleRemoveParte(parte)}
-                      >
-                        {parte} <span aria-hidden="true">x</span>
-                      </button>
-                    ))
-                  : <span className="multi-select__placeholder">Nenhuma parte adicionada</span>}
-              </div>
+            </div>
+            <div className="multi-select__chips">
+              {currentPartes.length ? (
+                currentPartes.map((parte) => (
+                  <button
+                    type="button"
+                    key={parte}
+                    className="chip"
+                    onClick={() => removerParte(parte)}
+                    aria-label={`Remover ${parte}`}
+                  >
+                    {parte} <span aria-hidden="true">x</span>
+                  </button>
+                ))
+              ) : (
+                <span className="multi-select__placeholder">Nenhuma parte adicionada</span>
+              )}
             </div>
           </div>
-          <datalist id={parteListId}>
-            {parteOptions.map((parte, index) => {
-              if (!parte) {
-                return null
-              }
-              if (typeof parte === 'string') {
-                return <option key={`${parte}-${index}`} value={parte} />
-              }
-              const nome = parte.nome ?? ''
-              const label = parte.label ?? nome
-              const key = `${nome}-${parte.subgrupo ?? ''}-${index}`
-              return <option key={key} value={nome} label={label} />
-            })}
-          </datalist>
         </label>
         <label className="field">
           <span>Centro de servico <span className="asterisco">*</span></span>
-          <input
+          <select
             name="centroServico"
             value={form.centroServico}
             onChange={onChange}
-            list={centroServicoListId}
             required
-            placeholder={
-              isLoadingPessoas
-                ? 'Carregando centros...'
-                : 'Digite ou selecione o centro de servico'
-            }
-            autoComplete="off"
-          />
-          <datalist id={centroServicoListId}>
+            disabled={shouldDisableCentroServico}
+          >
+            <option value="">{centroServicoPlaceholder}</option>
             {centroServicoOptions.map((centro) => (
-              <option key={centro} value={centro} />
+              <option key={centro} value={centro}>
+                {centro}
+              </option>
             ))}
-          </datalist>
+          </select>
         </label>
         <label className="field">
           <span>Local <span className="asterisco">*</span></span>
-          <input
+          <select
             name="local"
             value={form.local}
             onChange={onChange}
-            list={localListId}
             required
-            placeholder={
-              isLoadingLocais
-                ? 'Carregando locais...'
-                : 'Digite ou selecione o local do acidente'
-            }
-            autoComplete="off"
-          />
-          <datalist id={localListId}>
-            {locais.map((local) => (
-              <option key={local} value={local} />
+            disabled={shouldDisableLocal}
+          >
+            <option value="">{localPlaceholder}</option>
+            {localOptions.map((local) => (
+              <option key={local} value={local}>
+                {local}
+              </option>
             ))}
-          </datalist>
+          </select>
         </label>
         <label className="field">
           <span>CAT</span>
