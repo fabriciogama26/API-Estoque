@@ -52,6 +52,8 @@ export function AcidentesForm({
 
   useEffect(() => {
     setAgenteSelecionado('')
+    setNovaLesao('')
+    setParteSelecionada('')
   }, [form.agente])
 
   useEffect(() => {

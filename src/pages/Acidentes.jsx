@@ -72,6 +72,7 @@ const normalizeAgenteKey = (valor) =>
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
 
 const extractAgenteNome = (entrada) => {
   if (!entrada) {
@@ -422,10 +423,14 @@ export function AcidentesPage() {
             .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
             .filter(Boolean)
         : parseList(value)
+      let agenteAlterado = false
       setForm((prev) => {
         const agenteAtual = lista.length ? lista[lista.length - 1] : ''
+        const chaveAtual = normalizeAgenteKey(agenteAtual)
+        const chaveAnterior = normalizeAgenteKey(prev.agente ?? '')
+        agenteAlterado = chaveAtual !== chaveAnterior
         const next = { ...prev, agentes: lista, agente: agenteAtual }
-        if (!lista.length) {
+        if (!lista.length || agenteAlterado) {
           next.tipos = []
           next.tipo = ''
           next.lesoes = []
@@ -436,16 +441,28 @@ export function AcidentesPage() {
       if (!lista.length) {
         setTipoOpcoes([])
         setTiposError(null)
+        setLesaoOpcoes([])
+        setLesoesError(null)
+      } else if (agenteAlterado) {
+        setTipoOpcoes([])
+        setTiposError(null)
+        setLesaoOpcoes([])
+        setLesoesError(null)
       }
       return
     }
     if (name === 'agente') {
+      let alterou = false
       setForm((prev) => {
         if (prev.agente === value) {
+          alterou = false
           return prev
         }
+        const chaveAnterior = normalizeAgenteKey(prev.agente ?? '')
+        const chaveAtual = normalizeAgenteKey(value)
+        alterou = chaveAnterior !== chaveAtual
         const next = { ...prev, agente: value }
-        if (!value) {
+        if (!value || alterou) {
           next.tipos = []
           next.tipo = ''
           next.lesoes = []
@@ -453,9 +470,11 @@ export function AcidentesPage() {
         }
         return next
       })
-      if (!value) {
+      if (!value || alterou) {
         setTipoOpcoes([])
         setTiposError(null)
+        setLesaoOpcoes([])
+        setLesoesError(null)
       }
       return
     }

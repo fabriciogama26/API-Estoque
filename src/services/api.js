@@ -263,6 +263,86 @@ const normalizeAgenteLookupKey = (valor) => {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+const normalizeSearchTerm = (valor) => {
+  const texto = trim(valor)
+  if (!texto) {
+    return ''
+  }
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+const pessoaMatchesSearch = (pessoa, termo) => {
+  const alvo = normalizeSearchTerm(termo)
+  if (!alvo) {
+    return true
+  }
+  if (!pessoa || typeof pessoa !== 'object') {
+    return false
+  }
+  const campos = [
+    pessoa.nome,
+    pessoa.matricula,
+    pessoa.centroServico,
+    pessoa.setor,
+    pessoa.cargo,
+    pessoa.tipoExecucao,
+    pessoa.centroCusto,
+    pessoa.usuarioCadastro,
+    pessoa.usuarioEdicao,
+  ]
+  return campos.some((campo) => normalizeSearchTerm(campo).includes(alvo))
+}
+
+let agenteCatalogCache = null
+
+async function loadAgenteCatalog(forceReload = false) {
+  if (forceReload) {
+    agenteCatalogCache = null
+  }
+  if (agenteCatalogCache) {
+    return agenteCatalogCache
+  }
+  ensureSupabase()
+  const { data, error } = await supabase
+    .from('acidente_agentes')
+    .select('id, nome, ativo, ordem')
+    .order('ordem', { ascending: true, nullsFirst: false })
+    .order('nome', { ascending: true })
+  if (error) {
+    throw mapSupabaseError(error, 'Falha ao carregar agentes de acidente.')
+  }
+  const lista = (data ?? [])
+    .filter((item) => item && item.nome && item.ativo !== false)
+    .map((item) => ({
+      id: item.id ?? null,
+      nome: trim(item.nome),
+      ordem: item.ordem ?? null,
+    }))
+    .filter((item) => Boolean(item.nome))
+    .sort((a, b) => {
+      const ordemA = a.ordem ?? Number.MAX_SAFE_INTEGER
+      const ordemB = b.ordem ?? Number.MAX_SAFE_INTEGER
+      if (ordemA !== ordemB) {
+        return ordemA - ordemB
+      }
+      return a.nome.localeCompare(b.nome, 'pt-BR')
+    })
+  const map = new Map()
+  lista.forEach((item) => {
+    const chave = normalizeAgenteLookupKey(item.nome)
+    if (!chave || map.has(chave)) {
+      return
+    }
+    map.set(chave, { id: item.id ?? null, nome: item.nome })
+  })
+  agenteCatalogCache = { lista, map }
+  return agenteCatalogCache
 }
 
 async function resolveAgenteId(agenteNome) {
@@ -271,44 +351,67 @@ async function resolveAgenteId(agenteNome) {
     return null
   }
   const alvoNormalizado = normalizeAgenteLookupKey(nome)
+  if (!alvoNormalizado) {
+    return null
+  }
+  const tentarCatalogo = async (forceReload = false) => {
+    try {
+      const catalogo = await loadAgenteCatalog(forceReload)
+      const encontrado = catalogo?.map?.get(alvoNormalizado)
+      if (encontrado?.id) {
+        return encontrado.id
+      }
+    } catch (catalogError) {
+      console.warn('Falha ao carregar catalogo de agentes.', catalogError)
+    }
+    return null
+  }
+
+  let agenteId = await tentarCatalogo(false)
+  if (agenteId) {
+    return agenteId
+  }
+
+  agenteId = await tentarCatalogo(true)
+  if (agenteId) {
+    return agenteId
+  }
+
   try {
     ensureSupabase()
+    const like = `%${nome}%`
     const { data, error } = await supabase
       .from('acidente_agentes')
       .select('id, nome')
-      .eq('nome', nome)
+      .ilike('nome', like)
       .limit(1)
     if (error) {
       throw error
     }
     if (Array.isArray(data) && data.length === 1) {
-      return data[0]?.id ?? null
+      const registro = data[0] ?? null
+      const id = registro?.id ?? null
+      const nomeCatalogo = trim(registro?.nome ?? nome)
+      if (id) {
+        const chave = normalizeAgenteLookupKey(nomeCatalogo)
+        if (chave) {
+          try {
+            const catalogo = await loadAgenteCatalog(true)
+            catalogo.map.set(chave, { id, nome: nomeCatalogo })
+            if (!catalogo.lista.some((item) => item.id === id)) {
+              catalogo.lista.push({ id, nome: nomeCatalogo, ordem: null })
+            }
+          } catch (cacheError) {
+            console.warn('Falha ao atualizar cache de agentes.', cacheError)
+          }
+        }
+      }
+      return id
     }
-    const { data: fallback, error: fallbackError } = await supabase
-      .from('acidente_agentes')
-      .select('id, nome')
-      .ilike('nome', nome)
-      .limit(1)
-    if (fallbackError) {
-      throw fallbackError
-    }
-    if (Array.isArray(fallback) && fallback.length === 1) {
-      return fallback[0]?.id ?? null
-    }
-    const { data: catalogo, error: catalogoError } = await supabase
-      .from('acidente_agentes')
-      .select('id, nome')
-    if (catalogoError) {
-      throw catalogoError
-    }
-    const encontrado = (catalogo ?? []).find(
-      (item) => normalizeAgenteLookupKey(item?.nome) === alvoNormalizado,
-    )
-    return encontrado?.id ?? null
   } catch (lookupError) {
     console.warn('Nao foi possivel localizar agente para lesoes.', lookupError)
-    return null
   }
+  return null
 }
 
 async function ensureAcidenteLesoes(agenteNome, nomes) {
@@ -851,81 +954,115 @@ export const api = {
   },
   pessoas: {
     async list(params = {}) {
-      let query = supabase
-        .from('pessoas')
-        .select(`
-          id,
-          nome,
-          matricula,
-          "dataAdmissao",
-          "usuarioCadastro",
-          "usuarioEdicao",
-          "criadoEm",
-          "atualizadoEm",
-          centro_servico_id,
-          setor_id,
-          cargo_id,
-          centro_custo_id,
-          tipo_execucao_id,
-          centros_servico ( id, nome ),
-          setores ( id, nome ),
-          cargos ( id, nome ),
-          centros_custo ( id, nome ),
-          tipo_execucao ( id, nome )
-        `)
-        .order('nome', { ascending: true })
+      const filtros = {
+        centroServicoId: null,
+        setorId: null,
+        cargoId: null,
+        tipoExecucaoId: null,
+      }
 
       const centroServico = trim(params.centroServico ?? params.local ?? '')
       if (centroServico && centroServico.toLowerCase() !== 'todos') {
-        const centroId = await resolveReferenceId(
+        filtros.centroServicoId = await resolveReferenceId(
           'centros_servico',
           centroServico,
           'Centro de serviço inválido para filtro.'
         )
-        query = query.eq('centro_servico_id', centroId)
       }
 
       const setor = trim(params.setor ?? '')
       if (setor && setor.toLowerCase() !== 'todos') {
-        const setorId = await resolveReferenceId('setores', setor, 'Setor inválido para filtro.')
-        query = query.eq('setor_id', setorId)
+        filtros.setorId = await resolveReferenceId('setores', setor, 'Setor inválido para filtro.')
       }
 
       const cargo = trim(params.cargo ?? '')
       if (cargo && cargo.toLowerCase() !== 'todos') {
-        const cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inválido para filtro.')
-        query = query.eq('cargo_id', cargoId)
+        filtros.cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inválido para filtro.')
       }
 
       const tipoExecucaoFiltro = trim(params.tipoExecucao ?? '')
       if (tipoExecucaoFiltro && tipoExecucaoFiltro.toLowerCase() !== 'todos') {
-        const tipoId = await resolveReferenceId(
+        filtros.tipoExecucaoId = await resolveReferenceId(
           'tipo_execucao',
           tipoExecucaoFiltro.toUpperCase(),
           'Tipo de execução inválido para filtro.'
         )
-        query = query.eq('tipo_execucao_id', tipoId)
       }
 
       const termo = trim(params.termo)
-      if (termo) {
-        const like = `%${termo}%`
-        query = query.or(
-          [
-            `nome.ilike.${like}`,
-            `matricula.ilike.${like}`,
-            `centros_servico.nome.ilike.${like}`,
-            `setores.nome.ilike.${like}`,
-            `cargos.nome.ilike.${like}`,
-            `tipo_execucao.nome.ilike.${like}`,
-            `"usuarioCadastro".ilike.${like}`,
-            `"usuarioEdicao".ilike.${like}`,
-          ].join(',')
-        )
+
+      const buildQuery = () => {
+        let builder = supabase
+          .from('pessoas')
+          .select(`
+            id,
+            nome,
+            matricula,
+            "dataAdmissao",
+            "usuarioCadastro",
+            "usuarioEdicao",
+            "criadoEm",
+            "atualizadoEm",
+            centro_servico_id,
+            setor_id,
+            cargo_id,
+            centro_custo_id,
+            tipo_execucao_id,
+            centros_servico ( id, nome ),
+            setores ( id, nome ),
+            cargos ( id, nome ),
+            centros_custo ( id, nome ),
+            tipo_execucao ( id, nome )
+          `)
+          .order('nome', { ascending: true })
+
+        if (filtros.centroServicoId) {
+          builder = builder.eq('centro_servico_id', filtros.centroServicoId)
+        }
+        if (filtros.setorId) {
+          builder = builder.eq('setor_id', filtros.setorId)
+        }
+        if (filtros.cargoId) {
+          builder = builder.eq('cargo_id', filtros.cargoId)
+        }
+        if (filtros.tipoExecucaoId) {
+          builder = builder.eq('tipo_execucao_id', filtros.tipoExecucaoId)
+        }
+        return builder
       }
 
-      const data = await execute(query, 'Falha ao listar pessoas.')
-      return (data ?? []).map(mapPessoaRecord)
+      const buildSearchOr = (like) =>
+        [
+          `nome.ilike.${like}`,
+          `matricula.ilike.${like}`,
+          `centros_servico.nome.ilike.${like}`,
+          `setores.nome.ilike.${like}`,
+          `cargos.nome.ilike.${like}`,
+          `tipo_execucao.nome.ilike.${like}`,
+          `"usuarioCadastro".ilike.${like}`,
+          `"usuarioEdicao".ilike.${like}`,
+        ].join(',')
+
+      try {
+        let query = buildQuery()
+        if (termo) {
+          const like = `%${termo}%`
+          query = query.or(buildSearchOr(like))
+        }
+        const data = await execute(query, 'Falha ao listar pessoas.')
+        return (data ?? []).map(mapPessoaRecord)
+      } catch (error) {
+        if (!termo) {
+          throw error
+        }
+        console.warn(
+          'Erro ao aplicar filtro remoto por termo em pessoas, usando filtro local.',
+          error
+        )
+        const fallbackData = await execute(buildQuery(), 'Falha ao listar pessoas.')
+        const registros = (fallbackData ?? []).map(mapPessoaRecord)
+        return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
+      }
     },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
@@ -1451,6 +1588,14 @@ export const api = {
       return carregarAcidentes()
     },
     async agents() {
+      try {
+        const catalogo = await loadAgenteCatalog(false)
+        return (catalogo?.lista ?? [])
+          .map((item) => ({ id: item.id ?? null, nome: item.nome }))
+          .filter((item) => Boolean(item?.nome))
+      } catch (catalogoError) {
+        console.warn('Falha ao carregar agentes do cache, tentando consulta direta.', catalogoError)
+      }
       const data = await execute(
         supabase
           .from('acidente_agentes')
