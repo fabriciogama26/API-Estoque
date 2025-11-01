@@ -160,6 +160,30 @@ const normalizePessoaHistorico = (lista) => {
     .filter(Boolean)
 }
 
+const normalizeMaterialCamposAlterados = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  return lista
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return null
+      }
+
+      const campo = trim(item.campo ?? item.nome ?? '')
+      if (!campo) {
+        return null
+      }
+
+      return {
+        campo,
+        de: item.de ?? item.valorAnterior ?? item.de_valor ?? '',
+        para: item.para ?? item.valorAtual ?? item.para_valor ?? '',
+      }
+    })
+    .filter(Boolean)
+}
+
 const normalizeDomainOptions = (lista) =>
   (Array.isArray(lista) ? lista : [])
     .map((item) => {
@@ -1073,6 +1097,8 @@ export const api = {
     },
     async update(id, payload) {
       if (!id) {
+        throw new Error('Material inválido.')
+      }
       const atualLista = await execute(
         supabase
           .from('materiais')
@@ -1087,54 +1113,50 @@ export const api = {
       }
 
       const materialAtual = mapMaterialRecord(registroAtual)
-      const dados = sanitizeMaterialPayload({ ...materialAtual, ...payload })
+      const dadosCombinados = sanitizeMaterialPayload({ ...materialAtual, ...payload })
+      const usuario = await resolveUsuarioResponsavel()
+      const agora = new Date().toISOString()
       const camposAlterados = []
       MATERIAL_HISTORY_FIELDS.forEach((campo) => {
         const valorAtual = normalizeHistoryValue(materialAtual?.[campo])
-        const valorNovo = normalizeHistoryValue(dados?.[campo])
+        const valorNovo = normalizeHistoryValue(dadosCombinados?.[campo])
         if (valorAtual !== valorNovo) {
           camposAlterados.push({
             campo,
             de: materialAtual?.[campo] ?? '',
-            para: dados?.[campo] ?? '',
+            para: dadosCombinados?.[campo] ?? '',
           })
         }
       })
       if (camposAlterados.length > 0) {
-        await execute(
-          supabase.from('material_price_history').insert({
+        ensureSupabase()
+        const { error: historicoErro } = await supabase
+          .from('material_price_history')
+          .insert({
             materialId: id,
-            valorUnitario: dados.valorUnitario,
+            valorUnitario: dadosCombinados.valorUnitario,
             usuarioResponsavel: usuario,
             criadoEm: agora,
             campos_alterados: camposAlterados,
-          }),
-          'Falha ao registrar histrico do material.'
-        )
+          })
+        if (historicoErro) {
+          const mensagemErro = historicoErro.message?.toLowerCase?.() ?? ''
+          const isRlsViolation =
+            historicoErro.code === '42501' ||
+            historicoErro.code === 'PGRST301' ||
+            mensagemErro.includes('row-level security') ||
+            mensagemErro.includes('row level security')
+          if (isRlsViolation) {
+            console.warn(
+              'Registro de historico do material ignorado devido a politica de RLS.',
+              historicoErro
+            )
+          } else {
+            throw mapSupabaseError(historicoErro, 'Falha ao registrar histórico do material.')
+          }
+        }
       }
-        valorUnitario: toNullableNumber(registro.valorUnitario ?? registro.valor_unitario),
-        dataRegistro: registro.dataRegistro ?? registro.criadoEm ?? registro.criado_em ?? null,
-        camposAlterados: Array.isArray(registro.campos_alterados ?? registro.camposAlterados)
-          ? (registro.campos_alterados ?? registro.camposAlterados)
-              .map((item) => {
-                if (!item || typeof item !== 'object') {
-                  return null
-                }
-                const campo = item.campo ?? item.nome ?? ''
-                if (!campo) {
-                  return null
-                }
-                return {
-                  campo,
-                  de: item.de ?? item.valorAnterior ?? item.de_valor ?? '',
-                  para: item.para ?? item.valorAtual ?? item.para_valor ?? '',
-                }
-              })
-              .filter(Boolean)
-          : [],
       const dados = sanitizeMaterialPayload(payload)
-      const usuario = await resolveUsuarioResponsavel()
-      const agora = new Date().toISOString()
       const registro = await executeSingle(
         supabase
           .from('materiais')
@@ -1171,6 +1193,9 @@ export const api = {
         valorUnitario: toNumber(registro.valorUnitario ?? registro.valor_unitario),
         criadoEm: registro.criadoEm ?? registro.criado_em ?? null,
         usuarioResponsavel: registro.usuarioResponsavel ?? registro.usuario_responsavel ?? '',
+        camposAlterados: normalizeMaterialCamposAlterados(
+          registro.campos_alterados ?? registro.camposAlterados ?? registro.campos ?? []
+        ),
       }))
     },
     async groups() {
