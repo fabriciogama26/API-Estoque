@@ -31,6 +31,20 @@ const trim = (value) => {
   return String(value).trim()
 }
 
+const splitMultiValue = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => trim(item)).filter(Boolean)
+  }
+  const texto = trim(value)
+  if (!texto) {
+    return []
+  }
+  return texto
+    .split(/[;,]/)
+    .map((parte) => parte.trim())
+    .filter(Boolean)
+}
+
 const sanitizeDigitsOnly = (value = '') => String(value).replace(/\D/g, '')
 
 const toIsoOrNull = (value, defaultNow = false) => {
@@ -210,11 +224,17 @@ const mapLocalAcidenteRecord = (acidente) => {
       : acidente.lesao
       ? [String(acidente.lesao).trim()].filter(Boolean)
       : []
+  const agentesLista = splitMultiValue(acidente.agentes ?? acidente.agente ?? '')
+  const tiposLista = splitMultiValue(acidente.tipos ?? acidente.tipo ?? '')
   return {
     ...acidente,
     centroServico,
     setor: acidente.setor ?? centroServico,
     local: acidente.local ?? centroServico,
+    agente: agentesLista.join('; '),
+    agentes: agentesLista,
+    tipo: tiposLista.join('; '),
+    tipos: tiposLista,
     lesoes,
     lesao: lesoes[0] ?? acidente.lesao ?? '',
     partesLesionadas: partes,
@@ -905,13 +925,19 @@ const sanitizeAcidentePayload = (payload = {}) => {
     : payload.lesao
     ? [trim(payload.lesao)]
     : []
+  const agentes = splitMultiValue(payload.agentes ?? payload.agente ?? '')
+  const tipos = splitMultiValue(payload.tipos ?? payload.tipo ?? '')
+  const hhtTexto = trim(payload.hht)
+  const hhtValor = hhtTexto === '' ? null : Number(hhtTexto)
   return {
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
     cargo: trim(payload.cargo),
     data: toIsoOrNull(payload.data, false),
-    tipo: trim(payload.tipo),
-    agente: trim(payload.agente),
+    tipo: tipos.join('; '),
+    tipoPrincipal: tipos[0] ?? '',
+    agente: agentes.join('; '),
+    agentePrincipal: agentes[agentes.length - 1] ?? '',
     lesao: lesoes[0] ?? trim(payload.lesao),
     lesoes,
     parteLesionada: partes[0] ?? trim(payload.parteLesionada),
@@ -926,10 +952,7 @@ const sanitizeAcidentePayload = (payload = {}) => {
       payload.diasDebitados !== undefined && payload.diasDebitados !== null
         ? Number(payload.diasDebitados)
         : 0,
-    hht:
-      payload.hht !== undefined && payload.hht !== null && String(payload.hht).trim() !== ''
-        ? Number(payload.hht)
-        : null,
+    hht: hhtValor,
     cid: sanitizeOptional(payload.cid),
     cat: sanitizeOptional(payload.cat),
     observacao: sanitizeOptional(payload.observacao),
@@ -940,8 +963,10 @@ const validateAcidentePayload = (payload) => {
   if (!payload.matricula) throw createError(400, 'Matricula obrigatoria.')
   if (!payload.nome) throw createError(400, 'Nome obrigatorio.')
   if (!payload.cargo) throw createError(400, 'Cargo obrigatorio.')
-  if (!payload.tipo) throw createError(400, 'Tipo de acidente obrigatorio.')
-  if (!payload.agente) throw createError(400, 'Agente causador obrigatorio.')
+  const tiposValidados = splitMultiValue(payload.tipos ?? payload.tipo ?? payload.tipoPrincipal ?? '')
+  if (!tiposValidados.length) throw createError(400, 'Tipo de acidente obrigatorio.')
+  const agentesValidados = splitMultiValue(payload.agentes ?? payload.agente ?? payload.agentePrincipal ?? '')
+  if (!agentesValidados.length) throw createError(400, 'Agente causador obrigatorio.')
   const lesoesValidadas = Array.isArray(payload.lesoes)
     ? payload.lesoes.map((lesao) => (lesao ? lesao.trim() : '')).filter(Boolean)
     : payload.lesao
@@ -962,10 +987,11 @@ const validateAcidentePayload = (payload) => {
   if (!Number.isInteger(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
     throw createError(400, 'Dias debitados deve ser um inteiro zero ou positivo.')
   }
-  if (payload.hht !== null && payload.hht !== undefined) {
-    if (!Number.isInteger(Number(payload.hht)) || Number(payload.hht) < 0) {
-      throw createError(400, 'HHT deve ser um inteiro zero ou positivo.')
-    }
+  if (payload.hht === undefined || payload.hht === null || String(payload.hht).trim() === '') {
+    throw createError(400, 'HHT obrigatorio.')
+  }
+  if (!Number.isInteger(Number(payload.hht)) || Number(payload.hht) < 0) {
+    throw createError(400, 'HHT deve ser um inteiro zero ou positivo.')
   }
   if (payload.cat && !/^\d+$/.test(String(payload.cat))) {
     throw createError(400, 'CAT deve conter apenas numeros inteiros.')
@@ -1574,8 +1600,12 @@ const localApi = {
         return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }))
       })
     },
-    async lesions(agenteNome) {
-      const filtro = trim(agenteNome)
+    async lesions(agenteEntrada) {
+      const filtro = trim(
+        typeof agenteEntrada === 'object'
+          ? agenteEntrada?.nome ?? agenteEntrada?.label ?? agenteEntrada?.value
+          : agenteEntrada,
+      )
       const filtroNormalizado = normalizeKeyPart(filtro)
       return readState((state) => {
         const mapa = new Map()
@@ -1602,25 +1632,30 @@ const localApi = {
 
         const lista = Array.isArray(state.acidentes) ? state.acidentes : []
         lista.forEach((acidente) => {
-          const agente = trim(acidente?.agente ?? '')
-          if (!agente) {
+          const agentes = splitMultiValue(acidente.agentes ?? acidente.agente ?? '')
+          if (!agentes.length) {
             return
           }
-          if (filtro && normalizeKeyPart(agente) !== filtroNormalizado) {
-            return
-          }
-          const origem =
-            Array.isArray(acidente.lesoes) && acidente.lesoes.length
-              ? acidente.lesoes
-              : acidente.lesao
-              ? [acidente.lesao]
-              : []
-          origem.forEach((nome) => {
-            const valor = trim(nome)
-            if (!valor) {
+          agentes.forEach((agente) => {
+            if (!agente) {
               return
             }
-            adicionar(agente, valor, 1000)
+            if (filtro && normalizeKeyPart(agente) !== filtroNormalizado) {
+              return
+            }
+            const origem =
+              Array.isArray(acidente.lesoes) && acidente.lesoes.length
+                ? acidente.lesoes
+                : acidente.lesao
+                ? [acidente.lesao]
+                : []
+            origem.forEach((nome) => {
+              const valor = trim(nome)
+              if (!valor) {
+                return
+              }
+              adicionar(agente, valor, 1000)
+            })
           })
         })
 
@@ -1637,19 +1672,39 @@ const localApi = {
     },
     async agents() {
       return readState((state) => {
-        const set = new Set(Object.keys(catalogoAcidenteAgentes))
-        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
-        lista.forEach((acidente) => {
-          const valor = acidente?.agente ? String(acidente.agente).trim() : ''
-          if (valor) {
-            set.add(valor)
+        const mapa = new Map()
+        Object.keys(catalogoAcidenteAgentes).forEach((nome) => {
+          const chave = normalizeKeyPart(nome)
+          if (!chave) {
+            return
+          }
+          if (!mapa.has(chave)) {
+            mapa.set(chave, { id: null, nome: nome.trim() })
           }
         })
-        return Array.from(set).sort((a, b) => a.localeCompare(b))
+        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
+        lista.forEach((acidente) => {
+          const agentes = splitMultiValue(acidente.agentes ?? acidente.agente ?? '')
+          agentes.forEach((valor) => {
+            const nome = trim(valor)
+            const chave = normalizeKeyPart(nome)
+            if (!chave) {
+              return
+            }
+            if (!mapa.has(chave)) {
+              mapa.set(chave, { id: null, nome })
+            }
+          })
+        })
+        return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       })
     },
-    async agentTypes(agenteNome) {
-      const nome = trim(agenteNome)
+    async agentTypes(agenteEntrada) {
+      const nome = trim(
+        typeof agenteEntrada === 'object'
+          ? agenteEntrada?.nome ?? agenteEntrada?.label ?? agenteEntrada?.value
+          : agenteEntrada,
+      )
       if (!nome) {
         return []
       }
@@ -1662,18 +1717,24 @@ const localApi = {
         ] ??
         []
       return readState((state) => {
-        const extras = Array.isArray(state.acidentes)
-          ? state.acidentes
-              .filter(
-                (acidente) =>
-                  normalizeKeyPart(acidente?.agente ?? '') === normalizeKeyPart(nome),
-              )
-              .map((acidente) => trim(acidente?.tipo ?? ''))
-              .filter(Boolean)
-          : []
-        return Array.from(new Set([...(base || []), ...extras])).sort((a, b) =>
-          a.localeCompare(b),
-        )
+        const extrasSet = new Set(base || [])
+        const lista = Array.isArray(state.acidentes) ? state.acidentes : []
+        lista.forEach((acidente) => {
+          const agentes = splitMultiValue(acidente.agentes ?? acidente.agente ?? '')
+          const possui = agentes.some(
+            (valor) => normalizeKeyPart(valor) === normalizeKeyPart(nome),
+          )
+          if (!possui) {
+            return
+          }
+          const tiposExtras = splitMultiValue(acidente.tipos ?? acidente.tipo ?? '')
+          tiposExtras.forEach((tipo) => {
+            if (tipo) {
+              extrasSet.add(tipo)
+            }
+          })
+        })
+        return Array.from(extrasSet).sort((a, b) => a.localeCompare(b))
       })
     },
     async locals() {
@@ -1722,7 +1783,9 @@ const localApi = {
           cargo: dados.cargo,
           data: dados.data,
           tipo: dados.tipo,
+          tipos: splitMultiValue(dados.tipo),
           agente: dados.agente,
+          agentes: splitMultiValue(dados.agente),
           lesao: dados.lesao,
           lesoes: dados.lesoes,
           parteLesionada: dados.parteLesionada,
@@ -1770,6 +1833,9 @@ const localApi = {
           ...atual,
           ...dadosSanitizados,
         }
+
+        dados.tipos = splitMultiValue(dados.tipo)
+        dados.agentes = splitMultiValue(dados.agente)
 
         const centroServicoPessoa = pessoa?.centroServico || pessoa?.setor || pessoa?.local || ''
         const localPessoa = pessoa?.local || pessoa?.centroServico || ''

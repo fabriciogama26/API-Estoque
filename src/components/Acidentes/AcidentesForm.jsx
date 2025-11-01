@@ -30,6 +30,21 @@ export function AcidentesForm({
 }) {
   const normalizeText = (value) => (typeof value === 'string' ? value.trim() : '')
 
+  const parseList = (value) => {
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+        .filter(Boolean)
+    }
+    if (value === undefined || value === null) {
+      return []
+    }
+    return String(value)
+      .split(/[;,]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
   const [novaLesao, setNovaLesao] = useState('')
   const [parteSelecionada, setParteSelecionada] = useState('')
   const [agenteSelecionado, setAgenteSelecionado] = useState('')
@@ -37,6 +52,8 @@ export function AcidentesForm({
 
   useEffect(() => {
     setAgenteSelecionado('')
+    setNovaLesao('')
+    setParteSelecionada('')
   }, [form.agente])
 
   useEffect(() => {
@@ -204,6 +221,23 @@ export function AcidentesForm({
     new Set([...(locais || []), form.local].map(normalizeText).filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b, 'pt-BR'))
 
+  const currentAgentes = parseList(form.agentes?.length ? form.agentes : form.agente)
+  const currentTipos = parseList(form.tipos?.length ? form.tipos : form.tipo)
+
+  const updateAgentes = (lista) => {
+    const normalizados = lista
+      .map((item) => normalizeText(item))
+      .filter(Boolean)
+    const ultimoSelecionado = normalizados[normalizados.length - 1] ?? ''
+    onChange({ target: { name: 'agentes', value: normalizados } })
+    onChange({ target: { name: 'agente', value: ultimoSelecionado } })
+  }
+
+  const updateTipos = (lista) => {
+    onChange({ target: { name: 'tipos', value: lista } })
+    onChange({ target: { name: 'tipo', value: lista.join('; ') } })
+  }
+
   const updateLesoes = (lista) => {
     onChange({ target: { name: 'lesoes', value: lista } })
     onChange({ target: { name: 'lesao', value: lista[0] ?? '' } })
@@ -218,7 +252,12 @@ export function AcidentesForm({
     if (!valor) {
       return
     }
-    onChange({ target: { name: 'agente', value: valor } })
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    if (currentAgentes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
+      setAgenteSelecionado('')
+      return
+    }
+    updateAgentes([...currentAgentes, valor])
     setAgenteSelecionado('')
   }
 
@@ -227,8 +266,29 @@ export function AcidentesForm({
     if (!valor) {
       return
     }
-    onChange({ target: { name: 'tipo', value: valor } })
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    if (currentTipos.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
+      setTipoSelecionado('')
+      return
+    }
+    updateTipos([...currentTipos, valor])
     setTipoSelecionado('')
+  }
+
+  const removerAgente = (agenteParaRemover) => {
+    const chave = normalizeText(agenteParaRemover).toLocaleLowerCase('pt-BR')
+    const atualizadas = currentAgentes.filter(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') !== chave,
+    )
+    updateAgentes(atualizadas)
+  }
+
+  const removerTipo = (tipoParaRemover) => {
+    const chave = normalizeText(tipoParaRemover).toLocaleLowerCase('pt-BR')
+    const atualizadas = currentTipos.filter(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') !== chave,
+    )
+    updateTipos(atualizadas)
   }
 
   const removerLesao = (lesaoParaRemover) => {
@@ -279,14 +339,32 @@ export function AcidentesForm({
 
   const podeAdicionarLesao = Boolean(normalizeText(novaLesao))
   const podeAdicionarParte = Boolean(normalizeText(parteSelecionada))
-  const podeAdicionarAgente = Boolean(normalizeText(agenteSelecionado))
-  const podeAdicionarTipo = Boolean(normalizeText(tipoSelecionado))
+  const podeAdicionarAgente = (() => {
+    const valor = normalizeText(agenteSelecionado)
+    if (!valor) {
+      return false
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    return !currentAgentes.some(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
+    )
+  })()
+  const podeAdicionarTipo = (() => {
+    const valor = normalizeText(tipoSelecionado)
+    if (!valor) {
+      return false
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    return !currentTipos.some(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
+    )
+  })()
 
   const matriculaPlaceholder = isLoadingPessoas ? 'Carregando matriculas...' : 'Selecione a matricula'
   const agentePlaceholder = isLoadingAgentes ? 'Carregando agentes...' : 'Selecione o agente'
   const tipoPlaceholder = isLoadingTipos
     ? 'Carregando tipos...'
-    : form.agente
+    : currentAgentes.length
       ? 'Selecione o tipo'
       : 'Selecione o agente primeiro'
   const centroServicoPlaceholder = isLoadingPessoas
@@ -314,7 +392,7 @@ export function AcidentesForm({
   })()
 
   const shouldDisableMatricula = isLoadingPessoas && pessoaOptions.length === 0
-  const shouldDisableTipoBase = !form.agente && !form.tipo
+  const shouldDisableTipoBase = !currentAgentes.length && !currentTipos.length
   const shouldDisableCentroServico = isLoadingPessoas && centroServicoOptions.length === 0
   const shouldDisableLocal = isLoadingLocais && localOptions.length === 0
   const noAgentesDisponiveis = agenteOptions.length === 0
@@ -322,7 +400,7 @@ export function AcidentesForm({
   const shouldDisableTipo =
     shouldDisableTipoBase ||
     (isLoadingTipos && noTiposDisponiveis) ||
-    (noTiposDisponiveis && !form.tipo)
+    (noTiposDisponiveis && !currentTipos.length)
   const shouldDisableAgente = (isLoadingAgentes && noAgentesDisponiveis) || noAgentesDisponiveis
   const noLesoesDisponiveis = lesaoSelectOptions.length === 0
   const noPartesDisponiveis = parteSelectOptions.length === 0
@@ -389,7 +467,9 @@ export function AcidentesForm({
           />
         </label>
         <label className="field">
-          <span>HHT</span>
+          <span>
+            HHT <span className="asterisco">*</span>
+          </span>
           <input
             type="number"
             min="0"
@@ -398,6 +478,7 @@ export function AcidentesForm({
             value={form.hht}
             onChange={onChange}
             placeholder="0"
+            required
             inputMode="numeric"
           />
         </label>
@@ -458,7 +539,7 @@ export function AcidentesForm({
               name="agenteSelecionado"
               value={agenteSelecionado}
               onChange={(event) => setAgenteSelecionado(event.target.value)}
-              required={!form.agente}
+              required={!currentAgentes.length}
               disabled={shouldDisableAgente}
             >
               <option value="">{agentePlaceholder}</option>
@@ -479,19 +560,22 @@ export function AcidentesForm({
               </button>
             </div>
             <div className="multi-select__chips">
-              {form.agente ? (
-                <button
-                  type="button"
-                  className="chip"
-                  onClick={() => {
-                    setAgenteSelecionado('')
-                    setTipoSelecionado('')
-                    onChange({ target: { name: 'agente', value: '' } })
-                  }}
-                  aria-label={`Remover ${form.agente}`}
-                >
-                  {form.agente} <span aria-hidden="true">x</span>
-                </button>
+              {currentAgentes.length ? (
+                currentAgentes.map((agente) => (
+                  <button
+                    type="button"
+                    key={agente}
+                    className="chip"
+                    onClick={() => {
+                      setAgenteSelecionado('')
+                      setTipoSelecionado('')
+                      removerAgente(agente)
+                    }}
+                    aria-label={`Remover ${agente}`}
+                  >
+                    {agente} <span aria-hidden="true">x</span>
+                  </button>
+                ))
               ) : (
                 <span className="multi-select__placeholder">Nenhum agente selecionado</span>
               )}
@@ -505,7 +589,7 @@ export function AcidentesForm({
               name="tipoSelecionado"
               value={tipoSelecionado}
               onChange={(event) => setTipoSelecionado(event.target.value)}
-              required={!form.tipo}
+              required={!currentTipos.length}
               disabled={shouldDisableTipo}
             >
               <option value="">{tipoPlaceholder}</option>
@@ -526,18 +610,21 @@ export function AcidentesForm({
               </button>
             </div>
             <div className="multi-select__chips">
-              {form.tipo ? (
-                <button
-                  type="button"
-                  className="chip"
-                  onClick={() => {
-                    setTipoSelecionado('')
-                    onChange({ target: { name: 'tipo', value: '' } })
-                  }}
-                  aria-label={`Remover ${form.tipo}`}
-                >
-                  {form.tipo} <span aria-hidden="true">x</span>
-                </button>
+              {currentTipos.length ? (
+                currentTipos.map((tipo) => (
+                  <button
+                    type="button"
+                    key={tipo}
+                    className="chip"
+                    onClick={() => {
+                      setTipoSelecionado('')
+                      removerTipo(tipo)
+                    }}
+                    aria-label={`Remover ${tipo}`}
+                  >
+                    {tipo} <span aria-hidden="true">x</span>
+                  </button>
+                ))
               ) : (
                 <span className="multi-select__placeholder">Nenhum tipo selecionado</span>
               )}
