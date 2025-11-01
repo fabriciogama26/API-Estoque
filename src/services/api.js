@@ -160,6 +160,30 @@ const normalizePessoaHistorico = (lista) => {
     .filter(Boolean)
 }
 
+const normalizeMaterialCamposAlterados = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  return lista
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return null
+      }
+
+      const campo = trim(item.campo ?? item.nome ?? '')
+      if (!campo) {
+        return null
+      }
+
+      return {
+        campo,
+        de: item.de ?? item.valorAnterior ?? item.de_valor ?? '',
+        para: item.para ?? item.valorAtual ?? item.para_valor ?? '',
+      }
+    })
+    .filter(Boolean)
+}
+
 const normalizeDomainOptions = (lista) =>
   (Array.isArray(lista) ? lista : [])
     .map((item) => {
@@ -1105,16 +1129,32 @@ export const api = {
         }
       })
       if (camposAlterados.length > 0) {
-        await execute(
-          supabase.from('material_price_history').insert({
+        ensureSupabase()
+        const { error: historicoErro } = await supabase
+          .from('material_price_history')
+          .insert({
             materialId: id,
             valorUnitario: dadosCombinados.valorUnitario,
             usuarioResponsavel: usuario,
             criadoEm: agora,
             campos_alterados: camposAlterados,
-          }),
-          'Falha ao registrar histrico do material.'
-        )
+          })
+        if (historicoErro) {
+          const mensagemErro = historicoErro.message?.toLowerCase?.() ?? ''
+          const isRlsViolation =
+            historicoErro.code === '42501' ||
+            historicoErro.code === 'PGRST301' ||
+            mensagemErro.includes('row-level security') ||
+            mensagemErro.includes('row level security')
+          if (isRlsViolation) {
+            console.warn(
+              'Registro de historico do material ignorado devido a politica de RLS.',
+              historicoErro
+            )
+          } else {
+            throw mapSupabaseError(historicoErro, 'Falha ao registrar histórico do material.')
+          }
+        }
       }
       const dados = sanitizeMaterialPayload(payload)
       const registro = await executeSingle(
@@ -1153,6 +1193,9 @@ export const api = {
         valorUnitario: toNumber(registro.valorUnitario ?? registro.valor_unitario),
         criadoEm: registro.criadoEm ?? registro.criado_em ?? null,
         usuarioResponsavel: registro.usuarioResponsavel ?? registro.usuario_responsavel ?? '',
+        camposAlterados: normalizeMaterialCamposAlterados(
+          registro.campos_alterados ?? registro.camposAlterados ?? registro.campos ?? []
+        ),
       }))
     },
     async groups() {
