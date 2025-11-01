@@ -183,6 +183,7 @@ export function createAcidentePayload(form, usuarioCadastro) {
     : form.parteLesionada?.trim()
     ? [form.parteLesionada.trim()]
     : []
+  const observacao = typeof form.observacao === 'string' ? form.observacao.trim() : ''
 
   return {
     matricula: form.matricula.trim(),
@@ -205,6 +206,7 @@ export function createAcidentePayload(form, usuarioCadastro) {
     setor: centroServico,
     local,
     cat: form.cat.trim(),
+    observacao,
     usuarioCadastro,
   }
 }
@@ -237,6 +239,7 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     : form.parteLesionada?.trim()
     ? [form.parteLesionada.trim()]
     : []
+  const observacao = typeof form.observacao === 'string' ? form.observacao.trim() : ''
 
   return {
     matricula: form.matricula.trim(),
@@ -259,6 +262,7 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     setor: centroServico,
     local,
     cat: form.cat.trim(),
+    observacao,
     usuarioResponsavel,
   }
 }
@@ -327,6 +331,7 @@ export function filterAcidentes(acidentes, filters) {
       acidente.local,
       acidente.hht,
       acidente.cat,
+      acidente.observacao,
     ]
       .filter(Boolean)
       .join(' ')

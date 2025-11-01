@@ -151,6 +151,9 @@ ul, ol {
   font-size: 0.9rem;
   line-height: 1.25;
 }
+.field--full {
+  grid-column: 1 / -1;
+}
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
