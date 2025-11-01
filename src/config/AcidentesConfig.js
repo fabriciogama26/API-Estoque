@@ -19,6 +19,7 @@ export const ACIDENTES_FORM_DEFAULT = {
   setor: '',
   local: '',
   cat: '',
+  observacao: '',
 }
 
 export const ACIDENTES_FILTER_DEFAULT = {

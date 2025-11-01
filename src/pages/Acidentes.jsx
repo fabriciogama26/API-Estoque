@@ -615,6 +615,7 @@ export function AcidentesPage() {
             ? [acidente.parteLesionada]
             : [],
       cat: acidente.cat || '',
+      observacao: acidente.observacao || '',
     })
     setTipoOpcoes([])
     setTiposError(null)

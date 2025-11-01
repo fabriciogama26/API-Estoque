@@ -521,6 +521,16 @@ export function AcidentesForm({
             pattern="[0-9]*"
           />
         </label>
+        <label className="field field--full">
+          <span>Observacao</span>
+          <textarea
+            name="observacao"
+            value={form.observacao ?? ''}
+            onChange={onChange}
+            placeholder="Detalhes adicionais do acidente"
+            rows={3}
+          />
+        </label>
         <label className="field">
           <span>CID</span>
           <input name="cid" value={form.cid} onChange={onChange} placeholder="S93" />
