@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 export function AcidentesForm({
   form,
   onChange,
@@ -28,6 +30,18 @@ export function AcidentesForm({
 }) {
   const normalizeText = (value) => (typeof value === 'string' ? value.trim() : '')
 
+  const [novaLesao, setNovaLesao] = useState('')
+  const [novaParte, setNovaParte] = useState('')
+  const [novoAgente, setNovoAgente] = useState('')
+  const [novoTipo, setNovoTipo] = useState('')
+  const [agentesAdicionados, setAgentesAdicionados] = useState([])
+  const [tiposAdicionados, setTiposAdicionados] = useState([])
+
+  useEffect(() => {
+    setTiposAdicionados([])
+    setNovoTipo('')
+  }, [form.agente])
+
   const pessoaOptions = (() => {
     const map = new Map()
     if (Array.isArray(pessoas)) {
@@ -55,13 +69,45 @@ export function AcidentesForm({
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   })()
 
-  const agenteOptions = Array.from(
-    new Set([...(agentes || []), form.agente].map(normalizeText).filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const agenteOptions = (() => {
+    const map = new Map()
+    const addOption = (valor) => {
+      const nome = normalizeText(valor)
+      if (!nome) {
+        return
+      }
+      const chave = nome.toLocaleLowerCase('pt-BR')
+      if (!map.has(chave)) {
+        map.set(chave, nome)
+      }
+    }
+    agentesAdicionados.forEach(addOption)
+    if (Array.isArray(agentes)) {
+      agentes.forEach(addOption)
+    }
+    addOption(form.agente)
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  })()
 
-  const tipoOptions = Array.from(
-    new Set([...(tipos || []), form.tipo].map(normalizeText).filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const tipoOptions = (() => {
+    const map = new Map()
+    const addOption = (valor) => {
+      const nome = normalizeText(valor)
+      if (!nome) {
+        return
+      }
+      const chave = nome.toLocaleLowerCase('pt-BR')
+      if (!map.has(chave)) {
+        map.set(chave, nome)
+      }
+    }
+    tiposAdicionados.forEach(addOption)
+    if (Array.isArray(tipos)) {
+      tipos.forEach(addOption)
+    }
+    addOption(form.tipo)
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  })()
 
   const lesaoOptions = Array.isArray(lesoes) ? lesoes : []
   const parteOptions = Array.isArray(partes) ? partes : []
@@ -150,6 +196,58 @@ export function AcidentesForm({
     onChange({ target: { name: 'partesLesionadas', value: lista } })
   }
 
+  const adicionarNovoAgente = () => {
+    const valor = normalizeText(novoAgente)
+    if (!valor) {
+      return
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    const listaAtual = [
+      ...agentesAdicionados,
+      ...(Array.isArray(agentes) ? agentes : []),
+      form.agente,
+    ]
+    const jaExiste = listaAtual.some(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
+    )
+    if (!jaExiste) {
+      setAgentesAdicionados((prev) => [...prev, valor])
+    }
+    onChange({ target: { name: 'agente', value: valor } })
+    setNovoAgente('')
+  }
+
+  const adicionarNovoTipo = () => {
+    const valor = normalizeText(novoTipo)
+    if (!valor) {
+      return
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    const listaAtual = [
+      ...tiposAdicionados,
+      ...(Array.isArray(tipos) ? tipos : []),
+      form.tipo,
+    ]
+    const jaExiste = listaAtual.some(
+      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
+    )
+    if (!jaExiste) {
+      setTiposAdicionados((prev) => [...prev, valor])
+    }
+    onChange({ target: { name: 'tipo', value: valor } })
+    setNovoTipo('')
+  }
+
+  const removerLesao = (lesaoParaRemover) => {
+    const atualizadas = currentLesoes.filter((lesao) => lesao !== lesaoParaRemover)
+    updateLesoes(atualizadas)
+  }
+
+  const removerParte = (parteParaRemover) => {
+    const atualizadas = currentPartes.filter((parte) => parte !== parteParaRemover)
+    updatePartes(atualizadas)
+  }
+
   const handleLesoesSelectChange = (event) => {
     const selecionadas = Array.from(event.target.selectedOptions || []).map((option) => option.value)
     updateLesoes(selecionadas)
@@ -170,6 +268,91 @@ export function AcidentesForm({
 
   const lesoesSelectSize = multiSelectSize(lesaoSelectOptions)
   const partesSelectSize = multiSelectSize(parteSelectOptions)
+
+  const adicionarNovaLesao = () => {
+    const valor = normalizeText(novaLesao)
+    if (!valor) {
+      return
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    if (currentLesoes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
+      setNovaLesao('')
+      return
+    }
+    updateLesoes([...currentLesoes, valor])
+    setNovaLesao('')
+  }
+
+  const adicionarNovaParte = () => {
+    const valor = normalizeText(novaParte)
+    if (!valor) {
+      return
+    }
+    const chave = valor.toLocaleLowerCase('pt-BR')
+    if (currentPartes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
+      setNovaParte('')
+      return
+    }
+    updatePartes([...currentPartes, valor])
+    setNovaParte('')
+  }
+
+  const handleNovaLesaoKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarNovaLesao()
+    }
+  }
+
+  const handleNovaParteKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarNovaParte()
+    }
+  }
+
+  const handleNovoAgenteKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarNovoAgente()
+    }
+  }
+
+  const handleNovoTipoKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarNovoTipo()
+    }
+  }
+
+  const handleNovaLesaoBlur = () => {
+    if (normalizeText(novaLesao)) {
+      adicionarNovaLesao()
+    }
+  }
+
+  const handleNovaParteBlur = () => {
+    if (normalizeText(novaParte)) {
+      adicionarNovaParte()
+    }
+  }
+
+  const handleNovoAgenteBlur = () => {
+    if (normalizeText(novoAgente)) {
+      adicionarNovoAgente()
+    }
+  }
+
+  const handleNovoTipoBlur = () => {
+    if (normalizeText(novoTipo)) {
+      adicionarNovoTipo()
+    }
+  }
+
+  const podeAdicionarLesao = Boolean(normalizeText(novaLesao))
+  const podeAdicionarParte = Boolean(normalizeText(novaParte))
+  const podeAdicionarAgente = Boolean(normalizeText(novoAgente))
+  const podeAdicionarTipo = Boolean(normalizeText(novoTipo))
 
   const matriculaPlaceholder = isLoadingPessoas ? 'Carregando matriculas...' : 'Selecione a matricula'
   const agentePlaceholder = isLoadingAgentes ? 'Carregando agentes...' : 'Selecione o agente'
@@ -265,37 +448,81 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Tipo <span className="asterisco">*</span></span>
-          <select
-            name="tipo"
-            value={form.tipo}
-            onChange={onChange}
-            required
-            disabled={shouldDisableTipo}
-          >
-            <option value="">{tipoPlaceholder}</option>
-            {tipoOptions.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {tipo}
-              </option>
-            ))}
-          </select>
+          <div className="select-with-actions">
+            <select
+              name="tipo"
+              value={form.tipo}
+              onChange={onChange}
+              required
+              disabled={shouldDisableTipo}
+            >
+              <option value="">{tipoPlaceholder}</option>
+              {tipoOptions.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo}
+                </option>
+              ))}
+            </select>
+            <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novoTipo}
+                  onChange={(event) => setNovoTipo(event.target.value)}
+                  onKeyDown={handleNovoTipoKeyDown}
+                  onBlur={handleNovoTipoBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={shouldDisableTipo || isLoadingTipos}
+                />
+              </div>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={adicionarNovoTipo}
+                disabled={!podeAdicionarTipo || shouldDisableTipo}
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
         </label>
         <label className="field">
           <span>Agente <span className="asterisco">*</span></span>
-          <select
-            name="agente"
-            value={form.agente}
-            onChange={onChange}
-            required
-            disabled={isLoadingAgentes && agenteOptions.length === 0}
-          >
-            <option value="">{agentePlaceholder}</option>
-            {agenteOptions.map((agente) => (
-              <option key={agente} value={agente}>
-                {agente}
-              </option>
-            ))}
-          </select>
+          <div className="select-with-actions">
+            <select
+              name="agente"
+              value={form.agente}
+              onChange={onChange}
+              required
+              disabled={isLoadingAgentes && agenteOptions.length === 0}
+            >
+              <option value="">{agentePlaceholder}</option>
+              {agenteOptions.map((agente) => (
+                <option key={agente} value={agente}>
+                  {agente}
+                </option>
+              ))}
+            </select>
+            <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novoAgente}
+                  onChange={(event) => setNovoAgente(event.target.value)}
+                  onKeyDown={handleNovoAgenteKeyDown}
+                  onBlur={handleNovoAgenteBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingAgentes}
+                />
+              </div>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={adicionarNovoAgente}
+                disabled={!podeAdicionarAgente}
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
         </label>
         <label className="field">
           <span>CID</span>
@@ -303,50 +530,128 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Lesoes <span className="asterisco">*</span></span>
-          <select
-            name="lesoes"
-            value={currentLesoes}
-            onChange={handleLesoesSelectChange}
-            multiple
-            required
-            size={lesoesSelectSize}
-            disabled={shouldDisableLesoes}
-          >
-            {lesaoSelectOptions.length === 0 ? (
-              <option value="" disabled>
-                {lesoesPlaceholder}
-              </option>
-            ) : null}
-            {lesaoSelectOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="multi-select">
+            <select
+              name="lesoes"
+              value={currentLesoes}
+              onChange={handleLesoesSelectChange}
+              multiple
+              required
+              size={lesoesSelectSize}
+              disabled={shouldDisableLesoes}
+            >
+              {lesaoSelectOptions.length === 0 ? (
+                <option value="" disabled>
+                  {lesoesPlaceholder}
+                </option>
+              ) : null}
+              {lesaoSelectOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novaLesao}
+                  onChange={(event) => setNovaLesao(event.target.value)}
+                  onKeyDown={handleNovaLesaoKeyDown}
+                  onBlur={handleNovaLesaoBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingLesoes}
+                />
+              </div>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={adicionarNovaLesao}
+                disabled={!podeAdicionarLesao}
+              >
+                Adicionar
+              </button>
+            </div>
+            <div className="multi-select__chips">
+              {currentLesoes.length ? (
+                currentLesoes.map((lesao) => (
+                  <button
+                    type="button"
+                    key={lesao}
+                    className="chip"
+                    onClick={() => removerLesao(lesao)}
+                    aria-label={`Remover ${lesao}`}
+                  >
+                    {lesao} <span aria-hidden="true">x</span>
+                  </button>
+                ))
+              ) : (
+                <span className="multi-select__placeholder">Nenhuma lesao adicionada</span>
+              )}
+            </div>
+          </div>
           <input type="hidden" name="lesao" value={form.lesao} readOnly />
         </label>
         <label className="field">
           <span>Partes lesionadas <span className="asterisco">*</span></span>
-          <select
-            name="partesLesionadas"
-            value={currentPartes}
-            onChange={handlePartesSelectChange}
-            multiple
-            required
-            size={partesSelectSize}
-            disabled={shouldDisablePartes}
-          >
-            {parteSelectOptions.length === 0 ? (
-              <option value="" disabled>
-                {partesPlaceholder}
-              </option>
-            ) : null}
-            {parteSelectOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="multi-select">
+            <select
+              name="partesLesionadas"
+              value={currentPartes}
+              onChange={handlePartesSelectChange}
+              multiple
+              required
+              size={partesSelectSize}
+              disabled={shouldDisablePartes}
+            >
+              {parteSelectOptions.length === 0 ? (
+                <option value="" disabled>
+                  {partesPlaceholder}
+                </option>
+              ) : null}
+              {parteSelectOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novaParte}
+                  onChange={(event) => setNovaParte(event.target.value)}
+                  onKeyDown={handleNovaParteKeyDown}
+                  onBlur={handleNovaParteBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingPartes}
+                />
+              </div>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={adicionarNovaParte}
+                disabled={!podeAdicionarParte}
+              >
+                Adicionar
+              </button>
+            </div>
+            <div className="multi-select__chips">
+              {currentPartes.length ? (
+                currentPartes.map((parte) => (
+                  <button
+                    type="button"
+                    key={parte}
+                    className="chip"
+                    onClick={() => removerParte(parte)}
+                    aria-label={`Remover ${parte}`}
+                  >
+                    {parte} <span aria-hidden="true">x</span>
+                  </button>
+                ))
+              ) : (
+                <span className="multi-select__placeholder">Nenhuma parte adicionada</span>
+              )}
+            </div>
+          </div>
         </label>
         <label className="field">
           <span>Centro de servico <span className="asterisco">*</span></span>

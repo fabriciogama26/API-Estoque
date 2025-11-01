@@ -83,6 +83,16 @@
   gap: 0.5rem;
 }
 
+.select-with-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.select-with-actions select {
+  width: 100%;
+}
+
 .multi-select__chips {
   display: flex;
   flex: 1;
