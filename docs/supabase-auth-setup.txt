@@ -1,49 +1,47 @@
-﻿Guia de Autenticacao Supabase
+Guia de Autenticação Supabase
 =============================
 
-Visao Geral
+Visão geral
 -----------
-- O frontend usa o Supabase Auth (SDK oficial) para login e guarda o token `access_token`.
-- As chamadas de dados são feitas diretamente com `@supabase/supabase-js` (sem backend intermediário).
-- A tabela `public.app_users` (criada em `supabase/migrations/0001_create_schema.sql`) pode mapear perfis autenticados a metadados internos caso exista alguma camada serverless opcional.
-- As migrations **nao** configuram provedores de login, politicas de confirmacao ou templates de email; esses passos sao manuais no painel Supabase.
+- O frontend usa o Supabase Auth (SDK oficial) para login e mantém o `access_token` em memória/localStorage via SDK.
+- As chamadas de dados são feitas diretamente com `@supabase/supabase-js`; nenhuma API intermediária é obrigatória.
+- A tabela `public.app_users` (migrations iniciais) pode mapear perfis autenticados para metadados internos quando necessário.
+- As migrations não configuram provedores de login, confirmações ou templates de email: essas etapas são manuais no painel Supabase.
 
-Passo a Passo de Configuracao
+Passo a passo de configuração
 -----------------------------
-1. Projeto Supabase
-   - Crie um projeto em https://app.supabase.com (ou use um existente) e anote o `project-ref`.
-   - No menu *Authentication > Settings* configure:
+1. **Projeto Supabase**
+   - Crie um projeto em https://app.supabase.com (ou reutilize um existente) e anote o `project-ref`.
+   - Em *Authentication > Settings* configure:
      * Provedores desejados (Email/Password, OAuth, SSO etc.).
-     * Requisito de confirmacao de email se aplicavel.
-     * URLs de redirecionamento (por exemplo `http://localhost:5173` para desenvolvimento e o dominio de producao).
-2. Chaves e Variaveis
+     * Requisito de confirmação de email (se aplicável).
+     * URLs de redirecionamento (ex.: `http://localhost:5173` para desenvolvimento e o domínio de produção).
+2. **Chaves e variáveis**
    - Defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no `.env.local` e no ambiente de deploy.
-   - A `service_role` permanece reservada para funcoes backend opcionais (nao e utilizada pelo frontend direto).
-3. Aplicar Schema e Politicas
-   - `npx supabase link --project-ref <project-ref>` dentro de `supabase/`.
-   - `npx supabase db push` aplica as migrations `0001`–`0005`, criando `app_users`, `pessoas`, `materiais`, `entradas`, `saidas`, `material_price_history`, `acidentes` e ativando RLS conforme `0002_enable_rls.sql`.
-   - Se voce ja tinha tabelas com outro nome/estrutura, gere uma migration de ajuste (`npx supabase migration new ajustar_schema`) antes de aplicar.
-4. RLS e Perfis
-   - As migrations habilitam RLS e liberam:
-     * `select` para roles `authenticated`/`service_role`.
-     * Mutacoes apenas para `service_role`.
-   - Para restringir por usuario/empresa, adicione policies extras seguindo `docs/rls-policies-guide.txt`.
-5. Usuarios de Teste
-   - Crie contas de teste no dashboard (Authentication > Users) ou via CLI `npx supabase auth signups start` se quiser automatizar.
-   - Se precisar vincular um usuario a `app_users`, insira linha na tabela com `auth_user_id` igual ao `user.id` retornado pelo Supabase.
-6. Desenvolvimento Local
-   - `npx supabase db reset` roda migrations em um Postgres local via Docker (requer `supabase start`).
-   - Use `supabase env pull`/`env push` se quiser sincronizar variaveis com o projeto.
-7. Recuperacao de Senha
-   - Em *Authentication > Templates* ative e personalize o email "Reset password".
-   - Configure o remetente e as URLs permitidas em *Authentication > Settings > Email* para que o link seja enviado.
-   - Opcionalmente defina `VITE_SUPABASE_PASSWORD_REDIRECT` com a pagina que recebera o fluxo de redefinicao.
+   - A chave `service_role` deve ficar restrita a rotinas backend opcionais (funções em `api/`, jobs, migrações).
+3. **Aplicar schema e políticas**
+   - Dentro de `supabase/`, execute:
+     ```bash
+     supabase link --project-ref <project-ref>
+     supabase db push
+     ```
+   - Isso aplica todas as migrations (até `0027_expand_material_history.sql`), cria tabelas principais, catálogos de domínio e habilita RLS.
+4. **RLS e perfis**
+   - As migrations fornecem políticas básicas (leitura para `authenticated`, escrita restrita). Ajuste conforme os perfis do seu time seguindo [`docs/rls-policies-guide.txt`](rls-policies-guide.txt).
+   - Caso utilize claims customizadas (`is_admin`, permissões específicas), crie políticas adicionais antes de liberar produção.
+5. **Usuários de teste**
+   - Cadastre contas em *Authentication > Users* ou via CLI (`supabase auth signups start`).
+   - Se precisar vincular usuários à tabela `app_users`, insira registros com `auth_user_id` = `user.id` retornado pelo Supabase.
+6. **Desenvolvimento local**
+   - `supabase start` + `supabase db reset` reproduzem o stack local (requer Docker).
+   - Use `supabase env pull`/`env push` para sincronizar variáveis entre projeto remoto e ambiente local.
+7. **Recuperação de senha**
+   - Em *Authentication > Templates* personalize o email "Reset password".
+   - Configure remetente e URLs permitidas em *Authentication > Settings > Email*.
+   - Opcional: defina `VITE_SUPABASE_PASSWORD_REDIRECT` com a rota do frontend que tratará a redefinição.
 
-Observacoes Importantes
+Observações importantes
 -----------------------
-- O token `access_token` precisa ser enviado em `Authorization: Bearer` em todas as chamadas a `/api/*`.
-- A camada serverless assume que o usuario possui `user_metadata.nome` ou similares para compor `usuarioResponsavel`; configure os providers para capturar esses campos ou ajuste o codigo.
-- A migrations **nao** criam funcoes, triggers ou rotinas para provisionar usuarios automaticamente; qualquer sincronizacao adicional com sistemas externos deve ser codificada separadamente.
-- Depois de alterar politicas ou provedores, valide os fluxos de login/logout no frontend e rode `npx supabase db status` para garantir que nao ha migrations pendentes.
-
-
+- O SDK já envia `Authorization: Bearer <access_token>` em todas as chamadas; não é necessário configurar manualmente para o frontend.
+- Se publicar funções serverless que usem `service_role`, mantenha as chaves apenas no ambiente de deploy e implemente políticas específicas para `auth.role() = 'service_role'`.
+- Após alterar políticas ou provedores, teste os fluxos de login/logout no frontend e execute `supabase db status` para conferir migrations pendentes.

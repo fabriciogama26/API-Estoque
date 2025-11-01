@@ -1,47 +1,45 @@
 Tela: Entradas
 ==============
 
-Objetivo
---------
-- Registrar reabastecimentos de EPIs e exibir historico com valores totais.
-- Compartilha a mesma interface para modo remoto (Supabase) e modo local.
+Visão geral
+-----------
+- Registrar reabastecimentos de EPIs e listar o histórico filtrável por material, centro de custo e período.
+- O formulário e a tabela funcionam de forma idêntica em ambos os modos de dados; apenas a origem dos registros muda.
 
-Campos do formulario
+Fluxo principal
+---------------
+1. Ao montar, `EntradasPage` carrega materiais e entradas em paralelo via `Promise.all` (`dataClient.materiais.list` + `dataClient.entradas.list`).
+2. O formulário envia `materialId`, `quantidade`, `centroCusto`, `dataEntrada` e `usuarioResponsavel` (obtido do `AuthContext`).
+3. Após salvar (`dataClient.entradas.create(payload)`), o formulário é limpo e a lista é recarregada (reseta paginação).
+4. A listagem suporta filtros client-side (termo) e filtros enviados à API (material, centro de custo, data inicial/final).
+
+Campos do formulário
 --------------------
-- `materialId` (select, obrigatorio): lista populada via `dataClient.materiais.list`.
-- `quantidade` (numeric, minimo 1).
-- `centroCusto` (texto, obrigatorio): define o centro contabil responsavel pelo custo da entrada.
-- `dataEntrada` (date, opcional). Quando ausente, o backend/servico grava `now()` em ISO.
+- `materialId`: select obrigatório populado com os materiais ativos retornados pelo `dataClient`.
+- `quantidade`: input numérico ≥ 1.
+- `centroCusto`: campo texto obrigatório (aplicado direto na tabela `entradas.centro_custo`).
+- `dataEntrada`: input `type="date"` obrigatório; a data é repassada como string ISO (`yyyy-mm-dd`).
 
-Validacoes
-----------
-- HTML garante campos obrigatorios (material, quantidade, centro de custo) e quantidade positiva.
-- Servico remoto (`EntradasOperations.create`) confirma existencia do material no Supabase e rejeita centro de custo vazio.
-- Servico local replica as mesmas regras e armazena no `localStorage`.
+Regras de validação
+-------------------
+- HTML garante obrigatoriedade dos campos.
+- Antes de enviar, `quantidade` é convertida para `Number`. Valores inválidos resultam em erro exibido acima do formulário.
+- O backend remoto verifica a existência do material e normaliza o centro de custo; o modo local aplica validações equivalentes antes de persistir no `localStorage`.
 
-APIs
-----
-- Listagem de materiais: `dataClient.materiais.list()`.
-- Historico: `dataClient.entradas.list()`.
-- Registro: `dataClient.entradas.create(payload)`.
-  - Modo remoto envia `POST /api/entradas` com token Supabase.
-  - Modo local grava direto no armazenamento em cache.
+Tabela e paginação
+------------------
+- Paginação cliente (`TablePagination`) com página de tamanho fixo (`TABLE_PAGE_SIZE`).
+- Colunas incluem material, quantidade, valor total calculado (`quantidade * material.valorUnitario`), centro de custo, data e usuário responsável.
+- O filtro `termo` procura em nome do material e centro de custo dentro da lista já carregada.
 
-Fluxo de dados
---------------
-1. Ao enviar o formulario, `EntradasPage` monta o payload e chama `dataClient.entradas.create`.
-2. Em sucesso, limpa formulario, recarrega materiais e entradas.
-3. Tabela mostra nome do material, quantidade, valor total (calculado no cliente) e responsavel.
-4. Filtros locais permitem buscas sem chamadas adicionais.
+Componentes e dependências
+--------------------------
+- `src/pages/EntradasPage.jsx`
+- `src/components/TablePagination.jsx`
+- `src/services/api.js` / `src/services/localApi.js`
+- `src/styles/EntradasPage.css` (quando aplicável)
 
-Regras de negocio
------------------
-- Nenhum saldo e calculado aqui; outros endpoints usam os dados agregados.
-- Campo `usuarioResponsavel` vem do `AuthContext` (nome ou username).
-- Modo local honra seeds e gera IDs com `crypto.randomUUID`.
-
-Dependencias
-------------
-- `AuthContext` para obter usuario logado.
-- `dataClient` para encaminhar chamadas ao backend apropriado.
-- Seeds locais (`src/data/local-seed.json`) garantem dados iniciais quando em modo local.
+Relacionamentos
+---------------
+- As entradas alimentam os cálculos de estoque (`docs/Estoque.txt`) e o dashboard principal (`docs/Dashboard.txt`).
+- Registros servem de base para o termo de EPI ao calcular quantidades entregues versus disponíveis.

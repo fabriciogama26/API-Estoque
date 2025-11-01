@@ -1,12 +1,12 @@
-﻿# Supabase Setup
+# Supabase Setup
 
-Este diretório contém as migrations e instruções para replicar o banco do projeto no Supabase, tanto em ambientes locais (CLI + Docker) quanto remotos.
+Este diretório reúne as migrations SQL e orientações para preparar o banco do projeto tanto em ambientes locais (Supabase CLI + Docker) quanto no projeto hospedado no Supabase.
 
 ## Pré-requisitos
 
 - Supabase CLI instalada (`npm install -g supabase` ou `brew install supabase/tap/supabase`).
-- Projeto Supabase criado (via [https://app.supabase.com](https://app.supabase.com)) com as chaves `anon` e `service_role` em mãos.
-- Docker instalado para executar o stack local (`supabase start`).
+- Docker ativo para executar o stack local (`supabase start`).
+- Projeto criado em https://app.supabase.com com as chaves `anon` e `service_role` disponíveis.
 
 ## Estrutura
 
@@ -14,54 +14,85 @@ Este diretório contém as migrations e instruções para replicar o banco do pr
 supabase/
 ├── README.md
 └── migrations/
-    ├── 0001_create_schema.sql             # Cria tabelas principais (pessoas, materiais, entradas, saídas, acidentes, price history)
-    ├── 0002_enable_rls.sql                # Habilita RLS e define policies básicas
-    ├── 0003_seed_sample_data.sql          # Seeds de desenvolvimento (usuários, materiais, grupos)
-    ├── 0004_update_schema_supabase.sql    # Ajustes de nomenclatura camelCase, índices e colunas de auditoria
-    ├── 0005_add_material_group_fields.sql # Campos adicionais para agrupamento de materiais
-    ├── 0006_add_missing_person_accident_fields.sql # Campos adicionais (`dataAdmissao`, `tipoExecucao`, `hht`)
-    ├── 0007_rename_centro_columns.sql     # Converte colunas de centros para snake_case
-    └── 0008_update_centros.sql            # Ajusta centros (remove coluna em entradas e renomeia setor -> centro_servico)
+    ├── 0001_create_schema.sql                      # Tabelas base (pessoas, materiais, entradas, saídas, acidentes, price history)
+    ├── 0002_enable_rls.sql                         # Habilita RLS e aplica políticas mínimas
+    ├── 0003_seed_sample_data.sql                   # Seeds para desenvolvimento (não aplicar em produção)
+    ├── 0004_update_schema_supabase.sql             # Campos de auditoria e ajustes de nomenclatura
+    ├── 0005_add_material_group_fields.sql          # Campos de agrupamento e numeração de EPIs
+    ├── 0006_add_missing_person_accident_fields.sql # Campos adicionais em pessoas/acidentes
+    ├── 0007_rename_centro_columns.sql              # Padronização `centro_custo`/`centro_servico`
+    ├── 0008_update_centros.sql                     # Correções de dados nos centros cadastrados
+    ├── 0009_allow_authenticated_writes.sql         # Políticas para permitir escrita autenticada controlada
+    ├── 0010_add_setor_to_pessoas.sql               # Inclusão de setor + ajustes de views
+    ├── 0011_create_reference_tables.sql            # Tabelas de referência (centros, cargos etc.)
+    ├── 0012_create_grupos_material_itens.sql       # Catálogo de grupos de materiais
+    ├── 0013_rls_reference_tables.sql               # RLS para as tabelas de referência
+    ├── 0014_create_acidente_agentes_tipos.sql      # Catálogo de agentes/tipos de acidente
+    ├── 0015_create_acidente_partes.sql             # Catálogo de partes lesionadas
+    ├── 0016_create_acidente_lesoes.sql             # Catálogo de lesões
+    ├── 0017_alter_acidente_lesoes.sql              # Ajustes de colunas nas lesões
+    ├── 0018_create_centro_custo_table.sql          # Tabela dedicada de centro de custo
+    ├── 0019_create_reference_tables_people.sql     # Views auxiliares para pessoas
+    ├── 0020_link_pessoas_reference_tables.sql      # Relacionamentos de pessoas com as tabelas de referência
+    ├── 0021_update_pessoas_reference_links.sql     # Correções de vínculos e FKs
+    ├── 0022_drop_tipoExecucao_column.sql           # Substitui colunas simples por tabelas de domínio
+    ├── 0023_create_acidente_historico.sql          # Tabela de histórico de acidentes
+    ├── 0024_acidente_historico_policies.sql        # Políticas de RLS para o histórico
+    ├── 0025_create_pessoas_historico.sql           # Tabela de histórico de pessoas
+    ├── 0026_allow_authenticated_materials_write.sql# Ajustes de políticas para materiais
+    └── 0027_expand_material_history.sql            # Campos adicionais no histórico de materiais
 ```
 
-As migrations foram desenhadas para serem idempotentes (verificam `if not exists`) e podem ser reaplicadas com segurança.
- desenhadas para serem idempotentes (verificam `if not exists`) e podem ser reaplicadas com segurança.
+As migrations foram escritas para serem idempotentes sempre que possível. Mesmo assim, mantenha o versionamento da CLI em dia para garantir a execução na ordem correta.
 
 ## Como aplicar localmente
 
 1. Faça login na CLI: `supabase login` e informe o access token da sua conta.
-2. Inicie o projeto local (se ainda não existir) com `supabase init` e escolha este diretório (`supabase`) como destino.
-3. Suba o stack local (Postgres + API): `supabase start`.
-4. Execute as migrations: `supabase db reset --db-url postgres://postgres:postgres@localhost:6543/postgres`.
-   - Este comando aplicará os arquivos `0001` a `0005` na ordem e carregará o seed de desenvolvimento.
-5. Acesse o [Supabase Studio](http://localhost:54323) (a URL exata aparece em `supabase status`) ou use `psql` para validar as tabelas, policies e dados gerados.
+2. Dentro do diretório `supabase/`, inicialize o projeto local (apenas na primeira vez):
+   ```bash
+   supabase init
+   ```
+3. Suba o stack local (Postgres + API + Studio):
+   ```bash
+   supabase start
+   ```
+4. Execute as migrations (incluindo seeds de desenvolvimento):
+   ```bash
+   supabase db reset --db-url postgres://postgres:postgres@localhost:6543/postgres
+   ```
+5. Acesse o Studio local (URL exibida pelo comando) para conferir tabelas, políticas e dados carregados.
 
 ## Como aplicar em produção
 
-1. Gere um access token (Dashboard → Account → Access Tokens).
-2. Faça login na CLI na máquina de deploy: `supabase login`.
-3. Vincule o projeto remoto: `supabase link --project-ref <project-ref>`.
-4. Rode `supabase db push` para aplicar as migrations. O seed `0003_seed_sample_data.sql` foi pensado para desenvolvimento; remova-o do fluxo ou adapte para rodar apenas fora de produção.
-5. Confirme no dashboard que as policies RLS (`0002_enable_rls.sql`) e os índices/constraints adicionais (`0004`, `0005`) estão habilitados.
+1. Gere um access token (Dashboard → Account → Access Tokens) e faça login com `supabase login`.
+2. Vincule o projeto remoto dentro do diretório `supabase/`:
+   ```bash
+   supabase link --project-ref <project-ref>
+   ```
+3. Suba as migrations:
+   ```bash
+   supabase db push
+   ```
+4. **Seeds:** o arquivo `0003_seed_sample_data.sql` é apenas para ambientes de desenvolvimento. Remova-o do fluxo de produção ou mantenha uma ramificação separada.
+5. Revise as políticas de RLS após o deploy, garantindo que as permissões atendam aos perfis esperados do aplicativo.
 
-## Integração com o backend
+## Integração com o frontend
 
-- Crie um arquivo `.env` para as funções serverless com as chaves:
-  ```
-  SUPABASE_URL=https://<project-ref>.supabase.co
-  SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
-  SUPABASE_ANON_KEY=<anon-key>
-  ```
-- O frontend consome `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` via `.env.local`.
-- As operações da API utilizam o client oficial (`@supabase/supabase-js`) configurado em `api/_shared/supabaseClient.js`.
-- Policies e perfis de acesso extras podem ser baseados no guia [`docs/rls-policies-guide.txt`](../docs/rls-policies-guide.txt).
+- As variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` alimentam o SDK usado em `src/services/api.js`.
+- O frontend consome diretamente as tabelas criadas pelas migrations (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, tabelas de domínio e históricos).
+- Para recursos que exigem a chave `service_role` (por exemplo, funções serverless em `api/`), configure `.env`/variáveis da Vercel com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`.
 
-## Dicas
+## Checklist rápido após rodar as migrations
 
-- **Reaplicar seeds**: execute novamente `supabase db reset` no ambiente local sempre que precisar dos dados iniciais.
-- **Sincronizar schema**: após ajustes manuais no dashboard, gere uma nova migration com `supabase migration new <nome>` e salve no diretório `migrations/` para manter o versionamento.
-- **Testes automatizados**: valide endpoints com o comando `supabase functions serve` ou executando `vercel dev` apontando para o Postgres local.
-- **Auditoria**: os campos adicionados em `0004_update_schema_supabase.sql` (`usuarioCadastro`, `usuarioAtualizacao`, `historicoEdicao`, etc.) são usados pelo frontend para exibir logs e devem ser mantidos em updates.
+- [ ] Todas as tabelas essenciais existem e possuem RLS habilitado (verifique com `select * from pg_policies where schemaname = 'public';`).
+- [ ] Views `vw_indicadores_acidentes` e demais estruturas de suporte estão alinhadas com os dashboards (quando aplicável).
+- [ ] Tabelas de referência (`centros_servico`, `setores`, `cargos`, `centros_custo`, `tipo_execucao`, `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`) possuem dados mínimos para alimentar os formulários.
+- [ ] Usuários de teste foram criados no Supabase Auth e conseguem autenticar no frontend.
+- [ ] Seeds locais carregaram corretamente (caso esteja rodando o modo `local`).
 
-Com isso o Supabase ficará alinhado com as expectativas das funções serverless e do frontend.
+## Dicas adicionais
 
+- Reaplique `supabase db reset` em ambientes locais sempre que precisar voltar aos dados de exemplo.
+- Gere novas migrations (`supabase migration new <nome>`) sempre que alterar manualmente o schema via Studio.
+- Use `supabase functions serve` ou `vercel dev` para testar as rotas em `api/` com o mesmo banco local.
+- Documente mudanças relevantes em [`docs/supabase-esquema-checklist.txt`](../docs/supabase-esquema-checklist.txt) para manter o time alinhado.

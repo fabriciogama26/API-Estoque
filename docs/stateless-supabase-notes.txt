@@ -1,53 +1,55 @@
-Nota: desde 2025-10 o frontend tambem suporta modo de dados local. Para detalhes veja docs/data-mode-guide.txt.\r\n\r\nNotas de Migracao Stateless
+Notas de Migração Stateless
 ===========================
 
-Visao Geral da Arquitetura
----------------------
-- O frontend (Vite/React) e implantado como ativos estaticos no Vercel.
-- As chamadas de dados sao feitas diretamente pelo navegador usando o SDK oficial `@supabase/supabase-js`; nenhuma funcao serverless intermediaria e necessaria.
-- Cada requisicao utiliza o token do Supabase Auth armazenado pelo cliente e respeita as policies RLS definidas para os usuarios autenticados.
+> Desde 2025-10 o frontend também suporta modo de dados local. Consulte [`docs/data-mode-guide.txt`](data-mode-guide.txt) para orientações.
 
-Variaveis de Ambiente
----------------------
-- `VITE_SUPABASE_URL`: URL publica do Supabase usada pelo navegador.
-- `VITE_SUPABASE_ANON_KEY`: chave anonima utilizada pelo SDK (respeita RLS).
-- `VITE_DATA_MODE`: `remote` para trabalhar direto com o Supabase.
-- Variaveis opcionais para o modo local (`APP_USERNAME`, etc.) permanecem para desenvolvimento offline.
+Visão geral da arquitetura
+--------------------------
+- O frontend (Vite/React) é publicado como assets estáticos (ex.: Vercel).
+- Todas as requisições de dados partem do navegador usando `@supabase/supabase-js`; não há camada obrigatória de backend.
+- Os tokens do Supabase Auth são mantidos pelo SDK e utilizados em cada chamada, respeitando as políticas RLS configuradas.
 
-Expectativas do esquema Supabase
-----------------------------
-- `pessoas(id uuid pk, nome text, matricula text unique, centro_servico text, cargo text, usuarioCadastro text, usuarioEdicao text, criadoEm timestamp, atualizarEm timestamp, historicoEdicao jsonb)`
-- `materiais(id uuid pk, nome text, fabricante text, validadeDias int, ca text, valorUnitario numeric, estoqueMinimo numeric, ativo boolean, usuarioCadastro text, usuarioAtualizacao text, dataCadastro timestamp, atualizarEm timestamp)`
-- `material_price_history(id uuid pk, materialId uuid fk, valorUnitario numerico, usuarioResponsavel text, criadoEm timestamp)`
-- `entradas(id uuid pk, materialId uuid fk, quantidade numerica, centro_custo texto, dataEntrada timestamp, usuarioResponsavel texto)`
-- `saidas(id uuid pk, materialId uuid fk, pessoaId uuid fk, quantidade numerica, centro_custo texto, centro_servico texto, dataEntrega timestamp, dataTroca timestamp, status text, usuarioResponsavel text)`
-- `acidentes(id uuid pk, matricula text, nome text, cargo text, data timestamp, diasPerdidos numeric, diasDebitados numeric, tipo text, agente text, cid text, lesao text, parteLesionada text, centro_servico text, local text, cat text, observacao text, criadoEm timestamp, atualizadoEm timestamp)`
+Variáveis de ambiente
+---------------------
+- `VITE_SUPABASE_URL`: URL pública do projeto Supabase.
+- `VITE_SUPABASE_ANON_KEY`: chave `anon` (respeita RLS).
+- `VITE_DATA_MODE`: `remote` para Supabase, `local` para persistir no navegador.
+- Variáveis opcionais para o termo de EPI (`VITE_TERMO_EPI_EMPRESA_*`) e modo local (`VITE_LOCAL_*`).
+
+Expectativas do schema Supabase
+-------------------------------
+As migrations em `supabase/migrations` já alinham as tabelas esperadas. Principais entidades:
+- `pessoas`: inclui campos de centro de serviço, setor, cargo, tipo de execução, data de admissão e histórico (`pessoas_historico`).
+- `materiais`: contém validações de estoque mínimo, histórico de preço (`material_price_history`) e chave única por grupo/número.
+- `entradas` / `saidas`: registram movimentações com auditoria (`usuarioResponsavel`, `dataEntrada`, `dataEntrega`, `dataTroca`).
+- `acidentes`: armazena dados completos de SST, vinculando-se às tabelas de domínio (`acidente_agentes`, `acidente_partes`, `acidente_lesoes`, `acidente_tipos`).
+- Tabelas de referência: centros de serviço, centros de custo, setores, cargos, tipos de execução e catálogos de acidentes.
 
 Fluxo de dados no frontend
 --------------------------
-- O `src/services/api.js` instancia o client Supabase e executa selects/inserts/updates diretamente nas tabelas.
-- Regras de negocio (estoque, dashboards, historicos) continuam sendo calculadas no cliente com as funcoes de `src/lib`.
-- Para operacoes que exigiriam chave `service_role` (ex.: PDF server-side) o app alerta o usuario, pois nao ha backend intermediario.
+- `src/services/api.js` monta queries Supabase, normaliza registros (`map*Record`) e reaproveita funções de domínio (`src/lib`).
+- `src/services/localApi.js` oferece o mesmo contrato utilizando o seed local.
+- Dashboards e cálculos (estoque atual, agregações de acidentes, termo de EPI) são executados no cliente via helpers puros.
 
-Destaques da logica de negocios
+Destaques da lógica de negócios
 -------------------------------
-- Pessoas: campos obrigatorios, matricula unica, historico de edicoes armazenado em `historicoEdicao`.
-- Materiais: valida insumos, evita duplicatas, registra historico de precos quando o valor muda.
-- Entradas: garante a existencia de material, a quantidade e positiva e captura o usuario responsavel.
-- Saidas: verifica pessoa/material, valida o estoque disponivel, calcula `dataTroca`.
-- Estoque/Painel: auxiliares sem estado recalculam saldos, alertas e agregacoes para cada solicitacao.
-- Acidentes: limpa entradas, garante campos obrigatorios, busca pessoa por matricula e previne contadores negativos.
+- Pessoas: valida campos obrigatórios, garante matrícula única e registra histórico de alterações.
+- Materiais: valida grupos, numerações específicas e gera histórico de preço a cada mudança de `valorUnitario`.
+- Entradas: verifica existência do material e registra centro de custo e responsável.
+- Saídas: checa saldo disponível (`calcularSaldoMaterialAtual`), calcula `dataTroca` e vincula colaborador/centro de serviço.
+- Termo de EPI: combina dados de pessoas e saídas para montar o documento, com geração de PDF client-side.
+- Dashboards: `montarDashboard` e `montarDashboardAcidentes` recalculam métricas sob demanda.
 
-Recomendacoes de RLS
--------------------
-- Habilite o RLS em todas as tabelas e permita acesso somente quando `auth.uid()` estiver presente.
-- Como o codigo serverless usa a funcao de servico, adicione protecoes adicionais (reivindicacoes, tabelas de referencia) ao restringir por usuario ou equipe.
-- Considere visualizacoes ou procedimentos armazenados para relatorios pesados.
+Recomendações de segurança
+--------------------------
+- Habilite RLS em todas as tabelas e crie políticas específicas para cada perfil (ver [`docs/rls-policies-guide.txt`](rls-policies-guide.txt)).
+- Para funções serverless opcionais, use a chave `service_role` apenas no backend e adicione políticas explícitas (`auth.role() = 'service_role'`).
+- Monitore acessos sensíveis (históricos, indicadores) e registre auditoria quando necessário.
 
-Proximos Passos
-----------
-- Configure os provedores de Autenticacao do Supabase e alinhe as politicas de RLS com as funcoes do aplicativo.
-- Crie tabelas base (pessoas, materiais) para exercitar os fluxos.
-- Versione o esquema usando migracoes do Supabase ou arquivos SQL.
-- Monitorar o tempo das funcoes do Vercel e otimizar ou armazenar em cache quando necessario.
-- Auditar as politicas de RLS periodicamente e documentar as alteracoes em `docs/`.
+Próximos passos sugeridos
+-------------------------
+- Configurar provedores de autenticação (email, OAuth) no painel Supabase.
+- Popular tabelas de domínio (centros, cargos, agentes) antes de liberar o cadastro operacional.
+- Automatizar migrations no pipeline de deploy (`supabase db push`).
+- Avaliar métricas de uso e, se necessário, criar views/materialized views para dashboards pesados.
+- Revisar periodicamente políticas de acesso e documentar mudanças neste diretório.

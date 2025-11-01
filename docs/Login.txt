@@ -1,34 +1,35 @@
 Tela: Login
 ============
 
-Objetivo
---------
-- Controlar acesso antes de liberar qualquer rota protegida (`ProtectedRoute`).
-- Oferecer dois fluxos de autenticacao:
-  - **Modo remoto (Supabase)**: usa `supabase.auth.signInWithPassword`.
-  - **Modo local**: valida credenciais definidas em `VITE_LOCAL_USERNAME` e `VITE_LOCAL_PASSWORD`.
+Visão geral
+-----------
+- Porta de entrada para as rotas protegidas (`ProtectedRoute`).
+- Suporta dois fluxos de autenticação:
+  - **Modo Supabase:** utiliza `supabase.auth.signInWithPassword` e oferece recuperação de senha via email.
+  - **Modo local:** valida credenciais configuradas em `.env.local` (`VITE_LOCAL_USERNAME`, `VITE_LOCAL_PASSWORD`).
 
-Campos do formulario
---------------------
-- `username` (obrigatorio): email ou identificador. No modo local comparar com o valor de `VITE_LOCAL_USERNAME`.
-- `password` (obrigatorio).
-- `remember` (checkbox): somente visual por enquanto (persistencia depende do Supabase).
-
-Validacoes
-----------
-- HTML `required` impede envio sem usuario/senha.
-- `AuthContext.login` retorna `Informe usuario e senha` quando algum campo esta vazio.
-- Modo remoto: mensagem do Supabase exibida diretamente em caso de erro.
-- Modo local: retorna `Usuario ou senha invalidos` se fugir do par configurado.
+Comportamento do formulário
+---------------------------
+- Campos obrigatórios: email (`username`) e senha (`password`).
+- Botão "Entrar" exibe estado de carregamento enquanto aguarda o `AuthContext.login`.
+- Link "Esqueceu a senha?" chama `AuthContext.recoverPassword` (apenas no modo Supabase). Exige email preenchido e exibe mensagens de sucesso/erro na própria tela.
+- Mensagens de feedback (`feedback--error`/`feedback--success`) aparecem abaixo dos campos.
 
 Fluxo de dados
 --------------
-- Em caso de sucesso, `AuthContext` armazena o usuario normalizado em `localStorage` (`api-estoque-auth`) para recarga rapida.
-- No modo remoto o Supabase mantem a sessao ativa (refresh tokens administrados pelo SDK).
-- No modo local nenhum token externo e emitido; todo o estado fica no navegador.
+1. Ao enviar o formulário, `AuthContext.login` decide entre modo local ou Supabase conforme `VITE_DATA_MODE`.
+2. Em sucesso, o usuário é redirecionado para a rota originalmente solicitada (`location.state.from` ou `/`).
+3. `AuthContext` persiste o usuário normalizado em `localStorage` (`api-estoque-auth`) para restaurar a sessão na próxima visita.
+4. No modo Supabase, o SDK administra refresh tokens automaticamente.
 
-Notas importantes
------------------
-- Para alternar o comportamento defina `VITE_DATA_MODE` (`remote` ou `local`) e reinicie o Vite.
-- Limpe `api-estoque-auth` ao trocar de modo para evitar reaproveitar usuarios com formato diferente.
-- Guia completo: `docs/data-mode-guide.txt`.
+Boas práticas
+-------------
+- Limpe `localStorage.api-estoque-auth` ao alternar entre os modos para evitar conflitos de credenciais.
+- Mantenha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` válidos no `.env.local` para o modo remoto.
+- Configure os templates de email de recuperação no painel do Supabase (ver [`docs/supabase-auth-setup.txt`](supabase-auth-setup.txt)).
+
+Componentes e estilos
+---------------------
+- `src/pages/LoginPage.jsx`
+- `src/context/AuthContext.jsx`
+- `src/styles/LoginPage.css`

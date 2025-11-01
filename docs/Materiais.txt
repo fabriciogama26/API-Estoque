@@ -1,62 +1,56 @@
 Tela: Materiais
 ===============
 
-Objetivo
---------
-- Cadastrar e manter EPIs (nome sem numeros, fabricante, validade, CA, valor unitario, estoque minimo, grupo e status).
-- Registrar historico de precos para auditoria e garantir chave unica por grupo/material/fabricante/numero especifico.
-
-Fluxo geral
+Visão geral
 -----------
-1. Formulario cria ou atualiza materiais via `dataClient.materiais`.
-2. Tabela lista materiais com filtros por termo/campos.
-3. Modal de historico (`MateriaisHistoryModal`) mostra variacao de preco.
+- Cadastro completo de EPIs com suporte a grupos, numeração específica, histórico de valores e filtros por status.
+- Componentes dedicados encapsulam formulário, filtros, tabela e modal de histórico.
+- Opera com os mesmos comportamentos tanto no modo Supabase quanto no modo local.
 
-Campos principais
------------------
-- `nome`, `fabricante`, `validadeDias`, `ca`, `valorUnitario`, `estoqueMinimo`, `ativo`.
-- `grupoMaterial` (obrigatorio, proveniente da API `/api/materiais/groups`).
-- `numeroCalcado` (requerido quando o grupo for "Calcado").
-- `numeroVestimenta` (requerido quando o grupo for "Vestimenta").
-- `numeroEspecifico` (definido automaticamente a partir do grupo/numero informado).
-- Valor unitario usa helpers de formatacao (`formatCurrencyInput`).
-- Atualizacoes registram usuario responsavel e timestamp.
+Fluxo principal
+---------------
+1. `MateriaisPage` carrega a lista de materiais (`dataClient.materiais.list`) e os grupos disponíveis (`dataClient.materiais.groups`) logo após montar.
+2. O formulário utiliza `validateMaterialForm` e `createMaterialPayload`/`updateMaterialPayload` para normalizar e validar os campos antes de salvar.
+3. Criação e edição chamam `dataClient.materiais.create` ou `.update`, adicionando `usuarioResponsavel` com base no `AuthContext`.
+4. O modal de histórico (`MateriaisHistoryModal`) busca os registros sob demanda com `dataClient.materiais.priceHistory(materialId)` e mantém cache em memória.
 
-APIs
-----
-- `dataClient.materiais.list()`
-- `dataClient.materiais.create(payload)`
-- `dataClient.materiais.update(id, payload)`
-- `dataClient.materiais.priceHistory(id)`
-  - Remoto: mapeia para `/api/materiais`, `/api/materiais/:id`, `/api/materiais/price-history/:id`.
-  - Local: persiste no `localStorage` e adiciona registros em `materialPriceHistory`.
-- `dataClient.materiais.groups()` (consulta os grupos disponiveis; remoto usa `/api/materiais/groups`).
+Campos e regras principais
+--------------------------
+- `nome` e `fabricante`: obrigatórios, sem números no nome (regra aplicada em `validateMaterialForm`).
+- `validadeDias`: inteiro > 0.
+- `ca`: dígitos apenas (`sanitizeDigits`).
+- `valorUnitario`: monetário com formatação amigável (`formatCurrencyInput`).
+- `estoqueMinimo`: inteiro ≥ 0 (pode ficar em branco para considerar 0).
+- `grupoMaterial`: obrigatório; ao mudar, reinicia campos dependentes (`numeroCalcado`, `numeroVestimenta`).
+- `numeroCalcado`: obrigatório apenas para grupos identificados como calçados.
+- `numeroVestimenta`: obrigatório apenas para grupos classificados como vestimenta.
+- `descricao` e `ativo`: opcionais (toggle na tabela).
+- `numeroEspecifico`/`chaveUnica`: calculados pelo backend para garantir unicidade por grupo + número.
 
-Validacoes
-----------
-- Frontend garante campos obrigatorios, impede digitos no campo EPI e formata numeros.
-- Servicos validam:
-  - Nome/fabricante nao vazios e EPI sem numeros.
-  - `grupoMaterial` obrigatorio.
-  - `numeroCalcado` obrigatorio apenas para grupo "Calcado".
-  - `numeroVestimenta` obrigatorio apenas para grupo "Vestimenta".
-  - `validadeDias` > 0.
-  - `valorUnitario` > 0.
-  - `estoqueMinimo` >= 0 (ou null).
-  - CA nao vazio (apenas digitos).
-  - Chave unica (`grupoMaterial + nome + fabricante + numeroEspecifico`) nao pode se repetir.
-- Historico de preco e gravado sempre que `valorUnitario` muda.
+Filtros e tabela
+----------------
+- Filtros por termo (nome/fabricante), status (`ativo`) e grupo.
+- `filterMateriais` aplica a filtragem no cliente; a ordenação padrão utiliza `sortMateriaisByNome`.
+- Tabela mostra valores formatados (`formatCurrency`) e realça materiais inativos.
+- Ações por linha: editar (preenche o formulário) e histórico de preços.
 
-Comportamento da UI
+Histórico de preços
 -------------------
-- `isSaving` desabilita botoes e mostra feedback textual.
-- Erros exibem mensagens do `Error.message`.
-- Abertura do modal busca cache local antes de nova chamada.
-- Edicao preenche formulario com valores formatados.
+- `MateriaisHistoryModal` exibe cada alteração de `valorUnitario` com data/hora, valor anterior e usuário responsável.
+- O backend registra entradas na tabela `material_price_history` sempre que o valor muda (`src/services/api.js`).
 
-Dependencias
-------------
-- `AuthContext` para resolver usuario (nome exibido no historico).
-- `MateriaisRules` para sanitizacao/formatacao.
-- `dataClient` para alternar entre modo remoto e local.
-- Seeds locais fornecem dois materiais de exemplo com historico inicial.
+Componentes e arquivos relevantes
+---------------------------------
+- `src/pages/Materiais.jsx`
+- `src/components/Materiais/MateriaisForm.jsx`
+- `src/components/Materiais/MateriaisFilters.jsx`
+- `src/components/Materiais/MateriaisTable.jsx`
+- `src/components/Materiais/MateriaisHistoryModal.jsx`
+- `src/rules/MateriaisRules.js`
+- `src/utils/MateriaisUtils.js`
+
+Integração com outros módulos
+-----------------------------
+- Materiais são usados por Entradas, Saídas, Estoque e Termo de EPI.
+- A edição de estoque mínimo reflete imediatamente na tela de Estoque (`docs/Estoque.txt`).
+- Os grupos retornados aqui alimentam formulários e filtros nos módulos de movimentação.

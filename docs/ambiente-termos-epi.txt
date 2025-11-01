@@ -1,41 +1,43 @@
-Ambiente de geracao do Termo de EPI
+Ambiente de geração do Termo de EPI
 ===================================
 
-Visao geral
+Visão geral
 -----------
-Historicamente o projeto dependia de Puppeteer em uma funcao serverless, mas o fluxo atual gera o PDF diretamente no navegador com `html2pdf.js`.
+O fluxo atual não depende mais de Puppeteer ou funções serverless para gerar PDF. Todo o processo ocorre no navegador:
+- O contexto do termo é obtido diretamente pelo `dataClient` (Supabase ou dados locais).
+- O HTML é renderizado com `buildEpiTermHtml` e convertido para PDF no cliente usando `html2pdf.js`.
 
-Pontos principais
------------------
-* O backend (funcoes em `api/`) continua disponivel apenas para montar o contexto (`DocumentosOperations.termoEpiContext`). A rota `/api/documentos/termo-epi` agora responde somente JSON.
-* A pagina `Termos > Termo de EPI` mostra um badge indicando o modo atual. O JSON retornado pela API inclui o campo `origem` (`local` ou `remoto`).
-* O front nao depende mais de Chromium/Puppeteer: o botao "Baixar PDF" usa `html2pdf.js` para baixar o documento com base no HTML exibido.
-* A lista de saidas nao possui mais botao de termo; toda a experiencia fica na pagina dedicada (veja `docs/TermosEpi.txt`).
+Passos para utilizar
+--------------------
+1. Configure o `.env.local` do frontend com as variáveis necessárias. Exemplo:
+   ```
+   VITE_DATA_MODE=remote            # ou "local" para usar o armazenamento do navegador
+   VITE_SUPABASE_URL=...
+   VITE_SUPABASE_ANON_KEY=...
+   ```
+2. Execute o frontend normalmente:
+   ```bash
+   npm run dev
+   ```
+3. Acesse `http://localhost:5173`, autentique-se e navegue até **Termos > Termo de EPI**.
 
-Como usar
----------
-1. Configure o arquivo `.env.local` do frontend. Exemplos:
+Notas sobre modos de dados
+--------------------------
+- **Modo Supabase:** `src/services/api.js` consulta `pessoas` e `saidas` direto do banco e devolve JSON com `origem: 'remoto'`.
+- **Modo local:** `src/services/localApi.js` monta o contexto com os dados do `localStorage` e marca `origem: 'local'`.
+- O badge na tela indica o modo ativo para facilitar testes.
 
-```
-VITE_DATA_MODE=local          # ou "remote" para usar Supabase
-```
+Customização e assets
+---------------------
+- Logos, razão social e contato usados no documento são definidos pelas variáveis `VITE_TERMO_EPI_EMPRESA_*`.
+- Ajustes visuais devem ser feitos em `shared/documents/epiTermTemplate.js` (preview e PDF usam o mesmo template).
 
-2. Se quiser rodar o backend em modo local, execute (em um terminal separado):
+Limpeza de dados locais
+-----------------------
+- Para reiniciar o modo local, remova a chave `api-estoque-local-data-v1` do `localStorage`.
+- Se necessário, limpe `api-estoque-auth` para forçar novo login com as credenciais definidas em `.env.local`.
 
-```
-# PowerShell
-$env:DATA_MODE='local'; npx vercel dev --listen 3000
-
-# bash
-DATA_MODE=local npx vercel dev --listen 3000
-```
-
-   Sem esse comando o download dependera do ambiente publicado na Vercel para obter o contexto, mas o PDF sera gerado localmente de qualquer forma.
-
-3. Rode o frontend normalmente com `npm run dev` e acesse `http://localhost:5173`.
-
-Observacoes
------------
-* Para o modo online basta deixar `DATA_MODE` em branco e usar as credenciais reais do Supabase.
-* Os logos e textos do termo ficam em `shared/documents/epiTermTemplate.js`. Ajuste ali e utilize as variaveis `TERMO_EPI_EMPRESA_*` (ou as versoes `VITE_...` para o front).
-* `localDataStore` usa o seed de `src/data/local-seed.json`. Se precisar limpar, remova a chave `api-estoque-local-data-v1` do `localStorage`.
+Quando usar backend serverless
+------------------------------
+- As funções em `api/` permanecem opcionais (ex.: para integrar com sistemas externos ou armazenar PDFs). O fluxo padrão da tela não requer essas funções.
+- Caso ative uma rota serverless para gerar PDF em backend, reutilize o contexto retornado pelo `dataClient` para manter consistência.

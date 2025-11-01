@@ -1,40 +1,56 @@
-﻿Tela: Dashboards
-=================
+Tela: Dashboards de Estoque
+===========================
 
-1. Dashboard de Estoque
------------------------
-- Objetivo: mostrar panorama de entradas, saidas e alertas de estoque.
-- Filtros: periodoInicio, periodoFim (inputs type="month") e termo (busca em memoria por nome/fabricante).
-- Dados:
-  * Modo remoto: GET /api/estoque?view=dashboard (c/ token). Backend usa EstoqueOperations.dashboard.
-  * Modo local: localApi.estoque.dashboard combina seeds do localStorage via src/lib/estoque.js.
-- Fluxo: filtros -> dataClient.estoque.dashboard -> charts EntradasSaidasChart, ValorMovimentadoChart, EstoquePorMaterialChart, EstoquePorCategoriaChart, MateriaisMaisUsadosChart.
-- Regras: numero de materiais e valores tratados no backend/servico; filtro termo nao dispara novas chamadas.
-- UI: loading nos botoes, mensagens neutras sem dados, cards destacados por tonalidades.
+Visão geral
+-----------
+- Resumo consolidado das movimentações de estoque (entradas x saídas), valores financeiros e materiais em alerta.
+- Componentes reutilizam os mesmos dados tanto no modo Supabase quanto no modo local, já que todo o cálculo é feito no cliente.
+- Filtros controlam apenas a faixa de períodos consultada no `dataClient`; a busca textual (`termo`) atua em memória.
 
-2. Dashboard de Acidentes
--------------------------
-- Objetivo: acompanhar indicadores SST (acidentes, TF, TG, distribuicoes) alinhados com o estilo do dashboard de estoque.
-- Filtros do formulario (src/components/FiltrosDashboard.jsx):
-  * periodoInicio / periodoFim (type="month").
-  * centroServico, tipo, lesao, parteLesionada, agente, cargo (selects dinamicos).
-- Dados:
-  * Modo remoto: view vw_indicadores_acidentes via Supabase (maybeSingle). Ainda aceita apenas ano/unidade; filtros adicionais sao aplicados apenas no modo local.
-  * Modo local: localApi.acidentes.dashboard delega para src/lib/acidentesDashboard.js, que agrega acidentes em memoria, calcula TF/TG e expoe opcoes unicas para os selects.
-- Fluxo: filtros -> dataClient.acidentes.dashboard -> componentes DashboardCards, ChartTendencia, ChartTipos, ChartPartesLesionadas, ChartCargos, ChartAgentes.
-- Regras:
-  * montarDashboardAcidentes normaliza datas, limita periodo, contabiliza contagens > 0 e monta helper periodo_label.
-  * O retorno inclui options com listas unicas (centros, tipos, lesoes, partes, agentes, cargos).
-  * Graficos ignoram valores <= 0 e exibem mensagem "Nenhum dado disponivel para os filtros escolhidos".
-- UI: formulario usa classes form form--inline form--filters; os cards de grafico compartilham estilos de src/styles/charts.css (tamanhos especificos por classe dashboard-card--*).
-- Modo local: filtros adicionais sao aplicados diretamente nos dados do localStorage; limpar filtros recarrega seeds.
+Fluxo principal
+---------------
+1. Ao montar a página, `DashboardPage` define filtros padrão para o ano corrente e chama `dataClient.estoque.dashboard(params)`.
+2. O client remoto (`src/services/api.js`) consulta Supabase (`materiais`, `entradas`, `saidas`, `pessoas`) e delega a agregação para `montarDashboard` (`src/lib/estoque.js`).
+3. O client local (`src/services/localApi.js`) utiliza os mesmos helpers com os dados do `localStorage`.
+4. O resultado alimenta os cards de destaque, os gráficos e as tabelas derivadas.
 
-Notas sobre estilos
+Filtros
+-------
+- `periodoInicio` / `periodoFim`: inputs `type="month"` que limitam a consulta ao `dataClient`.
+- `termo`: texto livre aplicado sobre nome e fabricante dos materiais já carregados.
+- Botões de "Filtrar" e "Limpar" disparam o recálculo e reposicionam os filtros para os valores padrão.
+
+Cards principais
+----------------
+- **Movimentações:** quantidade total de entradas + saídas, com breakdown na legenda.
+- **Valor movimentado:** soma de `quantidade * valorUnitario` para as movimentações do período.
+- **Materiais no estoque:** total de itens (quantidade) e número de materiais distintos.
+- **Alertas:** quantidade de materiais abaixo do estoque mínimo atual.
+
+Gráficos e tabelas
+------------------
+- `EntradasSaidasChart`: série temporal mensal construída por `agruparPorPeriodo` (em `DashboardPage.jsx`).
+- `ValorMovimentadoChart`: aproveita os mesmos dados da série temporal para representar valores financeiros.
+- `EstoquePorMaterialChart`: top materiais com maior quantidade disponível.
+- `EstoquePorCategoriaChart`: distribuição por categorias (primeira palavra do nome do material por padrão).
+- `MateriaisMaisUsadosChart`: ranking de materiais mais movimentados (entradas + saídas).
+
+Estados e mensagens
 -------------------
-- src/styles/DashboardPage.css concentra layout/base dos formularios e dos "cartoes brancos".
-- src/styles/charts.css concentra o grid, dimensoes padrao dos cards e variacoes para cada grafico (dashboard-card--tendencia, --tipos, --parte, --cargos, --agentes).
+- `isLoading`: desabilita o formulário de filtros e exibe o estado de carregamento nos cards e gráficos.
+- `error`: mensagem de erro global abaixo do cabeçalho quando o `dataClient` falha.
+- Cada componente de gráfico mostra fallback "Nenhum dado disponível" quando recebe arrays vazios.
 
-Documentacao relacionada
+Componentes relacionados
 ------------------------
-- docs/data-mode-guide.txt: detalhes para reset do modo local e alternancia de ambientes.
-- docs/Estoque.txt e docs/Acidentes.txt: regras especificas das telas operacionais.
+- `src/pages/DashboardPage.jsx`
+- `src/components/charts/EntradasSaidasChart.jsx`
+- `src/components/charts/EstoqueCharts.jsx`
+- `src/components/charts/EstoqueCategoriaChart.jsx`
+- `src/styles/DashboardPage.css` e `src/styles/charts.css`
+
+Dependências
+------------
+- `src/services/api.js` e `src/services/localApi.js` para consulta de dados.
+- `src/lib/estoque.js` para agregações de estoque e cálculo de alertas.
+- `AuthContext` não interfere diretamente na tela, mas o usuário logado aparece na barra lateral (`SystemStatus`).

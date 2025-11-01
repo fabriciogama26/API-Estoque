@@ -1,56 +1,53 @@
 Tela: Cadastro de Acidentes
 ===========================
 
-Objetivo
---------
-- Registrar e manter o historico de acidentes/incidentes envolvendo colaboradores.
-- Consultar rapidamente registros existentes, aplicar filtros e acessar o historico de edicoes.
+Visão geral
+-----------
+- Registro completo de acidentes com colaboradores, incluindo dados de SST (tipo, agente, lesão, parte lesionada, HHT, dias perdidos/debitados).
+- Filtros permitem localizar registros existentes por termo, tipo, agente e centro de serviço; histórico detalha alterações campo a campo.
+- Compatível com modo Supabase e modo local (mesmo conjunto de componentes e validações).
 
-Componentes principais
-----------------------
-- **`<AcidentesForm />`**: formulario de cadastro/edicao com preenchimento automatico de nome, cargo e centro de servico ao informar a matricula.
-- **`<AcidentesFilters />`**: filtros aplicados em memoria sobre a lista carregada (termo livre, tipo, centro de servico, agente).
-- **`<AcidentesTable />`**: tabela com botoes para editar e abrir o historico de edicoes.
-- **`<AcidentesHistoryModal />`**: modal que exibe a linha do tempo de alteracoes (`/history`).
+Fluxo principal
+---------------
+1. Ao montar, `AcidentesPage` carrega a lista de acidentes (`dataClient.acidentes.list`) e popula datalists com colaboradores (`dataClient.pessoas.list`).
+2. Lists auxiliares (agentes, partes lesionadas, tipos, lesões, locais) são buscadas com `api.acidentes.agents/parts/types/lesions/locals` e exibidas como sugestões.
+3. `validateAcidenteForm` garante consistência dos dados antes de criar ou atualizar (`dataClient.acidentes.create/update`).
+4. Após salvar, a página recarrega a lista de acidentes, limpa o formulário e mantém cache de históricos separado por ID.
+5. O modal de histórico (`AcidentesHistoryModal`) consulta `dataClient.acidentes.history(id)` apenas quando o usuário solicita, armazenando a resposta em cache.
 
-Fluxo de dados
---------------
-1. Ao montar a pagina:
-   - Lista acidentes via `dataClient.acidentes.list()`.
-   - Busca pessoas com `dataClient.pessoas.list()` para popular o `datalist` de matrículas.
-2. O `dataClient` encaminha chamadas para Supabase (`api.js`) ou para o modo local (`localApi.js`), dependendo de `VITE_DATA_MODE`.
-3. No envio do formulario:
-   - Valida com `validateAcidenteForm` (campos obrigatorios, datas numericas, valores >= 0).
-   - Monta o payload com `createAcidentePayload` ou `updateAcidentePayload`, adicionando `registradoPor`/`atualizadoPor`.
-   - Chama `dataClient.acidentes.create()` ou `.update()`.
-   - Recarrega a lista e limpa caches de historico.
-4. O historico usa `dataClient.acidentes.history(id)` apenas quando o usuario abre o modal, mantendo cache por `id` para proximas consultas.
+Campos principais
+-----------------
+- Dados do colaborador: matrícula, nome (preenchido automaticamente ao selecionar a matrícula), cargo, centro de serviço/local.
+- Informações do acidente: data, tipo, agente, lesão, parte lesionada, local, CID, CAT, observação.
+- Métricas: dias perdidos, dias debitados, HHT (horas homem trabalhadas).
+- Controle de status: `registradoPor` e `atualizadoPor` são preenchidos a partir do usuário autenticado.
 
-Validacoes e regras
--------------------
-- Matricula e demais dados chaves sao obtidos da tabela de pessoas; em modo remoto, o backend rejeita matriculas inexistentes.
-- Dias perdidos/debitados e HHT devem ser inteiros nao negativos (tratados nas regras e novamente no backend).
-- Centro de servico/setor e nome/cargo ficam somente leitura porque sao derivados da pessoa selecionada.
-- Edicao reusa o formulario e bloqueia o botao "Registrar" ate que a requisicao finalize (`isSaving`).
-- O filtro por termo considera nome, matricula e centro de servico (vide `filterAcidentes`).
+Validações
+----------
+- Matrícula obrigatória; quando informada, o sistema busca os dados da pessoa para preencher nome/cargo/centro de serviço.
+- Data precisa ser válida (`yyyy-mm-dd`).
+- Campos numéricos (dias, HHT) devem ser ≥ 0.
+- Tipos/listas: os valores precisam existir nas listas retornadas pelo backend para evitar inconsistências.
+- Modo Supabase verifica referências no banco e mantém histórico em `acidente_historico`.
 
-Comportamento de UI
--------------------
-- Mensagens de erro do formulario aparecem abaixo dos campos quando `validateAcidenteForm` ou a API retornam erro.
-- Loading states:
-  - Lista: feedback de "Carregando acidentes..." no cabecalho da tabela (estado controlado por `isLoading`).
-  - Pessoas: desabilita a entrada de matricula enquanto `isLoadingPessoas` for verdadeiro.
-- Tabela mostra destaque para parte lesionada/lesao abaixo do nome.
-- O modal de historico abre em tela cheia com overlay clicavel para fechar.
+Filtros e tabela
+----------------
+- Filtros por termo (nome/matrícula), tipo, centro de serviço e agente (`filterAcidentes`).
+- A tabela mostra os principais campos e disponibiliza ações de editar e visualizar histórico.
+- Mensagens de erro do formulário e da listagem são exibidas separadamente (`formError` e `listError`).
 
-Persistencia
-------------
-- **Modo remoto (Supabase)**: tabelas `acidentes` e `pessoas`; valida tokens Supabase e aplica RLS.
-- **Modo local**: estrutura mantida em `localStorage` (`api-estoque-local-data-v1`) com helpers em `src/services/localApi.js`.
+Componentes e utilitários
+-------------------------
+- `src/pages/Acidentes.jsx`
+- `src/components/Acidentes/AcidentesForm.jsx`
+- `src/components/Acidentes/AcidentesFilters.jsx`
+- `src/components/Acidentes/AcidentesTable.jsx`
+- `src/components/Acidentes/AcidentesHistoryModal.jsx`
+- `src/rules/AcidentesRules.js`
+- `src/config/AcidentesConfig.js`
 
 Integração com dashboards
 -------------------------
-- O dashboard específico de acidentes (`/dashboard/acidentes`) consome a view Supabase `vw_indicadores_acidentes`.
-- O preenchimento correto da tela depende de agregados atualizados (totais, séries mensais, distribuições por tipo/parte/cargo/agente).
-- Recomenda-se agendar uma rotina (trigger ou cron externo) que alimente a view a partir das tabelas `acidentes` e `pessoas`.
-- Garanta que as políticas RLS da view permitam apenas leitura e respeitem a organização/unidade disponível nos filtros.
+- Os registros alimentam o dashboard de acidentes (`docs/DashboardAcidentes.txt`).
+- Campos de HHT, dias perdidos e debitados são fundamentais para calcular TF/TG.
+- As listas de agentes/partes/lesões reaproveitam tabelas de domínio mantidas nas migrations Supabase.

@@ -1,89 +1,86 @@
-Guia de Configuracao e Validacao de RLS
-========================================
+Guia de Configuração e Validação de RLS
+=======================================
 
 Contexto
--------
-Funcoes serverless em `api/` usam a chave de funcao de servico do Supabase para executar a logica de negocios. As politicas de Seguranca em Nivel de Linha (RLS) devem, portanto, garantir que os usuarios finais, autenticados com o Supabase Auth, possam acessar apenas as linhas permitidas enquanto a funcao de servico continua operando para a logica de back-end.
+--------
+O frontend acessa o Supabase diretamente via `@supabase/supabase-js`, usando tokens emitidos para usuários autenticados. Todas as tabelas expostas ao cliente devem ter Row Level Security (RLS) habilitado, garantindo que cada usuário enxergue apenas os dados permitidos. Funções serverless em `api/` são opcionais, mas quando utilizadas devem operar com a chave `service_role` e respeitar políticas específicas.
 
-Permissoes Recomendadas
------------------------
-1. `pessoas`
-- `SELECT`: permitir usuarios autenticados.
-- `INSERT` / `UPDATE`: restringir a funcoes administrativas (por exemplo, declarar `is_admin` ou ser membro de uma tabela de permissoes dedicada).
-2. `materiais`
-- `SELECT`: usuarios autenticados.
-- `INSERT` / `UPDATE`: forneca politicas que verifiquem reivindicacoes ou associacao (`usuarios_permissoes`) antes de permitir gravacoes.
-3. `material_price_history`
-- `INSERT`: geralmente deve ser permitido apenas para a funcao de servico. Adicione uma politica que verifique `current_setting('request.jwt.claim.role', true) = 'service_role'`.
-- `SELECT`: usuarios autenticados podem ler para auditoria.
-4. `entradas` e `saidas`
-- `SELECT`: usuarios autenticados.
-- `INSERT`: limite para operadores responsaveis pelo estoque (por exemplo, associacao em `operadores_estoque`).
-- Sempre registre `usuarioResponsavel` usando o e-mail autenticado para rastreabilidade.
-5. `acidentes`
-- `SELECT` / `INSERT`: pessoal de seguranca autenticado.
-- `UPDATE`: restrinja ao registrante original ou funcoes de seguranca explicitas.
+Tabelas principais
+------------------
+Recomendações gerais:
+- **pessoas:**
+  - `SELECT`: permitir `auth.role() = 'authenticated'`.
+  - `INSERT` / `UPDATE`: restringir a perfis administrativos (claims como `is_admin` ou associação em tabela de permissões).
+- **materiais:**
+  - `SELECT`: liberar para usuários autenticados.
+  - `INSERT` / `UPDATE`: permitir apenas quando o usuário possuir claim apropriada (por exemplo `auth.jwt()->>'can_manage_materials' = 'true'`).
+- **material_price_history:**
+  - `SELECT`: liberar para auditoria.
+  - `INSERT`: permitir apenas para a função serverless ou claims administrativas (verifique `request.jwt.claim.role`).
+- **entradas** e **saidas:**
+  - `SELECT`: usuários autenticados.
+  - `INSERT`: apenas operadores de estoque; uma tabela auxiliar (`operadores_estoque`) pode relacionar `user_id` com permissão.
+- **acidentes:**
+  - `SELECT`: equipe de SST autenticada.
+  - `INSERT` / `UPDATE`: limitar a perfis autorizados (claims ou associação em tabela dedicada).
+- **tabelas de domínio (centros, cargos, agentes etc.):**
+  - Geralmente leitura aberta para `authenticated`; escrituras podem ser limitadas a administradores.
 
-Criando Politicas
+Criando políticas
 -----------------
-1. Habilite o RLS:
+Exemplos de comandos úteis:
 ```sql
+-- Habilitar RLS
 alter table pessoas enable row level security;
-```
-2. Politica de leitura simples:
-```sql
-create policy "authenticated read" on pessoas
+
+-- Política de leitura genérica
+create policy "pessoas_select_authenticated" on pessoas
 for select using (auth.role() = 'authenticated');
-```
-3. Politica de gravacao condicional usando declaracoes personalizadas:
-```sql
-create policy "admins update pessoas" on pessoas
+
+-- Política de escrita condicionada por claim
+create policy "pessoas_update_admins" on pessoas
 for update using (
-auth.role() = 'authenticated'
-and coalesce((auth.jwt()->>'is_admin')::bool, false)
+  auth.role() = 'authenticated'
+  and coalesce((auth.jwt()->>'is_admin')::bool, false)
+);
+
+-- Política baseada em tabela auxiliar
+create policy "entradas_operadores" on entradas
+for insert using (
+  auth.role() = 'authenticated'
+  and exists (
+    select 1 from operadores_estoque oe
+    where oe.user_id = auth.uid()
+  )
 );
 ```
-4. Politica baseada em associacao:
-```sql
-criar politica "operadores estoque" em entradas
-para todos usando (
-auth.role() = 'authenticated'
-e exists (
-selecione 1 de operadores_estoque oe
-onde oe.user_id = auth.uid()
-)
-);
-```
 
-Validacao Continua
----------------------
-- **Testes automatizados**
-- Use o Supabase CLI ou `pgTAP` para simular consultas com diferentes JWTs.
-- Adicione verificacoes de CI que tentem `SELECT/INSERT/UPDATE` com usuarios sem permissoes e garanta que falhem.
-- **Testes manuais**
-- Gere tokens de acesso via `supabase.auth.signInWithPassword` para cada funcao e chame os endpoints `/api/*`.
-- Confirme se chamadas nao autorizadas retornam respostas 401/403.
-- **Auditorias**
-- Listar politicas ativas: `select * from pg_policies where schemaname = 'public';`
-- Garantir que as novas tabelas tenham o RLS habilitado antes da implantacao em producao.
-- Registrar as alteracoes nesta pasta para referencia futura.
+Validação contínua
+------------------
+- **Testes automatizados:**
+  - Utilize Supabase CLI com tokens simulados ou `pgTAP` para validar políticas em pipelines.
+- **Testes manuais:**
+  - Gere tokens com `supabase.auth.signInWithPassword` para diferentes perfis e execute consultas usando `curl`/Postman.
+  - Confirme que operações sem permissão retornam 401/403.
+- **Auditoria:**
+  - Consulte políticas ativas com `select * from pg_policies where schemaname = 'public';`.
+  - Verifique periodicamente se novas tabelas foram criadas sem RLS habilitado.
 
-Integracao com Rotas Serverless
-----------------------------------
-- Todas as funcoes usam `requireAuth` para validar o token do portador. Garantir que:
-- Os tokens emitidos pelo usuario nunca incluam o `service_role`.
-- A chave da funcao de servico permaneca apenas no lado do servidor.
-- Para operacoes criticas (ajustes de estoque, atualizacoes de acidentes), verifique se as regras de negocios ainda sao executadas com o RLS habilitado. Se necessario, adicione politicas explicitas concedendo acesso a funcao de servico (por exemplo, `FORCE ROW LEVEL SECURITY` mais uma politica de servico).
+Integração com funções serverless (opcional)
+-------------------------------------------
+- Quando usar `service_role`, adicione políticas específicas permitindo operações com `auth.role() = 'service_role'`.
+- Nunca exponha a chave `service_role` ao frontend; mantenha-a apenas nas funções em `api/` ou na infraestrutura de deploy.
+- Se precisar executar operações privilegiadas (ex.: gerar relatórios agregados), considere criar RPCs ou views com políticas dedicadas.
 
-Lista de Verificacao de Implantacao
---------------------
-1. Aplicar ou atualizar politicas para cada tabela acessada pelo aplicativo.
-2. Execute testes de permissao automatizados e manuais para `pessoas`, `materiais`, `entradas`, `saidas`, `estoque` e `acidentes`.
-3. Documente os resultados e atualizacoes em `docs/`.
-4. Revise as politicas sempre que novas rotas ou tabelas forem introduzidas.
+Checklist de implantação
+------------------------
+1. Certifique-se de que todas as tabelas acessadas pelo aplicativo tenham RLS habilitado.
+2. Crie políticas de leitura/escrita condizentes com os perfis existentes.
+3. Execute testes de autorização antes de cada deploy.
+4. Documente ajustes relevantes neste diretório (`docs/`).
 
-Referencias
-----------
-- Guia RLS do Supabase: https://supabase.com/docs/guides/auth/row-level-security
-- Declaracoes personalizadas: https://supabase.com/docs/guides/auth/custom-claims
-- Testes da CLI do Supabase: https://supabase.com/docs/guides/cli/local-testing
+Referências
+-----------
+- [Supabase RLS](https://supabase.com/docs/guides/auth/row-level-security)
+- [Claims personalizados](https://supabase.com/docs/guides/auth/custom-claims)
+- [Supabase CLI](https://supabase.com/docs/guides/cli)
