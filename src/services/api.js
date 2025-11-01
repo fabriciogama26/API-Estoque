@@ -89,6 +89,22 @@ const ACIDENTE_HISTORY_FIELDS = [
   'observacao',
 ]
 
+const MATERIAL_HISTORY_FIELDS = [
+  'nome',
+  'fabricante',
+  'validadeDias',
+  'ca',
+  'valorUnitario',
+  'estoqueMinimo',
+  'ativo',
+  'descricao',
+  'grupoMaterial',
+  'numeroCalcado',
+  'numeroVestimenta',
+  'numeroEspecifico',
+  'chaveUnica',
+]
+
 const normalizeHistoryValue = (value) => {
   if (value === null || value === undefined) {
     return ''
@@ -247,7 +263,7 @@ async function ensureAcidenteLesoes(agenteNome, nomes) {
 
 function ensureSupabase() {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
+    throw new Error('Supabase nÃ£o configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
   }
 }
 
@@ -285,7 +301,7 @@ async function resolveUsuarioResponsavel() {
   const { data } = await supabase.auth.getSession()
   const user = data?.session?.user
   if (!user) {
-    return 'anônimo'
+    return 'anÃ´nimo'
   }
   const metadata = user.user_metadata ?? {}
   return (
@@ -295,7 +311,7 @@ async function resolveUsuarioResponsavel() {
     user.email ||
     user.phone ||
     user.id ||
-    'anônimo'
+    'anÃ´nimo'
   )
 }
 
@@ -776,20 +792,20 @@ export const api = {
         const centroId = await resolveReferenceId(
           'centros_servico',
           centroServico,
-          'Centro de serviço inválido para filtro.'
+          'Centro de serviÃ§o invÃ¡lido para filtro.'
         )
         query = query.eq('centro_servico_id', centroId)
       }
 
       const setor = trim(params.setor ?? '')
       if (setor && setor.toLowerCase() !== 'todos') {
-        const setorId = await resolveReferenceId('setores', setor, 'Setor inválido para filtro.')
+        const setorId = await resolveReferenceId('setores', setor, 'Setor invÃ¡lido para filtro.')
         query = query.eq('setor_id', setorId)
       }
 
       const cargo = trim(params.cargo ?? '')
       if (cargo && cargo.toLowerCase() !== 'todos') {
-        const cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inválido para filtro.')
+        const cargoId = await resolveReferenceId('cargos', cargo, 'Cargo invÃ¡lido para filtro.')
         query = query.eq('cargo_id', cargoId)
       }
 
@@ -798,7 +814,7 @@ export const api = {
         const tipoId = await resolveReferenceId(
           'tipo_execucao',
           tipoExecucaoFiltro.toUpperCase(),
-          'Tipo de execução inválido para filtro.'
+          'Tipo de execuÃ§Ã£o invÃ¡lido para filtro.'
         )
         query = query.eq('tipo_execucao_id', tipoId)
       }
@@ -1023,7 +1039,7 @@ export const api = {
           .select('id, data_edicao, usuario_responsavel, campos_alterados')
           .eq('pessoa_id', id)
           .order('data_edicao', { ascending: true }),
-        'Falha ao obter histórico.'
+        'Falha ao obter histÃ³rico.'
       )
       return normalizePessoaHistorico(registros ?? [])
     },
@@ -1057,8 +1073,65 @@ export const api = {
     },
     async update(id, payload) {
       if (!id) {
-        throw new Error('ID obrigatório.')
+      const atualLista = await execute(
+        supabase
+          .from('materiais')
+          .select('*')
+          .eq('id', id)
+          .limit(1),
+        'Falha ao localizar material.'
+      )
+      const registroAtual = Array.isArray(atualLista) ? atualLista[0] : null
+      if (!registroAtual) {
+        throw new Error('Material no encontrado.')
       }
+
+      const materialAtual = mapMaterialRecord(registroAtual)
+      const dados = sanitizeMaterialPayload({ ...materialAtual, ...payload })
+      const camposAlterados = []
+      MATERIAL_HISTORY_FIELDS.forEach((campo) => {
+        const valorAtual = normalizeHistoryValue(materialAtual?.[campo])
+        const valorNovo = normalizeHistoryValue(dados?.[campo])
+        if (valorAtual !== valorNovo) {
+          camposAlterados.push({
+            campo,
+            de: materialAtual?.[campo] ?? '',
+            para: dados?.[campo] ?? '',
+          })
+        }
+      })
+      if (camposAlterados.length > 0) {
+        await execute(
+          supabase.from('material_price_history').insert({
+            materialId: id,
+            valorUnitario: dados.valorUnitario,
+            usuarioResponsavel: usuario,
+            criadoEm: agora,
+            campos_alterados: camposAlterados,
+          }),
+          'Falha ao registrar histrico do material.'
+        )
+      }
+        valorUnitario: toNullableNumber(registro.valorUnitario ?? registro.valor_unitario),
+        dataRegistro: registro.dataRegistro ?? registro.criadoEm ?? registro.criado_em ?? null,
+        camposAlterados: Array.isArray(registro.campos_alterados ?? registro.camposAlterados)
+          ? (registro.campos_alterados ?? registro.camposAlterados)
+              .map((item) => {
+                if (!item || typeof item !== 'object') {
+                  return null
+                }
+                const campo = item.campo ?? item.nome ?? ''
+                if (!campo) {
+                  return null
+                }
+                return {
+                  campo,
+                  de: item.de ?? item.valorAnterior ?? item.de_valor ?? '',
+                  para: item.para ?? item.valorAtual ?? item.para_valor ?? '',
+                }
+              })
+              .filter(Boolean)
+          : [],
       const dados = sanitizeMaterialPayload(payload)
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
@@ -1090,7 +1163,7 @@ export const api = {
           .select('*')
           .eq('materialId', id)
           .order('criadoEm', { ascending: false }),
-        'Falha ao obter histórico de preços.'
+        'Falha ao obter histÃ³rico de preÃ§os.'
       )
       return (data ?? []).map((registro) => ({
         id: registro.id,
@@ -1235,7 +1308,7 @@ export const api = {
 
       const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId)
       if (quantidade > estoqueDisponivel) {
-        const error = new Error('Quantidade informada maior que o estoque disponível.')
+        const error = new Error('Quantidade informada maior que o estoque disponÃ­vel.')
         error.status = 400
         throw error
       }
@@ -1606,14 +1679,14 @@ export const api = {
       if (historicoRegistro) {
         await execute(
           supabase.from('acidente_historico').insert(historicoRegistro),
-          'Falha ao registrar histórico do acidente.'
+          'Falha ao registrar histÃ³rico do acidente.'
         )
       }
       return mapAcidenteRecord(registro)
     },
     async history(id) {
       if (!id) {
-        throw new Error('ID obrigatório.')
+        throw new Error('ID obrigatÃ³rio.')
       }
       const data = await execute(
         supabase
@@ -1621,7 +1694,7 @@ export const api = {
           .select('id, data_edicao, usuario_responsavel, campos_alterados')
           .eq('acidente_id', id)
           .order('data_edicao', { ascending: false }),
-        'Falha ao obter histórico do acidente.'
+        'Falha ao obter histÃ³rico do acidente.'
       )
       return (data ?? []).map((item) => ({
         id: item.id,
@@ -1671,7 +1744,7 @@ async dashboard(params = {}) {
       const matricula = trim(params.matricula)
       const nome = trim(params.nome)
       if (!matricula && !nome) {
-        throw new Error('Informe a matrícula ou o nome do colaborador.')
+        throw new Error('Informe a matrÃ­cula ou o nome do colaborador.')
       }
 
       let pessoa = null
@@ -1691,7 +1764,7 @@ async dashboard(params = {}) {
       }
 
       if (!pessoa) {
-        throw new Error('Colaborador não encontrado.')
+        throw new Error('Colaborador nÃ£o encontrado.')
       }
 
       const saidas = await execute(
@@ -1745,7 +1818,7 @@ async function resolveReferenceId(table, value, errorMessage) {
 
   const id = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
   if (!id) {
-    throw new Error(errorMessage ?? ('Valor "' + nome + '" não encontrado.'))
+    throw new Error(errorMessage ?? ('Valor "' + nome + '" nÃ£o encontrado.'))
   }
   return id
 }
@@ -1754,28 +1827,28 @@ async function resolvePessoaReferencias(dados) {
   const centroServicoId = await resolveReferenceId(
     'centros_servico',
     dados.centroServico,
-    'Selecione um centro de serviço válido.'
+    'Selecione um centro de serviÃ§o vÃ¡lido.'
   )
   const setorNome = dados.setor || dados.centroServico
   const setorId = await resolveReferenceId(
     'setores',
     setorNome,
-    'Selecione um setor válido.'
+    'Selecione um setor vÃ¡lido.'
   )
   const cargoId = await resolveReferenceId(
     'cargos',
     dados.cargo,
-    'Selecione um cargo válido.'
+    'Selecione um cargo vÃ¡lido.'
   )
   const centroCustoId = await resolveReferenceId(
     'centros_custo',
     dados.centroServico,
-    'Selecione um centro de custo válido.'
+    'Selecione um centro de custo vÃ¡lido.'
   )
   const tipoExecucaoId = await resolveReferenceId(
     'tipo_execucao',
     dados.tipoExecucao || 'PROPRIO',
-    'Selecione o tipo de execução.'
+    'Selecione o tipo de execuÃ§Ã£o.'
   )
   return {
     centroServicoId,

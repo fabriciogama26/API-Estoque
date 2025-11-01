@@ -1354,6 +1354,7 @@ const localApi = {
           valorUnitario: Number(dados.valorUnitario),
           usuarioResponsavel: usuario,
           dataRegistro: nowIso(),
+          camposAlterados: [],
         })
 
         return material
@@ -1382,22 +1383,53 @@ const localApi = {
           throw createError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
         }
 
+        const camposComparacao = [
+          'nome',
+          'fabricante',
+          'validadeDias',
+          'ca',
+          'valorUnitario',
+          'estoqueMinimo',
+          'ativo',
+          'descricao',
+          'grupoMaterial',
+          'numeroCalcado',
+          'numeroVestimenta',
+          'numeroEspecifico',
+          'chaveUnica',
+        ]
+
+        const camposAlterados = []
+        camposComparacao.forEach((campo) => {
+          const valorAtual = normalizeHistoryValue(atual[campo])
+          const valorNovo = normalizeHistoryValue(dadosCompletos[campo])
+          if (valorAtual !== valorNovo) {
+            camposAlterados.push({
+              campo,
+              de: atual[campo] ?? '',
+              para: dadosCompletos[campo] ?? '',
+            })
+          }
+        })
+
+        const agora = nowIso()
         const atualizado = {
           ...atual,
           ...dadosCompletos,
           usuarioAtualizacao: usuario,
-          atualizadoEm: nowIso(),
+          atualizadoEm: agora,
         }
 
         state.materiais[index] = atualizado
 
-        if (Number(dadosCompletos.valorUnitario) !== Number(atual.valorUnitario)) {
+        if (camposAlterados.length > 0) {
           state.materialPriceHistory.push({
             id: randomId(),
             materialId: id,
             valorUnitario: Number(dadosCompletos.valorUnitario),
             usuarioResponsavel: usuario,
-            dataRegistro: nowIso(),
+            dataRegistro: agora,
+            camposAlterados,
           })
         }
 

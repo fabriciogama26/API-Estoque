@@ -23,7 +23,7 @@ export function MateriaisHistoryModal({ modal, onClose }) {
     >
       <div className="materiais-record-history__modal" onClick={stopPropagation}>
         <header className="materiais-record-history__header">
-          <h3 id="record-history-title">Historico de precos - {modal.material?.nome}</h3>
+          <h3 id="record-history-title">Historico de edicoes - {modal.material?.nome}</h3>
           <button
             type="button"
             className="materiais-record-history__close"
