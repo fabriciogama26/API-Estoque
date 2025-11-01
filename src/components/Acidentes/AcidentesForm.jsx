@@ -546,6 +546,16 @@ export function AcidentesForm({
               ))}
             </select>
             <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novaLesao}
+                  onChange={(event) => setNovaLesao(event.target.value)}
+                  onKeyDown={handleNovaLesaoKeyDown}
+                  onBlur={handleNovaLesaoBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingLesoes}
+                />
+              </div>
               <button
                 type="button"
                 className="button button--ghost"
@@ -593,6 +603,16 @@ export function AcidentesForm({
               ))}
             </select>
             <div className="multi-select__actions">
+              <div className="multi-select__input">
+                <input
+                  value={novaParte}
+                  onChange={(event) => setNovaParte(event.target.value)}
+                  onKeyDown={handleNovaParteKeyDown}
+                  onBlur={handleNovaParteBlur}
+                  placeholder="Digite e pressione Enter para adicionar"
+                  disabled={isLoadingPartes}
+                />
+              </div>
               <button
                 type="button"
                 className="button button--ghost"
