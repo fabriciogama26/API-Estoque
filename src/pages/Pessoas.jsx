@@ -19,6 +19,7 @@ import {
   extractCentrosServico,
   extractCargos,
   extractSetores,
+  extractTiposExecucao,
 } from '../rules/PessoasRules.js'
 import { resolveUsuarioNome } from '../utils/PessoasUtils.js'
 
@@ -68,6 +69,29 @@ export function PessoasPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [referencias, setReferencias] = useState({
+    centrosServico: [],
+    setores: [],
+    cargos: [],
+    tiposExecucao: [],
+  })
+
+  const refreshReferencias = useCallback(async () => {
+    if (!api.references || typeof api.references.pessoas !== 'function') {
+      return
+    }
+    try {
+      const data = await api.references.pessoas()
+      setReferencias({
+        centrosServico: data?.centrosServico ?? [],
+        setores: data?.setores ?? [],
+        cargos: data?.cargos ?? [],
+        tiposExecucao: data?.tiposExecucao ?? [],
+      })
+    } catch (err) {
+      console.warn('Falha ao carregar referencias de pessoas.', err)
+    }
+  }, [api])
 
   const loadPessoas = useCallback(
     async (params, refreshOptions = false) => {
@@ -83,6 +107,7 @@ export function PessoasPage() {
 
         if (optionsData) {
           setPessoasOptions(optionsData ?? [])
+          await refreshReferencias()
         }
         setPessoas(filteredData ?? [])
       } catch (err) {
@@ -91,17 +116,25 @@ export function PessoasPage() {
         setIsLoading(false)
       }
     },
-    [pessoasOptions.length],
+    [pessoasOptions.length, refreshReferencias],
   )
 
   useEffect(() => {
     loadPessoas(PESSOAS_FILTER_DEFAULT, true)
   }, [loadPessoas])
 
+  useEffect(() => {
+    refreshReferencias()
+  }, [refreshReferencias])
+
   const handleFormChange = (event) => {
     const { name, value } = event.target
     if (name === 'centroServico') {
       setForm((prev) => ({ ...prev, centroServico: value, local: value }))
+      return
+    }
+    if (name === 'tipoExecucao') {
+      setForm((prev) => ({ ...prev, [name]: value.toUpperCase() }))
       return
     }
     setForm((prev) => ({ ...prev, [name]: value }))
@@ -146,6 +179,7 @@ export function PessoasPage() {
       setHistoryCache({})
       setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
       await loadPessoas(filters, true)
+      await refreshReferencias()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -204,9 +238,47 @@ export function PessoasPage() {
     [pessoas],
   )
 
-  const centrosServico = useMemo(() => extractCentrosServico(pessoasOptions), [pessoasOptions])
-  const setores = useMemo(() => extractSetores(pessoasOptions), [pessoasOptions])
-  const cargos = useMemo(() => extractCargos(pessoasOptions), [pessoasOptions])
+  const centrosServico = useMemo(() => {
+    const referenciasNomes = (referencias.centrosServico ?? []).map((item) => item?.nome ?? '').filter(Boolean)
+    if (referenciasNomes.length > 0) {
+      return referenciasNomes
+    }
+    return extractCentrosServico(pessoasOptions)
+  }, [referencias.centrosServico, pessoasOptions])
+
+  const setores = useMemo(() => {
+    const referenciasNomes = (referencias.setores ?? []).map((item) => item?.nome ?? '').filter(Boolean)
+    if (referenciasNomes.length > 0) {
+      return referenciasNomes
+    }
+    return extractSetores(pessoasOptions)
+  }, [referencias.setores, pessoasOptions])
+
+  const cargos = useMemo(() => {
+    const referenciasNomes = (referencias.cargos ?? []).map((item) => item?.nome ?? '').filter(Boolean)
+    if (referenciasNomes.length > 0) {
+      return referenciasNomes
+    }
+    return extractCargos(pessoasOptions)
+  }, [referencias.cargos, pessoasOptions])
+
+  const tiposExecucao = useMemo(() => {
+    const referenciasNomes = (referencias.tiposExecucao ?? []).map((item) => item?.nome ?? '').filter(Boolean)
+    if (referenciasNomes.length > 0) {
+      return referenciasNomes
+    }
+    return extractTiposExecucao(pessoasOptions)
+  }, [referencias.tiposExecucao, pessoasOptions])
+
+  const formOptions = useMemo(
+    () => ({
+      centrosServico,
+      setores,
+      cargos,
+      tiposExecucao,
+    }),
+    [centrosServico, setores, cargos, tiposExecucao],
+  )
 
   return (
     <div className="stack">
@@ -224,6 +296,7 @@ export function PessoasPage() {
         editingPessoa={editingPessoa}
         onCancel={cancelEdit}
         error={error}
+        options={formOptions}
       />
 
       <PessoasFilters

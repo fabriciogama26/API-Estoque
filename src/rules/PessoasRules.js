@@ -106,3 +106,7 @@ export function extractCargos(pessoas) {
 export function extractSetores(pessoas) {
   return uniqueSorted(pessoas.map((pessoa) => pessoa.setor))
 }
+
+export function extractTiposExecucao(pessoas) {
+  return uniqueSorted(pessoas.map((pessoa) => pessoa.tipoExecucao))
+}
