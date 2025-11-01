@@ -32,14 +32,15 @@ export function AcidentesForm({
 
   const [novaLesao, setNovaLesao] = useState('')
   const [parteSelecionada, setParteSelecionada] = useState('')
-  const [novoAgente, setNovoAgente] = useState('')
-  const [novoTipo, setNovoTipo] = useState('')
-  const [agentesAdicionados, setAgentesAdicionados] = useState([])
-  const [tiposAdicionados, setTiposAdicionados] = useState([])
+  const [agenteSelecionado, setAgenteSelecionado] = useState('')
+  const [tipoSelecionado, setTipoSelecionado] = useState('')
 
   useEffect(() => {
-    setTiposAdicionados([])
-    setNovoTipo('')
+    setAgenteSelecionado('')
+  }, [form.agente])
+
+  useEffect(() => {
+    setTipoSelecionado('')
   }, [form.agente])
 
 
@@ -82,11 +83,11 @@ export function AcidentesForm({
         map.set(chave, nome)
       }
     }
-    agentesAdicionados.forEach(addOption)
     if (Array.isArray(agentes)) {
       agentes.forEach(addOption)
     }
     addOption(form.agente)
+    addOption(agenteSelecionado)
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   })()
 
@@ -102,11 +103,11 @@ export function AcidentesForm({
         map.set(chave, nome)
       }
     }
-    tiposAdicionados.forEach(addOption)
     if (Array.isArray(tipos)) {
       tipos.forEach(addOption)
     }
     addOption(form.tipo)
+    addOption(tipoSelecionado)
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   })()
 
@@ -212,46 +213,22 @@ export function AcidentesForm({
     onChange({ target: { name: 'partesLesionadas', value: lista } })
   }
 
-  const adicionarNovoAgente = () => {
-    const valor = normalizeText(novoAgente)
+  const adicionarAgenteSelecionado = () => {
+    const valor = normalizeText(agenteSelecionado)
     if (!valor) {
       return
-    }
-    const chave = valor.toLocaleLowerCase('pt-BR')
-    const listaAtual = [
-      ...agentesAdicionados,
-      ...(Array.isArray(agentes) ? agentes : []),
-      form.agente,
-    ]
-    const jaExiste = listaAtual.some(
-      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
-    )
-    if (!jaExiste) {
-      setAgentesAdicionados((prev) => [...prev, valor])
     }
     onChange({ target: { name: 'agente', value: valor } })
-    setNovoAgente('')
+    setAgenteSelecionado('')
   }
 
-  const adicionarNovoTipo = () => {
-    const valor = normalizeText(novoTipo)
+  const adicionarTipoSelecionado = () => {
+    const valor = normalizeText(tipoSelecionado)
     if (!valor) {
       return
     }
-    const chave = valor.toLocaleLowerCase('pt-BR')
-    const listaAtual = [
-      ...tiposAdicionados,
-      ...(Array.isArray(tipos) ? tipos : []),
-      form.tipo,
-    ]
-    const jaExiste = listaAtual.some(
-      (item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave,
-    )
-    if (!jaExiste) {
-      setTiposAdicionados((prev) => [...prev, valor])
-    }
     onChange({ target: { name: 'tipo', value: valor } })
-    setNovoTipo('')
+    setTipoSelecionado('')
   }
 
   const removerLesao = (lesaoParaRemover) => {
@@ -300,36 +277,10 @@ export function AcidentesForm({
     setParteSelecionada('')
   }
 
-  const handleNovoAgenteKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      adicionarNovoAgente()
-    }
-  }
-
-  const handleNovoTipoKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      adicionarNovoTipo()
-    }
-  }
-
-  const handleNovoAgenteBlur = () => {
-    if (normalizeText(novoAgente)) {
-      adicionarNovoAgente()
-    }
-  }
-
-  const handleNovoTipoBlur = () => {
-    if (normalizeText(novoTipo)) {
-      adicionarNovoTipo()
-    }
-  }
-
   const podeAdicionarLesao = Boolean(normalizeText(novaLesao))
   const podeAdicionarParte = Boolean(normalizeText(parteSelecionada))
-  const podeAdicionarAgente = Boolean(normalizeText(novoAgente))
-  const podeAdicionarTipo = Boolean(normalizeText(novoTipo))
+  const podeAdicionarAgente = Boolean(normalizeText(agenteSelecionado))
+  const podeAdicionarTipo = Boolean(normalizeText(tipoSelecionado))
 
   const matriculaPlaceholder = isLoadingPessoas ? 'Carregando matriculas...' : 'Selecione a matricula'
   const agentePlaceholder = isLoadingAgentes ? 'Carregando agentes...' : 'Selecione o agente'
@@ -363,9 +314,16 @@ export function AcidentesForm({
   })()
 
   const shouldDisableMatricula = isLoadingPessoas && pessoaOptions.length === 0
-  const shouldDisableTipo = !form.agente && !form.tipo
+  const shouldDisableTipoBase = !form.agente && !form.tipo
   const shouldDisableCentroServico = isLoadingPessoas && centroServicoOptions.length === 0
   const shouldDisableLocal = isLoadingLocais && localOptions.length === 0
+  const noAgentesDisponiveis = agenteOptions.length === 0
+  const noTiposDisponiveis = tipoOptions.length === 0
+  const shouldDisableTipo =
+    shouldDisableTipoBase ||
+    (isLoadingTipos && noTiposDisponiveis) ||
+    (noTiposDisponiveis && !form.tipo)
+  const shouldDisableAgente = (isLoadingAgentes && noAgentesDisponiveis) || noAgentesDisponiveis
   const noLesoesDisponiveis = lesaoSelectOptions.length === 0
   const noPartesDisponiveis = parteSelectOptions.length === 0
 
@@ -444,13 +402,110 @@ export function AcidentesForm({
           />
         </label>
         <label className="field">
-          <span>Tipo <span className="asterisco">*</span></span>
-          <div className="select-with-actions">
+          <span>Centro de servico <span className="asterisco">*</span></span>
+          <select
+            name="centroServico"
+            value={form.centroServico}
+            onChange={onChange}
+            required
+            disabled={shouldDisableCentroServico}
+          >
+            <option value="">{centroServicoPlaceholder}</option>
+            {centroServicoOptions.map((centro) => (
+              <option key={centro} value={centro}>
+                {centro}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Local <span className="asterisco">*</span></span>
+          <select
+            name="local"
+            value={form.local}
+            onChange={onChange}
+            required
+            disabled={shouldDisableLocal}
+          >
+            <option value="">{localPlaceholder}</option>
+            {localOptions.map((local) => (
+              <option key={local} value={local}>
+                {local}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>CAT</span>
+          <input
+            type="text"
+            name="cat"
+            value={form.cat}
+            onChange={onChange}
+            placeholder="000000"
+            inputMode="numeric"
+            pattern="[0-9]*"
+          />
+        </label>
+        <label className="field">
+          <span>CID</span>
+          <input name="cid" value={form.cid} onChange={onChange} placeholder="S93" />
+        </label>
+        <label className="field">
+          <span>Agente <span className="asterisco">*</span></span>
+          <div className="multi-select">
             <select
-              name="tipo"
-              value={form.tipo}
-              onChange={onChange}
-              required
+              name="agenteSelecionado"
+              value={agenteSelecionado}
+              onChange={(event) => setAgenteSelecionado(event.target.value)}
+              required={!form.agente}
+              disabled={shouldDisableAgente}
+            >
+              <option value="">{agentePlaceholder}</option>
+              {agenteOptions.map((agente) => (
+                <option key={agente} value={agente}>
+                  {agente}
+                </option>
+              ))}
+            </select>
+            <div className="multi-select__actions">
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={adicionarAgenteSelecionado}
+                disabled={!podeAdicionarAgente || shouldDisableAgente}
+              >
+                Adicionar
+              </button>
+            </div>
+            <div className="multi-select__chips">
+              {form.agente ? (
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => {
+                    setAgenteSelecionado('')
+                    setTipoSelecionado('')
+                    onChange({ target: { name: 'agente', value: '' } })
+                  }}
+                  aria-label={`Remover ${form.agente}`}
+                >
+                  {form.agente} <span aria-hidden="true">x</span>
+                </button>
+              ) : (
+                <span className="multi-select__placeholder">Nenhum agente selecionado</span>
+              )}
+            </div>
+          </div>
+        </label>
+        <label className="field">
+          <span>Tipo <span className="asterisco">*</span></span>
+          <div className="multi-select">
+            <select
+              name="tipoSelecionado"
+              value={tipoSelecionado}
+              onChange={(event) => setTipoSelecionado(event.target.value)}
+              required={!form.tipo}
               disabled={shouldDisableTipo}
             >
               <option value="">{tipoPlaceholder}</option>
@@ -461,69 +516,33 @@ export function AcidentesForm({
               ))}
             </select>
             <div className="multi-select__actions">
-              <div className="multi-select__input">
-                <input
-                  value={novoTipo}
-                  onChange={(event) => setNovoTipo(event.target.value)}
-                  onKeyDown={handleNovoTipoKeyDown}
-                  onBlur={handleNovoTipoBlur}
-                  placeholder="Digite e pressione Enter para adicionar"
-                  disabled={shouldDisableTipo || isLoadingTipos}
-                />
-              </div>
               <button
                 type="button"
                 className="button button--ghost"
-                onClick={adicionarNovoTipo}
+                onClick={adicionarTipoSelecionado}
                 disabled={!podeAdicionarTipo || shouldDisableTipo}
               >
                 Adicionar
               </button>
             </div>
-          </div>
-        </label>
-        <label className="field">
-          <span>Agente <span className="asterisco">*</span></span>
-          <div className="select-with-actions">
-            <select
-              name="agente"
-              value={form.agente}
-              onChange={onChange}
-              required
-              disabled={isLoadingAgentes && agenteOptions.length === 0}
-            >
-              <option value="">{agentePlaceholder}</option>
-              {agenteOptions.map((agente) => (
-                <option key={agente} value={agente}>
-                  {agente}
-                </option>
-              ))}
-            </select>
-            <div className="multi-select__actions">
-              <div className="multi-select__input">
-                <input
-                  value={novoAgente}
-                  onChange={(event) => setNovoAgente(event.target.value)}
-                  onKeyDown={handleNovoAgenteKeyDown}
-                  onBlur={handleNovoAgenteBlur}
-                  placeholder="Digite e pressione Enter para adicionar"
-                  disabled={isLoadingAgentes}
-                />
-              </div>
-              <button
-                type="button"
-                className="button button--ghost"
-                onClick={adicionarNovoAgente}
-                disabled={!podeAdicionarAgente}
-              >
-                Adicionar
-              </button>
+            <div className="multi-select__chips">
+              {form.tipo ? (
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => {
+                    setTipoSelecionado('')
+                    onChange({ target: { name: 'tipo', value: '' } })
+                  }}
+                  aria-label={`Remover ${form.tipo}`}
+                >
+                  {form.tipo} <span aria-hidden="true">x</span>
+                </button>
+              ) : (
+                <span className="multi-select__placeholder">Nenhum tipo selecionado</span>
+              )}
             </div>
           </div>
-        </label>
-        <label className="field">
-          <span>CID</span>
-          <input name="cid" value={form.cid} onChange={onChange} placeholder="S93" />
         </label>
         <label className="field">
           <span>Lesoes <span className="asterisco">*</span></span>
@@ -543,16 +562,6 @@ export function AcidentesForm({
               ))}
             </select>
             <div className="multi-select__actions">
-              <div className="multi-select__input">
-                <input
-                  value={novaLesao}
-                  onChange={(event) => setNovaLesao(event.target.value)}
-                  onKeyDown={handleNovaLesaoKeyDown}
-                  onBlur={handleNovaLesaoBlur}
-                  placeholder="Digite e pressione Enter para adicionar"
-                  disabled={isLoadingLesoes}
-                />
-              </div>
               <button
                 type="button"
                 className="button button--ghost"
@@ -600,16 +609,6 @@ export function AcidentesForm({
               ))}
             </select>
             <div className="multi-select__actions">
-              <div className="multi-select__input">
-                <input
-                  value={novaParte}
-                  onChange={(event) => setNovaParte(event.target.value)}
-                  onKeyDown={handleNovaParteKeyDown}
-                  onBlur={handleNovaParteBlur}
-                  placeholder="Digite e pressione Enter para adicionar"
-                  disabled={isLoadingPartes}
-                />
-              </div>
               <button
                 type="button"
                 className="button button--ghost"
@@ -637,52 +636,6 @@ export function AcidentesForm({
               )}
             </div>
           </div>
-        </label>
-        <label className="field">
-          <span>Centro de servico <span className="asterisco">*</span></span>
-          <select
-            name="centroServico"
-            value={form.centroServico}
-            onChange={onChange}
-            required
-            disabled={shouldDisableCentroServico}
-          >
-            <option value="">{centroServicoPlaceholder}</option>
-            {centroServicoOptions.map((centro) => (
-              <option key={centro} value={centro}>
-                {centro}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Local <span className="asterisco">*</span></span>
-          <select
-            name="local"
-            value={form.local}
-            onChange={onChange}
-            required
-            disabled={shouldDisableLocal}
-          >
-            <option value="">{localPlaceholder}</option>
-            {localOptions.map((local) => (
-              <option key={local} value={local}>
-                {local}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>CAT</span>
-          <input
-            type="text"
-            name="cat"
-            value={form.cat}
-            onChange={onChange}
-            placeholder="000000"
-            inputMode="numeric"
-            pattern="[0-9]*"
-          />
         </label>
       </div>
       {pessoasError ? <p className="feedback feedback--error">{pessoasError}</p> : null}
