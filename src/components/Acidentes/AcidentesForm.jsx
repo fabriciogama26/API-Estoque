@@ -30,7 +30,7 @@ export function AcidentesForm({
 }) {
   const normalizeText = (value) => (typeof value === 'string' ? value.trim() : '')
 
-  const [lesaoSelecionada, setLesaoSelecionada] = useState('')
+  const [novaLesao, setNovaLesao] = useState('')
   const [parteSelecionada, setParteSelecionada] = useState('')
   const [novoAgente, setNovoAgente] = useState('')
   const [novoTipo, setNovoTipo] = useState('')
@@ -181,13 +181,10 @@ export function AcidentesForm({
   })()
 
   useEffect(() => {
-    if (
-      lesaoSelecionada &&
-      !lesaoSelectOptions.some((option) => option.value === lesaoSelecionada)
-    ) {
-      setLesaoSelecionada('')
+    if (novaLesao && !lesaoSelectOptions.some((option) => option.value === novaLesao)) {
+      setNovaLesao('')
     }
-  }, [lesaoSelecionada, lesaoSelectOptions])
+  }, [novaLesao, lesaoSelectOptions])
 
   useEffect(() => {
     if (
@@ -268,7 +265,7 @@ export function AcidentesForm({
   }
 
   const handleLesoesSelectChange = (event) => {
-    setLesaoSelecionada(event.target.value)
+    setNovaLesao(event.target.value)
   }
 
   const handlePartesSelectChange = (event) => {
@@ -276,17 +273,17 @@ export function AcidentesForm({
   }
 
   const adicionarLesaoSelecionada = () => {
-    const valor = normalizeText(lesaoSelecionada)
+    const valor = normalizeText(novaLesao)
     if (!valor) {
       return
     }
     const chave = valor.toLocaleLowerCase('pt-BR')
     if (currentLesoes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
-      setLesaoSelecionada('')
+      setNovaLesao('')
       return
     }
     updateLesoes([...currentLesoes, valor])
-    setLesaoSelecionada('')
+    setNovaLesao('')
   }
 
   const adicionarParteSelecionada = () => {
@@ -329,7 +326,7 @@ export function AcidentesForm({
     }
   }
 
-  const podeAdicionarLesao = Boolean(normalizeText(lesaoSelecionada))
+  const podeAdicionarLesao = Boolean(normalizeText(novaLesao))
   const podeAdicionarParte = Boolean(normalizeText(parteSelecionada))
   const podeAdicionarAgente = Boolean(normalizeText(novoAgente))
   const podeAdicionarTipo = Boolean(normalizeText(novoTipo))
@@ -533,7 +530,7 @@ export function AcidentesForm({
           <div className="multi-select">
             <select
               name="lesoes"
-              value={lesaoSelecionada}
+              value={novaLesao}
               onChange={handleLesoesSelectChange}
               required={!currentLesoes.length}
               disabled={shouldDisableLesoes}
