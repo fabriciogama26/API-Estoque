@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { EntryIcon } from '../components/icons.jsx'
+import { TablePagination } from '../components/TablePagination.jsx'
+import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -58,8 +60,12 @@ export function EntradasPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const load = async (params = filters) => {
+  const load = async (params = filters, { resetPage = false } = {}) => {
+    if (resetPage) {
+      setCurrentPage(1)
+    }
     setIsLoading(true)
     setError(null)
     try {
@@ -77,7 +83,7 @@ export function EntradasPage() {
   }
 
   useEffect(() => {
-    load(filterInitial)
+    load(filterInitial, { resetPage: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -104,7 +110,7 @@ export function EntradasPage() {
       }
       await api.entradas.create(payload)
       setForm(initialForm)
-      await load(filters)
+      await load(filters, { resetPage: true })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -119,12 +125,12 @@ export function EntradasPage() {
 
   const handleFilterSubmit = (event) => {
     event.preventDefault()
-    load(filters)
+    load(filters, { resetPage: true })
   }
 
   const handleFilterClear = () => {
     setFilters({ ...filterInitial })
-    load(filterInitial)
+    load(filterInitial, { resetPage: true })
   }
 
   const materiaisMap = useMemo(() => {
@@ -134,6 +140,24 @@ export function EntradasPage() {
     })
     return map
   }, [materiais])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(entradas.length / TABLE_PAGE_SIZE))
+    setCurrentPage((prev) => {
+      if (prev < 1) {
+        return 1
+      }
+      if (prev > totalPages) {
+        return totalPages
+      }
+      return prev
+    })
+  }, [entradas.length])
+
+  const paginatedEntradas = useMemo(() => {
+    const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE
+    return entradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
+  }, [entradas, currentPage])
 
   return (
     <div className="stack">
@@ -245,7 +269,7 @@ export function EntradasPage() {
                 </tr>
               </thead>
               <tbody>
-                {entradas.map((entrada) => {
+                {paginatedEntradas.map((entrada) => {
                   const material = materiaisMap.get(entrada.materialId)
                   const valorUnitario = Number(material?.valorUnitario ?? 0)
                   const total = valorUnitario * Number(entrada.quantidade ?? 0)
@@ -267,6 +291,12 @@ export function EntradasPage() {
             </table>
           </div>
         ) : null}
+        <TablePagination
+          totalItems={entradas.length}
+          pageSize={TABLE_PAGE_SIZE}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
       </section>
     </div>
   )
