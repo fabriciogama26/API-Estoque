@@ -239,6 +239,21 @@ async function ensureAcidentePartes(nomes) {
   return lista
 }
 
+const normalizeAgenteInput = (agente) => {
+  if (!agente) {
+    return { id: null, nome: '' }
+  }
+  if (typeof agente === 'object') {
+    const nome = trim(agente.nome ?? agente.label ?? agente.value)
+    const id = agente.id ?? agente.agenteId ?? null
+    if (id || nome) {
+      return { id: id || null, nome }
+    }
+    return { id: null, nome }
+  }
+  return { id: null, nome: trim(agente) }
+}
+
 async function resolveAgenteId(agenteNome) {
   const nome = trim(agenteNome)
   if (!nome) {
@@ -1415,15 +1430,19 @@ export const api = {
       const data = await execute(
         supabase
           .from('acidente_agentes')
-          .select('nome, ativo, ordem')
+          .select('id, nome, ativo, ordem')
           .order('ordem', { ascending: true, nullsFirst: false })
           .order('nome', { ascending: true }),
         'Falha ao listar agentes de acidente.'
       )
       return (data ?? [])
         .filter((item) => item && item.nome && item.ativo !== false)
-        .map((item) => item.nome.trim())
-        .filter(Boolean)
+        .map((item) => ({
+          id: item.id ?? null,
+          nome: trim(item.nome),
+        }))
+        .filter((item) => Boolean(item.nome))
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     },
     async parts() {
       const data = await execute(
@@ -1448,10 +1467,10 @@ export const api = {
         })
     },
 
-    async lesions(agenteNome) {
-      const nomeAgente = trim(agenteNome)
-      let agenteId = null
-      if (nomeAgente) {
+    async lesions(agenteEntrada) {
+      const { nome: nomeAgente, id: agenteEntradaId } = normalizeAgenteInput(agenteEntrada)
+      let agenteId = agenteEntradaId ?? null
+      if (!agenteId && nomeAgente) {
         agenteId = await resolveAgenteId(nomeAgente)
       }
       let query = supabase
@@ -1482,20 +1501,23 @@ export const api = {
       return lista
     },
 
-    async agentTypes(agenteNome) {
-      const nome = trim(agenteNome)
-      if (!nome) {
+    async agentTypes(agenteEntrada) {
+      const { nome, id: agenteEntradaId } = normalizeAgenteInput(agenteEntrada)
+      if (!nome && !agenteEntradaId) {
         return []
       }
-      const agente = await execute(
-        supabase
-          .from('acidente_agentes')
-          .select('id')
-          .eq('nome', nome)
-          .limit(1),
-        'Falha ao localizar agente de acidente.'
-      )
-      const agenteId = agente?.[0]?.id
+      let agenteId = agenteEntradaId ?? null
+      if (!agenteId && nome) {
+        const agente = await execute(
+          supabase
+            .from('acidente_agentes')
+            .select('id')
+            .eq('nome', nome)
+            .limit(1),
+          'Falha ao localizar agente de acidente.'
+        )
+        agenteId = agente?.[0]?.id ?? null
+      }
       if (!agenteId) {
         return []
       }

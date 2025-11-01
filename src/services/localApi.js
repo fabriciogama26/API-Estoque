@@ -1600,8 +1600,12 @@ const localApi = {
         return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }))
       })
     },
-    async lesions(agenteNome) {
-      const filtro = trim(agenteNome)
+    async lesions(agenteEntrada) {
+      const filtro = trim(
+        typeof agenteEntrada === 'object'
+          ? agenteEntrada?.nome ?? agenteEntrada?.label ?? agenteEntrada?.value
+          : agenteEntrada,
+      )
       const filtroNormalizado = normalizeKeyPart(filtro)
       return readState((state) => {
         const mapa = new Map()
@@ -1668,21 +1672,39 @@ const localApi = {
     },
     async agents() {
       return readState((state) => {
-        const set = new Set(Object.keys(catalogoAcidenteAgentes))
+        const mapa = new Map()
+        Object.keys(catalogoAcidenteAgentes).forEach((nome) => {
+          const chave = normalizeKeyPart(nome)
+          if (!chave) {
+            return
+          }
+          if (!mapa.has(chave)) {
+            mapa.set(chave, { id: null, nome: nome.trim() })
+          }
+        })
         const lista = Array.isArray(state.acidentes) ? state.acidentes : []
         lista.forEach((acidente) => {
           const agentes = splitMultiValue(acidente.agentes ?? acidente.agente ?? '')
           agentes.forEach((valor) => {
-            if (valor) {
-              set.add(valor)
+            const nome = trim(valor)
+            const chave = normalizeKeyPart(nome)
+            if (!chave) {
+              return
+            }
+            if (!mapa.has(chave)) {
+              mapa.set(chave, { id: null, nome })
             }
           })
         })
-        return Array.from(set).sort((a, b) => a.localeCompare(b))
+        return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       })
     },
-    async agentTypes(agenteNome) {
-      const nome = trim(agenteNome)
+    async agentTypes(agenteEntrada) {
+      const nome = trim(
+        typeof agenteEntrada === 'object'
+          ? agenteEntrada?.nome ?? agenteEntrada?.label ?? agenteEntrada?.value
+          : agenteEntrada,
+      )
       if (!nome) {
         return []
       }
