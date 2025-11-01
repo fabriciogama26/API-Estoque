@@ -42,6 +42,21 @@ const toInputDate = (value) => {
   return `${year}-${month}-${day}`
 }
 
+const parseList = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  if (value === undefined || value === null) {
+    return []
+  }
+  return String(value)
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 export function AcidentesPage() {
   const { user } = useAuth()
   const [form, setForm] = useState(() => ({ ...ACIDENTES_FORM_DEFAULT }))
@@ -310,20 +325,58 @@ export function AcidentesPage() {
       })
       return
     }
+    if (name === 'agentes') {
+      const lista = Array.isArray(value)
+        ? value
+            .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+            .filter(Boolean)
+        : parseList(value)
+      setForm((prev) => {
+        const agenteAtual = lista.length ? lista[lista.length - 1] : ''
+        const next = { ...prev, agentes: lista, agente: agenteAtual }
+        if (!lista.length) {
+          next.tipos = []
+          next.tipo = ''
+          next.lesoes = []
+          next.lesao = ''
+        }
+        return next
+      })
+      if (!lista.length) {
+        setTipoOpcoes([])
+        setTiposError(null)
+      }
+      return
+    }
     if (name === 'agente') {
-      setForm((prev) => ({
-        ...prev,
-        agente: value,
-        tipo: '',
-        lesoes: [],
-        lesao: '',
-      }))
-      setTipoOpcoes([])
-      setTiposError(null)
+      setForm((prev) => {
+        if (prev.agente === value) {
+          return prev
+        }
+        const next = { ...prev, agente: value }
+        if (!value) {
+          next.tipos = []
+          next.tipo = ''
+          next.lesoes = []
+          next.lesao = ''
+        }
+        return next
+      })
+      if (!value) {
+        setTipoOpcoes([])
+        setTiposError(null)
+      }
       return
     }
     if (name === 'tipo') {
       setForm((prev) => ({ ...prev, tipo: value }))
+      return
+    }
+    if (name === 'tipos') {
+      const lista = Array.isArray(value)
+        ? value.map((item) => (item === undefined || item === null ? '' : String(item).trim())).filter(Boolean)
+        : parseList(value)
+      setForm((prev) => ({ ...prev, tipos: lista, tipo: lista.join('; ') }))
       return
     }
     if (name === 'lesoes') {
@@ -421,6 +474,8 @@ export function AcidentesPage() {
         : acidente.lesao
           ? [acidente.lesao]
           : []
+    const agentesSelecionados = parseList(acidente.agentes?.length ? acidente.agentes : acidente.agente)
+    const tiposSelecionados = parseList(acidente.tipos?.length ? acidente.tipos : acidente.tipo)
     setForm({
       matricula: acidente.matricula || '',
       nome: acidente.nome || '',
@@ -429,8 +484,10 @@ export function AcidentesPage() {
       diasPerdidos: acidente.diasPerdidos !== null && acidente.diasPerdidos !== undefined ? String(acidente.diasPerdidos) : '',
       diasDebitados:
         acidente.diasDebitados !== null && acidente.diasDebitados !== undefined ? String(acidente.diasDebitados) : '',
-      tipo: acidente.tipo || '',
-      agente: acidente.agente || '',
+      tipo: tiposSelecionados.join('; '),
+      tipos: tiposSelecionados,
+      agente: agentesSelecionados[agentesSelecionados.length - 1] || '',
+      agentes: agentesSelecionados,
       cid: acidente.cid || '',
       lesao: lesoesSelecionadas[0] || '',
       lesoes: lesoesSelecionadas,

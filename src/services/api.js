@@ -47,6 +47,20 @@ const normalizeStringArray = (value) => {
   return value.map((item) => trim(item)).filter(Boolean)
 }
 
+const splitMultiValue = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => trim(item)).filter(Boolean)
+  }
+  const texto = trim(value)
+  if (!texto) {
+    return []
+  }
+  return texto
+    .split(/[;,]/)
+    .map((parte) => parte.trim())
+    .filter(Boolean)
+}
+
 const resolveTextValue = (value) => {
   if (value === undefined || value === null) {
     return ''
@@ -470,6 +484,13 @@ function mapAcidenteRecord(record) {
     }
   }
   const lesaoPrincipal = lesoes[0] ?? ''
+  const tiposLista = splitMultiValue(record.tipos ?? record.tipo ?? '')
+  const tiposTexto = tiposLista.join('; ')
+  const agentesLista = splitMultiValue(record.agentes ?? record.agente ?? '')
+  const agentesTexto = agentesLista.join('; ')
+  const agentePrincipalRegistro = trim(record.agentePrincipal ?? record.agente_principal ?? '')
+  const agentePrincipal =
+    agentePrincipalRegistro || (agentesLista.length ? agentesLista[agentesLista.length - 1] : '')
   return {
     id: record.id,
     matricula: record.matricula ?? '',
@@ -478,8 +499,12 @@ function mapAcidenteRecord(record) {
     data: record.data ?? null,
     diasPerdidos: toNumber(record.diasPerdidos ?? record.dias_perdidos),
     diasDebitados: toNumber(record.diasDebitados ?? record.dias_debitados),
-    tipo: record.tipo ?? '',
-    agente: record.agente ?? '',
+    tipo: tiposTexto,
+    tipos: tiposLista,
+    agente: agentesTexto,
+    agentes: agentesLista,
+    tipoPrincipal: tiposLista[0] ?? '',
+    agentePrincipal,
     cid: record.cid ?? '',
     lesao: lesaoPrincipal,
     lesoes,
@@ -1525,12 +1550,23 @@ export const api = {
       }
       const lesaoPrincipal = lesoes[0] ?? ''
       const partePrincipal = partes[0] ?? trim(payload.parteLesionada)
+      const agentesLista = splitMultiValue(
+        payload.agentes ?? payload.agente ?? '',
+      )
+      const tiposLista = splitMultiValue(payload.tipos ?? payload.tipo ?? '')
+      const agentePrincipal = trim(
+        payload.agentePrincipal ??
+          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
+      )
+      const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
       const dados = {
         matricula: trim(payload.matricula),
         nome: trim(payload.nome),
         cargo: trim(payload.cargo),
-        tipo: trim(payload.tipo),
-        agente: trim(payload.agente),
+        tipo: tiposLista.join('; '),
+        tipoPrincipal,
+        agente: agentesLista.join('; '),
+        agentePrincipal,
         lesao: lesaoPrincipal,
         lesoes,
         centroServico: trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
@@ -1550,12 +1586,14 @@ export const api = {
       }
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
-      await ensureAcidenteLesoes(dados.agente, lesoes)
+      await ensureAcidenteLesoes(agentePrincipal, lesoes)
       const {
         centroServico: centroServicoDb,
         partesLesionadas: partesPayload,
         lesao: _lesaoPrincipal,
         partePrincipal: _partePrincipal,
+        agentePrincipal: _agentePrincipal,
+        tipoPrincipal: _tipoPrincipal,
         ...resto
       } = dados
       const registro = await executeSingle(
@@ -1606,12 +1644,26 @@ export const api = {
       const partePrincipal =
         partes[0] ??
         trim(payload.parteLesionada ?? atual.parteLesionada ?? atual.parte_lesionada ?? '')
+      const agentesLista = splitMultiValue(
+        payload.agentes ?? payload.agente ?? atual.agentes ?? atual.agente ?? '',
+      )
+      const tiposLista = splitMultiValue(
+        payload.tipos ?? payload.tipo ?? atual.tipos ?? atual.tipo ?? '',
+      )
+      const agentePrincipal = trim(
+        payload.agentePrincipal ??
+          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
+      )
+      const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
+
       const dados = {
         matricula: trim(payload.matricula ?? atual.matricula),
         nome: trim(payload.nome ?? atual.nome),
         cargo: trim(payload.cargo ?? atual.cargo),
-        tipo: trim(payload.tipo ?? atual.tipo),
-        agente: trim(payload.agente ?? atual.agente),
+        tipo: tiposLista.join('; '),
+        tipoPrincipal,
+        agente: agentesLista.join('; '),
+        agentePrincipal,
         lesao: lesaoPrincipal,
         lesoes,
         partesLesionadas: partes,
@@ -1633,7 +1685,7 @@ export const api = {
 
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
-      await ensureAcidenteLesoes(dados.agente, lesoes)
+      await ensureAcidenteLesoes(agentePrincipal, lesoes)
 
       const antigo = mapAcidenteRecord(atual)
       const novoComparacao = {

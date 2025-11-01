@@ -351,7 +351,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
 
   const availableOptions = {
     centrosServico: collectOptions(filtradosPorPeriodo, (item) => item?.centroServico ?? item?.setor ?? item?.local),
-    tipos: collectOptions(filtradosPorPeriodo, (item) => item?.tipo),
+    tipos: collectOptions(filtradosPorPeriodo, (item) => item?.tipos ?? item?.tipo),
     lesoes: collectOptions(
       filtradosPorPeriodo,
       (item) => item?.lesoes ?? (item?.lesao ? [item.lesao] : []),
@@ -360,7 +360,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
       filtradosPorPeriodo,
       (item) => item?.partesLesionadas ?? (item?.parteLesionada ? [item.parteLesionada] : []),
     ),
-    agentes: collectOptions(filtradosPorPeriodo, (item) => item?.agente),
+    agentes: collectOptions(filtradosPorPeriodo, (item) => item?.agentes ?? item?.agente),
     cargos: collectOptions(filtradosPorPeriodo, (item) => item?.cargo),
   }
 
@@ -368,7 +368,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     if (!matchesFilter(acidente?.centroServico ?? acidente?.setor ?? acidente?.local, centroServicoFiltro)) {
       return false
     }
-    if (!matchesFilter(acidente?.tipo, tipoFiltro)) {
+    if (!matchesFilter(acidente?.tipos ?? acidente?.tipo, tipoFiltro)) {
       return false
     }
     if (
@@ -384,7 +384,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     ) {
       return false
     }
-    if (!matchesFilter(acidente?.agente, agenteFiltro)) {
+    if (!matchesFilter(acidente?.agentes ?? acidente?.agente, agenteFiltro)) {
       return false
     }
     if (!matchesFilter(acidente?.cargo, cargoFiltro)) {
@@ -407,7 +407,11 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
   }
 
   const tendencia = montarTendencia(listaFiltrada, periodoInicio, periodoFim)
-  const tipos = distribuirPorChave(listaFiltrada, (item) => item?.tipo, 'Nao informado').map((item) => ({
+  const tipos = distribuirPorChave(
+    listaFiltrada,
+    (item) => item?.tipos ?? item?.tipo,
+    'Nao informado',
+  ).map((item) => ({
     tipo: item.label,
     total: item.total,
   }))
@@ -423,7 +427,11 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     cargo: item.label,
     total: item.total,
   }))
-  const agentes = distribuirPorChave(listaFiltrada, (item) => item?.agente, 'Nao informado').map((item) => ({
+  const agentes = distribuirPorChave(
+    listaFiltrada,
+    (item) => item?.agentes ?? item?.agente,
+    'Nao informado',
+  ).map((item) => ({
     agente: item.label,
     total: item.total,
   }))
