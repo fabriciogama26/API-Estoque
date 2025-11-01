@@ -61,25 +61,37 @@ const splitMultiValue = (value) => {
     .filter(Boolean)
 }
 
+const normalizeDisplayText = (valor) => {
+  if (valor === undefined || valor === null) {
+    return ''
+  }
+  const textoBase = typeof valor === 'string' ? valor : String(valor)
+  const texto = textoBase.trim()
+  if (!texto) {
+    return ''
+  }
+  return typeof texto.normalize === 'function' ? texto.normalize('NFC') : texto
+}
+
 const resolveTextValue = (value) => {
   if (value === undefined || value === null) {
     return ''
   }
   if (typeof value === 'string') {
-    return value.trim()
+    return normalizeDisplayText(value)
   }
   if (typeof value === 'object') {
     if (typeof value.nome === 'string') {
-      return value.nome.trim()
+      return normalizeDisplayText(value.nome)
     }
     if (typeof value.label === 'string') {
-      return value.label.trim()
+      return normalizeDisplayText(value.label)
     }
     if (typeof value.descricao === 'string') {
-      return value.descricao.trim()
+      return normalizeDisplayText(value.descricao)
     }
   }
-  return String(value).trim()
+  return normalizeDisplayText(value)
 }
 
 const ACIDENTE_HISTORY_FIELDS = [
@@ -297,6 +309,31 @@ const pessoaMatchesSearch = (pessoa, termo) => {
     pessoa.usuarioEdicao,
   ]
   return campos.some((campo) => normalizeSearchTerm(campo).includes(alvo))
+}
+
+const applyPessoaSearchFilters = (builder, like) => {
+  const baseFilters = [
+    `nome.ilike.${like}`,
+    `matricula.ilike.${like}`,
+    `usuarioCadastro.ilike.${like}`,
+    `usuarioEdicao.ilike.${like}`,
+  ]
+
+  let query = builder.or(baseFilters.join(','))
+
+  const relatedTables = [
+    'centros_servico',
+    'setores',
+    'cargos',
+    'centros_custo',
+    'tipo_execucao',
+  ]
+
+  relatedTables.forEach((table) => {
+    query = query.or(`nome.ilike.${like}`, { foreignTable: table })
+  })
+
+  return query
 }
 
 let agenteCatalogCache = null
@@ -1031,23 +1068,11 @@ export const api = {
         return builder
       }
 
-      const buildSearchOr = (like) =>
-        [
-          `nome.ilike.${like}`,
-          `matricula.ilike.${like}`,
-          `centros_servico.nome.ilike.${like}`,
-          `setores.nome.ilike.${like}`,
-          `cargos.nome.ilike.${like}`,
-          `tipo_execucao.nome.ilike.${like}`,
-          `"usuarioCadastro".ilike.${like}`,
-          `"usuarioEdicao".ilike.${like}`,
-        ].join(',')
-
       try {
         let query = buildQuery()
         if (termo) {
           const like = `%${termo}%`
-          query = query.or(buildSearchOr(like))
+          query = applyPessoaSearchFilters(query, like)
         }
         const data = await execute(query, 'Falha ao listar pessoas.')
         return (data ?? []).map(mapPessoaRecord)

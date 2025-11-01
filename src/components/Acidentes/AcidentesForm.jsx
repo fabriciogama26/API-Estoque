@@ -123,7 +123,6 @@ export function AcidentesForm({
     if (Array.isArray(tipos)) {
       tipos.forEach(addOption)
     }
-    addOption(form.tipo)
     addOption(tipoSelecionado)
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   })()
@@ -160,12 +159,6 @@ export function AcidentesForm({
         if (nome && !map.has(nome.toLowerCase())) {
           map.set(nome.toLowerCase(), { value: nome, label: label || nome })
         }
-      }
-    })
-    currentLesoes.forEach((lesao) => {
-      const nome = normalizeText(lesao)
-      if (nome && !map.has(nome.toLowerCase())) {
-        map.set(nome.toLowerCase(), { value: nome, label: nome })
       }
     })
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
