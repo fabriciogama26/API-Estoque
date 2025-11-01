@@ -430,7 +430,7 @@ export function AcidentesPage() {
         const chaveAnterior = normalizeAgenteKey(prev.agente ?? '')
         agenteAlterado = chaveAtual !== chaveAnterior
         const next = { ...prev, agentes: lista, agente: agenteAtual }
-        if (!lista.length || agenteAlterado) {
+        if (!lista.length) {
           next.tipos = []
           next.tipo = ''
           next.lesoes = []
@@ -443,7 +443,8 @@ export function AcidentesPage() {
         setTiposError(null)
         setLesaoOpcoes([])
         setLesoesError(null)
-      } else if (agenteAlterado) {
+      }
+      if (agenteAlterado) {
         setTipoOpcoes([])
         setTiposError(null)
         setLesaoOpcoes([])
@@ -462,7 +463,7 @@ export function AcidentesPage() {
         const chaveAtual = normalizeAgenteKey(value)
         alterou = chaveAnterior !== chaveAtual
         const next = { ...prev, agente: value }
-        if (!value || alterou) {
+        if (!value) {
           next.tipos = []
           next.tipo = ''
           next.lesoes = []
