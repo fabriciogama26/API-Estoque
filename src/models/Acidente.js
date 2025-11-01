@@ -1,3 +1,18 @@
+const splitList = (valor) => {
+  if (Array.isArray(valor)) {
+    return valor
+      .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  if (valor === undefined || valor === null) {
+    return []
+  }
+  return String(valor)
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 class Acidente {
   constructor({
     id,
@@ -9,7 +24,9 @@ class Acidente {
     diasDebitados,
     hht = null,
     tipo,
+    tipos = [],
     agente,
+    agentes = [],
     lesao,
     lesoes = [],
     parteLesionada,
@@ -33,8 +50,12 @@ class Acidente {
     this.diasPerdidos = diasPerdidos
     this.diasDebitados = diasDebitados
     this.hht = hht ?? null
-    this.tipo = tipo
-    this.agente = agente
+    const listaTipos = splitList(tipos.length ? tipos : tipo)
+    const listaAgentes = splitList(agentes.length ? agentes : agente)
+    this.tipos = listaTipos
+    this.tipo = listaTipos[0] ?? (tipo ? String(tipo).trim() : '')
+    this.agentes = listaAgentes
+    this.agente = listaAgentes[0] ?? (agente ? String(agente).trim() : '')
     const listaLesoes = Array.isArray(lesoes)
       ? lesoes.filter((item) => item && String(item).trim())
       : lesao
