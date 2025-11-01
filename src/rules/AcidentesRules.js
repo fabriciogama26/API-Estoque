@@ -176,7 +176,7 @@ export function createAcidentePayload(form, usuarioCadastro) {
   addLesao(form.lesao)
   const agentesSelecionados = collectTextList(form.agentes, form.agente)
   const tiposSelecionados = collectTextList(form.tipos, form.tipo)
-  const agentePrincipal = agentesSelecionados[0] ?? ''
+  const agentePrincipal = agentesSelecionados[agentesSelecionados.length - 1] ?? ''
   const tipoPrincipal = tiposSelecionados[0] ?? ''
   const partes = Array.isArray(form.partesLesionadas)
     ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)
@@ -230,7 +230,7 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
   addLesao(form.lesao)
   const agentesSelecionados = collectTextList(form.agentes, form.agente)
   const tiposSelecionados = collectTextList(form.tipos, form.tipo)
-  const agentePrincipal = agentesSelecionados[0] ?? ''
+  const agentePrincipal = agentesSelecionados[agentesSelecionados.length - 1] ?? ''
   const tipoPrincipal = tiposSelecionados[0] ?? ''
   const partes = Array.isArray(form.partesLesionadas)
     ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)

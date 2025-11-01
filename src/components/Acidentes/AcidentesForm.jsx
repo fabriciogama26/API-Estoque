@@ -223,8 +223,12 @@ export function AcidentesForm({
   const currentTipos = parseList(form.tipos?.length ? form.tipos : form.tipo)
 
   const updateAgentes = (lista) => {
-    onChange({ target: { name: 'agentes', value: lista } })
-    onChange({ target: { name: 'agente', value: lista[0] ?? '' } })
+    const normalizados = lista
+      .map((item) => normalizeText(item))
+      .filter(Boolean)
+    const ultimoSelecionado = normalizados[normalizados.length - 1] ?? ''
+    onChange({ target: { name: 'agentes', value: normalizados } })
+    onChange({ target: { name: 'agente', value: ultimoSelecionado } })
   }
 
   const updateTipos = (lista) => {

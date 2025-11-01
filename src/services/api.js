@@ -488,6 +488,9 @@ function mapAcidenteRecord(record) {
   const tiposTexto = tiposLista.join('; ')
   const agentesLista = splitMultiValue(record.agentes ?? record.agente ?? '')
   const agentesTexto = agentesLista.join('; ')
+  const agentePrincipalRegistro = trim(record.agentePrincipal ?? record.agente_principal ?? '')
+  const agentePrincipal =
+    agentePrincipalRegistro || (agentesLista.length ? agentesLista[agentesLista.length - 1] : '')
   return {
     id: record.id,
     matricula: record.matricula ?? '',
@@ -501,7 +504,7 @@ function mapAcidenteRecord(record) {
     agente: agentesTexto,
     agentes: agentesLista,
     tipoPrincipal: tiposLista[0] ?? '',
-    agentePrincipal: agentesLista[0] ?? '',
+    agentePrincipal,
     cid: record.cid ?? '',
     lesao: lesaoPrincipal,
     lesoes,
@@ -1551,7 +1554,10 @@ export const api = {
         payload.agentes ?? payload.agente ?? '',
       )
       const tiposLista = splitMultiValue(payload.tipos ?? payload.tipo ?? '')
-      const agentePrincipal = trim(payload.agentePrincipal ?? agentesLista[0] ?? '')
+      const agentePrincipal = trim(
+        payload.agentePrincipal ??
+          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
+      )
       const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
       const dados = {
         matricula: trim(payload.matricula),
@@ -1644,7 +1650,10 @@ export const api = {
       const tiposLista = splitMultiValue(
         payload.tipos ?? payload.tipo ?? atual.tipos ?? atual.tipo ?? '',
       )
-      const agentePrincipal = trim(payload.agentePrincipal ?? agentesLista[0] ?? '')
+      const agentePrincipal = trim(
+        payload.agentePrincipal ??
+          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
+      )
       const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
 
       const dados = {

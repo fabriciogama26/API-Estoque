@@ -937,7 +937,7 @@ const sanitizeAcidentePayload = (payload = {}) => {
     tipo: tipos.join('; '),
     tipoPrincipal: tipos[0] ?? '',
     agente: agentes.join('; '),
-    agentePrincipal: agentes[0] ?? '',
+    agentePrincipal: agentes[agentes.length - 1] ?? '',
     lesao: lesoes[0] ?? trim(payload.lesao),
     lesoes,
     parteLesionada: partes[0] ?? trim(payload.parteLesionada),

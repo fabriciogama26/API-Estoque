@@ -327,10 +327,13 @@ export function AcidentesPage() {
     }
     if (name === 'agentes') {
       const lista = Array.isArray(value)
-        ? value.map((item) => (item === undefined || item === null ? '' : String(item).trim())).filter(Boolean)
+        ? value
+            .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+            .filter(Boolean)
         : parseList(value)
       setForm((prev) => {
-        const next = { ...prev, agentes: lista, agente: lista[0] ?? '' }
+        const agenteAtual = lista.length ? lista[lista.length - 1] : ''
+        const next = { ...prev, agentes: lista, agente: agenteAtual }
         if (!lista.length) {
           next.tipos = []
           next.tipo = ''
@@ -483,7 +486,7 @@ export function AcidentesPage() {
         acidente.diasDebitados !== null && acidente.diasDebitados !== undefined ? String(acidente.diasDebitados) : '',
       tipo: tiposSelecionados.join('; '),
       tipos: tiposSelecionados,
-      agente: agentesSelecionados[0] || '',
+      agente: agentesSelecionados[agentesSelecionados.length - 1] || '',
       agentes: agentesSelecionados,
       cid: acidente.cid || '',
       lesao: lesoesSelecionadas[0] || '',
