@@ -1,72 +1,73 @@
-﻿Guia: alternar modo local e Supabase
+Guia: alternar modo local e Supabase
 ===================================
 
 Resumo
 ------
-- **Modo remote (default)**: usa Supabase para autenticacao e banco. Requer `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` e a API serverless apontando para um projeto Supabase funcional.
-- **Modo local**: ignora Supabase, persiste dados no navegador (`localStorage`) e usa seeds iniciais de `src/data/local-seed.json`. Ideal para desenvolvimento offline ou prototipos.
+- **Modo remoto (padrão):** usa Supabase para autenticação e banco de dados. Requer `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` configurados no `.env.local` e no ambiente de deploy.
+- **Modo local:** ignora Supabase, persiste dados no navegador (`localStorage`) e usa seeds de `src/data/local-seed.json`. Ideal para desenvolvimento offline ou demonstrações rápidas.
 
 Requisitos para modo local
 --------------------------
-1. Certifique-se de iniciar o Vite normalmente (`npm run dev`).
-2. Configure no arquivo `.env.local`:
+1. Inicie o Vite normalmente (`npm run dev`).
+2. Configure `.env.local` com:
    ```
    VITE_DATA_MODE=local
-   VITE_LOCAL_USERNAME=admin        # opcional (padrao: admin)
-   VITE_LOCAL_PASSWORD=admin123     # opcional (padrao: admin123)
+   VITE_LOCAL_USERNAME=admin        # opcional (padrão: admin)
+   VITE_LOCAL_PASSWORD=admin123     # opcional (padrão: admin123)
    VITE_LOCAL_DISPLAY_NAME=Administrador Local  # opcional
    ```
-3. Limpe o armazenamento anterior, se desejar reiniciar os dados:
-   - Apague a chave `api-estoque-local-data-v1` no `localStorage` via ferramentas do navegador.
-   - Opcionalmente remova `api-estoque-auth` para forcar novo login.
-4. O login aceita apenas as credenciais definidas acima.
+3. Limpe dados anteriores se quiser reiniciar o ambiente:
+   - Remova a chave `api-estoque-local-data-v1` do `localStorage`.
+   - Opcional: apague `api-estoque-auth` para forçar novo login.
+4. O login aceitará apenas as credenciais definidas acima.
 
 Requisitos para modo Supabase
 -----------------------------
-1. Garanta que as variaveis ja existentes estejam definidas:
+1. Defina as variáveis:
    ```
    VITE_SUPABASE_URL=...
    VITE_SUPABASE_ANON_KEY=...
    ```
 2. Deixe `VITE_DATA_MODE` ausente ou defina `VITE_DATA_MODE=remote`.
-3. Cadastre usuarios e dados diretamente no Supabase.
+3. Garanta que usuários e dados estejam cadastrados no projeto Supabase correspondente.
 
 Como alternar rapidamente
 -------------------------
-1. **Ir para modo local**:
+1. **Ir para modo local:**
    - Ajuste `.env.local` com `VITE_DATA_MODE=local` e as credenciais desejadas.
    - Reinicie o servidor Vite.
-   - (Opcional) Limpe as chaves `api-estoque-auth` e `api-estoque-local-data-v1` no navegador para reiniciar dados e sessao.
-2. **Voltar ao modo Supabase**:
-   - Remova `VITE_DATA_MODE` ou defina `VITE_DATA_MODE=remote`.
-   - Certifique-se de que as variaveis do Supabase estejam corretas.
-   - Reinicie o Vite.
-   - Limpe `api-estoque-auth` caso a sessao local esteja cacheada.
+   - (Opcional) Limpe `api-estoque-auth` e `api-estoque-local-data-v1` no navegador para começar do zero.
+2. **Voltar ao modo Supabase:**
+   - Remova `VITE_DATA_MODE` ou defina `remote`.
+   - Confirme as variáveis `VITE_SUPABASE_*`.
+   - Reinicie o Vite e limpe `api-estoque-auth` se ainda existir sessão local.
 
 O que muda entre os modos
 -------------------------
-- **Autenticacao**:
-  - Local: valido apenas as credenciais do `.env.local`.
-  - Supabase: utiliza `supabase.auth.signInWithPassword`.
-- **Persistencia**:
-  - Local: `localStorage` (chave `api-estoque-local-data-v1`). Seeds iniciais sao carregados uma unica vez.
-  - Supabase: tabelas reais (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`).
-- **Health check**:
-  - Local: `SystemStatus` exibe Modo local ativo.
-  - Supabase: tenta checar API e consulta uma tabela do Supabase.
+- **Autenticação:**
+  - Local: `AuthContext` valida usuário/senha definidos em `.env.local`.
+  - Supabase: usa `supabase.auth.signInWithPassword` e mantém sessão via SDK.
+- **Persistência:**
+  - Local: `localStorage` (`api-estoque-local-data-v1`). Seeds são carregados uma única vez.
+  - Supabase: tabelas reais (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`, domínios etc.).
+- **Referências dinâmicas:**
+  - Local: listas (centros, cargos, tipos, agentes) vêm do seed.
+  - Supabase: consultas às tabelas de domínio via `api.references.*` e `api.acidentes.*`.
+- **Status na interface:**
+  - O componente `SystemStatus` (sidebar) exibe "Modo local" ou "Modo Supabase" conforme a configuração.
 
-Boas praticas
+Boas práticas
 -------------
-- Versione `.env.local.example` com caminhos comentados para lembrar valores padrao.
-- Sempre reinicie o Vite apos mudar `VITE_DATA_MODE`.
-- Quando alternar para Supabase, confirme o acesso executando `/api/health` no navegador ou via curl com token valido.
-- Para resetar somente os dados locais mantenha o modo local e limpe a chave `api-estoque-local-data-v1`; as credenciais de login permanecem.
+- Versione um `.env.local.example` com placeholders para lembrar as variáveis suportadas.
+- Sempre reinicie o Vite após mudar `VITE_DATA_MODE`.
+- Ao mudar para Supabase, valide rapidamente realizando login e acessando uma tela que consulte dados (Estoque ou Dashboard).
+- Para resetar apenas os dados locais, mantenha o modo local ativo e limpe `api-estoque-local-data-v1`.
 
-Solucao de problemas
+Solução de problemas
 --------------------
-- **Login falha no modo local**: verifique as variaveis `VITE_LOCAL_*` e se o navegador nao manteve um valor antigo em `api-estoque-auth`.
-- **Dashboard vazio no modo local**: confirme se os seeds foram carregados (verifique `localStorage`). Se estiver vazio, limpe a chave para recarregar os seeds.
-  * Estoque: processado por `localApi.estoque.dashboard` (`src/lib/estoque.js`).
-  * Acidentes: processado por `localApi.acidentes.dashboard` (`src/lib/acidentesDashboard.js`), que tambem preenche as listas de filtros dinamicos.
-- **Erros de Supabase quando deveria estar local**: garanta que `VITE_DATA_MODE=local` foi salvo e que o Vite foi reiniciado. O `SystemStatus` deve indicar Modo local ativo.
-- **Erros 401 no modo Supabase**: a sessao pode ter expirado; refaca login e confirme que as variaveis `VITE_SUPABASE_*` apontam para o projeto correto.
+- **Login falha no modo local:** verifique `VITE_LOCAL_*` e se `api-estoque-auth` não guarda credenciais antigas.
+- **Dashboard vazio no modo local:** confirme se os seeds foram carregados no `localStorage`. Caso contrário, apague `api-estoque-local-data-v1`.
+  * Estoque: calculado por `localApi.estoque.dashboard` (`src/lib/estoque.js`).
+  * Acidentes: calculado por `localApi.acidentes.dashboard` (`src/lib/acidentesDashboard.js`).
+- **Erros de Supabase no modo local:** confirme `VITE_DATA_MODE=local` e reinicie o Vite. O `SystemStatus` deve indicar modo local.
+- **Erros 401 no modo Supabase:** a sessão pode ter expirado. Refazer login normalmente renova o token.

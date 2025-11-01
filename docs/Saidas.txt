@@ -1,51 +1,45 @@
-Tela: Saidas
+Tela: Saídas
 ============
 
-Objetivo
---------
-- Registrar entregas de EPIs a colaboradores e acompanhar status de devolucao/troca.
-- Garantir controle de estoque usando os mesmos dados do modo remoto ou local.
+Visão geral
+-----------
+- Registrar entregas de EPIs para colaboradores e acompanhar o histórico com filtros avançados.
+- Valida saldo de estoque antes de permitir a entrega e calcula automaticamente a data de troca quando o material possui validade.
+- Compartilha a mesma experiência tanto com Supabase quanto com o modo local.
 
-Campos do formulario
---------------------
-- `pessoaId` (select): preenchido com `dataClient.pessoas.list`.
-- `materialId` (select): preenchido com `dataClient.materiais.list`.
-- `quantidade` (numeric >= 1).
-- `centroCusto` (texto, obrigatorio): identifica o centro que recebera o custo da saida.
-- `centroServico` (texto, obrigatorio): centro de servico responsavel pelo colaborador.
-- `dataEntrega` (date opcional).
-- `status` (select na tabela; valores dinamicos).
+Fluxo principal
+---------------
+1. Ao montar, `SaidasPage` carrega pessoas, materiais e saídas em paralelo (`dataClient.pessoas.list`, `dataClient.materiais.list`, `dataClient.saidas.list`).
+2. O formulário envia `pessoaId`, `materialId`, `quantidade`, `centroCusto`, `centroServico`, `dataEntrega` e `usuarioResponsavel`.
+3. Após a criação (`dataClient.saidas.create(payload)`), o formulário é resetado e a listagem recarregada (volta para a primeira página).
+4. Filtros permitem refinar por termo, pessoa, material, centro de custo, centro de serviço, status e intervalo de datas. Os filtros são convertidos em query antes de chamar `dataClient.saidas.list`.
 
-Validacoes
-----------
-- HTML assegura campos obrigatorios e quantidade positiva.
-- Servico remoto verifica:
-  - Pessoa e material existentes em Supabase.
-  - Disponibilidade de estoque (`calcularSaldoMaterialAtual`).
-  - Centros de custo e servico preenchidos.
-  - Calcula `dataTroca` com base na validade do material.
-- Servico local aplica a mesma logica antes de persistir no `localStorage`.
+Preenchimento assistido
+-----------------------
+- Selecionar uma pessoa no formulário preenche automaticamente `centroServico` com o valor registrado na tabela `pessoas`.
+- O select de status na área de filtros é populado dinamicamente com os status existentes na lista carregada.
 
-APIs
-----
-- `dataClient.saidas.list()`
-- `dataClient.saidas.create(payload)`
-- Em modo remoto mapeia para `/api/saidas`.
+Regras de validação
+-------------------
+- Campos obrigatórios: pessoa, material, quantidade (≥ 1), centro de custo, centro de serviço e data de entrega.
+- Quantidade é convertida para número e rejeita valores não positivos.
+- No modo Supabase, `api.saidas.create` verifica se há estoque disponível (`calcularSaldoMaterialAtual`) e lança erro quando a quantidade solicitada excede o saldo.
+- A data de troca (`dataTroca`) é calculada no backend utilizando `calcularDataTroca` com base na validade do material.
 
-Fluxo de dados
---------------
-1. Depois de registrar uma saida, pagina recarrega pessoas, materiais e saidas em paralelo.
-2. Tabela mostra pessoa, material, quantidade, status, datas e valor total (calculado no cliente).
-3. Filtros por termo, pessoa, material, status, periodo.
+Tabela e paginação
+------------------
+- Paginação cliente (`TablePagination`) com tamanho definido por `TABLE_PAGE_SIZE`.
+- Exibe pessoa, material, quantidade, status, centro de custo/serviço, datas e valor total calculado (`quantidade * valorUnitario`).
+- Permite filtrar por termo (nome do colaborador ou material) sem novas chamadas à API.
 
-Regra de estoque
-----------------
-- Quantidade maxima permitida e o saldo atual do material.
-- Operacao retorna `estoqueAtual` apos o registro (utilizado em mensagens de feedback no futuro).
+Componentes e utilitários
+-------------------------
+- `src/pages/SaidasPage.jsx`
+- `src/components/TablePagination.jsx`
+- `src/services/api.js` / `src/services/localApi.js`
+- `src/lib/estoque.js` (funções de saldo e validade)
 
-Dependencias
-------------
-- `AuthContext` para `usuarioResponsavel`.
-- `dataClient` para alternar backend.
-- `SaidasRules` e `MateriaisRules` para reutilizar validacoes.
-- Seeds locais incluem duas saidas de exemplo.
+Impacto em outros módulos
+-------------------------
+- As saídas alimentam o cálculo de estoque atual (`docs/Estoque.txt`) e os indicadores do dashboard principal (`docs/Dashboard.txt`).
+- São a fonte de dados para o termo de EPI (`docs/TermosEpi.txt`).
