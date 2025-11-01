@@ -47,6 +47,20 @@ const normalizeStringArray = (value) => {
   return value.map((item) => trim(item)).filter(Boolean)
 }
 
+const splitMultiValue = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => trim(item)).filter(Boolean)
+  }
+  const texto = trim(value)
+  if (!texto) {
+    return []
+  }
+  return texto
+    .split(/[;,]/)
+    .map((parte) => parte.trim())
+    .filter(Boolean)
+}
+
 const resolveTextValue = (value) => {
   if (value === undefined || value === null) {
     return ''
@@ -223,6 +237,21 @@ async function ensureAcidentePartes(nomes) {
     console.warn('Nao foi possivel upsert partes lesionadas.', error)
   }
   return lista
+}
+
+const normalizeAgenteInput = (agente) => {
+  if (!agente) {
+    return { id: null, nome: '' }
+  }
+  if (typeof agente === 'object') {
+    const nome = trim(agente.nome ?? agente.label ?? agente.value)
+    const id = agente.id ?? agente.agenteId ?? null
+    if (id || nome) {
+      return { id: id || null, nome }
+    }
+    return { id: null, nome }
+  }
+  return { id: null, nome: trim(agente) }
 }
 
 async function resolveAgenteId(agenteNome) {
@@ -470,6 +499,13 @@ function mapAcidenteRecord(record) {
     }
   }
   const lesaoPrincipal = lesoes[0] ?? ''
+  const tiposLista = splitMultiValue(record.tipos ?? record.tipo ?? '')
+  const tiposTexto = tiposLista.join('; ')
+  const agentesLista = splitMultiValue(record.agentes ?? record.agente ?? '')
+  const agentesTexto = agentesLista.join('; ')
+  const agentePrincipalRegistro = trim(record.agentePrincipal ?? record.agente_principal ?? '')
+  const agentePrincipal =
+    agentePrincipalRegistro || (agentesLista.length ? agentesLista[agentesLista.length - 1] : '')
   return {
     id: record.id,
     matricula: record.matricula ?? '',
@@ -478,8 +514,12 @@ function mapAcidenteRecord(record) {
     data: record.data ?? null,
     diasPerdidos: toNumber(record.diasPerdidos ?? record.dias_perdidos),
     diasDebitados: toNumber(record.diasDebitados ?? record.dias_debitados),
-    tipo: record.tipo ?? '',
-    agente: record.agente ?? '',
+    tipo: tiposTexto,
+    tipos: tiposLista,
+    agente: agentesTexto,
+    agentes: agentesLista,
+    tipoPrincipal: tiposLista[0] ?? '',
+    agentePrincipal,
     cid: record.cid ?? '',
     lesao: lesaoPrincipal,
     lesoes,
@@ -1390,15 +1430,19 @@ export const api = {
       const data = await execute(
         supabase
           .from('acidente_agentes')
-          .select('nome, ativo, ordem')
+          .select('id, nome, ativo, ordem')
           .order('ordem', { ascending: true, nullsFirst: false })
           .order('nome', { ascending: true }),
         'Falha ao listar agentes de acidente.'
       )
       return (data ?? [])
         .filter((item) => item && item.nome && item.ativo !== false)
-        .map((item) => item.nome.trim())
-        .filter(Boolean)
+        .map((item) => ({
+          id: item.id ?? null,
+          nome: trim(item.nome),
+        }))
+        .filter((item) => Boolean(item.nome))
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     },
     async parts() {
       const data = await execute(
@@ -1423,10 +1467,10 @@ export const api = {
         })
     },
 
-    async lesions(agenteNome) {
-      const nomeAgente = trim(agenteNome)
-      let agenteId = null
-      if (nomeAgente) {
+    async lesions(agenteEntrada) {
+      const { nome: nomeAgente, id: agenteEntradaId } = normalizeAgenteInput(agenteEntrada)
+      let agenteId = agenteEntradaId ?? null
+      if (!agenteId && nomeAgente) {
         agenteId = await resolveAgenteId(nomeAgente)
       }
       let query = supabase
@@ -1457,20 +1501,23 @@ export const api = {
       return lista
     },
 
-    async agentTypes(agenteNome) {
-      const nome = trim(agenteNome)
-      if (!nome) {
+    async agentTypes(agenteEntrada) {
+      const { nome, id: agenteEntradaId } = normalizeAgenteInput(agenteEntrada)
+      if (!nome && !agenteEntradaId) {
         return []
       }
-      const agente = await execute(
-        supabase
-          .from('acidente_agentes')
-          .select('id')
-          .eq('nome', nome)
-          .limit(1),
-        'Falha ao localizar agente de acidente.'
-      )
-      const agenteId = agente?.[0]?.id
+      let agenteId = agenteEntradaId ?? null
+      if (!agenteId && nome) {
+        const agente = await execute(
+          supabase
+            .from('acidente_agentes')
+            .select('id')
+            .eq('nome', nome)
+            .limit(1),
+          'Falha ao localizar agente de acidente.'
+        )
+        agenteId = agente?.[0]?.id ?? null
+      }
       if (!agenteId) {
         return []
       }
@@ -1525,12 +1572,23 @@ export const api = {
       }
       const lesaoPrincipal = lesoes[0] ?? ''
       const partePrincipal = partes[0] ?? trim(payload.parteLesionada)
+      const agentesLista = splitMultiValue(
+        payload.agentes ?? payload.agente ?? '',
+      )
+      const tiposLista = splitMultiValue(payload.tipos ?? payload.tipo ?? '')
+      const agentePrincipal = trim(
+        payload.agentePrincipal ??
+          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
+      )
+      const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
       const dados = {
         matricula: trim(payload.matricula),
         nome: trim(payload.nome),
         cargo: trim(payload.cargo),
-        tipo: trim(payload.tipo),
-        agente: trim(payload.agente),
+        tipo: tiposLista.join('; '),
+        tipoPrincipal,
+        agente: agentesLista.join('; '),
+        agentePrincipal,
         lesao: lesaoPrincipal,
         lesoes,
         centroServico: trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
@@ -1550,12 +1608,14 @@ export const api = {
       }
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
-      await ensureAcidenteLesoes(dados.agente, lesoes)
+      await ensureAcidenteLesoes(agentePrincipal, lesoes)
       const {
         centroServico: centroServicoDb,
         partesLesionadas: partesPayload,
         lesao: _lesaoPrincipal,
         partePrincipal: _partePrincipal,
+        agentePrincipal: _agentePrincipal,
+        tipoPrincipal: _tipoPrincipal,
         ...resto
       } = dados
       const registro = await executeSingle(
@@ -1606,12 +1666,26 @@ export const api = {
       const partePrincipal =
         partes[0] ??
         trim(payload.parteLesionada ?? atual.parteLesionada ?? atual.parte_lesionada ?? '')
+      const agentesLista = splitMultiValue(
+        payload.agentes ?? payload.agente ?? atual.agentes ?? atual.agente ?? '',
+      )
+      const tiposLista = splitMultiValue(
+        payload.tipos ?? payload.tipo ?? atual.tipos ?? atual.tipo ?? '',
+      )
+      const agentePrincipal = trim(
+        payload.agentePrincipal ??
+          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
+      )
+      const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
+
       const dados = {
         matricula: trim(payload.matricula ?? atual.matricula),
         nome: trim(payload.nome ?? atual.nome),
         cargo: trim(payload.cargo ?? atual.cargo),
-        tipo: trim(payload.tipo ?? atual.tipo),
-        agente: trim(payload.agente ?? atual.agente),
+        tipo: tiposLista.join('; '),
+        tipoPrincipal,
+        agente: agentesLista.join('; '),
+        agentePrincipal,
         lesao: lesaoPrincipal,
         lesoes,
         partesLesionadas: partes,
@@ -1633,7 +1707,7 @@ export const api = {
 
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
-      await ensureAcidenteLesoes(dados.agente, lesoes)
+      await ensureAcidenteLesoes(agentePrincipal, lesoes)
 
       const antigo = mapAcidenteRecord(atual)
       const novoComparacao = {
