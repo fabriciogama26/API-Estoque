@@ -300,6 +300,32 @@ export function AcidentesForm({
     setParteSelecionada('')
   }
 
+  const handleNovaLesaoKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarLesaoSelecionada()
+    }
+  }
+
+  const handleNovaLesaoBlur = () => {
+    if (normalizeText(novaLesao)) {
+      adicionarLesaoSelecionada()
+    }
+  }
+
+  const handleNovaParteKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarParteSelecionada()
+    }
+  }
+
+  const handleNovaParteBlur = () => {
+    if (normalizeText(parteSelecionada)) {
+      adicionarParteSelecionada()
+    }
+  }
+
   const handleNovoAgenteKeyDown = (event) => {
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -602,8 +628,8 @@ export function AcidentesForm({
             <div className="multi-select__actions">
               <div className="multi-select__input">
                 <input
-                  value={novaParte}
-                  onChange={(event) => setNovaParte(event.target.value)}
+                  value={parteSelecionada}
+                  onChange={(event) => setParteSelecionada(event.target.value)}
                   onKeyDown={handleNovaParteKeyDown}
                   onBlur={handleNovaParteBlur}
                   placeholder="Digite e pressione Enter para adicionar"
