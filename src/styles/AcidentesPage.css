@@ -83,6 +83,10 @@
   gap: 0.5rem;
 }
 
+.multi-select select {
+  width: 100%;
+}
+
 .select-with-actions {
   display: flex;
   flex-direction: column;

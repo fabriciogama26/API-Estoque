@@ -30,8 +30,8 @@ export function AcidentesForm({
 }) {
   const normalizeText = (value) => (typeof value === 'string' ? value.trim() : '')
 
-  const [novaLesao, setNovaLesao] = useState('')
-  const [novaParte, setNovaParte] = useState('')
+  const [lesaoSelecionada, setLesaoSelecionada] = useState('')
+  const [parteSelecionada, setParteSelecionada] = useState('')
   const [novoAgente, setNovoAgente] = useState('')
   const [novoTipo, setNovoTipo] = useState('')
   const [agentesAdicionados, setAgentesAdicionados] = useState([])
@@ -41,6 +41,7 @@ export function AcidentesForm({
     setTiposAdicionados([])
     setNovoTipo('')
   }, [form.agente])
+
 
   const pessoaOptions = (() => {
     const map = new Map()
@@ -179,6 +180,24 @@ export function AcidentesForm({
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   })()
 
+  useEffect(() => {
+    if (
+      lesaoSelecionada &&
+      !lesaoSelectOptions.some((option) => option.value === lesaoSelecionada)
+    ) {
+      setLesaoSelecionada('')
+    }
+  }, [lesaoSelecionada, lesaoSelectOptions])
+
+  useEffect(() => {
+    if (
+      parteSelecionada &&
+      !parteSelectOptions.some((option) => option.value === parteSelecionada)
+    ) {
+      setParteSelecionada('')
+    }
+  }, [parteSelecionada, parteSelectOptions])
+
   const centroServicoOptions = Array.from(
     new Set([...(centrosServico || []), form.centroServico].map(normalizeText).filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b, 'pt-BR'))
@@ -249,66 +268,39 @@ export function AcidentesForm({
   }
 
   const handleLesoesSelectChange = (event) => {
-    const selecionadas = Array.from(event.target.selectedOptions || []).map((option) => option.value)
-    updateLesoes(selecionadas)
+    setLesaoSelecionada(event.target.value)
   }
 
   const handlePartesSelectChange = (event) => {
-    const selecionadas = Array.from(event.target.selectedOptions || []).map((option) => option.value)
-    updatePartes(selecionadas)
+    setParteSelecionada(event.target.value)
   }
 
-  const multiSelectSize = (lista) => {
-    const quantidade = Array.isArray(lista) ? lista.length : 0
-    if (quantidade === 0) {
-      return 3
-    }
-    return Math.min(6, Math.max(3, quantidade))
-  }
-
-  const lesoesSelectSize = multiSelectSize(lesaoSelectOptions)
-  const partesSelectSize = multiSelectSize(parteSelectOptions)
-
-  const adicionarNovaLesao = () => {
-    const valor = normalizeText(novaLesao)
+  const adicionarLesaoSelecionada = () => {
+    const valor = normalizeText(lesaoSelecionada)
     if (!valor) {
       return
     }
     const chave = valor.toLocaleLowerCase('pt-BR')
     if (currentLesoes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
-      setNovaLesao('')
+      setLesaoSelecionada('')
       return
     }
     updateLesoes([...currentLesoes, valor])
-    setNovaLesao('')
+    setLesaoSelecionada('')
   }
 
-  const adicionarNovaParte = () => {
-    const valor = normalizeText(novaParte)
+  const adicionarParteSelecionada = () => {
+    const valor = normalizeText(parteSelecionada)
     if (!valor) {
       return
     }
     const chave = valor.toLocaleLowerCase('pt-BR')
     if (currentPartes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
-      setNovaParte('')
+      setParteSelecionada('')
       return
     }
     updatePartes([...currentPartes, valor])
-    setNovaParte('')
-  }
-
-  const handleNovaLesaoKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      adicionarNovaLesao()
-    }
-  }
-
-  const handleNovaParteKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      adicionarNovaParte()
-    }
+    setParteSelecionada('')
   }
 
   const handleNovoAgenteKeyDown = (event) => {
@@ -325,18 +317,6 @@ export function AcidentesForm({
     }
   }
 
-  const handleNovaLesaoBlur = () => {
-    if (normalizeText(novaLesao)) {
-      adicionarNovaLesao()
-    }
-  }
-
-  const handleNovaParteBlur = () => {
-    if (normalizeText(novaParte)) {
-      adicionarNovaParte()
-    }
-  }
-
   const handleNovoAgenteBlur = () => {
     if (normalizeText(novoAgente)) {
       adicionarNovoAgente()
@@ -349,8 +329,8 @@ export function AcidentesForm({
     }
   }
 
-  const podeAdicionarLesao = Boolean(normalizeText(novaLesao))
-  const podeAdicionarParte = Boolean(normalizeText(novaParte))
+  const podeAdicionarLesao = Boolean(normalizeText(lesaoSelecionada))
+  const podeAdicionarParte = Boolean(normalizeText(parteSelecionada))
   const podeAdicionarAgente = Boolean(normalizeText(novoAgente))
   const podeAdicionarTipo = Boolean(normalizeText(novoTipo))
 
@@ -365,15 +345,35 @@ export function AcidentesForm({
     ? 'Carregando centros...'
     : 'Selecione o centro de servico'
   const localPlaceholder = isLoadingLocais ? 'Carregando locais...' : 'Selecione o local do acidente'
-  const lesoesPlaceholder = isLoadingLesoes ? 'Carregando lesoes...' : 'Selecione as lesoes'
-  const partesPlaceholder = isLoadingPartes ? 'Carregando partes...' : 'Selecione as partes lesionadas'
+  const lesoesPlaceholder = (() => {
+    if (isLoadingLesoes && lesaoSelectOptions.length === 0) {
+      return 'Carregando lesoes...'
+    }
+    if (lesaoSelectOptions.length === 0) {
+      return 'Nenhuma lesao disponivel'
+    }
+    return 'Selecione a lesao'
+  })()
+
+  const partesPlaceholder = (() => {
+    if (isLoadingPartes && parteSelectOptions.length === 0) {
+      return 'Carregando partes...'
+    }
+    if (parteSelectOptions.length === 0) {
+      return 'Nenhuma parte disponivel'
+    }
+    return 'Selecione a parte lesionada'
+  })()
 
   const shouldDisableMatricula = isLoadingPessoas && pessoaOptions.length === 0
   const shouldDisableTipo = !form.agente && !form.tipo
   const shouldDisableCentroServico = isLoadingPessoas && centroServicoOptions.length === 0
   const shouldDisableLocal = isLoadingLocais && localOptions.length === 0
-  const shouldDisableLesoes = isLoadingLesoes && lesaoSelectOptions.length === 0
-  const shouldDisablePartes = isLoadingPartes && parteSelectOptions.length === 0
+  const noLesoesDisponiveis = lesaoSelectOptions.length === 0
+  const noPartesDisponiveis = parteSelectOptions.length === 0
+
+  const shouldDisableLesoes = (isLoadingLesoes && noLesoesDisponiveis) || noLesoesDisponiveis
+  const shouldDisablePartes = (isLoadingPartes && noPartesDisponiveis) || noPartesDisponiveis
 
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -533,18 +533,12 @@ export function AcidentesForm({
           <div className="multi-select">
             <select
               name="lesoes"
-              value={currentLesoes}
+              value={lesaoSelecionada}
               onChange={handleLesoesSelectChange}
-              multiple
-              required
-              size={lesoesSelectSize}
+              required={!currentLesoes.length}
               disabled={shouldDisableLesoes}
             >
-              {lesaoSelectOptions.length === 0 ? (
-                <option value="" disabled>
-                  {lesoesPlaceholder}
-                </option>
-              ) : null}
+              <option value="">{lesoesPlaceholder}</option>
               {lesaoSelectOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -565,8 +559,8 @@ export function AcidentesForm({
               <button
                 type="button"
                 className="button button--ghost"
-                onClick={adicionarNovaLesao}
-                disabled={!podeAdicionarLesao}
+                onClick={adicionarLesaoSelecionada}
+                disabled={!podeAdicionarLesao || shouldDisableLesoes}
               >
                 Adicionar
               </button>
@@ -596,18 +590,12 @@ export function AcidentesForm({
           <div className="multi-select">
             <select
               name="partesLesionadas"
-              value={currentPartes}
+              value={parteSelecionada}
               onChange={handlePartesSelectChange}
-              multiple
-              required
-              size={partesSelectSize}
+              required={!currentPartes.length}
               disabled={shouldDisablePartes}
             >
-              {parteSelectOptions.length === 0 ? (
-                <option value="" disabled>
-                  {partesPlaceholder}
-                </option>
-              ) : null}
+              <option value="">{partesPlaceholder}</option>
               {parteSelectOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -628,8 +616,8 @@ export function AcidentesForm({
               <button
                 type="button"
                 className="button button--ghost"
-                onClick={adicionarNovaParte}
-                disabled={!podeAdicionarParte}
+                onClick={adicionarParteSelecionada}
+                disabled={!podeAdicionarParte || shouldDisablePartes}
               >
                 Adicionar
               </button>
