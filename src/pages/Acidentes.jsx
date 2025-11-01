@@ -239,14 +239,23 @@ export function AcidentesPage() {
       return null
     }
     return (
-      agenteOpcoes.find((item) => normalizeAgenteKey(extractAgenteNome(item)) === alvo) ?? null
+      agenteOpcoes.find((item) => {
+        if (!item) {
+          return false
+        }
+        const nomeItem = extractAgenteNome(item)
+        return normalizeAgenteKey(nomeItem) === alvo
+      }) ?? null
     )
   }, [agenteOpcoes, form.agente])
 
   const agenteAtualPayload = useMemo(() => {
     const nome = normalizeAgenteNome(form.agente)
     if (agenteSelecionadoInfo && typeof agenteSelecionadoInfo === 'object') {
-      const payloadNome = normalizeAgenteNome(extractAgenteNome(agenteSelecionadoInfo)) || nome
+      const nomeOficial = normalizeAgenteNome(
+        agenteSelecionadoInfo.nome ?? extractAgenteNome(agenteSelecionadoInfo),
+      )
+      const payloadNome = nomeOficial || nome
       return {
         nome: payloadNome,
         id: agenteSelecionadoInfo.id ?? agenteSelecionadoInfo.agenteId ?? null,

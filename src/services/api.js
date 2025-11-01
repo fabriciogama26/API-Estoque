@@ -254,11 +254,23 @@ const normalizeAgenteInput = (agente) => {
   return { id: null, nome: trim(agente) }
 }
 
+const normalizeAgenteLookupKey = (valor) => {
+  const texto = trim(valor)
+  if (!texto) {
+    return ''
+  }
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
 async function resolveAgenteId(agenteNome) {
   const nome = trim(agenteNome)
   if (!nome) {
     return null
   }
+  const alvoNormalizado = normalizeAgenteLookupKey(nome)
   try {
     ensureSupabase()
     const { data, error } = await supabase
@@ -280,7 +292,19 @@ async function resolveAgenteId(agenteNome) {
     if (fallbackError) {
       throw fallbackError
     }
-    return Array.isArray(fallback) && fallback.length === 1 ? fallback[0]?.id ?? null : null
+    if (Array.isArray(fallback) && fallback.length === 1) {
+      return fallback[0]?.id ?? null
+    }
+    const { data: catalogo, error: catalogoError } = await supabase
+      .from('acidente_agentes')
+      .select('id, nome')
+    if (catalogoError) {
+      throw catalogoError
+    }
+    const encontrado = (catalogo ?? []).find(
+      (item) => normalizeAgenteLookupKey(item?.nome) === alvoNormalizado,
+    )
+    return encontrado?.id ?? null
   } catch (lookupError) {
     console.warn('Nao foi possivel localizar agente para lesoes.', lookupError)
     return null
@@ -1473,6 +1497,8 @@ export const api = {
       if (!agenteId && nomeAgente) {
         agenteId = await resolveAgenteId(nomeAgente)
       }
+      const filtrarPorNome = !agenteId && Boolean(nomeAgente)
+      const alvoNormalizado = filtrarPorNome ? normalizeAgenteLookupKey(nomeAgente) : ''
       let query = supabase
         .from('acidente_lesoes')
         .select('agente_id, nome, ativo, ordem, agente:acidente_agentes(nome)')
@@ -1494,52 +1520,50 @@ export const api = {
             label: nome,
           }
         })
-      if (nomeAgente && !agenteId) {
-        const alvo = nomeAgente.toLowerCase()
-        return lista.filter((item) => (item.agente ?? '').toLowerCase() === alvo)
-      }
+        .filter((item) => {
+          if (!filtrarPorNome) {
+            return true
+          }
+          return normalizeAgenteLookupKey(item.agente) === alvoNormalizado
+        })
       return lista
     },
 
     async agentTypes(agenteEntrada) {
-      const { nome, id: agenteEntradaId } = normalizeAgenteInput(agenteEntrada)
-      if (!nome && !agenteEntradaId) {
+      const { nome: nomeAgente, id: agenteEntradaId } = normalizeAgenteInput(agenteEntrada)
+      if (!nomeAgente && !agenteEntradaId) {
         return []
       }
       let agenteId = agenteEntradaId ?? null
-      if (!agenteId && nome) {
-        const agente = await execute(
-          supabase
-            .from('acidente_agentes')
-            .select('id')
-            .eq('nome', nome)
-            .limit(1),
-          'Falha ao localizar agente de acidente.'
-        )
-        agenteId = agente?.[0]?.id ?? null
+      if (!agenteId && nomeAgente) {
+        agenteId = await resolveAgenteId(nomeAgente)
       }
-      if (!agenteId) {
-        return []
+      const filtrarPorNome = !agenteId && Boolean(nomeAgente)
+      const alvoNormalizado = filtrarPorNome ? normalizeAgenteLookupKey(nomeAgente) : ''
+      let query = supabase
+        .from('acidente_tipos')
+        .select('nome, ativo, ordem, agente_id, agente:acidente_agentes(nome)')
+        .order('ordem', { ascending: true, nullsFirst: false })
+        .order('nome', { ascending: true })
+      if (agenteId) {
+        query = query.eq('agente_id', agenteId)
       }
-      const data = await execute(
-        supabase
-          .from('acidente_tipos')
-          .select('nome, ativo, ordem')
-          .eq('agente_id', agenteId)
-          .order('ordem', { ascending: true, nullsFirst: false })
-          .order('nome', { ascending: true }),
-        'Falha ao listar tipos de acidente.'
-      )
+      const data = await execute(query, 'Falha ao listar tipos de acidente.')
       const tipos = new Set()
       ;(data ?? []).forEach((item) => {
-        if (item && item.nome && item.ativo !== false) {
-          const tipoNome = String(item.nome).trim()
-          if (tipoNome) {
-            tipos.add(tipoNome)
-          }
+        if (!item || item.ativo === false) {
+          return
+        }
+        const agenteNome = String(item?.agente?.nome ?? '').trim()
+        if (filtrarPorNome && normalizeAgenteLookupKey(agenteNome) !== alvoNormalizado) {
+          return
+        }
+        const tipoNome = String(item.nome ?? '').trim()
+        if (tipoNome) {
+          tipos.add(tipoNome)
         }
       })
-      return Array.from(tipos)
+      return Array.from(tipos).sort((a, b) => a.localeCompare(b, 'pt-BR'))
     },
     async locals() {
       const data = await execute(
