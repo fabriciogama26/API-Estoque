@@ -58,16 +58,17 @@ export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSavi
             <tr>
               <th>Nome</th>
               <th>Matricula</th>
-              <th>Cargo</th>
               <th>Data</th>
               <th>Dias perdidos</th>
               <th>Dias debitados</th>
-              <th>Tipo</th>
               <th>Agente</th>
-              <th>Centro de servico</th>
+              <th>Tipo</th>
+              <th>Lesoes</th>
+              <th>Partes lesionadas</th>
               <th>Local</th>
               <th>HHT</th>
               <th>CAT</th>
+              <th>CID</th>
               <th>Acao</th>
             </tr>
           </thead>
@@ -89,32 +90,33 @@ export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSavi
                 : acidente.lesao
                   ? [acidente.lesao]
                   : []
+              const agentesSelecionados = Array.isArray(acidente.agentes)
+                ? acidente.agentes.filter(Boolean)
+                : acidente.agente
+                  ? [acidente.agente]
+                  : []
+              const tiposSelecionados = Array.isArray(acidente.tipos)
+                ? acidente.tipos.filter(Boolean)
+                : acidente.tipo
+                  ? [acidente.tipo]
+                  : []
               return (
                 <tr key={acidente.id}>
                   <td>
                     <strong>{acidente.nome}</strong>
-                    {partesSelecionadas.length ? (
-                      <div className="data-table__muted">
-                        Partes lesionadas: {partesSelecionadas.join(', ')}
-                      </div>
-                    ) : null}
-                    {lesoesSelecionadas.length ? (
-                      <div className="data-table__muted">
-                        Lesoes: {lesoesSelecionadas.join(', ')}
-                      </div>
-                    ) : null}
                   </td>
                   <td>{acidente.matricula || '-'}</td>
-                  <td>{acidente.cargo || '-'}</td>
                   <td>{formatDate(acidente.data)}</td>
                   <td>{formatNumber(acidente.diasPerdidos)}</td>
                   <td>{formatNumber(acidente.diasDebitados)}</td>
-                  <td>{acidente.tipo || '-'}</td>
-                  <td>{acidente.agente || '-'}</td>
-                  <td>{(acidente.centroServico ?? acidente.setor) || '-'}</td>
+                  <td>{agentesSelecionados.length ? agentesSelecionados.join(', ') : '-'}</td>
+                  <td>{tiposSelecionados.length ? tiposSelecionados.join(', ') : '-'}</td>
+                  <td>{lesoesSelecionadas.length ? lesoesSelecionadas.join(', ') : '-'}</td>
+                  <td>{partesSelecionadas.length ? partesSelecionadas.join(', ') : '-'}</td>
                   <td>{acidente.local || '-'}</td>
                   <td>{formatNumber(acidente.hht)}</td>
                   <td>{acidente.cat || '-'}</td>
+                  <td>{acidente.cid || '-'}</td>
                   <td>
                     <div className="pessoas-data-table__actions">
                       <button

@@ -42,6 +42,56 @@ const toInputDate = (value) => {
   return `${year}-${month}-${day}`
 }
 
+const parseList = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  if (value === undefined || value === null) {
+    return []
+  }
+  return String(value)
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+const normalizeAgenteNome = (valor) => {
+  if (typeof valor === 'string') {
+    return valor.trim()
+  }
+  if (valor === undefined || valor === null) {
+    return ''
+  }
+  return String(valor).trim()
+}
+
+const normalizeAgenteKey = (valor) =>
+  normalizeAgenteNome(valor)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+const extractAgenteNome = (entrada) => {
+  if (!entrada) {
+    return ''
+  }
+  if (typeof entrada === 'string') {
+    return entrada
+  }
+  if (typeof entrada === 'object') {
+    return (
+      entrada.nome ??
+      entrada.label ??
+      entrada.value ??
+      entrada.descricao ??
+      ''
+    )
+  }
+  return ''
+}
+
 export function AcidentesPage() {
   const { user } = useAuth()
   const [form, setForm] = useState(() => ({ ...ACIDENTES_FORM_DEFAULT }))
@@ -104,7 +154,29 @@ export function AcidentesPage() {
     setAgentesError(null)
     try {
       const response = await api.acidentes.agents()
-      setAgenteOpcoes(Array.isArray(response) ? response : [])
+      const lista = Array.isArray(response)
+        ? response
+            .map((item) => {
+              if (!item) {
+                return null
+              }
+              if (typeof item === 'string') {
+                const nome = normalizeAgenteNome(item)
+                return nome ? { id: null, nome } : null
+              }
+              const nome = normalizeAgenteNome(item.nome ?? item.label ?? item.value)
+              if (!nome) {
+                return null
+              }
+              return {
+                id: item.id ?? item.agenteId ?? null,
+                nome,
+              }
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+        : []
+      setAgenteOpcoes(lista)
     } catch (err) {
       setAgentesError(err.message)
       setAgenteOpcoes([])
@@ -161,10 +233,43 @@ export function AcidentesPage() {
     loadPartes()
   }, [loadPartes])
 
+  const agenteSelecionadoInfo = useMemo(() => {
+    const alvo = normalizeAgenteKey(form.agente ?? '')
+    if (!alvo) {
+      return null
+    }
+    return (
+      agenteOpcoes.find((item) => {
+        if (!item) {
+          return false
+        }
+        const nomeItem = extractAgenteNome(item)
+        return normalizeAgenteKey(nomeItem) === alvo
+      }) ?? null
+    )
+  }, [agenteOpcoes, form.agente])
+
+  const agenteAtualPayload = useMemo(() => {
+    const nome = normalizeAgenteNome(form.agente)
+    if (agenteSelecionadoInfo && typeof agenteSelecionadoInfo === 'object') {
+      const nomeOficial = normalizeAgenteNome(
+        agenteSelecionadoInfo.nome ?? extractAgenteNome(agenteSelecionadoInfo),
+      )
+      const payloadNome = nomeOficial || nome
+      return {
+        nome: payloadNome,
+        id: agenteSelecionadoInfo.id ?? agenteSelecionadoInfo.agenteId ?? null,
+      }
+    }
+    if (nome) {
+      return { nome, id: null }
+    }
+    return null
+  }, [agenteSelecionadoInfo, form.agente])
+
   useEffect(() => {
     let cancelado = false
-    const nomeAgente = (form.agente ?? '').trim()
-    if (!nomeAgente) {
+    if (!agenteAtualPayload) {
       setLesaoOpcoes([])
       setLesoesError(null)
       setIsLoadingLesoes(false)
@@ -184,8 +289,9 @@ export function AcidentesPage() {
       }
       setIsLoadingLesoes(true)
       setLesoesError(null)
+      setLesaoOpcoes([])
       try {
-        const response = await fetcher(nomeAgente)
+        const response = await fetcher(agenteAtualPayload)
         if (!cancelado) {
           setLesaoOpcoes(Array.isArray(response) ? response : [])
         }
@@ -204,11 +310,10 @@ export function AcidentesPage() {
     return () => {
       cancelado = true
     }
-  }, [form.agente, api])
+  }, [agenteAtualPayload])
 
   useEffect(() => {
-    const agenteNome = form.agente?.trim()
-    if (!agenteNome) {
+    if (!agenteAtualPayload) {
       setTipoOpcoes([])
       setTiposError(null)
       setIsLoadingTipos(false)
@@ -217,8 +322,9 @@ export function AcidentesPage() {
     let cancelado = false
     setIsLoadingTipos(true)
     setTiposError(null)
+    setTipoOpcoes([])
     api.acidentes
-      .agentTypes(agenteNome)
+      .agentTypes(agenteAtualPayload)
       .then((lista) => {
         if (!cancelado) {
           setTipoOpcoes(Array.isArray(lista) ? lista : [])
@@ -238,7 +344,7 @@ export function AcidentesPage() {
     return () => {
       cancelado = true
     }
-  }, [form.agente])
+  }, [agenteAtualPayload])
 
   const pessoasPorMatricula = useMemo(() => {
     const map = new Map()
@@ -310,20 +416,58 @@ export function AcidentesPage() {
       })
       return
     }
+    if (name === 'agentes') {
+      const lista = Array.isArray(value)
+        ? value
+            .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+            .filter(Boolean)
+        : parseList(value)
+      setForm((prev) => {
+        const agenteAtual = lista.length ? lista[lista.length - 1] : ''
+        const next = { ...prev, agentes: lista, agente: agenteAtual }
+        if (!lista.length) {
+          next.tipos = []
+          next.tipo = ''
+          next.lesoes = []
+          next.lesao = ''
+        }
+        return next
+      })
+      if (!lista.length) {
+        setTipoOpcoes([])
+        setTiposError(null)
+      }
+      return
+    }
     if (name === 'agente') {
-      setForm((prev) => ({
-        ...prev,
-        agente: value,
-        tipo: '',
-        lesoes: [],
-        lesao: '',
-      }))
-      setTipoOpcoes([])
-      setTiposError(null)
+      setForm((prev) => {
+        if (prev.agente === value) {
+          return prev
+        }
+        const next = { ...prev, agente: value }
+        if (!value) {
+          next.tipos = []
+          next.tipo = ''
+          next.lesoes = []
+          next.lesao = ''
+        }
+        return next
+      })
+      if (!value) {
+        setTipoOpcoes([])
+        setTiposError(null)
+      }
       return
     }
     if (name === 'tipo') {
       setForm((prev) => ({ ...prev, tipo: value }))
+      return
+    }
+    if (name === 'tipos') {
+      const lista = Array.isArray(value)
+        ? value.map((item) => (item === undefined || item === null ? '' : String(item).trim())).filter(Boolean)
+        : parseList(value)
+      setForm((prev) => ({ ...prev, tipos: lista, tipo: lista.join('; ') }))
       return
     }
     if (name === 'lesoes') {
@@ -421,6 +565,8 @@ export function AcidentesPage() {
         : acidente.lesao
           ? [acidente.lesao]
           : []
+    const agentesSelecionados = parseList(acidente.agentes?.length ? acidente.agentes : acidente.agente)
+    const tiposSelecionados = parseList(acidente.tipos?.length ? acidente.tipos : acidente.tipo)
     setForm({
       matricula: acidente.matricula || '',
       nome: acidente.nome || '',
@@ -429,8 +575,10 @@ export function AcidentesPage() {
       diasPerdidos: acidente.diasPerdidos !== null && acidente.diasPerdidos !== undefined ? String(acidente.diasPerdidos) : '',
       diasDebitados:
         acidente.diasDebitados !== null && acidente.diasDebitados !== undefined ? String(acidente.diasDebitados) : '',
-      tipo: acidente.tipo || '',
-      agente: acidente.agente || '',
+      tipo: tiposSelecionados.join('; '),
+      tipos: tiposSelecionados,
+      agente: agentesSelecionados[agentesSelecionados.length - 1] || '',
+      agentes: agentesSelecionados,
       cid: acidente.cid || '',
       lesao: lesoesSelecionadas[0] || '',
       lesoes: lesoesSelecionadas,
@@ -490,6 +638,21 @@ export function AcidentesPage() {
 
   const tiposFiltro = useMemo(() => extractTipos(acidentes), [acidentes])
   const centrosServico = useMemo(() => extractCentrosServico(acidentes), [acidentes])
+  const agenteOpcoesNomes = useMemo(() => {
+    const mapa = new Map()
+    agenteOpcoes.forEach((item) => {
+      const nome = normalizeAgenteNome(extractAgenteNome(item))
+      if (!nome) {
+        return
+      }
+      const chave = normalizeAgenteKey(nome)
+      if (!mapa.has(chave)) {
+        mapa.set(chave, nome)
+      }
+    })
+    return Array.from(mapa.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [agenteOpcoes])
+
   const agentesFiltro = useMemo(() => extractAgentes(acidentes), [acidentes])
 
   return (
@@ -514,20 +677,20 @@ export function AcidentesPage() {
         locais={locais}
         locaisError={locaisError}
         isLoadingLocais={isLoadingLocais}
-        agentes={agenteOpcoes}
+        agentes={agenteOpcoesNomes}
         agentesError={agentesError}
         isLoadingAgentes={isLoadingAgentes}
         tipos={tipoOpcoes}
         tiposError={tiposError}
         isLoadingTipos={isLoadingTipos}
-      lesoes={lesaoOpcoes}
-      lesoesError={lesoesError}
-      isLoadingLesoes={isLoadingLesoes}
-      partes={partesOpcoes}
-      partesError={partesError}
-      isLoadingPartes={isLoadingPartes}
-      centrosServico={centrosServicoPessoas}
-    />
+        lesoes={lesaoOpcoes}
+        lesoesError={lesoesError}
+        isLoadingLesoes={isLoadingLesoes}
+        partes={partesOpcoes}
+        partesError={partesError}
+        isLoadingPartes={isLoadingPartes}
+        centrosServico={centrosServicoPessoas}
+      />
 
       <AcidentesFilters
         filters={filters}
