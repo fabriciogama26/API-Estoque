@@ -300,6 +300,32 @@ export function AcidentesForm({
     setParteSelecionada('')
   }
 
+  const handleNovaLesaoKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarLesaoSelecionada()
+    }
+  }
+
+  const handleNovaLesaoBlur = () => {
+    if (normalizeText(novaLesao)) {
+      adicionarLesaoSelecionada()
+    }
+  }
+
+  const handleNovaParteKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      adicionarParteSelecionada()
+    }
+  }
+
+  const handleNovaParteBlur = () => {
+    if (normalizeText(parteSelecionada)) {
+      adicionarParteSelecionada()
+    }
+  }
+
   const handleNovoAgenteKeyDown = (event) => {
     if (event.key === 'Enter') {
       event.preventDefault()
