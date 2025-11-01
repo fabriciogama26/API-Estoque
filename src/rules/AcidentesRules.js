@@ -15,6 +15,45 @@ const integerOrNull = (value) => {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+const splitTextList = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  if (value === undefined || value === null) {
+    return []
+  }
+  return String(value)
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+const collectTextList = (...inputs) => {
+  const lista = []
+  const vistos = new Set()
+  inputs.forEach((input) => {
+    if (input === undefined || input === null) {
+      return
+    }
+    const valores = Array.isArray(input) ? input : splitTextList(input)
+    valores.forEach((valor) => {
+      const texto = (valor === undefined || valor === null ? '' : String(valor).trim())
+      if (!texto) {
+        return
+      }
+      const chave = texto.toLowerCase()
+      if (vistos.has(chave)) {
+        return
+      }
+      vistos.add(chave)
+      lista.push(texto)
+    })
+  })
+  return lista
+}
+
 export function resolveUsuarioNome(user) {
   return user?.name || user?.username || user?.email || 'sistema'
 }
@@ -32,6 +71,8 @@ export function validateAcidenteForm(form) {
     : form.parteLesionada
     ? [form.parteLesionada.trim()]
     : []
+  const agentesSelecionados = collectTextList(form.agentes, form.agente)
+  const tiposSelecionados = collectTextList(form.tipos, form.tipo)
 
   if (!form.nome.trim()) {
     return 'Informe o nome do colaborador.'
@@ -45,11 +86,11 @@ export function validateAcidenteForm(form) {
   if (!form.data) {
     return 'Selecione a data do acidente.'
   }
-  if (!form.tipo.trim()) {
-    return 'Informe o tipo do acidente.'
+  if (!tiposSelecionados.length) {
+    return 'Informe ao menos um tipo do acidente.'
   }
-  if (!form.agente.trim()) {
-    return 'Informe o agente do acidente.'
+  if (!agentesSelecionados.length) {
+    return 'Informe ao menos um agente do acidente.'
   }
   if (lesoesSelecionadas.length === 0) {
     return 'Informe ao menos uma lesao.'
@@ -63,15 +104,16 @@ export function validateAcidenteForm(form) {
   if (!local) {
     return 'Selecione o local do acidente.'
   }
-  const hasHht = String(form.hht ?? '').trim() !== ''
-  if (hasHht) {
-    const hht = integerOrNull(form.hht)
-    if (hht === null) {
-      return 'HHT deve ser um numero inteiro.'
-    }
-    if (hht < 0) {
-      return 'HHT nao pode ser negativo.'
-    }
+  const hhtTexto = String(form.hht ?? '').trim()
+  if (!hhtTexto) {
+    return 'Informe o HHT do acidente.'
+  }
+  const hht = integerOrNull(form.hht)
+  if (hht === null) {
+    return 'HHT deve ser um numero inteiro.'
+  }
+  if (hht < 0) {
+    return 'HHT nao pode ser negativo.'
   }
 
   const hasDiasPerdidos = String(form.diasPerdidos ?? '').trim() !== ''
@@ -132,6 +174,10 @@ export function createAcidentePayload(form, usuarioCadastro) {
     form.lesoes.forEach(addLesao)
   }
   addLesao(form.lesao)
+  const agentesSelecionados = collectTextList(form.agentes, form.agente)
+  const tiposSelecionados = collectTextList(form.tipos, form.tipo)
+  const agentePrincipal = agentesSelecionados[0] ?? ''
+  const tipoPrincipal = tiposSelecionados[0] ?? ''
   const partes = Array.isArray(form.partesLesionadas)
     ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)
     : form.parteLesionada?.trim()
@@ -146,8 +192,10 @@ export function createAcidentePayload(form, usuarioCadastro) {
     diasPerdidos: integerOrNull(form.diasPerdidos),
     diasDebitados: integerOrNull(form.diasDebitados),
     hht: integerOrNull(form.hht),
-    tipo: form.tipo.trim(),
-    agente: form.agente.trim(),
+    tipo: tiposSelecionados.join('; '),
+    tipoPrincipal,
+    agente: agentesSelecionados.join('; '),
+    agentePrincipal,
     cid: form.cid.trim(),
     lesoes,
     lesao: lesoes[0] || '',
@@ -180,6 +228,10 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     form.lesoes.forEach(addLesao)
   }
   addLesao(form.lesao)
+  const agentesSelecionados = collectTextList(form.agentes, form.agente)
+  const tiposSelecionados = collectTextList(form.tipos, form.tipo)
+  const agentePrincipal = agentesSelecionados[0] ?? ''
+  const tipoPrincipal = tiposSelecionados[0] ?? ''
   const partes = Array.isArray(form.partesLesionadas)
     ? form.partesLesionadas.map((parte) => parte && parte.trim()).filter(Boolean)
     : form.parteLesionada?.trim()
@@ -194,8 +246,10 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     diasPerdidos: integerOrNull(form.diasPerdidos),
     diasDebitados: integerOrNull(form.diasDebitados),
     hht: integerOrNull(form.hht),
-    tipo: form.tipo.trim(),
-    agente: form.agente.trim(),
+    tipo: tiposSelecionados.join('; '),
+    tipoPrincipal,
+    agente: agentesSelecionados.join('; '),
+    agentePrincipal,
     cid: form.cid.trim(),
     lesoes,
     lesao: lesoes[0] || '',
@@ -214,7 +268,11 @@ export function filterAcidentes(acidentes, filters) {
   const centroServicoFiltro = String(filters.centroServico ?? filters.setor ?? 'todos').toLowerCase()
 
   return acidentes.filter((acidente) => {
-    if (filters.tipo !== 'todos' && (acidente.tipo || '').toLowerCase() !== filters.tipo.toLowerCase()) {
+    const tiposRegistro = collectTextList(acidente.tipos, acidente.tipo)
+    if (
+      filters.tipo !== 'todos' &&
+      !tiposRegistro.some((item) => item.toLowerCase() === filters.tipo.toLowerCase())
+    ) {
       return false
     }
 
@@ -223,7 +281,11 @@ export function filterAcidentes(acidentes, filters) {
       return false
     }
 
-    if (filters.agente !== 'todos' && (acidente.agente || '').toLowerCase() !== filters.agente.toLowerCase()) {
+    const agentesRegistro = collectTextList(acidente.agentes, acidente.agente)
+    if (
+      filters.agente !== 'todos' &&
+      !agentesRegistro.some((item) => item.toLowerCase() === filters.agente.toLowerCase())
+    ) {
       return false
     }
 
@@ -255,8 +317,8 @@ export function filterAcidentes(acidentes, filters) {
       acidente.nome,
       acidente.matricula,
       acidente.cargo,
-      acidente.tipo,
-      acidente.agente,
+      tiposRegistro.join(' '),
+      agentesRegistro.join(' '),
       acidente.cid,
       Array.isArray(acidente.lesoes) ? acidente.lesoes.join(' ') : acidente.lesao,
       Array.isArray(acidente.partesLesionadas) ? acidente.partesLesionadas.join(' ') : acidente.parteLesionada,
@@ -278,6 +340,13 @@ const buildSortedUnique = (items, accessor) => {
   const values = new Set()
   items.forEach((item) => {
     const value = accessor(item)
+    if (Array.isArray(value)) {
+      value
+        .map((parte) => (parte === undefined || parte === null ? '' : String(parte).trim()))
+        .filter(Boolean)
+        .forEach((parte) => values.add(parte))
+      return
+    }
     if (!value) {
       return
     }
@@ -286,7 +355,9 @@ const buildSortedUnique = (items, accessor) => {
   return Array.from(values).sort((a, b) => a.localeCompare(b))
 }
 
-export const extractTipos = (acidentes) => buildSortedUnique(acidentes, (item) => item.tipo)
+export const extractTipos = (acidentes) =>
+  buildSortedUnique(acidentes, (item) => collectTextList(item.tipos, item.tipo))
 export const extractCentrosServico = (acidentes) =>
   buildSortedUnique(acidentes, (item) => item.centroServico ?? item.setor)
-export const extractAgentes = (acidentes) => buildSortedUnique(acidentes, (item) => item.agente)
+export const extractAgentes = (acidentes) =>
+  buildSortedUnique(acidentes, (item) => collectTextList(item.agentes, item.agente))
