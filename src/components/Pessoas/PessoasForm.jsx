@@ -8,37 +8,51 @@ export function PessoasForm({
   error,
   options = {},
 }) {
-  const toOptionList = (lista, transform) => {
-    const source = Array.isArray(lista) ? lista : []
-    const mapped = source
-      .map((item) => {
+  const normalizeValue = (valor) => (typeof valor === 'string' ? valor.trim() : '')
+
+  const toOptionList = (lista, atual, transform) => {
+    const map = new Map()
+    if (Array.isArray(lista)) {
+      lista.forEach((item) => {
         if (typeof item === 'string') {
-          return item
+          const value = normalizeValue(item)
+          if (value) {
+            const finalValue = transform ? transform(value) : value
+            if (finalValue && !map.has(finalValue)) {
+              map.set(finalValue, finalValue)
+            }
+          }
+          return
         }
         if (item && typeof item === 'object' && typeof item.nome === 'string') {
-          return item.nome
+          const value = normalizeValue(item.nome)
+          if (value) {
+            const finalValue = transform ? transform(value) : value
+            if (finalValue && !map.has(finalValue)) {
+              map.set(finalValue, finalValue)
+            }
+          }
         }
-        return ''
       })
-      .map((value) => {
-        const normalized = typeof value === 'string' ? value.trim() : ''
-        return transform ? transform(normalized) : normalized
-      })
-      .filter(Boolean)
-    return Array.from(new Set(mapped))
+    }
+    const atualNormalizado = normalizeValue(atual)
+    if (atualNormalizado) {
+      const finalValue = transform ? transform(atualNormalizado) : atualNormalizado
+      if (finalValue && !map.has(finalValue)) {
+        map.set(finalValue, finalValue)
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   }
 
-  const centrosServicoOptions = toOptionList(options.centrosServico)
-  const setoresOptions = toOptionList(options.setores)
-  const cargosOptions = toOptionList(options.cargos)
-  const tiposExecucaoOptions = toOptionList(options.tiposExecucao, (valor) => valor.toUpperCase())
-
-  const datalistIds = {
-    centrosServico: 'pessoas-centros-servico-options',
-    setores: 'pessoas-setores-options',
-    cargos: 'pessoas-cargos-options',
-    tiposExecucao: 'pessoas-tipos-execucao-options',
-  }
+  const centrosServicoOptions = toOptionList(options.centrosServico, form.centroServico)
+  const setoresOptions = toOptionList(options.setores, form.setor)
+  const cargosOptions = toOptionList(options.cargos, form.cargo)
+  const tiposExecucaoOptions = toOptionList(
+    options.tiposExecucao,
+    form.tipoExecucao,
+    (valor) => normalizeValue(valor).toUpperCase(),
+  )
 
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -53,42 +67,41 @@ export function PessoasForm({
         </label>
         <label className="field">
           <span>Centro de servico <span className="asterisco">*</span></span>
-          <input
+          <select
             name="centroServico"
             value={form.centroServico}
             onChange={onChange}
             required
-            placeholder="Ex: Operacao"
-            list={datalistIds.centrosServico}
-            autoComplete="off"
-            title={form.centroServico}
-          />
+          >
+            <option value="">Selecione o centro de servico</option>
+            {centrosServicoOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Setor <span className="asterisco">*</span></span>
-          <input
-            name="setor"
-            value={form.setor}
-            onChange={onChange}
-            required
-            placeholder="Ex: Almoxarifado"
-            list={datalistIds.setores}
-            autoComplete="off"
-            title={form.setor}
-          />
+          <select name="setor" value={form.setor} onChange={onChange} required>
+            <option value="">Selecione o setor</option>
+            {setoresOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Cargo <span className="asterisco">*</span></span>
-          <input
-            name="cargo"
-            value={form.cargo}
-            onChange={onChange}
-            required
-            placeholder="Tecnico de manutencao"
-            list={datalistIds.cargos}
-            autoComplete="off"
-            title={form.cargo}
-          />
+          <select name="cargo" value={form.cargo} onChange={onChange} required>
+            <option value="">Selecione o cargo</option>
+            {cargosOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Data de admissao</span>
@@ -102,38 +115,16 @@ export function PessoasForm({
         </label>
         <label className="field">
           <span>Tipo Execucao <span className="asterisco">*</span></span>
-          <input
-            name="tipoExecucao"
-            value={form.tipoExecucao}
-            onChange={onChange}
-            required
-            placeholder="Ex: Proprio, Terceirizado"
-            list={datalistIds.tiposExecucao}
-            autoComplete="off"
-            title={form.tipoExecucao}
-          />
+          <select name="tipoExecucao" value={form.tipoExecucao} onChange={onChange} required>
+            <option value="">Selecione o tipo de execucao</option>
+            {tiposExecucaoOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
-      <datalist id={datalistIds.centrosServico}>
-        {centrosServicoOptions.map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-      <datalist id={datalistIds.setores}>
-        {setoresOptions.map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-      <datalist id={datalistIds.cargos}>
-        {cargosOptions.map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-      <datalist id={datalistIds.tiposExecucao}>
-        {tiposExecucaoOptions.map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">
         <button type="submit" className="button button--primary" disabled={isSaving}>
