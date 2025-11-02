@@ -15,6 +15,7 @@ export const PESSOAS_FILTER_DEFAULT = {
   setor: 'todos',
   cargo: 'todos',
   local: 'todos',
+  tipoExecucao: 'todos',
 }
 
 export const PESSOAS_HISTORY_DEFAULT = {
