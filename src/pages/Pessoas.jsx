@@ -151,10 +151,13 @@ export function PessoasPage() {
 
   const handleFilterSubmit = (event) => {
     event.preventDefault()
+    loadPessoas(filters)
   }
 
   const handleFilterClear = () => {
-    setFilters({ ...PESSOAS_FILTER_DEFAULT })
+    const nextFilters = { ...PESSOAS_FILTER_DEFAULT }
+    setFilters(nextFilters)
+    loadPessoas(nextFilters)
   }
 
   const resetForm = () => {
