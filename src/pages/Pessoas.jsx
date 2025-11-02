@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { PeopleIcon } from '../components/icons.jsx'
 import { PessoasForm } from '../components/Pessoas/PessoasForm.jsx'
@@ -54,6 +54,10 @@ const buildPessoasQuery = (filters) => {
   if (setor && setor.toLowerCase() !== 'todos') {
     query.setor = setor
   }
+  const tipoExecucao = filters.tipoExecucao?.trim()
+  if (tipoExecucao && tipoExecucao.toLowerCase() !== 'todos') {
+    query.tipoExecucao = tipoExecucao
+  }
   return query
 }
 
@@ -63,6 +67,11 @@ export function PessoasPage() {
   const [filters, setFilters] = useState(() => ({ ...PESSOAS_FILTER_DEFAULT }))
   const [pessoas, setPessoas] = useState([])
   const [pessoasOptions, setPessoasOptions] = useState([])
+  const pessoasOptionsRef = useRef([])
+
+  useEffect(() => {
+    pessoasOptionsRef.current = pessoasOptions
+  }, [pessoasOptions])
   const [editingPessoa, setEditingPessoa] = useState(null)
   const [historyCache, setHistoryCache] = useState({})
   const [historyState, setHistoryState] = useState(() => ({ ...PESSOAS_HISTORY_DEFAULT }))
@@ -105,18 +114,44 @@ export function PessoasPage() {
           api.pessoas.list(query),
         ])
 
+        const baseOptions = optionsData ?? pessoasOptionsRef.current
         if (optionsData) {
-          setPessoasOptions(optionsData ?? [])
+          const nextOptions = optionsData ?? []
+          pessoasOptionsRef.current = nextOptions
+          setPessoasOptions(nextOptions)
           await refreshReferencias()
         }
-        setPessoas(filteredData ?? [])
+
+        const enrichedPessoas = (filteredData ?? []).map((pessoa) => {
+          if (!pessoa || typeof pessoa !== 'object') {
+            return pessoa
+          }
+
+          const fallback = baseOptions.find((item) => item?.id === pessoa.id) || {}
+          const centroServicoAtual =
+            pessoa.centroServico ?? pessoa.local ?? fallback.centroServico ?? fallback.local ?? ''
+          const localAtual =
+            pessoa.local ?? pessoa.centroServico ?? fallback.local ?? fallback.centroServico ?? ''
+
+          return {
+            ...fallback,
+            ...pessoa,
+            centroServico: centroServicoAtual,
+            local: localAtual,
+            setor: pessoa.setor ?? fallback.setor ?? '',
+            cargo: pessoa.cargo ?? fallback.cargo ?? '',
+            tipoExecucao: pessoa.tipoExecucao ?? fallback.tipoExecucao ?? '',
+          }
+        })
+
+        setPessoas(enrichedPessoas)
       } catch (err) {
         setError(err.message)
       } finally {
         setIsLoading(false)
       }
     },
-    [pessoasOptions.length, refreshReferencias],
+    [refreshReferencias],
   )
 
   useEffect(() => {
@@ -307,6 +342,7 @@ export function PessoasPage() {
         centrosServico={centrosServico}
         setores={setores}
         cargos={cargos}
+        tiposExecucao={tiposExecucao}
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}
         onClear={handleFilterClear}

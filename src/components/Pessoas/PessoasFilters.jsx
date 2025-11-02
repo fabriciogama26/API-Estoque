@@ -1,4 +1,13 @@
-export function PessoasFilters({ filters, centrosServico = [], setores = [], cargos = [], onChange, onSubmit, onClear }) {
+export function PessoasFilters({
+  filters,
+  centrosServico = [],
+  setores = [],
+  cargos = [],
+  tiposExecucao = [],
+  onChange,
+  onSubmit,
+  onClear,
+}) {
   return (
     <form className="form form--inline" onSubmit={onSubmit}>
       <label className="field">
@@ -39,6 +48,17 @@ export function PessoasFilters({ filters, centrosServico = [], setores = [], car
           {cargos.map((cargo) => (
             <option key={cargo} value={cargo}>
               {cargo}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="field">
+        <span>Tipo de execução</span>
+        <select name="tipoExecucao" value={filters.tipoExecucao} onChange={onChange}>
+          <option value="todos">Todos</option>
+          {tiposExecucao.map((tipo) => (
+            <option key={tipo} value={tipo}>
+              {tipo}
             </option>
           ))}
         </select>
