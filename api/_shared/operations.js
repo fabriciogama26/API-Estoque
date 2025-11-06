@@ -754,14 +754,32 @@ async function replaceMaterialCorVinculos(materialId, corIds) {
 }
 
 async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
-  await replaceMaterialRelations({
-    table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
-    materialId,
-    columnName: 'grupo_caracteristica_epi_id',
-    values: caracteristicaIds,
-    deleteMessage: 'Falha ao limpar vínculos de características do material.',
-    insertMessage: 'Falha ao vincular características ao material.',
-  })
+  const columnCandidates = ['grupo_caracteristica_epi_id', 'caracteristica_epi_id']
+  let lastColumnError = null
+
+  for (const columnName of columnCandidates) {
+    try {
+      await replaceMaterialRelations({
+        table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
+        materialId,
+        columnName,
+        values: caracteristicaIds,
+        deleteMessage: 'Falha ao limpar vínculos de características do material.',
+        insertMessage: 'Falha ao vincular características ao material.',
+      })
+      return
+    } catch (error) {
+      if (!error || error.code !== '42703') {
+        throw error
+      }
+
+      lastColumnError = error
+    }
+  }
+
+  if (lastColumnError) {
+    throw lastColumnError
+  }
 }
 
 async function syncMaterialVinculos(materialId, { corIds, caracteristicaIds }) {
