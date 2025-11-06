@@ -261,23 +261,91 @@ const normalizeKeyPart = (value) =>
         .replace(/[\\u0300-\\u036f]/g, '')
     : ''
 
-const isGrupo = (value, target) => normalizeKeyPart(value) === normalizeKeyPart(target)
+const normalizeGrupoMaterial = (value) => {
+  const base = normalizeKeyPart(value)
+  return base.endsWith('s') ? base.slice(0, -1) : base
+}
 
-const buildNumeroEspecificoMaterial = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
-  if (isGrupo(grupoMaterial, 'Cal\u00e7ado')) {
+const isGrupo = (value, target) => normalizeGrupoMaterial(value) === normalizeGrupoMaterial(target)
+
+const requiresTamanho = (grupoMaterial) =>
+  isGrupo(grupoMaterial, 'Vestimenta') || isGrupo(grupoMaterial, 'Proteção das Mãos')
+
+const normalizeCaracteristicaLista = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  const texto = String(value ?? '')
+  if (!texto.trim()) {
+    return []
+  }
+  return texto
+    .split(/[;|,]/)
+    .map((parte) => String(parte).trim())
+    .filter(Boolean)
+}
+
+const formatCaracteristicaTexto = (value) =>
+  Array.from(new Set(normalizeCaracteristicaLista(value)))
+    .sort((a, b) => a.localeCompare(b))
+    .join('; ')
+
+const buildNumeroReferenciaMaterial = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
+  if (isGrupo(grupoMaterial, 'Calçado')) {
     return sanitizeDigits(numeroCalcado)
-  if (isGrupo(grupoMaterial, 'Vestimenta')) {
+  }
+  if (requiresTamanho(grupoMaterial)) {
     return String(numeroVestimenta || '').trim()
+  }
   return ''
 }
 
-const buildChaveUnicaMaterial = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
-  [
-    normalizeKeyPart(grupoMaterial),
+const buildChaveUnicaMaterial = ({
+  grupoMaterial,
+  nome,
+  fabricante,
+  numeroCalcado,
+  numeroVestimenta,
+  caracteristicaEpi,
+  corMaterial,
+  ca,
+}) => {
+  const partes = [
     normalizeKeyPart(nome),
     normalizeKeyPart(fabricante),
-    normalizeKeyPart(numeroEspecifico),
-  ].join('||')
+    normalizeKeyPart(grupoMaterial),
+  ]
+
+  const numeroReferencia = normalizeKeyPart(numeroCalcado || numeroVestimenta)
+  if (numeroReferencia) {
+    partes.push(numeroReferencia)
+  }
+
+  const caracteristicas = normalizeCaracteristicaLista(caracteristicaEpi)
+  if (caracteristicas.length) {
+    partes.push(
+      caracteristicas
+        .map((item) => normalizeKeyPart(item))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+        .join('||'),
+    )
+  }
+
+  const cor = normalizeKeyPart(corMaterial)
+  if (cor) {
+    partes.push(cor)
+  }
+
+  const caNormalizado = normalizeKeyPart(sanitizeDigits(ca))
+  if (caNormalizado) {
+    partes.push(caNormalizado)
+  }
+
+  return partes.join('||')
+}
 
 function sanitizeMaterialPayload(payload = {}) {
   const nome = trim(payload.nome)
@@ -285,18 +353,23 @@ function sanitizeMaterialPayload(payload = {}) {
   const grupoMaterial = trim(payload.grupoMaterial)
   const numeroCalcadoRaw = sanitizeDigits(payload.numeroCalcado)
   const numeroVestimentaRaw = trim(payload.numeroVestimenta)
-  const numeroCalcado = isGrupo(grupoMaterial, 'Cal\u00e7ado') ? numeroCalcadoRaw : ''
-  const numeroVestimenta = isGrupo(grupoMaterial, 'Vestimenta') ? numeroVestimentaRaw : ''
-  const numeroEspecifico = buildNumeroEspecificoMaterial({
+  const numeroCalcado = isGrupo(grupoMaterial, 'Calçado') ? numeroCalcadoRaw : ''
+  const numeroVestimenta = requiresTamanho(grupoMaterial) ? numeroVestimentaRaw : ''
+  const caracteristicaEpi = formatCaracteristicaTexto(payload.caracteristicaEpi)
+  const corMaterial = trim(payload.corMaterial)
+  const descricao = trim(payload.descricao)
+  const ca = sanitizeDigits(payload.ca)
+  const numeroEspecifico = buildNumeroReferenciaMaterial({
     grupoMaterial,
     numeroCalcado,
     numeroVestimenta,
   })
+
   return {
     nome,
     fabricante,
     validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
-    ca: sanitizeDigits(payload.ca),
+    ca,
     valorUnitario: Number(payload.valorUnitario ?? 0),
     estoqueMinimo:
       payload.estoqueMinimo !== undefined && payload.estoqueMinimo !== null
@@ -307,35 +380,76 @@ function sanitizeMaterialPayload(payload = {}) {
     numeroCalcado,
     numeroVestimenta,
     numeroEspecifico,
+    caracteristicaEpi,
+    corMaterial,
+    descricao,
     chaveUnica: buildChaveUnicaMaterial({
       grupoMaterial,
       nome,
       fabricante,
-      numeroEspecifico,
+      numeroCalcado,
+      numeroVestimenta,
+      caracteristicaEpi,
+      corMaterial,
+      ca,
     }),
+  }
 }
 
 function validateMaterialPayload(payload) {
   if (!payload.nome) throw createHttpError(400, 'Nome do EPI obrigatorio.')
-  if (/\d/.test(payload.nome)) throw createHttpError(400, 'O campo EPI nao pode conter numeros.')
+  if (/\\d/.test(payload.nome)) throw createHttpError(400, 'O campo EPI nao pode conter numeros.')
   if (!payload.grupoMaterial) throw createHttpError(400, 'Grupo de material obrigatorio.')
   if (!payload.fabricante) throw createHttpError(400, 'Fabricante obrigatorio.')
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
     throw createHttpError(400, 'Validade deve ser maior que zero.')
-  if (!payload.ca) {
-    throw createHttpError(400, 'CA obrigatorio.')
+  }
   if (Number.isNaN(Number(payload.valorUnitario)) || Number(payload.valorUnitario) <= 0) {
     throw createHttpError(400, 'Valor unitario deve ser maior que zero.')
-  if (isGrupo(payload.grupoMaterial, 'Cal\u00e7ado') && !payload.numeroCalcado) {
+  }
+  if (isGrupo(payload.grupoMaterial, 'Calçado') && !payload.numeroCalcado) {
     throw createHttpError(400, 'Informe o numero do calcado.')
-  if (isGrupo(payload.grupoMaterial, 'Vestimenta') && !payload.numeroVestimenta) {
-    throw createHttpError(400, 'Informe o numero da vestimenta.')
+  }
+  if (requiresTamanho(payload.grupoMaterial) && !payload.numeroVestimenta) {
+    throw createHttpError(400, 'Informe o tamanho.')
+  }
   if (
     payload.estoqueMinimo !== null &&
     (Number.isNaN(Number(payload.estoqueMinimo)) || Number(payload.estoqueMinimo) < 0)
   ) {
     throw createHttpError(400, 'Estoque minimo deve ser zero ou positivo.')
+  }
+  if (!normalizeCaracteristicaLista(payload.caracteristicaEpi).length) {
+    throw createHttpError(400, 'Informe ao menos uma caracteristica.')
+  }
 }
+
+
+const resolveCatalogoNome = (registro) => {
+  if (!registro || typeof registro !== 'object') {
+    return ''
+  }
+  const keys = ['nome', 'descricao', 'label', 'valor', 'value']
+  for (const key of keys) {
+    const valor = registro[key]
+    if (typeof valor === 'string' && valor.trim()) {
+      return valor.trim()
+    }
+  }
+  return ''
+}
+
+const normalizeCatalogoLista = (lista) => {
+  const valores = new Set()
+  ;(lista ?? []).forEach((item) => {
+    const nome = resolveCatalogoNome(item)
+    if (nome) {
+      valores.add(nome)
+    }
+  })
+  return Array.from(valores).sort((a, b) => a.localeCompare(b))
+}
+
 
 async function ensureMaterialChaveUnica(chaveUnica, ignoreId) {
   if (!chaveUnica) {
@@ -917,6 +1031,34 @@ export const MateriaisOperations = {
       .filter((value) => Boolean(value))
       .sort((a, b) => a.localeCompare(b))
   },
+  async caracteristicas() {
+    const registros = await execute(
+      supabaseAdmin.from('caracteristica_epi').select('nome, descricao').order('nome'),
+      'Falha ao listar caracteristicas de EPI.',
+    )
+    return normalizeCatalogoLista(registros)
+  },
+  async cores() {
+    const registros = await execute(
+      supabaseAdmin.from('cor').select('nome, descricao').order('nome'),
+      'Falha ao listar cores.',
+    )
+    return normalizeCatalogoLista(registros)
+  },
+  async medidasCalcado() {
+    const registros = await execute(
+      supabaseAdmin.from('medidas_calcado').select('nome, descricao').order('nome'),
+      'Falha ao listar medidas de calçado.',
+    )
+    return normalizeCatalogoLista(registros)
+  },
+  async medidasVestimenta() {
+    const registros = await execute(
+      supabaseAdmin.from('medidas_vestimentas').select('nome, descricao').order('nome'),
+      'Falha ao listar tamanhos.',
+    )
+    return normalizeCatalogoLista(registros)
+  },
   async create(payload, user) {
     const dados = sanitizeMaterialPayload(payload)
     validateMaterialPayload(dados)
@@ -974,6 +1116,9 @@ export const MateriaisOperations = {
           numeroCalcado: dados.numeroCalcado,
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
+          caracteristicaEpi: dados.caracteristicaEpi,
+          corMaterial: dados.corMaterial,
+          descricao: dados.descricao,
           chaveUnica: dados.chaveUnica,
           usuarioAtualizacao: usuario,
           atualizadoEm: nowIso(),

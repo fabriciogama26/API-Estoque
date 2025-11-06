@@ -31,23 +31,79 @@ const isGrupoLocal = (value, target) => normalizeGrupoLocal(value) === normalize
 
 const sanitizeDigitsLocal = (value = '') => String(value).replace(/\D/g, '')
 
+const requiresTamanhoLocal = (grupoMaterial) =>
+  isGrupoLocal(grupoMaterial, 'Vestimenta') || isGrupoLocal(grupoMaterial, 'Proteção das Mãos')
+
+const normalizeCaracteristicaListaLocal = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  const texto = String(value ?? '')
+  if (!texto.trim()) {
+    return []
+  }
+  return texto
+    .split(/[;|,]/)
+    .map((parte) => String(parte).trim())
+    .filter(Boolean)
+}
+
+const formatCaracteristicaTextoLocal = (value) =>
+  Array.from(new Set(normalizeCaracteristicaListaLocal(value)))
+    .sort((a, b) => a.localeCompare(b))
+    .join('; ')
+
 const buildNumeroEspecificoLocal = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
   if (isGrupoLocal(grupoMaterial, 'Calçado')) {
     return sanitizeDigitsLocal(numeroCalcado)
   }
-  if (isGrupoLocal(grupoMaterial, 'Vestimenta')) {
+  if (requiresTamanhoLocal(grupoMaterial)) {
     return String(numeroVestimenta || '').trim()
   }
   return ''
 }
 
-const buildChaveUnicaLocal = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
-  [
-    normalizeKeyPart(grupoMaterial),
+const buildChaveUnicaLocal = ({
+  grupoMaterial,
+  nome,
+  fabricante,
+  numeroCalcado,
+  numeroVestimenta,
+  caracteristicaEpi,
+  corMaterial,
+  ca,
+}) => {
+  const partes = [
     normalizeKeyPart(nome),
     normalizeKeyPart(fabricante),
-    normalizeKeyPart(numeroEspecifico),
-  ].join('||')
+    normalizeKeyPart(grupoMaterial),
+  ]
+  const numero = normalizeKeyPart(numeroCalcado || numeroVestimenta)
+  if (numero) {
+    partes.push(numero)
+  }
+  const caracteristicas = normalizeCaracteristicaListaLocal(caracteristicaEpi)
+  if (caracteristicas.length) {
+    partes.push(
+      caracteristicas
+        .map((item) => normalizeKeyPart(item))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+        .join('||'),
+    )
+  }
+  const cor = normalizeKeyPart(corMaterial)
+  if (cor) {
+    partes.push(cor)
+  }
+  const caNormalizado = normalizeKeyPart(String(ca || '').trim())
+  if (caNormalizado) {
+    partes.push(caNormalizado)
+  }
+  return partes.join('||')
+}
 
 function getDefaultState() {
   return {
@@ -84,9 +140,12 @@ function normalizeState(state) {
     const numeroCalcado = isGrupoLocal(grupoMaterial, 'Calçado')
       ? sanitizeDigitsLocal(material.numeroCalcado)
       : ''
-    const numeroVestimenta = isGrupoLocal(grupoMaterial, 'Vestimenta')
+    const numeroVestimenta = requiresTamanhoLocal(grupoMaterial)
       ? String(material.numeroVestimenta || '').trim()
       : ''
+    const caracteristicaEpi = formatCaracteristicaTextoLocal(material.caracteristicaEpi)
+    const corMaterial = String(material.corMaterial || '').trim()
+    const ca = material.ca ?? ''
     const numeroEspecifico =
       material.numeroEspecifico ??
       buildNumeroEspecificoLocal({
@@ -100,7 +159,11 @@ function normalizeState(state) {
         grupoMaterial,
         nome: material.nome || '',
         fabricante: material.fabricante || '',
-        numeroEspecifico,
+        numeroCalcado,
+        numeroVestimenta,
+        caracteristicaEpi,
+        corMaterial,
+        ca,
       })
     return {
       ...material,
@@ -108,6 +171,8 @@ function normalizeState(state) {
       numeroCalcado,
       numeroVestimenta,
       numeroEspecifico,
+      caracteristicaEpi,
+      corMaterial,
       chaveUnica,
     }
   })

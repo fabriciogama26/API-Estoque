@@ -24,13 +24,11 @@ class MaterialRepository extends BaseRepository {
           grupoMaterial: item.grupoMaterial || '',
           nome: item.nome || '',
           fabricante: item.fabricante || '',
-          numeroEspecifico:
-            item.numeroEspecifico ||
-            materialRules.buildNumeroEspecifico({
-              grupoMaterial: item.grupoMaterial || '',
-              numeroCalcado: item.numeroCalcado || '',
-              numeroVestimenta: item.numeroVestimenta || '',
-            }),
+          numeroCalcado: item.numeroCalcado || '',
+          numeroVestimenta: item.numeroVestimenta || '',
+          caracteristicaEpi: item.caracteristicaEpi || '',
+          corMaterial: item.corMaterial || '',
+          ca: item.ca || '',
         });
       return (existenteChave || '').toLowerCase() === target;
     });

@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import {
   HISTORY_MODAL_DEFAULT,
   MATERIAIS_FILTER_DEFAULT,
-  MATERIAIS_FORM_DEFAULT,
+  createMateriaisFormDefault,
 } from '../config/MateriaisConfig.js'
 import {
   createMaterialPayload,
@@ -21,6 +21,8 @@ import {
   updateMaterialPayload,
   GRUPO_MATERIAL_CALCADO,
   GRUPO_MATERIAL_VESTIMENTA,
+  GRUPO_MATERIAL_PROTECAO_MAOS,
+  parseCaracteristicaEpi,
 } from '../rules/MateriaisRules.js'
 import { formatCurrency, formatCurrencyInput, sanitizeDigits } from '../utils/MateriaisUtils.js'
 import '../styles/MateriaisPage.css'
@@ -38,7 +40,7 @@ const isGrupo = (value, target) => normalizeGrupo(value) === normalizeGrupo(targ
 
 export function MateriaisPage() {
   const { user } = useAuth()
-  const [form, setForm] = useState(() => ({ ...MATERIAIS_FORM_DEFAULT }))
+  const [form, setForm] = useState(() => createMateriaisFormDefault())
   const [filters, setFilters] = useState(() => ({ ...MATERIAIS_FILTER_DEFAULT }))
   const [materiais, setMateriais] = useState([])
   const [historyCache, setHistoryCache] = useState({})
@@ -53,6 +55,18 @@ export function MateriaisPage() {
   const [materialItems, setMaterialItems] = useState([])
   const [isLoadingItems, setIsLoadingItems] = useState(false)
   const [itemsError, setItemsError] = useState(null)
+  const [caracteristicaOptions, setCaracteristicaOptions] = useState([])
+  const [isLoadingCaracteristicas, setIsLoadingCaracteristicas] = useState(false)
+  const [caracteristicaError, setCaracteristicaError] = useState(null)
+  const [corOptions, setCorOptions] = useState([])
+  const [isLoadingCores, setIsLoadingCores] = useState(false)
+  const [corError, setCorError] = useState(null)
+  const [calcadoOptions, setCalcadoOptions] = useState([])
+  const [isLoadingCalcados, setIsLoadingCalcados] = useState(false)
+  const [calcadoError, setCalcadoError] = useState(null)
+  const [tamanhoOptions, setTamanhoOptions] = useState([])
+  const [isLoadingTamanhos, setIsLoadingTamanhos] = useState(false)
+  const [tamanhoError, setTamanhoError] = useState(null)
 
   const loadMaterialGroups = useCallback(async () => {
     setIsLoadingGroups(true)
@@ -98,6 +112,69 @@ export function MateriaisPage() {
   useEffect(() => {
     loadMaterialGroups()
   }, [loadMaterialGroups])
+
+  const loadCaracteristicas = useCallback(async () => {
+    setIsLoadingCaracteristicas(true)
+    setCaracteristicaError(null)
+    try {
+      const lista = await api.materiais.caracteristicas()
+      setCaracteristicaOptions(Array.isArray(lista) ? lista : [])
+    } catch (err) {
+      setCaracteristicaError(err.message)
+      setCaracteristicaOptions([])
+    } finally {
+      setIsLoadingCaracteristicas(false)
+    }
+  }, [])
+
+  const loadCores = useCallback(async () => {
+    setIsLoadingCores(true)
+    setCorError(null)
+    try {
+      const lista = await api.materiais.cores()
+      setCorOptions(Array.isArray(lista) ? lista : [])
+    } catch (err) {
+      setCorError(err.message)
+      setCorOptions([])
+    } finally {
+      setIsLoadingCores(false)
+    }
+  }, [])
+
+  const loadCalcados = useCallback(async () => {
+    setIsLoadingCalcados(true)
+    setCalcadoError(null)
+    try {
+      const lista = await api.materiais.medidasCalcado()
+      setCalcadoOptions(Array.isArray(lista) ? lista : [])
+    } catch (err) {
+      setCalcadoError(err.message)
+      setCalcadoOptions([])
+    } finally {
+      setIsLoadingCalcados(false)
+    }
+  }, [])
+
+  const loadTamanhos = useCallback(async () => {
+    setIsLoadingTamanhos(true)
+    setTamanhoError(null)
+    try {
+      const lista = await api.materiais.medidasVestimenta()
+      setTamanhoOptions(Array.isArray(lista) ? lista : [])
+    } catch (err) {
+      setTamanhoError(err.message)
+      setTamanhoOptions([])
+    } finally {
+      setIsLoadingTamanhos(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCaracteristicas()
+    loadCores()
+    loadCalcados()
+    loadTamanhos()
+  }, [loadCaracteristicas, loadCores, loadCalcados, loadTamanhos])
 
   useEffect(() => {
     const grupo = form.grupoMaterial?.trim()
@@ -152,7 +229,10 @@ export function MateriaisPage() {
         grupoMaterial: value,
         nome: '',
         numeroCalcado: isGrupo(value, GRUPO_MATERIAL_CALCADO) ? prev.numeroCalcado : '',
-        numeroVestimenta: isGrupo(value, GRUPO_MATERIAL_VESTIMENTA) ? prev.numeroVestimenta : '',
+        numeroVestimenta:
+          isGrupo(value, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(value, GRUPO_MATERIAL_PROTECAO_MAOS)
+            ? prev.numeroVestimenta
+            : '',
       }))
       setMaterialItems([])
       setItemsError(null)
@@ -172,6 +252,32 @@ export function MateriaisPage() {
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
+  const handleAddCaracteristica = (valor) => {
+    const item = valor?.trim()
+    if (!item) {
+      return
+    }
+    setForm((prev) => {
+      const atual = Array.isArray(prev.caracteristicaEpi) ? prev.caracteristicaEpi : []
+      if (atual.some((value) => value.toLowerCase() === item.toLowerCase())) {
+        return prev
+      }
+      return {
+        ...prev,
+        caracteristicaEpi: [...atual, item].sort((a, b) => a.localeCompare(b)),
+      }
+    })
+  }
+
+  const handleRemoveCaracteristica = (valor) => {
+    setForm((prev) => ({
+      ...prev,
+      caracteristicaEpi: (prev.caracteristicaEpi || []).filter(
+        (item) => item.toLowerCase() !== valor.toLowerCase(),
+      ),
+    }))
+  }
+
   const handleFilterChange = (event) => {
     const { name, value } = event.target
     setFilters((prev) => ({ ...prev, [name]: value }))
@@ -187,7 +293,7 @@ export function MateriaisPage() {
 
   const resetForm = () => {
     setEditingMaterial(null)
-    setForm({ ...MATERIAIS_FORM_DEFAULT })
+    setForm(createMateriaisFormDefault())
     setMaterialItems([])
     setItemsError(null)
     setIsLoadingItems(false)
@@ -276,6 +382,9 @@ export function MateriaisPage() {
       grupoMaterial: material.grupoMaterial || '',
       numeroCalcado: material.numeroCalcado || '',
       numeroVestimenta: material.numeroVestimenta || '',
+      caracteristicaEpi: parseCaracteristicaEpi(material.caracteristicaEpi),
+      corMaterial: material.corMaterial || '',
+      descricao: material.descricao || '',
     })
     setItemsError(null)
     setMaterialItems([])
@@ -317,6 +426,20 @@ export function MateriaisPage() {
         materialItems={materialItems}
         isLoadingItems={isLoadingItems}
         itemsError={itemsError}
+        caracteristicaOptions={caracteristicaOptions}
+        isLoadingCaracteristicas={isLoadingCaracteristicas}
+        caracteristicaError={caracteristicaError}
+        corOptions={corOptions}
+        isLoadingCores={isLoadingCores}
+        corError={corError}
+        calcadoOptions={calcadoOptions}
+        isLoadingCalcado={isLoadingCalcados}
+        calcadoError={calcadoError}
+        tamanhoOptions={tamanhoOptions}
+        isLoadingTamanho={isLoadingTamanhos}
+        tamanhoError={tamanhoError}
+        onAddCaracteristica={handleAddCaracteristica}
+        onRemoveCaracteristica={handleRemoveCaracteristica}
       />
 
       <MateriaisFilters

@@ -41,6 +41,18 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/materiais/groups' && method === 'GET') {
       return sendJson(res, 200, await MateriaisOperations.groups())
     }
+    if (path === '/api/materiais/caracteristicas' && method === 'GET') {
+      return sendJson(res, 200, await MateriaisOperations.caracteristicas())
+    }
+    if (path === '/api/materiais/cores' && method === 'GET') {
+      return sendJson(res, 200, await MateriaisOperations.cores())
+    }
+    if (path === '/api/materiais/medidas-calcado' && method === 'GET') {
+      return sendJson(res, 200, await MateriaisOperations.medidasCalcado())
+    }
+    if (path === '/api/materiais/medidas-vestimenta' && method === 'GET') {
+      return sendJson(res, 200, await MateriaisOperations.medidasVestimenta())
+    }
     if (path === '/api/materiais') {
       if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
       if (method === 'POST') {

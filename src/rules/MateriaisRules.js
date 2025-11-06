@@ -2,6 +2,9 @@ import { parseCurrencyToNumber, sanitizeDigits } from '../utils/MateriaisUtils.j
 
 export const GRUPO_MATERIAL_CALCADO = 'Calcado'
 export const GRUPO_MATERIAL_VESTIMENTA = 'Vestimenta'
+export const GRUPO_MATERIAL_PROTECAO_MAOS = 'Proteção das Mãos'
+
+const CARACTERISTICA_SEPARATOR = ';'
 
 const normalizeKeyPart = (value) =>
   value
@@ -24,23 +27,81 @@ const sanitizeAlphanumeric = (value = '') => String(value).trim()
 
 const sanitizeMaterialNome = (value = '') => value.replace(/\d/g, '')
 
-const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
+const requiresTamanho = (grupo) =>
+  isGrupo(grupo, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(grupo, GRUPO_MATERIAL_PROTECAO_MAOS)
+
+const normalizeCaracteristicaLista = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeAlphanumeric(item))
+      .map((item) => item.normalize?.('NFC') ?? item)
+      .filter(Boolean)
+  }
+  const texto = String(value ?? '')
+  if (!texto.trim()) {
+    return []
+  }
+
+  return texto
+    .split(/[;|,]/)
+    .map((parte) => sanitizeAlphanumeric(parte))
+    .filter(Boolean)
+}
+
+const ordenarCaracteristicas = (lista) =>
+  Array.from(new Set(lista.map((item) => item.trim()))).sort((a, b) => a.localeCompare(b))
+
+const buildCaracteristicaTexto = (value) =>
+  ordenarCaracteristicas(normalizeCaracteristicaLista(value)).join(`${CARACTERISTICA_SEPARATOR} `)
+
+const buildNumeroReferencia = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
   if (isGrupo(grupoMaterial, GRUPO_MATERIAL_CALCADO)) {
     return numeroCalcado
   }
-  if (isGrupo(grupoMaterial, GRUPO_MATERIAL_VESTIMENTA)) {
+  if (requiresTamanho(grupoMaterial)) {
     return numeroVestimenta
   }
   return ''
 }
 
-const buildChaveUnica = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
-  [
-    normalizeKeyPart(grupoMaterial),
+const buildChaveUnica = ({
+  nome,
+  fabricante,
+  grupoMaterial,
+  numeroCalcado,
+  numeroVestimenta,
+  caracteristicaEpi,
+  corMaterial,
+  ca,
+}) => {
+  const partes = [
     normalizeKeyPart(nome),
     normalizeKeyPart(fabricante),
-    normalizeKeyPart(numeroEspecifico),
-  ].join('||')
+    normalizeKeyPart(grupoMaterial),
+  ]
+
+  const numeroReferencia = normalizeKeyPart(numeroCalcado || numeroVestimenta)
+  if (numeroReferencia) {
+    partes.push(numeroReferencia)
+  }
+
+  const caracteristicas = ordenarCaracteristicas(normalizeCaracteristicaLista(caracteristicaEpi))
+  if (caracteristicas.length) {
+    partes.push(caracteristicas.map((item) => normalizeKeyPart(item)).filter(Boolean).join('||'))
+  }
+
+  const cor = normalizeKeyPart(corMaterial)
+  if (cor) {
+    partes.push(cor)
+  }
+
+  const caNormalizado = normalizeKeyPart(sanitizeDigits(ca))
+  if (caNormalizado) {
+    partes.push(caNormalizado)
+  }
+
+  return partes.join('||')
+}
 
 export function resolveUsuarioNome(user) {
   return user?.name || user?.username || user?.email || 'sistema'
@@ -65,14 +126,19 @@ export function validateMaterialForm(form) {
     }
   }
 
-  if (isGrupo(form.grupoMaterial, GRUPO_MATERIAL_VESTIMENTA)) {
+  if (requiresTamanho(form.grupoMaterial)) {
     if (!String(form.numeroVestimenta || '').trim()) {
-      return 'Informe o numero da vestimenta.'
+      return 'Informe o tamanho.'
     }
   }
 
   if (!form.fabricante?.trim()) {
     return 'Informe o fabricante.'
+  }
+
+  const caracteristicas = normalizeCaracteristicaLista(form.caracteristicaEpi)
+  if (!caracteristicas.length) {
+    return 'Informe ao menos uma caracteristica.'
   }
 
   const validade = Number(form.validadeDias)
@@ -85,10 +151,6 @@ export function validateMaterialForm(form) {
     return 'Valor unitario deve ser maior que zero.'
   }
 
-  if (!sanitizeDigits(form.ca)) {
-    return 'Informe o CA.'
-  }
-
   return null
 }
 
@@ -98,7 +160,8 @@ const buildMaterialPayload = (form) => {
   const numeroVestimentaRaw = sanitizeAlphanumeric(form.numeroVestimenta)
   const numeroCalcado = numeroCalcadoRaw ? String(numeroCalcadoRaw) : ''
   const numeroVestimenta = numeroVestimentaRaw
-  const numeroEspecifico = buildNumeroEspecifico({
+  const caracteristicaTexto = buildCaracteristicaTexto(form.caracteristicaEpi)
+  const numeroEspecifico = buildNumeroReferencia({
     grupoMaterial,
     numeroCalcado,
     numeroVestimenta,
@@ -107,7 +170,11 @@ const buildMaterialPayload = (form) => {
     grupoMaterial,
     nome: form.nome,
     fabricante: form.fabricante,
-    numeroEspecifico,
+    numeroCalcado,
+    numeroVestimenta,
+    caracteristicaEpi: caracteristicaTexto,
+    corMaterial: form.corMaterial,
+    ca: form.ca,
   })
 
   return {
@@ -118,9 +185,12 @@ const buildMaterialPayload = (form) => {
     valorUnitario: parseCurrencyToNumber(form.valorUnitario),
     grupoMaterial,
     numeroCalcado: isGrupo(grupoMaterial, GRUPO_MATERIAL_CALCADO) ? numeroCalcado : '',
-    numeroVestimenta: isGrupo(grupoMaterial, GRUPO_MATERIAL_VESTIMENTA) ? numeroVestimenta : '',
+    numeroVestimenta: requiresTamanho(grupoMaterial) ? numeroVestimenta : '',
     numeroEspecifico,
     chaveUnica,
+    caracteristicaEpi: caracteristicaTexto,
+    corMaterial: sanitizeAlphanumeric(form.corMaterial),
+    descricao: sanitizeAlphanumeric(form.descricao),
   }
 }
 
@@ -161,7 +231,11 @@ export function filterMateriais(materiais, filters) {
       material.fabricante,
       material.ca,
       material.grupoMaterial,
-      material.numeroEspecifico,
+      material.numeroCalcado,
+      material.numeroVestimenta,
+      material.caracteristicaEpi,
+      material.corMaterial,
+      material.descricao,
     ]
       .filter(Boolean)
       .join(' ')
@@ -173,4 +247,8 @@ export function filterMateriais(materiais, filters) {
 
 export function sortMateriaisByNome(materiais) {
   return materiais.slice().sort((a, b) => a.nome.localeCompare(b.nome))
+}
+
+export function parseCaracteristicaEpi(value) {
+  return ordenarCaracteristicas(normalizeCaracteristicaLista(value))
 }
