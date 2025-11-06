@@ -11,6 +11,9 @@ class Material {
     numeroVestimenta = '',
     numeroEspecifico = '',
     chaveUnica,
+    caracteristicaEpi = '',
+    corMaterial = '',
+    descricao = '',
     usuarioCadastro,
     dataCadastro = new Date().toISOString(),
     estoqueMinimo = 0,
@@ -27,6 +30,9 @@ class Material {
     this.numeroVestimenta = numeroVestimenta;
     this.numeroEspecifico = numeroEspecifico;
     this.chaveUnica = chaveUnica;
+    this.caracteristicaEpi = caracteristicaEpi;
+    this.corMaterial = corMaterial;
+    this.descricao = descricao;
     this.usuarioCadastro = usuarioCadastro;
     this.dataCadastro = dataCadastro;
     this.estoqueMinimo = estoqueMinimo;

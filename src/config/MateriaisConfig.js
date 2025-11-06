@@ -1,6 +1,6 @@
 
 // Configurações e estados padrão relacionados a materiais
-export const MATERIAIS_FORM_DEFAULT = {
+export const createMateriaisFormDefault = () => ({
   nome: '',
   fabricante: '',
   validadeDias: '',
@@ -9,7 +9,10 @@ export const MATERIAIS_FORM_DEFAULT = {
   grupoMaterial: '',
   numeroCalcado: '',
   numeroVestimenta: '',
-}
+  caracteristicaEpi: [],
+  corMaterial: '',
+  descricao: '',
+})
 
 // Filtro padrão de materiais
 export const MATERIAIS_FILTER_DEFAULT = {

@@ -443,23 +443,92 @@ const normalizeGrupoLocal = (value) => {
 
 const isGrupo = (value, target) => normalizeGrupoLocal(value) === normalizeGrupoLocal(target)
 
+const requiresTamanho = (grupoMaterial) =>
+  isGrupo(grupoMaterial, 'Vestimenta') || isGrupo(grupoMaterial, 'Proteção das Mãos')
+
+const normalizeCaracteristicaLista = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  const texto = String(value ?? '')
+  if (!texto.trim()) {
+    return []
+  }
+  return texto
+    .split(/[;|,]/)
+    .map((parte) => String(parte).trim())
+    .filter(Boolean)
+}
+
+const formatCaracteristicaTexto = (value) =>
+  Array.from(new Set(normalizeCaracteristicaLista(value)))
+    .sort((a, b) => a.localeCompare(b))
+    .join('; ')
+
+const normalizeCatalogoLista = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  return Array.from(
+    new Set(
+      lista
+        .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b))
+}
+
 const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
   if (isGrupo(grupoMaterial, 'Calçado')) {
     return numeroCalcado
   }
-  if (isGrupo(grupoMaterial, 'Vestimenta')) {
+  if (requiresTamanho(grupoMaterial)) {
     return numeroVestimenta
   }
   return ''
 }
 
-const buildChaveUnica = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
-  [
-    normalizeKeyPart(grupoMaterial),
+const buildChaveUnica = ({
+  grupoMaterial,
+  nome,
+  fabricante,
+  numeroCalcado,
+  numeroVestimenta,
+  caracteristicaEpi,
+  corMaterial,
+  ca,
+}) => {
+  const partes = [
     normalizeKeyPart(nome),
     normalizeKeyPart(fabricante),
-    normalizeKeyPart(numeroEspecifico),
-  ].join('||')
+    normalizeKeyPart(grupoMaterial),
+  ]
+  const numero = normalizeKeyPart(numeroCalcado || numeroVestimenta)
+  if (numero) {
+    partes.push(numero)
+  }
+  const caracteristicas = normalizeCaracteristicaLista(caracteristicaEpi)
+  if (caracteristicas.length) {
+    partes.push(
+      caracteristicas
+        .map((item) => normalizeKeyPart(item))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+        .join('||'),
+    )
+  }
+  const cor = normalizeKeyPart(corMaterial)
+  if (cor) {
+    partes.push(cor)
+  }
+  const caNormalizado = normalizeKeyPart(String(ca || '').trim())
+  if (caNormalizado) {
+    partes.push(caNormalizado)
+  }
+  return partes.join('||')
+}
 
 const catalogoGruposMateriais = {
   Vestimentas: [
@@ -524,6 +593,22 @@ const catalogoGruposMateriais = {
     'Protetor de nuca',
   ],
 }
+
+const catalogoCaracteristicasEpi = [
+  'Impermeável',
+  'Resistente a corte',
+  'Antiestático',
+  'Descartável',
+  'Proteção térmica',
+  'Proteção química',
+  'Proteção elétrica',
+]
+
+const catalogoCores = ['AMARELA', 'AZUL', 'BRANCA', 'LARANJA', 'PRETA', 'VERDE', 'VERMELHA']
+
+const catalogoMedidasCalcado = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44']
+
+const catalogoMedidasVestimenta = ['PP', 'P', 'M', 'G', 'GG', 'XG']
 
 const gruposEpiFonte = (() => {
   if (Array.isArray(gruposEpi)) {
@@ -799,6 +884,8 @@ const sanitizeMaterialPayload = (payload = {}) => {
   const grupoMaterial = trim(payload.grupoMaterial)
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
   const numeroVestimenta = trim(payload.numeroVestimenta)
+  const caracteristicaEpi = formatCaracteristicaTexto(payload.caracteristicaEpi)
+  const corMaterial = trim(payload.corMaterial)
   const numeroEspecifico = buildNumeroEspecifico({
     grupoMaterial,
     numeroCalcado,
@@ -818,13 +905,20 @@ const sanitizeMaterialPayload = (payload = {}) => {
     ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
     grupoMaterial,
     numeroCalcado: isGrupo(grupoMaterial, 'Calçado') ? numeroCalcado : '',
-    numeroVestimenta: isGrupo(grupoMaterial, 'Vestimenta') ? numeroVestimenta : '',
+    numeroVestimenta: requiresTamanho(grupoMaterial) ? numeroVestimenta : '',
     numeroEspecifico,
+    caracteristicaEpi,
+    corMaterial,
+    descricao: String(payload.descricao || '').trim(),
     chaveUnica: buildChaveUnica({
       grupoMaterial,
       nome: payload.nome,
       fabricante: payload.fabricante,
-      numeroEspecifico,
+      numeroCalcado: isGrupo(grupoMaterial, 'Calçado') ? numeroCalcado : '',
+      numeroVestimenta: requiresTamanho(grupoMaterial) ? numeroVestimenta : '',
+      caracteristicaEpi,
+      corMaterial,
+      ca: payload.ca,
     }),
   }
 }
@@ -838,9 +932,6 @@ const validateMaterialPayload = (payload) => {
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
     throw createError(400, 'Validade deve ser maior que zero.')
   }
-  if (!payload.ca) {
-    throw createError(400, 'CA obrigatorio.')
-  }
   if (Number.isNaN(Number(payload.valorUnitario)) || Number(payload.valorUnitario) <= 0) {
     throw createError(400, 'Valor unitario deve ser maior que zero.')
   }
@@ -850,14 +941,17 @@ const validateMaterialPayload = (payload) => {
   if (isGrupo(payload.grupoMaterial, 'Calçado') && !payload.numeroCalcado) {
     throw createError(400, 'Informe o número do calçado.')
   }
-  if (isGrupo(payload.grupoMaterial, 'Vestimenta') && !payload.numeroVestimenta) {
-    throw createError(400, 'Informe o número da vestimenta.')
+  if (requiresTamanho(payload.grupoMaterial) && !payload.numeroVestimenta) {
+    throw createError(400, 'Informe o tamanho.')
   }
   if (
     payload.estoqueMinimo !== null &&
     (Number.isNaN(Number(payload.estoqueMinimo)) || Number(payload.estoqueMinimo) < 0)
   ) {
     throw createError(400, 'Estoque minimo deve ser zero ou positivo.')
+  }
+  if (!normalizeCaracteristicaLista(payload.caracteristicaEpi).length) {
+    throw createError(400, 'Informe ao menos uma característica.')
   }
 }
 
@@ -1351,6 +1445,18 @@ const localApi = {
         return Array.from(new Set([...(base || []), ...extras])).sort((a, b) => a.localeCompare(b))
       })
     },
+    async caracteristicas() {
+      return normalizeCatalogoLista(catalogoCaracteristicasEpi)
+    },
+    async cores() {
+      return normalizeCatalogoLista(catalogoCores)
+    },
+    async medidasCalcado() {
+      return normalizeCatalogoLista(catalogoMedidasCalcado)
+    },
+    async medidasVestimenta() {
+      return normalizeCatalogoLista(catalogoMedidasVestimenta)
+    },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)
       validateMaterialPayload(dados)
@@ -1422,6 +1528,8 @@ const localApi = {
           'numeroCalcado',
           'numeroVestimenta',
           'numeroEspecifico',
+          'caracteristicaEpi',
+          'corMaterial',
           'chaveUnica',
         ]
 

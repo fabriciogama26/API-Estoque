@@ -12,7 +12,10 @@ function normalizeMaterialInput(payload) {
   const numeroCalcadoRaw = materialRules.sanitizeDigits(payload.numeroCalcado);
   const numeroVestimentaRaw = String(payload.numeroVestimenta || '').trim();
   const numeroCalcado = materialRules.isGrupoCalcado(grupoMaterial) ? numeroCalcadoRaw : '';
-  const numeroVestimenta = materialRules.isGrupoVestimenta(grupoMaterial) ? numeroVestimentaRaw : '';
+  const numeroVestimenta = materialRules.requiresTamanho(grupoMaterial) ? numeroVestimentaRaw : '';
+  const caracteristicaEpi = materialRules.formatCaracteristicaTexto(payload.caracteristicaEpi || '');
+  const corMaterial = String(payload.corMaterial || '').trim();
+  const descricao = String(payload.descricao || '').trim();
   const numeroEspecifico = materialRules.buildNumeroEspecifico({
     grupoMaterial,
     numeroCalcado,
@@ -22,7 +25,11 @@ function normalizeMaterialInput(payload) {
     grupoMaterial,
     nome,
     fabricante,
-    numeroEspecifico,
+    numeroCalcado,
+    numeroVestimenta,
+    caracteristicaEpi,
+    corMaterial,
+    ca,
   });
 
   return {
@@ -34,6 +41,9 @@ function normalizeMaterialInput(payload) {
     numeroCalcado,
     numeroVestimenta,
     numeroEspecifico,
+    caracteristicaEpi,
+    corMaterial,
+    descricao,
     chaveUnica,
   };
 }
@@ -51,7 +61,7 @@ class MaterialService {
 
     const existente = repositories.materiais.findByChaveUnica(normalized.chaveUnica);
     if (existente) {
-      throw new Error('Já existe um EPI com essas mesmas informações cadastrado.');
+      throw new Error('JÃ¡ existe um EPI com essas mesmas informaÃ§Ãµes cadastrado.');
     }
 
     const material = new Material({
@@ -97,13 +107,19 @@ class MaterialService {
         payload.numeroVestimenta !== undefined
           ? payload.numeroVestimenta
           : material.numeroVestimenta,
+      caracteristicaEpi:
+        payload.caracteristicaEpi !== undefined
+          ? payload.caracteristicaEpi
+          : material.caracteristicaEpi,
+      corMaterial:
+        payload.corMaterial !== undefined ? payload.corMaterial : material.corMaterial,
+      descricao: payload.descricao !== undefined ? payload.descricao : material.descricao,
     };
 
     materialRules.validarDadosObrigatorios({
       ...merged,
       valorUnitario:
         payload.valorUnitario !== undefined ? payload.valorUnitario : material.valorUnitario,
-      ca: merged.ca,
     });
 
     const normalized = normalizeMaterialInput(merged);
@@ -117,7 +133,7 @@ class MaterialService {
       .findAll()
       .find((item) => item.id !== id && item.chaveUnica === normalized.chaveUnica);
     if (duplicado) {
-      throw new Error('Já existe um EPI com essas mesmas informações cadastrado.');
+      throw new Error('JÃ¡ existe um EPI com essas mesmas informaÃ§Ãµes cadastrado.');
     }
 
     const atualizacoes = {

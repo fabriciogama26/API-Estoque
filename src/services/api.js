@@ -128,6 +128,8 @@ const MATERIAL_HISTORY_FIELDS = [
   'numeroCalcado',
   'numeroVestimenta',
   'numeroEspecifico',
+  'caracteristicaEpi',
+  'corMaterial',
   'chaveUnica',
 ]
 
@@ -209,6 +211,52 @@ const normalizeMaterialCamposAlterados = (lista) => {
     })
     .filter(Boolean)
 }
+
+const resolveCatalogoNome = (record) => {
+  if (!record || typeof record !== 'object') {
+    return ''
+  }
+  const keys = ['nome', 'descricao', 'label', 'valor', 'value']
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+  return ''
+}
+
+const normalizeCatalogoLista = (lista) => {
+  const valores = new Set()
+  ;(lista ?? []).forEach((item) => {
+    const nome = resolveCatalogoNome(item)
+    if (nome) {
+      valores.add(nome)
+    }
+  })
+  return Array.from(valores).sort((a, b) => a.localeCompare(b))
+}
+
+const normalizeCaracteristicaLista = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+      .filter(Boolean)
+  }
+  const texto = String(value ?? '')
+  if (!texto.trim()) {
+    return []
+  }
+  return texto
+    .split(/[;|,]/)
+    .map((parte) => String(parte).trim())
+    .filter(Boolean)
+}
+
+const formatCaracteristicaTexto = (value) =>
+  Array.from(new Set(normalizeCaracteristicaLista(value)))
+    .sort((a, b) => a.localeCompare(b))
+    .join('; ')
 
 const normalizeDomainOptions = (lista) =>
   (Array.isArray(lista) ? lista : [])
@@ -551,6 +599,8 @@ function mapMaterialRecord(record) {
     numeroEspecifico: record.numeroEspecifico ?? record.numero_especifico ?? '',
     chaveUnica: record.chaveUnica ?? record.chave_unica ?? '',
     descricao: record.descricao ?? '',
+    caracteristicaEpi: record.caracteristicaEpi ?? record.caracteristica_epi ?? '',
+    corMaterial: record.corMaterial ?? record.cor_material ?? '',
     usuarioCadastro: record.usuarioCadastro ?? record.usuario_cadastro ?? '',
     usuarioAtualizacao: record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
     dataCadastro: record.dataCadastro ?? record.data_cadastro ?? null,
@@ -715,6 +765,14 @@ function sanitizePessoaPayload(payload = {}) {
 }
 
 function sanitizeMaterialPayload(payload = {}) {
+  const grupoMaterial = trim(payload.grupoMaterial ?? payload.grupo_material ?? '')
+  const numeroCalcado = trim(payload.numeroCalcado ?? payload.numero_calcado ?? '')
+  const numeroVestimenta = trim(payload.numeroVestimenta ?? payload.numero_vestimenta ?? '')
+  const caracteristicaEpi = formatCaracteristicaTexto(
+    payload.caracteristicaEpi ?? payload.caracteristica_epi ?? '',
+  )
+  const corMaterial = trim(payload.corMaterial ?? payload.cor_material ?? '')
+  const numeroEspecifico = trim(payload.numeroEspecifico ?? payload.numero_especifico ?? '')
   return {
     nome: trim(payload.nome),
     fabricante: trim(payload.fabricante),
@@ -724,10 +782,12 @@ function sanitizeMaterialPayload(payload = {}) {
     estoqueMinimo: toNumber(payload.estoqueMinimo ?? payload.estoque_minimo ?? 0),
     ativo: payload.ativo ?? true,
     descricao: trim(payload.descricao ?? ''),
-    grupoMaterial: trim(payload.grupoMaterial ?? payload.grupo_material ?? ''),
-    numeroCalcado: trim(payload.numeroCalcado ?? payload.numero_calcado ?? ''),
-    numeroVestimenta: trim(payload.numeroVestimenta ?? payload.numero_vestimenta ?? ''),
-    numeroEspecifico: trim(payload.numeroEspecifico ?? payload.numero_especifico ?? ''),
+    grupoMaterial,
+    numeroCalcado,
+    numeroVestimenta,
+    numeroEspecifico,
+    caracteristicaEpi,
+    corMaterial,
     chaveUnica: trim(payload.chaveUnica ?? payload.chave_unica ?? ''),
   }
 }
@@ -1437,6 +1497,37 @@ export const api = {
         .filter((item) => item && item.nome && item.ativo !== false)
         .map((item) => item.nome.trim())
         .filter(Boolean)
+    },
+    async caracteristicas() {
+      const data = await execute(
+        supabase.from('caracteristica_epi').select('nome, descricao').order('nome', { ascending: true }),
+        'Falha ao listar caracteristicas de EPI.',
+      )
+      return normalizeCatalogoLista(data)
+    },
+    async cores() {
+      const data = await execute(
+        supabase.from('cor').select('nome, descricao').order('nome', { ascending: true }),
+        'Falha ao listar cores.',
+      )
+      return normalizeCatalogoLista(data)
+    },
+    async medidasCalcado() {
+      const data = await execute(
+        supabase.from('medidas_calcado').select('nome, descricao').order('nome', { ascending: true }),
+        'Falha ao listar medidas de calçado.',
+      )
+      return normalizeCatalogoLista(data)
+    },
+    async medidasVestimenta() {
+      const data = await execute(
+        supabase
+          .from('medidas_vestimentas')
+          .select('nome, descricao')
+          .order('nome', { ascending: true }),
+        'Falha ao listar tamanhos de vestimenta.',
+      )
+      return normalizeCatalogoLista(data)
     },
     async items(grupoNome) {
       const nome = trim(grupoNome)

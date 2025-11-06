@@ -19,6 +19,12 @@ const buildDescricaoMaterial = (material) => {
   if (numeroEspecifico) {
     partes.push(numeroEspecifico)
   }
+  if (material.caracteristicaEpi) {
+    partes.push(material.caracteristicaEpi)
+  }
+  if (material.corMaterial) {
+    partes.push(material.corMaterial)
+  }
   return partes.filter(Boolean).join(' ')
 }
 
@@ -66,6 +72,8 @@ const mapLocalMaterialResumo = (material) => {
     numeroCalcado: material.numeroCalcado || '',
     numeroVestimenta: material.numeroVestimenta || '',
     grupoMaterial: material.grupoMaterial || '',
+    caracteristicaEpi: material.caracteristicaEpi || '',
+    corMaterial: material.corMaterial || '',
   }
 }
 

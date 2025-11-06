@@ -1,5 +1,6 @@
 const GRUPO_MATERIAL_CALCADO = 'Calçado';
 const GRUPO_MATERIAL_VESTIMENTA = 'Vestimenta';
+const GRUPO_MATERIAL_PROTECAO_MAOS = 'Proteção das Mãos';
 
 const normalizeKeyPart = (value) =>
   value
@@ -16,33 +17,89 @@ const sanitizeDigits = (value = '') => String(value).replace(/\D/g, '');
 
 const sanitizeNomeEpi = (value = '') => String(value).replace(/\d/g, '').trim();
 
+const requiresTamanho = (grupo) =>
+  isGrupo(grupo, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(grupo, GRUPO_MATERIAL_PROTECAO_MAOS);
+
+const normalizeCaracteristicaLista = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+      .filter(Boolean);
+  }
+  const texto = String(value ?? '');
+  if (!texto.trim()) {
+    return [];
+  }
+  return texto
+    .split(/[;|,]/)
+    .map((parte) => String(parte).trim())
+    .filter(Boolean);
+};
+
+const formatCaracteristicaTexto = (value) =>
+  Array.from(new Set(normalizeCaracteristicaLista(value)))
+    .sort((a, b) => a.localeCompare(b))
+    .join('; ');
+
 const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
   if (isGrupo(grupoMaterial, GRUPO_MATERIAL_CALCADO)) {
     return sanitizeDigits(numeroCalcado);
   }
-  if (isGrupo(grupoMaterial, GRUPO_MATERIAL_VESTIMENTA)) {
+  if (requiresTamanho(grupoMaterial)) {
     return String(numeroVestimenta || '').trim();
   }
   return '';
 };
 
-const buildChaveUnica = ({ grupoMaterial, nome, fabricante, numeroEspecifico }) =>
-  [
-    normalizeKeyPart(grupoMaterial),
+const buildChaveUnica = ({
+  grupoMaterial,
+  nome,
+  fabricante,
+  numeroCalcado,
+  numeroVestimenta,
+  caracteristicaEpi,
+  corMaterial,
+  ca,
+}) => {
+  const partes = [
     normalizeKeyPart(nome),
     normalizeKeyPart(fabricante),
-    normalizeKeyPart(numeroEspecifico),
-  ].join('||');
+    normalizeKeyPart(grupoMaterial),
+  ];
+  const numero = normalizeKeyPart(numeroCalcado || numeroVestimenta);
+  if (numero) {
+    partes.push(numero);
+  }
+  const caracteristicas = normalizeCaracteristicaLista(caracteristicaEpi);
+  if (caracteristicas.length) {
+    partes.push(
+      caracteristicas
+        .map((item) => normalizeKeyPart(item))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+        .join('||'),
+    );
+  }
+  const cor = normalizeKeyPart(corMaterial);
+  if (cor) {
+    partes.push(cor);
+  }
+  const caNormalizado = normalizeKeyPart(sanitizeDigits(ca));
+  if (caNormalizado) {
+    partes.push(caNormalizado);
+  }
+  return partes.join('||');
+};
 
 function validarDadosObrigatorios({
   nome,
   fabricante,
   validadeDias,
   valorUnitario,
-  ca,
   grupoMaterial,
   numeroCalcado,
   numeroVestimenta,
+  caracteristicaEpi,
 }) {
   const nomeSanitizado = sanitizeNomeEpi(nome);
   if (!nomeSanitizado) {
@@ -57,8 +114,8 @@ function validarDadosObrigatorios({
   if (isGrupo(grupoMaterial, GRUPO_MATERIAL_CALCADO) && !sanitizeDigits(numeroCalcado)) {
     throw new Error('Informe o numero do calcado');
   }
-  if (isGrupo(grupoMaterial, GRUPO_MATERIAL_VESTIMENTA) && !String(numeroVestimenta || '').trim()) {
-    throw new Error('Informe o numero da vestimenta');
+  if (requiresTamanho(grupoMaterial) && !String(numeroVestimenta || '').trim()) {
+    throw new Error('Informe o tamanho');
   }
   if (!fabricante || !String(fabricante).trim()) {
     throw new Error('Fabricante obrigatorio');
@@ -69,8 +126,8 @@ function validarDadosObrigatorios({
   if (Number.isNaN(Number(valorUnitario)) || Number(valorUnitario) <= 0) {
     throw new Error('Valor unitario deve ser maior que zero');
   }
-  if (!sanitizeDigits(ca)) {
-    throw new Error('CA obrigatorio');
+  if (!normalizeCaracteristicaLista(caracteristicaEpi).length) {
+    throw new Error('Informe ao menos uma caracteristica');
   }
 }
 
@@ -86,6 +143,7 @@ function validarEstoqueMinimo(estoqueMinimo) {
 module.exports = {
   GRUPO_MATERIAL_CALCADO,
   GRUPO_MATERIAL_VESTIMENTA,
+  GRUPO_MATERIAL_PROTECAO_MAOS,
   validarDadosObrigatorios,
   validarEstoqueMinimo,
   sanitizeNomeEpi,
@@ -94,4 +152,6 @@ module.exports = {
   sanitizeDigits,
   isGrupoCalcado: (valor) => isGrupo(valor, GRUPO_MATERIAL_CALCADO),
   isGrupoVestimenta: (valor) => isGrupo(valor, GRUPO_MATERIAL_VESTIMENTA),
+  formatCaracteristicaTexto,
+  requiresTamanho,
 };

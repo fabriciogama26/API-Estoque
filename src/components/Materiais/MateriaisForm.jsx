@@ -1,4 +1,9 @@
-import { GRUPO_MATERIAL_CALCADO, GRUPO_MATERIAL_VESTIMENTA } from '../../rules/MateriaisRules.js'
+import { useState } from 'react'
+import {
+  GRUPO_MATERIAL_CALCADO,
+  GRUPO_MATERIAL_VESTIMENTA,
+  GRUPO_MATERIAL_PROTECAO_MAOS,
+} from '../../rules/MateriaisRules.js'
 
 const normalize = (value) =>
   value
@@ -30,19 +35,58 @@ export function MateriaisForm({
   materialItems = [],
   isLoadingItems = false,
   itemsError = null,
+  caracteristicaOptions = [],
+  isLoadingCaracteristicas = false,
+  caracteristicaError = null,
+  corOptions = [],
+  isLoadingCores = false,
+  corError = null,
+  calcadoOptions = [],
+  isLoadingCalcado = false,
+  calcadoError = null,
+  tamanhoOptions = [],
+  isLoadingTamanho = false,
+  tamanhoError = null,
+  onAddCaracteristica,
+  onRemoveCaracteristica,
 }) {
   const isCalcado = isGrupo(form.grupoMaterial, GRUPO_MATERIAL_CALCADO)
-  const isVestimenta = isGrupo(form.grupoMaterial, GRUPO_MATERIAL_VESTIMENTA)
+  const isVestimenta =
+    isGrupo(form.grupoMaterial, GRUPO_MATERIAL_VESTIMENTA) ||
+    isGrupo(form.grupoMaterial, GRUPO_MATERIAL_PROTECAO_MAOS)
   const groupOptions = Array.from(
     new Set([...(materialGroups || []), form.grupoMaterial].filter(Boolean))
   )
   const itemOptions = Array.from(
     new Set([...(materialItems || []), form.nome].filter(Boolean))
   )
+  const caracteristicasSelecionadas = Array.isArray(form.caracteristicaEpi)
+    ? form.caracteristicaEpi
+    : []
+  const [caracteristicaSelecionada, setCaracteristicaSelecionada] = useState('')
 
   return (
     <form className="form" onSubmit={onSubmit}>
       <div className="form__grid form__grid--two">
+        <label className="field">
+          <span>Grupo de material <span className="asterisco">*</span></span>
+          <select
+            name="grupoMaterial"
+            value={form.grupoMaterial}
+            onChange={onChange}
+            required
+            disabled={isLoadingGroups && !materialGroups.length}
+          >
+            <option value="">
+              {isLoadingGroups ? 'Carregando grupos...' : 'Selecione um grupo'}
+            </option>
+            {groupOptions.map((grupo) => (
+              <option key={grupo} value={grupo}>
+                {grupo}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="field">
           <span>EPI <span className="asterisco">*</span></span>
           <select
@@ -79,6 +123,57 @@ export function MateriaisForm({
           />
         </label>
         <label className="field">
+          <span>Característica <span className="asterisco">*</span></span>
+          <div className="field__inline">
+            <select
+              value={caracteristicaSelecionada}
+              onChange={(event) => setCaracteristicaSelecionada(event.target.value)}
+              disabled={isLoadingCaracteristicas}
+            >
+              <option value="">
+                {isLoadingCaracteristicas ? 'Carregando características...' : 'Selecione'}
+              </option>
+              {caracteristicaOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => {
+                onAddCaracteristica?.(caracteristicaSelecionada)
+                setCaracteristicaSelecionada('')
+              }}
+              disabled={!caracteristicaSelecionada}
+            >
+              Adicionar
+            </button>
+          </div>
+          {caracteristicasSelecionadas.length ? (
+            <ul className="materiais-caracteristicas">
+              {caracteristicasSelecionadas.map((item) => (
+                <li key={item}>
+                  <span>{item}</span>
+                  <button
+                    type="button"
+                    className="materiais-caracteristicas__remove"
+                    onClick={() => onRemoveCaracteristica?.(item)}
+                  >
+                    Remover
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="field__helper">Adicione todas as características do EPI.</p>
+          )}
+          {caracteristicaError ? (
+            <p className="feedback feedback--error">{caracteristicaError}</p>
+          ) : null}
+        </label>
+        <label className="field">
           <span>Validade (dias) <span className="asterisco">*</span></span>
           <input
             type="number"
@@ -112,50 +207,84 @@ export function MateriaisForm({
           />
         </label>
         <label className="field">
-          <span>Grupo de material <span className="asterisco">*</span></span>
-          <select
-            name="grupoMaterial"
-            value={form.grupoMaterial}
-            onChange={onChange}
-            required
-            disabled={isLoadingGroups && !materialGroups.length}
-          >
-            <option value="">
-              {isLoadingGroups ? 'Carregando grupos...' : 'Selecione um grupo'}
-            </option>
-            {groupOptions.map((grupo) => (
-              <option key={grupo} value={grupo}>
-                {grupo}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
           <span>
             Numero calcado {isCalcado ? <span className="asterisco">*</span> : null}
           </span>
-          <input
+          <select
             name="numeroCalcado"
             value={form.numeroCalcado}
             onChange={onChange}
-            placeholder="Ex: 40"
-            inputMode="numeric"
-            pattern="[0-9]*"
             required={isCalcado}
-            disabled={!isCalcado}
-          />
+            disabled={!isCalcado || isLoadingCalcado}
+          >
+            <option value="">
+              {isCalcado
+                ? isLoadingCalcado
+                  ? 'Carregando numerações...'
+                  : 'Selecione o número'
+                : 'Não se aplica ao grupo'}
+            </option>
+            {calcadoOptions.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao}
+              </option>
+            ))}
+          </select>
+          {calcadoError ? <p className="feedback feedback--error">{calcadoError}</p> : null}
         </label>
         <label className="field">
           <span>
-            Numero vestimenta {isVestimenta ? <span className="asterisco">*</span> : null}
+            Tamanho {isVestimenta ? <span className="asterisco">*</span> : null}
           </span>
-          <input
+          <select
             name="numeroVestimenta"
             value={form.numeroVestimenta}
             onChange={onChange}
-            placeholder="Ex: M"
             required={isVestimenta}
-            disabled={!isVestimenta}
+            disabled={!isVestimenta || isLoadingTamanho}
+          >
+            <option value="">
+              {isVestimenta
+                ? isLoadingTamanho
+                  ? 'Carregando tamanhos...'
+                  : 'Selecione o tamanho'
+                : 'Não se aplica ao grupo'}
+            </option>
+            {tamanhoOptions.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao}
+              </option>
+            ))}
+          </select>
+          {tamanhoError ? <p className="feedback feedback--error">{tamanhoError}</p> : null}
+        </label>
+        <label className="field">
+          <span>Cor</span>
+          <select
+            name="corMaterial"
+            value={form.corMaterial}
+            onChange={onChange}
+            disabled={isLoadingCores}
+          >
+            <option value="">
+              {isLoadingCores ? 'Carregando cores...' : 'Selecione'}
+            </option>
+            {corOptions.map((cor) => (
+              <option key={cor} value={cor}>
+                {cor}
+              </option>
+            ))}
+          </select>
+          {corError ? <p className="feedback feedback--error">{corError}</p> : null}
+        </label>
+        <label className="field field--full">
+          <span>Descrição</span>
+          <textarea
+            name="descricao"
+            value={form.descricao}
+            onChange={onChange}
+            placeholder="Detalhes adicionais do material"
+            rows={3}
           />
         </label>
       </div>
