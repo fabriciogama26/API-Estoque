@@ -1,6 +1,29 @@
 -- Cria uma view consolidando materiais com cores e características agregadas.
 -- A view expõe estruturas em JSON e listas auxiliares para facilitar filtros
--- no backend e frontend.
+-- no backend e frontend. A definição ajusta dinamicamente o nome da coluna
+-- de vínculo de características para lidar com diferenças entre ambientes.
+DO $$
+DECLARE
+  caracteristica_join_column text;
+  create_view_sql text;
+BEGIN
+  SELECT column_name
+    INTO caracteristica_join_column
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'material_grupo_caracteristica_epi'
+    AND column_name IN ('grupo_caracteristica_epi_id', 'caracteristica_epi_id')
+  ORDER BY CASE column_name
+             WHEN 'grupo_caracteristica_epi_id' THEN 0
+             ELSE 1
+           END
+  LIMIT 1;
+
+  IF caracteristica_join_column IS NULL THEN
+    RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo em material_grupo_caracteristica_epi.';
+  END IF;
+
+  create_view_sql := format($sql$
 create or replace view public.materiais_view as
 with caracteristicas_base as (
   select distinct
@@ -9,7 +32,7 @@ with caracteristicas_base as (
     trim(ce.caracteristica_material) as caracteristica_material
   from public.material_grupo_caracteristica_epi as mgce
   join public.caracteristica_epi as ce
-    on ce.id = mgce.grupo_caracteristica_epi_id
+    on ce.id = mgce.%1$I
   where trim(coalesce(ce.caracteristica_material, '')) <> ''
 ),
 caracteristicas as (
@@ -71,11 +94,11 @@ select
 from public.materiais as m
 left join caracteristicas on caracteristicas.material_id = m.id
 left join cores on cores.material_id = m.id;
+$sql$, caracteristica_join_column);
 
--- Mantém a view anterior utilizada pela aplicação apontando para a nova estrutura.
-create or replace view public.vw_materiais_vinculos as
-select * from public.materiais_view;
-
--- Concede permissão de leitura para perfis utilizados pelo Supabase.
-grant select on public.materiais_view to authenticated, anon, service_role;
-grant select on public.vw_materiais_vinculos to authenticated, anon, service_role;
+  EXECUTE create_view_sql;
+  EXECUTE 'create or replace view public.vw_materiais_vinculos as select * from public.materiais_view';
+  EXECUTE 'grant select on public.materiais_view to authenticated, anon, service_role';
+  EXECUTE 'grant select on public.vw_materiais_vinculos to authenticated, anon, service_role';
+END
+$$;
