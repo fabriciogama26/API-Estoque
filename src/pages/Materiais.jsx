@@ -360,17 +360,23 @@ export function MateriaisPage() {
       return {
         ...prev,
         caracteristicaEpi: atualizada,
+        caracteristicas_epi: atualizada.map((item) => item.id).filter(Boolean),
       }
     })
   }
 
   const handleRemoveCaracteristica = (valor) => {
-    setForm((prev) => ({
-      ...prev,
-      caracteristicaEpi: normalizeSelectionList(prev.caracteristicaEpi).filter(
+    setForm((prev) => {
+      const atualizada = normalizeSelectionList(prev.caracteristicaEpi).filter(
         (item) => item.id !== valor && item.nome !== valor,
-      ),
-    }))
+      )
+
+      return {
+        ...prev,
+        caracteristicaEpi: atualizada,
+        caracteristicas_epi: atualizada.map((item) => item.id).filter(Boolean),
+      }
+    })
   }
 
   const handleAddCor = (valor) => {
@@ -399,6 +405,7 @@ export function MateriaisPage() {
       return {
         ...prev,
         cores: atualizada,
+        coresIds: atualizada.map((item) => item.id).filter(Boolean),
         corMaterial: atualizada[0]?.nome ?? '',
       }
     })
@@ -413,6 +420,7 @@ export function MateriaisPage() {
       return {
         ...prev,
         cores: atualizada,
+        coresIds: atualizada.map((item) => item.id).filter(Boolean),
         corMaterial: atualizada[0]?.nome ?? '',
       }
     })
@@ -537,8 +545,10 @@ export function MateriaisPage() {
       numeroCalcado: material.numeroCalcado || '',
       numeroVestimenta: material.numeroVestimenta || '',
       caracteristicaEpi: caracteristicas,
+      caracteristicas_epi: caracteristicas.map((item) => item.id).filter(Boolean),
       corMaterial: cores[0]?.nome ?? '',
       cores,
+      coresIds: cores.map((item) => item.id).filter(Boolean),
       descricao: material.descricao || '',
     })
     setItemsError(null)
