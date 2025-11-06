@@ -1383,16 +1383,20 @@ export const api = {
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
 
+      const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
+      const supabasePayload = {
+        ...dadosSemCor,
+        cor_material: corMaterialCamel,
+        usuarioCadastro: usuario,
+        dataCadastro: agora,
+        usuarioAtualizacao: usuario,
+        atualizadoEm: agora,
+      }
+
       const registro = await executeSingle(
         supabase
           .from('materiais')
-          .insert({
-            ...dados,
-            usuarioCadastro: usuario,
-            dataCadastro: agora,
-            usuarioAtualizacao: usuario,
-            atualizadoEm: agora,
-          })
+          .insert(supabasePayload)
           .select(),
         'Falha ao criar material.'
       )
@@ -1460,14 +1464,18 @@ export const api = {
         }
       }
       const dados = sanitizeMaterialPayload(payload)
+      const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
+      const supabasePayload = {
+        ...dadosSemCor,
+        cor_material: corMaterialCamel,
+        usuarioAtualizacao: usuario,
+        atualizadoEm: agora,
+      }
+
       const registro = await executeSingle(
         supabase
           .from('materiais')
-          .update({
-            ...dados,
-            usuarioAtualizacao: usuario,
-            atualizadoEm: agora,
-          })
+          .update(supabasePayload)
           .eq('id', id)
           .select(),
         'Falha ao atualizar material.'

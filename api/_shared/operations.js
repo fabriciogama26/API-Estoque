@@ -1093,15 +1093,19 @@ export const MateriaisOperations = {
     const agora = nowIso()
     const usuario = resolveUsuarioNome(user)
 
+    const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
+    const materialPayload = {
+      id: randomId(),
+      ...dadosSemCor,
+      cor_material: corMaterialCamel,
+      usuarioCadastro: usuario,
+      dataCadastro: agora,
+    }
+
     const material = await executeSingle(
       supabaseAdmin
         .from('materiais')
-        .insert({
-          id: randomId(),
-          ...dados,
-          usuarioCadastro: usuario,
-          dataCadastro: agora,
-        })
+        .insert(materialPayload)
         .select(),
       'Falha ao criar material.'
     )
@@ -1127,6 +1131,8 @@ export const MateriaisOperations = {
 
     const usuario = resolveUsuarioNome(user)
 
+    const { corMaterial: corMaterialCamel } = dados
+
     const materialAtualizado = await executeSingle(
       supabaseAdmin
         .from('materiais')
@@ -1143,7 +1149,7 @@ export const MateriaisOperations = {
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
           caracteristicaEpi: dados.caracteristicaEpi,
-          corMaterial: dados.corMaterial,
+          cor_material: corMaterialCamel,
           descricao: dados.descricao,
           chaveUnica: dados.chaveUnica,
           usuarioAtualizacao: usuario,
