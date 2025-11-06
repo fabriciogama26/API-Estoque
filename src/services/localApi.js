@@ -289,6 +289,14 @@ const mapLocalMaterialResumo = (material) => {
     numeroCalcado: material.numeroCalcado || '',
     numeroVestimenta: material.numeroVestimenta || '',
     grupoMaterial: material.grupoMaterial || '',
+    caracteristicaEpi: material.caracteristicaEpi || '',
+    caracteristicas: Array.isArray(material.caracteristicas)
+      ? material.caracteristicas
+      : normalizeSelectionList(material.caracteristicaEpi || [], 'caracteristica'),
+    cores: Array.isArray(material.cores)
+      ? material.cores
+      : normalizeSelectionList(material.corMaterial || [], 'cor'),
+    corMaterial: material.corMaterial || '',
   }
 }
 
@@ -478,6 +486,86 @@ const normalizeCatalogoLista = (lista) => {
         .filter(Boolean),
     ),
   ).sort((a, b) => a.localeCompare(b))
+}
+
+const resolveCatalogoNome = (item) => {
+  if (item === null || item === undefined) {
+    return ''
+  }
+  if (typeof item === 'string') {
+    return trim(item)
+  }
+  const keys = [
+    'nome',
+    'descricao',
+    'label',
+    'valor',
+    'value',
+    'caracteristica_material',
+    'caracteristicaMaterial',
+    'cor',
+    'cor_material',
+  ]
+  for (const key of keys) {
+    const valor = item[key]
+    if (typeof valor === 'string' && valor.trim()) {
+      return valor.trim()
+    }
+  }
+  return ''
+}
+
+const buildOptionId = (prefix, nome, index = 0) => {
+  const base = normalizeKeyPart(nome)
+  if (!base) {
+    return `${prefix}-${index}-${Math.random().toString(36).slice(2, 8)}`
+  }
+  return `${prefix}-${base}`
+}
+
+const normalizeCatalogoOptions = (lista, prefix) => {
+  const valores = []
+  const vistos = new Set()
+  ;(Array.isArray(lista) ? lista : [])
+    .map((item, index) => {
+      if (item === null || item === undefined) {
+        return null
+      }
+      if (typeof item === 'string') {
+        const nome = trim(item)
+        if (!nome) {
+          return null
+        }
+        const id = buildOptionId(prefix, nome, index)
+        return { id, nome }
+      }
+      const nome = resolveCatalogoNome(item)
+      if (!nome) {
+        return null
+      }
+      const idBase = item.id ?? item.uuid ?? item.value ?? item.valor ?? null
+      const id = idBase ?? buildOptionId(prefix, nome, index)
+      return { id, nome }
+    })
+    .filter(Boolean)
+    .forEach((item) => {
+      const chave = item.id ?? `${prefix}-${item.nome.toLowerCase()}`
+      if (!vistos.has(chave)) {
+        vistos.add(chave)
+        valores.push(item)
+      }
+    })
+  return valores
+}
+
+const normalizeSelectionList = (value, prefix) => {
+  if (Array.isArray(value)) {
+    return normalizeCatalogoOptions(value, prefix)
+  }
+  if (value === null || value === undefined || value === '') {
+    return []
+  }
+  return normalizeCatalogoOptions([value], prefix)
 }
 
 const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
@@ -884,8 +972,22 @@ const sanitizeMaterialPayload = (payload = {}) => {
   const grupoMaterial = trim(payload.grupoMaterial)
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
   const numeroVestimenta = trim(payload.numeroVestimenta)
-  const caracteristicaEpi = formatCaracteristicaTexto(payload.caracteristicaEpi)
-  const corMaterial = trim(payload.corMaterial)
+  const caracteristicasSelecionadas = normalizeSelectionList(
+    payload.caracteristicas ?? payload.caracteristicasEpi ?? payload.caracteristicaEpi ?? [],
+    'caracteristica',
+  )
+  const caracteristicaEpi = formatCaracteristicaTexto(
+    caracteristicasSelecionadas.length
+      ? caracteristicasSelecionadas.map((item) => item.nome)
+      : payload.caracteristicaEpi,
+  )
+  const coresSelecionadas = normalizeSelectionList(
+    payload.cores ?? payload.corMaterial ?? [],
+    'cor',
+  )
+  const corMaterial = coresSelecionadas.length
+    ? coresSelecionadas.map((item) => item.nome).join('; ')
+    : trim(payload.corMaterial)
   const numeroEspecifico = buildNumeroEspecifico({
     grupoMaterial,
     numeroCalcado,
@@ -908,7 +1010,11 @@ const sanitizeMaterialPayload = (payload = {}) => {
     numeroVestimenta: requiresTamanho(grupoMaterial) ? numeroVestimenta : '',
     numeroEspecifico,
     caracteristicaEpi,
+    caracteristicas: caracteristicasSelecionadas,
+    caracteristicasIds: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
     corMaterial,
+    cores: coresSelecionadas,
+    coresIds: coresSelecionadas.map((item) => item.id).filter(Boolean),
     descricao: String(payload.descricao || '').trim(),
     chaveUnica: buildChaveUnica({
       grupoMaterial,
@@ -1446,10 +1552,19 @@ const localApi = {
       })
     },
     async caracteristicas() {
-      return normalizeCatalogoLista(catalogoCaracteristicasEpi)
+      return normalizeCatalogoOptions(catalogoCaracteristicasEpi.map((item, index) => ({
+        id: item.id ?? buildOptionId('caracteristica', `${item.agente || ''}-${item.nome}`, index),
+        nome: item.nome,
+      })), 'caracteristica')
     },
     async cores() {
-      return normalizeCatalogoLista(catalogoCores)
+      return normalizeCatalogoOptions(
+        catalogoCores.map((nome, index) => ({
+          id: buildOptionId('cor', nome, index),
+          nome,
+        })),
+        'cor',
+      )
     },
     async medidasCalcado() {
       return normalizeCatalogoLista(catalogoMedidasCalcado)

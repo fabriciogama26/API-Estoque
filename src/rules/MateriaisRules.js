@@ -33,8 +33,23 @@ const requiresTamanho = (grupo) =>
 const normalizeCaracteristicaLista = (value) => {
   if (Array.isArray(value)) {
     return value
-      .map((item) => sanitizeAlphanumeric(item))
-      .map((item) => item.normalize?.('NFC') ?? item)
+      .map((item) => {
+        if (item === null || item === undefined) {
+          return ''
+        }
+        if (typeof item === 'string') {
+          const texto = sanitizeAlphanumeric(item)
+          return texto.normalize?.('NFC') ?? texto
+        }
+        if (typeof item === 'object') {
+          const textoBase =
+            item.nome ?? item.label ?? item.valor ?? item.value ?? item.id ?? ''
+          const texto = sanitizeAlphanumeric(textoBase)
+          return texto.normalize?.('NFC') ?? texto
+        }
+        const texto = sanitizeAlphanumeric(String(item))
+        return texto.normalize?.('NFC') ?? texto
+      })
       .filter(Boolean)
   }
   const texto = String(value ?? '')
@@ -160,7 +175,50 @@ const buildMaterialPayload = (form) => {
   const numeroVestimentaRaw = sanitizeAlphanumeric(form.numeroVestimenta)
   const numeroCalcado = numeroCalcadoRaw ? String(numeroCalcadoRaw) : ''
   const numeroVestimenta = numeroVestimentaRaw
-  const caracteristicaTexto = buildCaracteristicaTexto(form.caracteristicaEpi)
+  const caracteristicasSelecionadas = Array.isArray(form.caracteristicaEpi)
+    ? form.caracteristicaEpi
+        .map((item) => {
+          if (item === null || item === undefined) {
+            return null
+          }
+          if (typeof item === 'string') {
+            const nome = sanitizeAlphanumeric(item)
+            return nome ? { id: item, nome } : null
+          }
+          const nome = sanitizeAlphanumeric(
+            item.nome ?? item.label ?? item.valor ?? item.value ?? item.id ?? '',
+          )
+          if (!nome) {
+            return null
+          }
+          return { id: item.id ?? item.value ?? item.valor ?? item.nome ?? nome, nome }
+        })
+        .filter(Boolean)
+    : []
+  const caracteristicaTexto = buildCaracteristicaTexto(
+    caracteristicasSelecionadas.length
+      ? caracteristicasSelecionadas.map((item) => item.nome)
+      : form.caracteristicaEpi,
+  )
+  const coresSelecionadas = Array.isArray(form.cores)
+    ? form.cores
+        .map((item) => {
+          if (item === null || item === undefined) {
+            return null
+          }
+          if (typeof item === 'string') {
+            const nome = sanitizeAlphanumeric(item)
+            return nome ? { id: item, nome } : null
+          }
+          const nome = sanitizeAlphanumeric(item.nome ?? item.label ?? item.valor ?? '')
+          if (!nome) {
+            return null
+          }
+          return { id: item.id ?? item.value ?? item.nome ?? nome, nome }
+        })
+        .filter(Boolean)
+    : []
+  const corPrincipal = coresSelecionadas[0]?.nome ?? form.corMaterial
   const numeroEspecifico = buildNumeroReferencia({
     grupoMaterial,
     numeroCalcado,
@@ -173,7 +231,7 @@ const buildMaterialPayload = (form) => {
     numeroCalcado,
     numeroVestimenta,
     caracteristicaEpi: caracteristicaTexto,
-    corMaterial: form.corMaterial,
+    corMaterial: corPrincipal,
     ca: form.ca,
   })
 
@@ -189,7 +247,11 @@ const buildMaterialPayload = (form) => {
     numeroEspecifico,
     chaveUnica,
     caracteristicaEpi: caracteristicaTexto,
-    corMaterial: sanitizeAlphanumeric(form.corMaterial),
+    corMaterial: sanitizeAlphanumeric(corPrincipal),
+    caracteristicas: caracteristicasSelecionadas,
+    caracteristicasIds: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
+    cores: coresSelecionadas,
+    coresIds: coresSelecionadas.map((item) => item.id).filter(Boolean),
     descricao: sanitizeAlphanumeric(form.descricao),
   }
 }

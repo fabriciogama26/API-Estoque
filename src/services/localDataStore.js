@@ -37,7 +37,20 @@ const requiresTamanhoLocal = (grupoMaterial) =>
 const normalizeCaracteristicaListaLocal = (value) => {
   if (Array.isArray(value)) {
     return value
-      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+      .map((item) => {
+        if (item === null || item === undefined) {
+          return ''
+        }
+        if (typeof item === 'string') {
+          return item.trim()
+        }
+        if (typeof item === 'object') {
+          return String(
+            item.nome ?? item.label ?? item.valor ?? item.value ?? item.descricao ?? item.id ?? '',
+          ).trim()
+        }
+        return String(item).trim()
+      })
       .filter(Boolean)
   }
   const texto = String(value ?? '')
@@ -105,6 +118,54 @@ const buildChaveUnicaLocal = ({
   return partes.join('||')
 }
 
+const buildLocalOptionId = (prefix, nome, index = 0) => {
+  const base = normalizeKeyPart(nome)
+  if (!base) {
+    return `${prefix}-${index}-${Math.random().toString(36).slice(2, 8)}`
+  }
+  return `${prefix}-${base}`
+}
+
+const normalizeOptionArrayLocal = (value, prefix) => {
+  const lista = Array.isArray(value) ? value : value ? [value] : []
+  const vistos = new Set()
+  const resultado = []
+  lista.forEach((item, index) => {
+    if (item === null || item === undefined) {
+      return
+    }
+    if (typeof item === 'string') {
+      const nome = item.trim()
+      if (!nome) {
+        return
+      }
+      const id = buildLocalOptionId(prefix, nome, index)
+      const chave = `${prefix}-${id}`
+      if (!vistos.has(chave)) {
+        vistos.add(chave)
+        resultado.push({ id, nome })
+      }
+      return
+    }
+    if (typeof item === 'object') {
+      const nome = String(
+        item.nome ?? item.label ?? item.valor ?? item.value ?? item.cor ?? item.descricao ?? '',
+      ).trim()
+      if (!nome) {
+        return
+      }
+      const idBase = item.id ?? item.uuid ?? item.value ?? item.valor ?? null
+      const id = idBase ?? buildLocalOptionId(prefix, nome, index)
+      const chave = `${prefix}-${id}`
+      if (!vistos.has(chave)) {
+        vistos.add(chave)
+        resultado.push({ id, nome })
+      }
+    }
+  })
+  return resultado
+}
+
 function getDefaultState() {
   return {
     version: STATE_VERSION,
@@ -143,8 +204,25 @@ function normalizeState(state) {
     const numeroVestimenta = requiresTamanhoLocal(grupoMaterial)
       ? String(material.numeroVestimenta || '').trim()
       : ''
-    const caracteristicaEpi = formatCaracteristicaTextoLocal(material.caracteristicaEpi)
-    const corMaterial = String(material.corMaterial || '').trim()
+    const caracteristicasLista = normalizeOptionArrayLocal(
+      Array.isArray(material.caracteristicas)
+        ? material.caracteristicas
+        : normalizeCaracteristicaListaLocal(material.caracteristicaEpi),
+      'caracteristica',
+    )
+    const caracteristicaEpi = formatCaracteristicaTextoLocal(
+      caracteristicasLista.length
+        ? caracteristicasLista.map((item) => item.nome)
+        : material.caracteristicaEpi,
+    )
+    const coresLista = normalizeOptionArrayLocal(
+      Array.isArray(material.cores) ? material.cores : material.corMaterial ? [material.corMaterial] : [],
+      'cor',
+    )
+    const corMaterial =
+      coresLista.length > 0
+        ? coresLista.map((item) => item.nome).join('; ')
+        : String(material.corMaterial || '').trim()
     const ca = material.ca ?? ''
     const numeroEspecifico =
       material.numeroEspecifico ??
@@ -172,7 +250,11 @@ function normalizeState(state) {
       numeroVestimenta,
       numeroEspecifico,
       caracteristicaEpi,
+      caracteristicas: caracteristicasLista,
+      caracteristicasIds: caracteristicasLista.map((item) => item.id).filter(Boolean),
       corMaterial,
+      cores: coresLista,
+      coresIds: coresLista.map((item) => item.id).filter(Boolean),
       chaveUnica,
     }
   })

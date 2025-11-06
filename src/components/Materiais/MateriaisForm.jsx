@@ -61,7 +61,11 @@ export function MateriaisForm({
     new Set([...(materialItems || []), form.nome].filter(Boolean))
   )
   const caracteristicasSelecionadas = Array.isArray(form.caracteristicaEpi)
-    ? form.caracteristicaEpi
+    ? form.caracteristicaEpi.map((item) =>
+        typeof item === 'string'
+          ? { id: item, nome: item }
+          : { id: item?.id ?? item?.nome ?? '', nome: item?.nome ?? '' }
+      )
     : []
   const [caracteristicaSelecionada, setCaracteristicaSelecionada] = useState('')
 
@@ -134,8 +138,8 @@ export function MateriaisForm({
                 {isLoadingCaracteristicas ? 'Carregando características...' : 'Selecione'}
               </option>
               {caracteristicaOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
+                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                  {item.nome}
                 </option>
               ))}
             </select>
@@ -154,12 +158,12 @@ export function MateriaisForm({
           {caracteristicasSelecionadas.length ? (
             <ul className="materiais-caracteristicas">
               {caracteristicasSelecionadas.map((item) => (
-                <li key={item}>
-                  <span>{item}</span>
+                <li key={item.id ?? item.nome}>
+                  <span>{item.nome}</span>
                   <button
                     type="button"
                     className="materiais-caracteristicas__remove"
-                    onClick={() => onRemoveCaracteristica?.(item)}
+                    onClick={() => onRemoveCaracteristica?.(item.id ?? item.nome)}
                   >
                     Remover
                   </button>
@@ -262,7 +266,7 @@ export function MateriaisForm({
           <span>Cor</span>
           <select
             name="corMaterial"
-            value={form.corMaterial}
+            value={form.cores?.[0]?.id ?? ''}
             onChange={onChange}
             disabled={isLoadingCores}
           >
@@ -270,8 +274,8 @@ export function MateriaisForm({
               {isLoadingCores ? 'Carregando cores...' : 'Selecione'}
             </option>
             {corOptions.map((cor) => (
-              <option key={cor} value={cor}>
-                {cor}
+              <option key={cor.id ?? cor.nome} value={cor.id ?? cor.nome}>
+                {cor.nome}
               </option>
             ))}
           </select>
