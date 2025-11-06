@@ -216,11 +216,28 @@ const resolveCatalogoNome = (record) => {
   if (!record || typeof record !== 'object') {
     return ''
   }
-  const keys = ['nome', 'descricao', 'label', 'valor', 'value']
+  const keys = [
+    'nome',
+    'descricao',
+    'label',
+    'valor',
+    'value',
+    'caracteristica_material',
+    'caracteristicaMaterial',
+    'numero_calcado',
+    'numeroCalcado',
+    'medidas',
+    'tamanho',
+    'cor',
+    'cor_material',
+  ]
   for (const key of keys) {
     const value = record[key]
     if (typeof value === 'string' && value.trim()) {
       return value.trim()
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value)
     }
   }
   return ''
@@ -1366,16 +1383,20 @@ export const api = {
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
 
+      const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
+      const supabasePayload = {
+        ...dadosSemCor,
+        cor_material: corMaterialCamel,
+        usuarioCadastro: usuario,
+        dataCadastro: agora,
+        usuarioAtualizacao: usuario,
+        atualizadoEm: agora,
+      }
+
       const registro = await executeSingle(
         supabase
           .from('materiais')
-          .insert({
-            ...dados,
-            usuarioCadastro: usuario,
-            dataCadastro: agora,
-            usuarioAtualizacao: usuario,
-            atualizadoEm: agora,
-          })
+          .insert(supabasePayload)
           .select(),
         'Falha ao criar material.'
       )
@@ -1443,14 +1464,18 @@ export const api = {
         }
       }
       const dados = sanitizeMaterialPayload(payload)
+      const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
+      const supabasePayload = {
+        ...dadosSemCor,
+        cor_material: corMaterialCamel,
+        usuarioAtualizacao: usuario,
+        atualizadoEm: agora,
+      }
+
       const registro = await executeSingle(
         supabase
           .from('materiais')
-          .update({
-            ...dados,
-            usuarioAtualizacao: usuario,
-            atualizadoEm: agora,
-          })
+          .update(supabasePayload)
           .eq('id', id)
           .select(),
         'Falha ao atualizar material.'
@@ -1500,21 +1525,27 @@ export const api = {
     },
     async caracteristicas() {
       const data = await execute(
-        supabase.from('caracteristica_epi').select('nome, descricao').order('nome', { ascending: true }),
+        supabase
+          .from('caracteristica_epi')
+          .select('caracteristica_material')
+          .order('caracteristica_material', { ascending: true }),
         'Falha ao listar caracteristicas de EPI.',
       )
       return normalizeCatalogoLista(data)
     },
     async cores() {
       const data = await execute(
-        supabase.from('cor').select('nome, descricao').order('nome', { ascending: true }),
+        supabase.from('cor').select('cor').order('cor', { ascending: true }),
         'Falha ao listar cores.',
       )
       return normalizeCatalogoLista(data)
     },
     async medidasCalcado() {
       const data = await execute(
-        supabase.from('medidas_calcado').select('nome, descricao').order('nome', { ascending: true }),
+        supabase
+          .from('medidas_calcado')
+          .select('numero_calcado')
+          .order('numero_calcado', { ascending: true }),
         'Falha ao listar medidas de calçado.',
       )
       return normalizeCatalogoLista(data)
@@ -1523,8 +1554,8 @@ export const api = {
       const data = await execute(
         supabase
           .from('medidas_vestimentas')
-          .select('nome, descricao')
-          .order('nome', { ascending: true }),
+          .select('medidas')
+          .order('medidas', { ascending: true }),
         'Falha ao listar tamanhos de vestimenta.',
       )
       return normalizeCatalogoLista(data)

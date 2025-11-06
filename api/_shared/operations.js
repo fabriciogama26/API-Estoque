@@ -429,11 +429,28 @@ const resolveCatalogoNome = (registro) => {
   if (!registro || typeof registro !== 'object') {
     return ''
   }
-  const keys = ['nome', 'descricao', 'label', 'valor', 'value']
+  const keys = [
+    'nome',
+    'descricao',
+    'label',
+    'valor',
+    'value',
+    'caracteristica_material',
+    'caracteristicaMaterial',
+    'numero_calcado',
+    'numeroCalcado',
+    'medidas',
+    'tamanho',
+    'cor',
+    'cor_material',
+  ]
   for (const key of keys) {
     const valor = registro[key]
     if (typeof valor === 'string' && valor.trim()) {
       return valor.trim()
+    }
+    if (typeof valor === 'number' && Number.isFinite(valor)) {
+      return String(valor)
     }
   }
   return ''
@@ -1033,28 +1050,37 @@ export const MateriaisOperations = {
   },
   async caracteristicas() {
     const registros = await execute(
-      supabaseAdmin.from('caracteristica_epi').select('nome, descricao').order('nome'),
+      supabaseAdmin
+        .from('caracteristica_epi')
+        .select('caracteristica_material')
+        .order('caracteristica_material'),
       'Falha ao listar caracteristicas de EPI.',
     )
     return normalizeCatalogoLista(registros)
   },
   async cores() {
     const registros = await execute(
-      supabaseAdmin.from('cor').select('nome, descricao').order('nome'),
+      supabaseAdmin.from('cor').select('cor').order('cor'),
       'Falha ao listar cores.',
     )
     return normalizeCatalogoLista(registros)
   },
   async medidasCalcado() {
     const registros = await execute(
-      supabaseAdmin.from('medidas_calcado').select('nome, descricao').order('nome'),
+      supabaseAdmin
+        .from('medidas_calcado')
+        .select('numero_calcado')
+        .order('numero_calcado'),
       'Falha ao listar medidas de calçado.',
     )
     return normalizeCatalogoLista(registros)
   },
   async medidasVestimenta() {
     const registros = await execute(
-      supabaseAdmin.from('medidas_vestimentas').select('nome, descricao').order('nome'),
+      supabaseAdmin
+        .from('medidas_vestimentas')
+        .select('medidas')
+        .order('medidas'),
       'Falha ao listar tamanhos.',
     )
     return normalizeCatalogoLista(registros)
@@ -1067,15 +1093,19 @@ export const MateriaisOperations = {
     const agora = nowIso()
     const usuario = resolveUsuarioNome(user)
 
+    const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
+    const materialPayload = {
+      id: randomId(),
+      ...dadosSemCor,
+      cor_material: corMaterialCamel,
+      usuarioCadastro: usuario,
+      dataCadastro: agora,
+    }
+
     const material = await executeSingle(
       supabaseAdmin
         .from('materiais')
-        .insert({
-          id: randomId(),
-          ...dados,
-          usuarioCadastro: usuario,
-          dataCadastro: agora,
-        })
+        .insert(materialPayload)
         .select(),
       'Falha ao criar material.'
     )
@@ -1101,6 +1131,8 @@ export const MateriaisOperations = {
 
     const usuario = resolveUsuarioNome(user)
 
+    const { corMaterial: corMaterialCamel } = dados
+
     const materialAtualizado = await executeSingle(
       supabaseAdmin
         .from('materiais')
@@ -1117,7 +1149,7 @@ export const MateriaisOperations = {
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
           caracteristicaEpi: dados.caracteristicaEpi,
-          corMaterial: dados.corMaterial,
+          cor_material: corMaterialCamel,
           descricao: dados.descricao,
           chaveUnica: dados.chaveUnica,
           usuarioAtualizacao: usuario,
