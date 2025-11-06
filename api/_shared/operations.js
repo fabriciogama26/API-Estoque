@@ -14,6 +14,29 @@ import { createHttpError } from './http.js'
 
 const GENERIC_SUPABASE_ERROR = 'Falha ao comunicar com o Supabase.'
 
+const MATERIAL_SELECT_COLUMNS = `
+  id,
+  nome,
+  fabricante,
+  "validadeDias",
+  ca,
+  "valorUnitario",
+  "estoqueMinimo",
+  ativo,
+  descricao,
+  "grupoMaterial",
+  "numeroCalcado",
+  "numeroVestimenta",
+  "numeroEspecifico",
+  "caracteristicaEpi",
+  cor_material,
+  "chaveUnica",
+  "usuarioCadastro",
+  "usuarioAtualizacao",
+  "dataCadastro",
+  "atualizadoEm"
+`
+
 async function execute(builder, fallbackMessage) {
   const { data, error } = await builder
   if (error) {
@@ -429,11 +452,28 @@ const resolveCatalogoNome = (registro) => {
   if (!registro || typeof registro !== 'object') {
     return ''
   }
-  const keys = ['nome', 'descricao', 'label', 'valor', 'value']
+  const keys = [
+    'nome',
+    'descricao',
+    'label',
+    'valor',
+    'value',
+    'caracteristica_material',
+    'caracteristicaMaterial',
+    'numero_calcado',
+    'numeroCalcado',
+    'medidas',
+    'tamanho',
+    'cor',
+    'cor_material',
+  ]
   for (const key of keys) {
     const valor = registro[key]
     if (typeof valor === 'string' && valor.trim()) {
       return valor.trim()
+    }
+    if (typeof valor === 'number' && Number.isFinite(valor)) {
+      return String(valor)
     }
   }
   return ''
@@ -652,11 +692,15 @@ async function obterPessoaPorNome(nome) {
   return mapPessoaRecord(registros[0])
 }
 
-async function obterMaterialPorId(id)(id) {
+async function obterMaterialPorId(id) {
   if (!id) {
     return null
+  }
   return executeMaybeSingle(
-    supabaseAdmin.from('materiais').select('*').eq('id', id),
+    supabaseAdmin
+      .from('materiais')
+      .select(MATERIAL_SELECT_COLUMNS)
+      .eq('id', id),
     'Falha ao obter material.'
   )
 }
@@ -716,7 +760,13 @@ async function carregarMovimentacoes(params) {
     saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
 
   const [materiais, entradas, saidas] = await Promise.all([
-    execute(supabaseAdmin.from('materiais').select('*').order('nome'), 'Falha ao listar materiais.'),
+    execute(
+      supabaseAdmin
+        .from('materiais')
+        .select(MATERIAL_SELECT_COLUMNS)
+        .order('nome'),
+      'Falha ao listar materiais.'
+    ),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
     execute(saidasFiltered, 'Falha ao listar saÃ­das.'),
   ])
@@ -1010,7 +1060,10 @@ export const MateriaisOperations = {
   async list() {
     return (
       (await execute(
-        supabaseAdmin.from('materiais').select('*').order('nome'),
+        supabaseAdmin
+          .from('materiais')
+          .select(MATERIAL_SELECT_COLUMNS)
+          .order('nome'),
         'Falha ao listar materiais.'
       )) ?? []
     )
@@ -1033,28 +1086,37 @@ export const MateriaisOperations = {
   },
   async caracteristicas() {
     const registros = await execute(
-      supabaseAdmin.from('caracteristica_epi').select('nome, descricao').order('nome'),
+      supabaseAdmin
+        .from('caracteristica_epi')
+        .select('caracteristica_material')
+        .order('caracteristica_material'),
       'Falha ao listar caracteristicas de EPI.',
     )
     return normalizeCatalogoLista(registros)
   },
   async cores() {
     const registros = await execute(
-      supabaseAdmin.from('cor').select('nome, descricao').order('nome'),
+      supabaseAdmin.from('cor').select('cor').order('cor'),
       'Falha ao listar cores.',
     )
     return normalizeCatalogoLista(registros)
   },
   async medidasCalcado() {
     const registros = await execute(
-      supabaseAdmin.from('medidas_calcado').select('nome, descricao').order('nome'),
+      supabaseAdmin
+        .from('medidas_calcado')
+        .select('numero_calcado')
+        .order('numero_calcado'),
       'Falha ao listar medidas de calçado.',
     )
     return normalizeCatalogoLista(registros)
   },
   async medidasVestimenta() {
     const registros = await execute(
-      supabaseAdmin.from('medidas_vestimentas').select('nome, descricao').order('nome'),
+      supabaseAdmin
+        .from('medidas_vestimentas')
+        .select('medidas')
+        .order('medidas'),
       'Falha ao listar tamanhos.',
     )
     return normalizeCatalogoLista(registros)
@@ -1067,16 +1129,20 @@ export const MateriaisOperations = {
     const agora = nowIso()
     const usuario = resolveUsuarioNome(user)
 
+    const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
+    const materialPayload = {
+      id: randomId(),
+      ...dadosSemCor,
+      cor_material: corMaterialCamel,
+      usuarioCadastro: usuario,
+      dataCadastro: agora,
+    }
+
     const material = await executeSingle(
       supabaseAdmin
         .from('materiais')
-        .insert({
-          id: randomId(),
-          ...dados,
-          usuarioCadastro: usuario,
-          dataCadastro: agora,
-        })
-        .select(),
+        .insert(materialPayload)
+        .select(MATERIAL_SELECT_COLUMNS),
       'Falha ao criar material.'
     )
 
@@ -1085,7 +1151,10 @@ export const MateriaisOperations = {
   },
   async update(id, payload, user) {
     const atual = await executeMaybeSingle(
-      supabaseAdmin.from('materiais').select('*').eq('id', id),
+      supabaseAdmin
+        .from('materiais')
+        .select(MATERIAL_SELECT_COLUMNS)
+        .eq('id', id),
       'Falha ao obter material.'
     )
     if (!atual) {
@@ -1100,6 +1169,8 @@ export const MateriaisOperations = {
     await ensureMaterialChaveUnica(dados.chaveUnica, id)
 
     const usuario = resolveUsuarioNome(user)
+
+    const { corMaterial: corMaterialCamel } = dados
 
     const materialAtualizado = await executeSingle(
       supabaseAdmin
@@ -1117,14 +1188,14 @@ export const MateriaisOperations = {
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
           caracteristicaEpi: dados.caracteristicaEpi,
-          corMaterial: dados.corMaterial,
+          cor_material: corMaterialCamel,
           descricao: dados.descricao,
           chaveUnica: dados.chaveUnica,
           usuarioAtualizacao: usuario,
           atualizadoEm: nowIso(),
         })
         .eq('id', id)
-        .select(),
+        .select(MATERIAL_SELECT_COLUMNS),
       'Falha ao atualizar material.'
     )
 
@@ -1136,7 +1207,10 @@ export const MateriaisOperations = {
   },
   async get(id) {
     return executeMaybeSingle(
-      supabaseAdmin.from('materiais').select('*').eq('id', id),
+      supabaseAdmin
+        .from('materiais')
+        .select(MATERIAL_SELECT_COLUMNS)
+        .eq('id', id),
       'Falha ao obter material.'
     )
   },
