@@ -10,8 +10,10 @@ export const createMateriaisFormDefault = () => ({
   numeroCalcado: '',
   numeroVestimenta: '',
   caracteristicaEpi: [],
+  caracteristicas_epi: [],
   corMaterial: '',
   cores: [],
+  coresIds: [],
   descricao: '',
 })
 

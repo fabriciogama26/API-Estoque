@@ -940,6 +940,7 @@ function sanitizeMaterialPayload(payload = {}) {
       payload.caracteristicasEpi ??
       payload.caracteristicaEpi ??
       payload.caracteristica_epi ??
+      payload.caracteristicas_epi ??
       []
   )
   const caracteristicaEpi = formatCaracteristicaTexto(
@@ -950,6 +951,7 @@ function sanitizeMaterialPayload(payload = {}) {
   const coresSelecionadas = normalizeOptionList(
     payload.cores ??
       payload.coresSelecionadas ??
+      payload.coresIds ??
       payload.corMaterial ??
       payload.cor_material ??
       payload.cor ??

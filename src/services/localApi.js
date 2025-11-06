@@ -973,7 +973,11 @@ const sanitizeMaterialPayload = (payload = {}) => {
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
   const numeroVestimenta = trim(payload.numeroVestimenta)
   const caracteristicasSelecionadas = normalizeSelectionList(
-    payload.caracteristicas ?? payload.caracteristicasEpi ?? payload.caracteristicaEpi ?? [],
+    payload.caracteristicas ??
+      payload.caracteristicasEpi ??
+      payload.caracteristicaEpi ??
+      payload.caracteristicas_epi ??
+      [],
     'caracteristica',
   )
   const caracteristicaEpi = formatCaracteristicaTexto(
@@ -982,7 +986,7 @@ const sanitizeMaterialPayload = (payload = {}) => {
       : payload.caracteristicaEpi,
   )
   const coresSelecionadas = normalizeSelectionList(
-    payload.cores ?? payload.corMaterial ?? [],
+    payload.cores ?? payload.coresIds ?? payload.corMaterial ?? [],
     'cor',
   )
   const corMaterial = coresSelecionadas.length

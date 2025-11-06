@@ -27,6 +27,82 @@ const sanitizeAlphanumeric = (value = '') => String(value).trim()
 
 const sanitizeMaterialNome = (value = '') => value.replace(/\d/g, '')
 
+const normalizeSelectionKey = (value) => normalizeKeyPart(value || '')
+
+const normalizeSelectionItem = (item) => {
+  if (item === null || item === undefined) {
+    return null
+  }
+  if (typeof item === 'string' || typeof item === 'number') {
+    const texto = sanitizeAlphanumeric(item)
+    if (!texto) {
+      return null
+    }
+    const valor = String(item).trim()
+    return { id: valor, nome: texto }
+  }
+  if (typeof item === 'object') {
+    const nomeBase = sanitizeAlphanumeric(
+      item.nome ?? item.label ?? item.valor ?? item.value ?? item.texto ?? item.text ?? '',
+    )
+    const idBase =
+      item.id ?? item.uuid ?? item.value ?? item.valor ?? item.nome ?? item.label ?? null
+    const id = sanitizeAlphanumeric(idBase ?? nomeBase)
+    const nome = nomeBase || id
+    if (!nome) {
+      return null
+    }
+    return { id, nome }
+  }
+  const texto = sanitizeAlphanumeric(String(item))
+  if (!texto) {
+    return null
+  }
+  const valor = String(item).trim()
+  return { id: valor, nome: texto }
+}
+
+const mergeSelectionLists = (...sources) => {
+  const itens = []
+  sources.forEach((source) => {
+    if (source === null || source === undefined || source === '') {
+      return
+    }
+    if (Array.isArray(source)) {
+      source.forEach((value) => {
+        itens.push(value)
+      })
+      return
+    }
+    if (typeof source === 'string') {
+      source
+        .split(/[;|,]/)
+        .map((parte) => sanitizeAlphanumeric(parte))
+        .filter(Boolean)
+        .forEach((parte) => itens.push(parte))
+      return
+    }
+    itens.push(source)
+  })
+
+  const vistos = new Set()
+  const normalizados = []
+
+  itens
+    .map((item) => normalizeSelectionItem(item))
+    .filter(Boolean)
+    .forEach((item) => {
+      const chave = item.id ? `id:${item.id}` : `nome:${normalizeSelectionKey(item.nome)}`
+      if (vistos.has(chave)) {
+        return
+      }
+      vistos.add(chave)
+      normalizados.push(item)
+    })
+
+  return normalizados.sort((a, b) => a.nome.localeCompare(b.nome))
+}
+
 const requiresTamanho = (grupo) =>
   isGrupo(grupo, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(grupo, GRUPO_MATERIAL_PROTECAO_MAOS)
 
@@ -151,7 +227,12 @@ export function validateMaterialForm(form) {
     return 'Informe o fabricante.'
   }
 
-  const caracteristicas = normalizeCaracteristicaLista(form.caracteristicaEpi)
+  const caracteristicas = mergeSelectionLists(
+    form.caracteristicaEpi,
+    form.caracteristicas,
+    form.caracteristicas_epi,
+    form.caracteristicasIds,
+  )
   if (!caracteristicas.length) {
     return 'Informe ao menos uma caracteristica.'
   }
@@ -175,49 +256,16 @@ const buildMaterialPayload = (form) => {
   const numeroVestimentaRaw = sanitizeAlphanumeric(form.numeroVestimenta)
   const numeroCalcado = numeroCalcadoRaw ? String(numeroCalcadoRaw) : ''
   const numeroVestimenta = numeroVestimentaRaw
-  const caracteristicasSelecionadas = Array.isArray(form.caracteristicaEpi)
-    ? form.caracteristicaEpi
-        .map((item) => {
-          if (item === null || item === undefined) {
-            return null
-          }
-          if (typeof item === 'string') {
-            const nome = sanitizeAlphanumeric(item)
-            return nome ? { id: item, nome } : null
-          }
-          const nome = sanitizeAlphanumeric(
-            item.nome ?? item.label ?? item.valor ?? item.value ?? item.id ?? '',
-          )
-          if (!nome) {
-            return null
-          }
-          return { id: item.id ?? item.value ?? item.valor ?? item.nome ?? nome, nome }
-        })
-        .filter(Boolean)
-    : []
-  const caracteristicaTexto = buildCaracteristicaTexto(
-    caracteristicasSelecionadas.length
-      ? caracteristicasSelecionadas.map((item) => item.nome)
-      : form.caracteristicaEpi,
+  const caracteristicasSelecionadas = mergeSelectionLists(
+    form.caracteristicaEpi,
+    form.caracteristicas,
+    form.caracteristicas_epi,
+    form.caracteristicasIds,
   )
-  const coresSelecionadas = Array.isArray(form.cores)
-    ? form.cores
-        .map((item) => {
-          if (item === null || item === undefined) {
-            return null
-          }
-          if (typeof item === 'string') {
-            const nome = sanitizeAlphanumeric(item)
-            return nome ? { id: item, nome } : null
-          }
-          const nome = sanitizeAlphanumeric(item.nome ?? item.label ?? item.valor ?? '')
-          if (!nome) {
-            return null
-          }
-          return { id: item.id ?? item.value ?? item.nome ?? nome, nome }
-        })
-        .filter(Boolean)
-    : []
+  const caracteristicaTexto = buildCaracteristicaTexto(
+    caracteristicasSelecionadas.length ? caracteristicasSelecionadas : form.caracteristicaEpi,
+  )
+  const coresSelecionadas = mergeSelectionLists(form.cores, form.coresIds)
   const corPrincipal = coresSelecionadas[0]?.nome ?? form.corMaterial
   const numeroEspecifico = buildNumeroReferencia({
     grupoMaterial,
@@ -250,6 +298,7 @@ const buildMaterialPayload = (form) => {
     corMaterial: sanitizeAlphanumeric(corPrincipal),
     caracteristicas: caracteristicasSelecionadas,
     caracteristicasIds: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
+    caracteristicas_epi: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
     cores: coresSelecionadas,
     coresIds: coresSelecionadas.map((item) => item.id).filter(Boolean),
     descricao: sanitizeAlphanumeric(form.descricao),

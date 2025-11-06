@@ -3,6 +3,86 @@ const { Material, PrecoHistorico } = require('../models');
 const repositories = require('../repositories');
 const { materialRules } = require('../rules');
 
+const sanitizeText = (value) => (value === undefined || value === null ? '' : String(value).trim());
+
+const normalizeKeyPart = (value) =>
+  sanitizeText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+const normalizeSelectionItem = (item) => {
+  if (item === null || item === undefined) {
+    return null;
+  }
+  if (typeof item === 'string' || typeof item === 'number') {
+    const texto = sanitizeText(item);
+    if (!texto) {
+      return null;
+    }
+    const valor = String(item).trim();
+    return { id: valor, nome: texto };
+  }
+  if (typeof item === 'object') {
+    const nomeBase = sanitizeText(
+      item.nome ?? item.label ?? item.valor ?? item.value ?? item.texto ?? item.text,
+    );
+    const idBase =
+      item.id ?? item.uuid ?? item.value ?? item.valor ?? item.nome ?? item.label ?? null;
+    const id = sanitizeText(idBase ?? nomeBase);
+    const nome = nomeBase || id;
+    if (!nome) {
+      return null;
+    }
+    return { id, nome };
+  }
+  const texto = sanitizeText(item);
+  if (!texto) {
+    return null;
+  }
+  return { id: texto, nome: texto };
+};
+
+const collectSelectionValues = (...sources) => {
+  const itens = [];
+  sources.forEach((source) => {
+    if (source === undefined || source === null || source === '') {
+      return;
+    }
+    if (Array.isArray(source)) {
+      source.forEach((value) => itens.push(value));
+      return;
+    }
+    if (typeof source === 'string') {
+      source
+        .split(/[;|,]/)
+        .map((parte) => sanitizeText(parte))
+        .filter(Boolean)
+        .forEach((parte) => itens.push(parte));
+      return;
+    }
+    itens.push(source);
+  });
+  return itens;
+};
+
+const mergeSelectionLists = (...sources) => {
+  const vistos = new Set();
+  const resultado = [];
+  collectSelectionValues(...sources)
+    .map((value) => normalizeSelectionItem(value))
+    .filter(Boolean)
+    .forEach((item) => {
+      const chave = item.id ? `id:${item.id}` : `nome:${normalizeKeyPart(item.nome)}`;
+      if (vistos.has(chave)) {
+        return;
+      }
+      vistos.add(chave);
+      resultado.push(item);
+    });
+  return resultado.sort((a, b) => a.nome.localeCompare(b.nome));
+};
+
 function normalizeMaterialInput(payload) {
   const nome = materialRules.sanitizeNomeEpi(payload.nome);
   const fabricante = String(payload.fabricante || '').trim();
@@ -13,8 +93,27 @@ function normalizeMaterialInput(payload) {
   const numeroVestimentaRaw = String(payload.numeroVestimenta || '').trim();
   const numeroCalcado = materialRules.isGrupoCalcado(grupoMaterial) ? numeroCalcadoRaw : '';
   const numeroVestimenta = materialRules.requiresTamanho(grupoMaterial) ? numeroVestimentaRaw : '';
-  const caracteristicaEpi = materialRules.formatCaracteristicaTexto(payload.caracteristicaEpi || '');
-  const corMaterial = String(payload.corMaterial || '').trim();
+  const caracteristicasLista = mergeSelectionLists(
+    payload.caracteristicas,
+    payload.caracteristicasSelecionadas,
+    payload.caracteristicasEpi,
+    payload.caracteristicaEpi,
+    payload.caracteristica_epi,
+    payload.caracteristicas_epi,
+    payload.caracteristicasIds,
+    payload.caracteristicaIds,
+  );
+  const caracteristicaEpiTexto = caracteristicasLista.length
+    ? materialRules.formatCaracteristicaTexto(caracteristicasLista.map((item) => item.nome))
+    : materialRules.formatCaracteristicaTexto(payload.caracteristicaEpi || payload.caracteristica_epi || '');
+  const coresLista = mergeSelectionLists(
+    payload.coresDetalhes,
+    payload.coresSelecionadas,
+    payload.cores,
+    payload.coresIds,
+    payload.corMaterial,
+  );
+  const corMaterial = coresLista[0]?.nome || sanitizeText(payload.corMaterial);
   const descricao = String(payload.descricao || '').trim();
   const numeroEspecifico = materialRules.buildNumeroEspecifico({
     grupoMaterial,
@@ -27,10 +126,12 @@ function normalizeMaterialInput(payload) {
     fabricante,
     numeroCalcado,
     numeroVestimenta,
-    caracteristicaEpi,
+    caracteristicaEpi: caracteristicaEpiTexto,
     corMaterial,
     ca,
   });
+  const caracteristicasIds = caracteristicasLista.map((item) => item.id).filter(Boolean);
+  const coresIds = coresLista.map((item) => item.id).filter(Boolean);
 
   return {
     nome,
@@ -41,10 +142,15 @@ function normalizeMaterialInput(payload) {
     numeroCalcado,
     numeroVestimenta,
     numeroEspecifico,
-    caracteristicaEpi,
+    caracteristicaEpi: caracteristicaEpiTexto,
     corMaterial,
     descricao,
     chaveUnica,
+    caracteristicas: caracteristicasLista,
+    caracteristicasIds,
+    caracteristicas_epi: caracteristicasIds,
+    cores: coresLista,
+    coresIds,
   };
 }
 
@@ -72,6 +178,12 @@ class MaterialService {
       estoqueMinimo: payload.estoqueMinimo !== undefined ? Number(payload.estoqueMinimo) : 0,
       ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
     });
+
+    material.caracteristicas = normalized.caracteristicas;
+    material.caracteristicasIds = normalized.caracteristicasIds;
+    material.caracteristicas_epi = normalized.caracteristicas_epi;
+    material.cores = normalized.cores;
+    material.coresIds = normalized.coresIds;
 
     repositories.materiais.create(material);
     this.registrarHistoricoPreco({
@@ -139,6 +251,11 @@ class MaterialService {
     const atualizacoes = {
       ...normalized,
       valorUnitario: valorUnitarioAtualizado,
+      caracteristicas: normalized.caracteristicas,
+      caracteristicasIds: normalized.caracteristicasIds,
+      caracteristicas_epi: normalized.caracteristicas_epi,
+      cores: normalized.cores,
+      coresIds: normalized.coresIds,
     };
 
     if (payload.estoqueMinimo !== undefined) {
