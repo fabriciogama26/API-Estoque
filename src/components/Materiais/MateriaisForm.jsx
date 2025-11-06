@@ -49,6 +49,8 @@ export function MateriaisForm({
   tamanhoError = null,
   onAddCaracteristica,
   onRemoveCaracteristica,
+  onAddCor,
+  onRemoveCor,
 }) {
   const isCalcado = isGrupo(form.grupoMaterial, GRUPO_MATERIAL_CALCADO)
   const isVestimenta =
@@ -61,13 +63,27 @@ export function MateriaisForm({
     new Set([...(materialItems || []), form.nome].filter(Boolean))
   )
   const caracteristicasSelecionadas = Array.isArray(form.caracteristicaEpi)
-    ? form.caracteristicaEpi.map((item) =>
-        typeof item === 'string'
-          ? { id: item, nome: item }
-          : { id: item?.id ?? item?.nome ?? '', nome: item?.nome ?? '' }
-      )
+    ? form.caracteristicaEpi
+        .map((item) =>
+          typeof item === 'string'
+            ? { id: item, nome: item }
+            : { id: item?.id ?? item?.nome ?? '', nome: item?.nome ?? '' }
+        )
+        .filter((item) => item.nome)
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+    : []
+  const coresSelecionadas = Array.isArray(form.cores)
+    ? form.cores
+        .map((item) =>
+          typeof item === 'string'
+            ? { id: item, nome: item }
+            : { id: item?.id ?? item?.nome ?? '', nome: item?.nome ?? '' }
+        )
+        .filter((item) => item.nome)
+        .sort((a, b) => a.nome.localeCompare(b.nome))
     : []
   const [caracteristicaSelecionada, setCaracteristicaSelecionada] = useState('')
+  const [corSelecionada, setCorSelecionada] = useState('')
 
   return (
     <form className="form" onSubmit={onSubmit}>
@@ -264,21 +280,51 @@ export function MateriaisForm({
         </label>
         <label className="field">
           <span>Cor</span>
-          <select
-            name="corMaterial"
-            value={form.cores?.[0]?.id ?? ''}
-            onChange={onChange}
-            disabled={isLoadingCores}
-          >
-            <option value="">
-              {isLoadingCores ? 'Carregando cores...' : 'Selecione'}
-            </option>
-            {corOptions.map((cor) => (
-              <option key={cor.id ?? cor.nome} value={cor.id ?? cor.nome}>
-                {cor.nome}
+          <div className="field__inline">
+            <select
+              value={corSelecionada}
+              onChange={(event) => setCorSelecionada(event.target.value)}
+              disabled={isLoadingCores}
+            >
+              <option value="">
+                {isLoadingCores ? 'Carregando cores...' : 'Selecione'}
               </option>
-            ))}
-          </select>
+              {corOptions.map((cor) => (
+                <option key={cor.id ?? cor.nome} value={cor.id ?? cor.nome}>
+                  {cor.nome}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => {
+                onAddCor?.(corSelecionada)
+                setCorSelecionada('')
+              }}
+              disabled={!corSelecionada}
+            >
+              Adicionar
+            </button>
+          </div>
+          {coresSelecionadas.length ? (
+            <ul className="materiais-caracteristicas">
+              {coresSelecionadas.map((item) => (
+                <li key={item.id ?? item.nome}>
+                  <span>{item.nome}</span>
+                  <button
+                    type="button"
+                    className="materiais-caracteristicas__remove"
+                    onClick={() => onRemoveCor?.(item.id ?? item.nome)}
+                  >
+                    Remover
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="field__helper">Selecione uma ou mais cores para o material.</p>
+          )}
           {corError ? <p className="feedback feedback--error">{corError}</p> : null}
         </label>
         <label className="field field--full">

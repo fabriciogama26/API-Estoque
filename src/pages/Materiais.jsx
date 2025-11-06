@@ -38,6 +38,86 @@ const normalizeGrupo = (value) =>
 
 const isGrupo = (value, target) => normalizeGrupo(value) === normalizeGrupo(target)
 
+const normalizeSelectionItem = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  if (typeof value === 'string') {
+    const nome = value.trim()
+    if (!nome) {
+      return null
+    }
+    return { id: value, nome }
+  }
+
+  if (typeof value === 'object') {
+    const nomeBase =
+      value.nome ?? value.label ?? value.valor ?? value.value ?? value.descricao ?? value.id ?? ''
+    const nome = typeof nomeBase === 'string' ? nomeBase.trim() : String(nomeBase ?? '').trim()
+
+    if (!nome) {
+      return null
+    }
+
+    const idBase = value.id ?? value.value ?? value.valor ?? value.nome ?? value.codigo
+    const id = idBase !== null && idBase !== undefined ? idBase : nome
+
+    return { id, nome }
+  }
+
+  const nome = String(value ?? '').trim()
+  if (!nome) {
+    return null
+  }
+  return { id: value, nome }
+}
+
+const normalizeSelectionKey = (value) =>
+  value
+    ? String(value)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    : ''
+
+const normalizeSelectionList = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+
+  const normalizados = lista
+    .map((item) => normalizeSelectionItem(item))
+    .filter(Boolean)
+    .reduce((acc, item) => {
+      const exists = acc.some((existente) => {
+        if (existente.id && item.id) {
+          return existente.id === item.id
+        }
+        return normalizeSelectionKey(existente.nome) === normalizeSelectionKey(item.nome)
+      })
+      if (!exists) {
+        acc.push(item)
+      }
+      return acc
+    }, [])
+
+  return normalizados.sort((a, b) => a.nome.localeCompare(b.nome))
+}
+
+const findOptionByValue = (options, valor) => {
+  const alvo = typeof valor === 'string' ? valor.trim() : valor
+  if (!alvo) {
+    return null
+  }
+
+  return options.find((item) => {
+    const id = item?.id ?? item?.value ?? item?.valor ?? item?.nome
+    return id === alvo || item?.nome === alvo
+  })
+}
+
 export function MateriaisPage() {
   const { user } = useAuth()
   const [form, setForm] = useState(() => createMateriaisFormDefault())
@@ -249,51 +329,37 @@ export function MateriaisPage() {
       return
     }
 
-    if (name === 'corMaterial') {
-      const selecionada = corOptions.find((item) => (item.id ?? item.nome) === value)
-      setForm((prev) => ({
-        ...prev,
-        corMaterial: selecionada?.nome ?? '',
-        cores: selecionada ? [selecionada] : [],
-      }))
-      return
-    }
-
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleAddCaracteristica = (valor) => {
-    const idSelecionado = valor?.trim()
-    if (!idSelecionado) {
-      return
-    }
-    const opcao = caracteristicaOptions.find((item) => (item.id ?? item.nome) === idSelecionado)
-    if (!opcao) {
-      return
-    }
     setForm((prev) => {
-      const atual = Array.isArray(prev.caracteristicaEpi) ? prev.caracteristicaEpi : []
+      const selecionada = normalizeSelectionItem(
+        findOptionByValue(caracteristicaOptions, valor) ?? valor,
+      )
+
+      if (!selecionada) {
+        return prev
+      }
+
+      const atual = normalizeSelectionList(prev.caracteristicaEpi)
+
       if (
-        atual.some((value) => {
-          if (typeof value === 'string') {
-            return value === idSelecionado || value === opcao.nome
+        atual.some((item) => {
+          if (item.id && selecionada.id) {
+            return item.id === selecionada.id
           }
-          const comparador = value?.id ?? value?.nome
-          return comparador === idSelecionado || comparador === opcao.nome
+          return normalizeSelectionKey(item.nome) === normalizeSelectionKey(selecionada.nome)
         })
       ) {
         return prev
       }
+
+      const atualizada = [...atual, selecionada].sort((a, b) => a.nome.localeCompare(b.nome))
+
       return {
         ...prev,
-        caracteristicaEpi: [...atual, opcao]
-          .map((item) =>
-            typeof item === 'string'
-              ? { id: item, nome: item }
-              : { id: item?.id ?? item?.nome ?? '', nome: item?.nome ?? '' }
-          )
-          .filter((item) => item.nome)
-          .sort((a, b) => a.nome.localeCompare(b.nome)),
+        caracteristicaEpi: atualizada,
       }
     })
   }
@@ -301,14 +367,55 @@ export function MateriaisPage() {
   const handleRemoveCaracteristica = (valor) => {
     setForm((prev) => ({
       ...prev,
-      caracteristicaEpi: (prev.caracteristicaEpi || []).filter((item) => {
-        if (typeof item === 'string') {
-          return item !== valor
-        }
-        const comparador = item?.id ?? item?.nome
-        return comparador !== valor
-      }),
+      caracteristicaEpi: normalizeSelectionList(prev.caracteristicaEpi).filter(
+        (item) => item.id !== valor && item.nome !== valor,
+      ),
     }))
+  }
+
+  const handleAddCor = (valor) => {
+    setForm((prev) => {
+      const selecionada = normalizeSelectionItem(findOptionByValue(corOptions, valor) ?? valor)
+
+      if (!selecionada) {
+        return prev
+      }
+
+      const atual = normalizeSelectionList(prev.cores)
+
+      if (
+        atual.some((item) => {
+          if (item.id && selecionada.id) {
+            return item.id === selecionada.id
+          }
+          return normalizeSelectionKey(item.nome) === normalizeSelectionKey(selecionada.nome)
+        })
+      ) {
+        return prev
+      }
+
+      const atualizada = [...atual, selecionada].sort((a, b) => a.nome.localeCompare(b.nome))
+
+      return {
+        ...prev,
+        cores: atualizada,
+        corMaterial: atualizada[0]?.nome ?? '',
+      }
+    })
+  }
+
+  const handleRemoveCor = (valor) => {
+    setForm((prev) => {
+      const atualizada = normalizeSelectionList(prev.cores).filter(
+        (item) => item.id !== valor && item.nome !== valor,
+      )
+
+      return {
+        ...prev,
+        cores: atualizada,
+        corMaterial: atualizada[0]?.nome ?? '',
+      }
+    })
   }
 
   const handleFilterChange = (event) => {
@@ -396,6 +503,20 @@ export function MateriaisPage() {
   }
 
   const startEdit = (material) => {
+    const caracteristicas = normalizeSelectionList(
+      Array.isArray(material.caracteristicas) && material.caracteristicas.length
+        ? material.caracteristicas
+        : parseCaracteristicaEpi(material.caracteristicaEpi).map((nome) => ({ id: nome, nome })),
+    )
+
+    const cores = normalizeSelectionList(
+      Array.isArray(material.cores) && material.cores.length
+        ? material.cores
+        : material.corMaterial
+          ? [{ id: material.corMaterial, nome: material.corMaterial }]
+          : [],
+    )
+
     setEditingMaterial(material)
     setMaterialGroups((prev) => {
       if (!material.grupoMaterial) {
@@ -415,11 +536,9 @@ export function MateriaisPage() {
       grupoMaterial: material.grupoMaterial || '',
       numeroCalcado: material.numeroCalcado || '',
       numeroVestimenta: material.numeroVestimenta || '',
-      caracteristicaEpi: Array.isArray(material.caracteristicas)
-        ? material.caracteristicas
-        : parseCaracteristicaEpi(material.caracteristicaEpi).map((nome) => ({ id: nome, nome })),
-      corMaterial: material.corMaterial || material.cores?.[0]?.nome || '',
-      cores: Array.isArray(material.cores) ? material.cores : [],
+      caracteristicaEpi: caracteristicas,
+      corMaterial: cores[0]?.nome ?? '',
+      cores,
       descricao: material.descricao || '',
     })
     setItemsError(null)
@@ -476,6 +595,8 @@ export function MateriaisPage() {
         tamanhoError={tamanhoError}
         onAddCaracteristica={handleAddCaracteristica}
         onRemoveCaracteristica={handleRemoveCaracteristica}
+        onAddCor={handleAddCor}
+        onRemoveCor={handleRemoveCor}
       />
 
       <MateriaisFilters
