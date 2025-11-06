@@ -14,28 +14,69 @@ import { createHttpError } from './http.js'
 
 const GENERIC_SUPABASE_ERROR = 'Falha ao comunicar com o Supabase.'
 
-const MATERIAL_SELECT_COLUMNS = `
-  id,
-  nome,
-  fabricante,
-  "validadeDias",
-  ca,
-  "valorUnitario",
-  "estoqueMinimo",
-  ativo,
-  descricao,
-  "grupoMaterial",
-  "numeroCalcado",
-  "numeroVestimenta",
-  "numeroEspecifico",
-  "caracteristicaEpi",
-  cor_material,
-  "chaveUnica",
-  "usuarioCadastro",
-  "usuarioAtualizacao",
-  "dataCadastro",
-  "atualizadoEm"
-`
+const DEFAULT_MATERIAIS_VIEW = 'vw_materiais_vinculos'
+const MATERIAIS_VIEW = process.env.MATERIAIS_VIEW || DEFAULT_MATERIAIS_VIEW
+const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
+const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
+
+const CARACTERISTICA_ID_KEYS = [
+  'caracteristicasIds',
+  'caracteristicaIds',
+  'caracteristicaId',
+  'caracteristica_id',
+  'caracteristicas_id',
+  'caracteristicas',
+  'caracteristicasSelecionadas',
+  'caracteristicasVinculos',
+]
+
+const COR_ID_KEYS = [
+  'corIds',
+  'coreIds',
+  'coresIds',
+  'cor_id',
+  'cores_id',
+  'cores',
+  'coresSelecionadas',
+  'coresVinculos',
+]
+
+const MATERIAL_CARACTERISTICAS_KEYS = [
+  'caracteristicas',
+  'caracteristicasEpi',
+  'caracteristicas_epi',
+  'caracteristicas_vinculos',
+  'caracteristica_vinculos',
+  'caracteristicasAgg',
+  'caracteristicas_agg',
+  'caracteristicasList',
+  'caracteristicas_list',
+]
+
+const MATERIAL_CORES_KEYS = [
+  'cores',
+  'cores_vinculos',
+  'coresAgg',
+  'cores_agg',
+  'coresRelacionadas',
+  'cores_relacionadas',
+  'coresList',
+  'cores_list',
+]
+
+const MATERIAL_CARACTERISTICAS_TEXTO_KEYS = [
+  'caracteristicasTexto',
+  'caracteristicas_texto',
+  'caracteristicaEpi',
+  'caracteristica_epi',
+]
+
+const MATERIAL_CORES_TEXTO_KEYS = [
+  'coresTexto',
+  'cores_texto',
+  'corMaterial',
+  'cor_material',
+]
 
 async function execute(builder, fallbackMessage) {
   const { data, error } = await builder
@@ -202,6 +243,7 @@ function mapAcidenteRecord(record) {
 function mapMaterialResumo(record) {
   if (!record || typeof record !== 'object') {
     return null
+  }
   return {
     id: record.id,
     nome: record.nome || '',
@@ -211,6 +253,47 @@ function mapMaterialResumo(record) {
     numeroCalcado: record.numeroCalcado || '',
     numeroVestimenta: record.numeroVestimenta || '',
     grupoMaterial: record.grupoMaterial || '',
+  }
+}
+
+function mapMaterialRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+
+  const caracteristicasFonte = getFirstAvailable(record, MATERIAL_CARACTERISTICAS_KEYS)
+  const coresFonte = getFirstAvailable(record, MATERIAL_CORES_KEYS)
+
+  const caracteristicas = normalizeMaterialRelationItems(caracteristicasFonte)
+  const cores = normalizeMaterialRelationItems(coresFonte)
+
+  const caracteristicasTextoBase = getFirstAvailable(record, MATERIAL_CARACTERISTICAS_TEXTO_KEYS)
+  const coresTextoBase = getFirstAvailable(record, MATERIAL_CORES_TEXTO_KEYS)
+
+  const caracteristicasTexto =
+    (typeof caracteristicasTextoBase === 'string' ? caracteristicasTextoBase.trim() : '') ||
+    buildCatalogoTexto(caracteristicas)
+
+  const coresTexto =
+    (typeof coresTextoBase === 'string' ? coresTextoBase.trim() : '') || buildCatalogoTexto(cores)
+
+  const corMaterial = coresTexto || ''
+  const caracteristicaEpi = caracteristicasTexto || ''
+
+  const mapped = {
+    ...record,
+    caracteristicas,
+    cores,
+    caracteristicasTexto,
+    coresTexto,
+    corMaterial,
+    caracteristicaEpi,
+  }
+
+  mapped.cor_material = corMaterial
+  mapped.caracteristica_epi = caracteristicaEpi
+
+  return mapped
 }
 
 function resolveEmpresaInfo() {
@@ -294,27 +377,6 @@ const isGrupo = (value, target) => normalizeGrupoMaterial(value) === normalizeGr
 const requiresTamanho = (grupoMaterial) =>
   isGrupo(grupoMaterial, 'Vestimenta') || isGrupo(grupoMaterial, 'Proteção das Mãos')
 
-const normalizeCaracteristicaLista = (value) => {
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
-      .filter(Boolean)
-  }
-  const texto = String(value ?? '')
-  if (!texto.trim()) {
-    return []
-  }
-  return texto
-    .split(/[;|,]/)
-    .map((parte) => String(parte).trim())
-    .filter(Boolean)
-}
-
-const formatCaracteristicaTexto = (value) =>
-  Array.from(new Set(normalizeCaracteristicaLista(value)))
-    .sort((a, b) => a.localeCompare(b))
-    .join('; ')
-
 const buildNumeroReferenciaMaterial = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
   if (isGrupo(grupoMaterial, 'Calçado')) {
     return sanitizeDigits(numeroCalcado)
@@ -331,8 +393,8 @@ const buildChaveUnicaMaterial = ({
   fabricante,
   numeroCalcado,
   numeroVestimenta,
-  caracteristicaEpi,
-  corMaterial,
+  caracteristicas,
+  cores,
   ca,
 }) => {
   const partes = [
@@ -346,10 +408,10 @@ const buildChaveUnicaMaterial = ({
     partes.push(numeroReferencia)
   }
 
-  const caracteristicas = normalizeCaracteristicaLista(caracteristicaEpi)
-  if (caracteristicas.length) {
+  const caracteristicasNomes = normalizeCatalogoLista(caracteristicas)
+  if (caracteristicasNomes.length) {
     partes.push(
-      caracteristicas
+      caracteristicasNomes
         .map((item) => normalizeKeyPart(item))
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b))
@@ -357,9 +419,15 @@ const buildChaveUnicaMaterial = ({
     )
   }
 
-  const cor = normalizeKeyPart(corMaterial)
-  if (cor) {
-    partes.push(cor)
+  const coresNomes = normalizeCatalogoLista(cores)
+  if (coresNomes.length) {
+    partes.push(
+      coresNomes
+        .map((item) => normalizeKeyPart(item))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+        .join('||'),
+    )
   }
 
   const caNormalizado = normalizeKeyPart(sanitizeDigits(ca))
@@ -370,7 +438,7 @@ const buildChaveUnicaMaterial = ({
   return partes.join('||')
 }
 
-function sanitizeMaterialPayload(payload = {}) {
+async function sanitizeMaterialPayload(payload = {}) {
   const nome = trim(payload.nome)
   const fabricante = trim(payload.fabricante)
   const grupoMaterial = trim(payload.grupoMaterial)
@@ -378,8 +446,6 @@ function sanitizeMaterialPayload(payload = {}) {
   const numeroVestimentaRaw = trim(payload.numeroVestimenta)
   const numeroCalcado = isGrupo(grupoMaterial, 'Calçado') ? numeroCalcadoRaw : ''
   const numeroVestimenta = requiresTamanho(grupoMaterial) ? numeroVestimentaRaw : ''
-  const caracteristicaEpi = formatCaracteristicaTexto(payload.caracteristicaEpi)
-  const corMaterial = trim(payload.corMaterial)
   const descricao = trim(payload.descricao)
   const ca = sanitizeDigits(payload.ca)
   const numeroEspecifico = buildNumeroReferenciaMaterial({
@@ -387,6 +453,21 @@ function sanitizeMaterialPayload(payload = {}) {
     numeroCalcado,
     numeroVestimenta,
   })
+
+  const caracteristicaIds = collectUuidListFromPayload(
+    payload,
+    CARACTERISTICA_ID_KEYS,
+    'características de EPI',
+  )
+  const corIds = collectUuidListFromPayload(payload, COR_ID_KEYS, 'cores')
+
+  const [caracteristicas, cores] = await Promise.all([
+    resolveCaracteristicasByIds(caracteristicaIds),
+    resolveCoresByIds(corIds),
+  ])
+
+  const caracteristicaEpi = buildCatalogoTexto(caracteristicas)
+  const corMaterial = buildCatalogoTexto(cores)
 
   return {
     nome,
@@ -403,8 +484,6 @@ function sanitizeMaterialPayload(payload = {}) {
     numeroCalcado,
     numeroVestimenta,
     numeroEspecifico,
-    caracteristicaEpi,
-    corMaterial,
     descricao,
     chaveUnica: buildChaveUnicaMaterial({
       grupoMaterial,
@@ -412,10 +491,16 @@ function sanitizeMaterialPayload(payload = {}) {
       fabricante,
       numeroCalcado,
       numeroVestimenta,
-      caracteristicaEpi,
-      corMaterial,
+      caracteristicas,
+      cores,
       ca,
     }),
+    caracteristicaEpi,
+    corMaterial,
+    caracteristicas,
+    cores,
+    caracteristicaIds,
+    corIds,
   }
 }
 
@@ -442,7 +527,7 @@ function validateMaterialPayload(payload) {
   ) {
     throw createHttpError(400, 'Estoque minimo deve ser zero ou positivo.')
   }
-  if (!normalizeCaracteristicaLista(payload.caracteristicaEpi).length) {
+  if (!Array.isArray(payload.caracteristicas) || payload.caracteristicas.length === 0) {
     throw createHttpError(400, 'Informe ao menos uma caracteristica.')
   }
 }
@@ -489,6 +574,244 @@ const normalizeCatalogoLista = (lista) => {
   })
   return Array.from(valores).sort((a, b) => a.localeCompare(b))
 }
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const MATERIAL_RELATION_ID_KEYS = [
+  'id',
+  'uuid',
+  'catalogoId',
+  'catalogo_id',
+  'caracteristicaId',
+  'caracteristica_id',
+  'corId',
+  'cor_id',
+]
+
+function normalizeMixedArray(value) {
+  if (value === undefined || value === null) {
+    return []
+  }
+  if (Array.isArray(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/[;,|]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return [value]
+}
+
+function extractUuidFromCandidate(candidate) {
+  if (!candidate) {
+    return null
+  }
+  if (typeof candidate === 'string') {
+    const trimmed = candidate.trim()
+    if (!trimmed) {
+      return null
+    }
+    if (!UUID_REGEX.test(trimmed)) {
+      return undefined
+    }
+    return trimmed
+  }
+  if (typeof candidate === 'object') {
+    for (const key of MATERIAL_RELATION_ID_KEYS) {
+      const valor = candidate[key]
+      if (typeof valor === 'string' && UUID_REGEX.test(valor.trim())) {
+        return valor.trim()
+      }
+    }
+  }
+  return null
+}
+
+function collectUuidListFromSources(sources, { label }) {
+  const ids = new Set()
+  const invalid = new Set()
+  sources.forEach((source) => {
+    normalizeMixedArray(source).forEach((item) => {
+      const uuid = extractUuidFromCandidate(item)
+      if (uuid === null) {
+        return
+      }
+      if (uuid === undefined) {
+        invalid.add(item)
+        return
+      }
+      ids.add(uuid)
+    })
+  })
+
+  if (invalid.size > 0) {
+    throw createHttpError(400, `Alguns identificadores de ${label} são inválidos.`)
+  }
+
+  return Array.from(ids)
+}
+
+function collectUuidListFromPayload(payload, keys, label) {
+  if (!payload || typeof payload !== 'object') {
+    return []
+  }
+
+  const sources = keys
+    .map((key) => payload[key])
+    .filter((value) => value !== undefined)
+
+  return collectUuidListFromSources(sources, { label })
+}
+
+async function fetchCatalogRecordsByIds({
+  table,
+  ids,
+  nameColumn,
+  errorLabel,
+  errorMessage,
+}) {
+  if (!ids || ids.length === 0) {
+    return []
+  }
+
+  const registros =
+    (await execute(
+      supabaseAdmin.from(table).select(`id, ${nameColumn}`).in('id', ids),
+      errorMessage,
+    )) ?? []
+
+  const encontrados = new Set((registros ?? []).map((item) => item.id))
+  const faltantes = ids.filter((id) => !encontrados.has(id))
+  if (faltantes.length > 0) {
+    throw createHttpError(400, `${errorLabel} informadas não foram encontradas.`)
+  }
+
+  return registros.map((registro) => ({
+    id: registro.id,
+    nome: resolveCatalogoNome({
+      ...registro,
+      [nameColumn]: registro[nameColumn],
+    }),
+  }))
+}
+
+async function resolveCaracteristicasByIds(ids) {
+  return fetchCatalogRecordsByIds({
+    table: 'caracteristica_epi',
+    ids,
+    nameColumn: 'caracteristica_material',
+    errorLabel: 'Características de EPI',
+    errorMessage: 'Falha ao consultar características de EPI.',
+  })
+}
+
+async function resolveCoresByIds(ids) {
+  return fetchCatalogRecordsByIds({
+    table: 'cor',
+    ids,
+    nameColumn: 'cor',
+    errorLabel: 'Cores',
+    errorMessage: 'Falha ao consultar cores.',
+  })
+}
+
+async function replaceMaterialRelations({
+  table,
+  materialId,
+  columnName,
+  values,
+  deleteMessage,
+  insertMessage,
+}) {
+  await execute(
+    supabaseAdmin.from(table).delete().eq('material_id', materialId),
+    deleteMessage,
+  )
+
+  if (!values || values.length === 0) {
+    return
+  }
+
+  const rows = values.map((value) => ({
+    material_id: materialId,
+    [columnName]: value,
+  }))
+
+  await execute(supabaseAdmin.from(table).insert(rows), insertMessage)
+}
+
+async function replaceMaterialCorVinculos(materialId, corIds) {
+  await replaceMaterialRelations({
+    table: MATERIAL_COR_RELATION_TABLE,
+    materialId,
+    columnName: 'grupo_cor_id',
+    values: corIds,
+    deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+    insertMessage: 'Falha ao vincular cores ao material.',
+  })
+}
+
+async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
+  await replaceMaterialRelations({
+    table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
+    materialId,
+    columnName: 'grupo_caracteristica_epi_id',
+    values: caracteristicaIds,
+    deleteMessage: 'Falha ao limpar vínculos de características do material.',
+    insertMessage: 'Falha ao vincular características ao material.',
+  })
+}
+
+async function syncMaterialVinculos(materialId, { corIds, caracteristicaIds }) {
+  await replaceMaterialCorVinculos(materialId, corIds)
+  await replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds)
+}
+
+const getFirstAvailable = (obj, keys) => {
+  if (!obj || typeof obj !== 'object') {
+    return undefined
+  }
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key]
+      if (value !== undefined && value !== null) {
+        return value
+      }
+    }
+  }
+  return undefined
+}
+
+function normalizeMaterialRelationItems(value) {
+  const lista = normalizeMixedArray(value)
+  const unique = new Map()
+
+  lista.forEach((item) => {
+    if (!item || typeof item !== 'object') {
+      return
+    }
+
+    const uuid = extractUuidFromCandidate(item)
+    if (!uuid || uuid === undefined) {
+      return
+    }
+
+    const nome = resolveCatalogoNome(item)
+    if (!nome) {
+      return
+    }
+
+    if (!unique.has(uuid)) {
+      unique.set(uuid, { id: uuid, nome })
+    }
+  })
+
+  return Array.from(unique.values())
+}
+
+const buildCatalogoTexto = (lista) => normalizeCatalogoLista(lista).join('; ')
 
 
 async function ensureMaterialChaveUnica(chaveUnica, ignoreId) {
@@ -696,13 +1019,14 @@ async function obterMaterialPorId(id) {
   if (!id) {
     return null
   }
-  return executeMaybeSingle(
-    supabaseAdmin
-      .from('materiais')
-      .select(MATERIAL_SELECT_COLUMNS)
-      .eq('id', id),
-    'Falha ao obter material.'
+  const registro = await executeMaybeSingle(
+    supabaseAdmin.from(MATERIAIS_VIEW).select('*').eq('id', id),
+    'Falha ao obter material.',
   )
+  if (!registro) {
+    return null
+  }
+  return mapMaterialRecord(registro)
 }
 
 function calcularDataTroca(dataEntregaIso, validadeDias) {
@@ -759,20 +1083,17 @@ async function carregarMovimentacoes(params) {
     entradasFiltered = entradasFiltered.lte('dataEntrada', fimIso)
     saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
 
-  const [materiais, entradas, saidas] = await Promise.all([
+  const [materiaisRegistros, entradas, saidas] = await Promise.all([
     execute(
-      supabaseAdmin
-        .from('materiais')
-        .select(MATERIAL_SELECT_COLUMNS)
-        .order('nome'),
-      'Falha ao listar materiais.'
+      supabaseAdmin.from(MATERIAIS_VIEW).select('*').order('nome'),
+      'Falha ao listar materiais.',
     ),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
-    execute(saidasFiltered, 'Falha ao listar saÃ­das.'),
+    execute(saidasFiltered, 'Falha ao listar saídas.'),
   ])
 
   return {
-    materiais,
+    materiais: (materiaisRegistros ?? []).map(mapMaterialRecord),
     entradas: (entradas ?? []).map(mapEntradaRecord),
     saidas: (saidas ?? []).map(mapSaidaRecord),
     periodo,
@@ -1058,15 +1379,12 @@ export const PessoasOperations = {
 
 export const MateriaisOperations = {
   async list() {
-    return (
+    const registros =
       (await execute(
-        supabaseAdmin
-          .from('materiais')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .order('nome'),
-        'Falha ao listar materiais.'
+        supabaseAdmin.from(MATERIAIS_VIEW).select('*').order('nome'),
+        'Falha ao listar materiais.',
       )) ?? []
-    )
+    return registros.map(mapMaterialRecord)
   },
   async groups() {
     const registros =
@@ -1122,46 +1440,54 @@ export const MateriaisOperations = {
     return normalizeCatalogoLista(registros)
   },
   async create(payload, user) {
-    const dados = sanitizeMaterialPayload(payload)
+    const dados = await sanitizeMaterialPayload(payload)
     validateMaterialPayload(dados)
     await ensureMaterialChaveUnica(dados.chaveUnica)
 
     const agora = nowIso()
     const usuario = resolveUsuarioNome(user)
+    const materialId = randomId()
 
-    const { corMaterial: corMaterialCamel, ...dadosSemCor } = dados
     const materialPayload = {
-      id: randomId(),
-      ...dadosSemCor,
-      cor_material: corMaterialCamel,
+      id: materialId,
+      nome: dados.nome,
+      fabricante: dados.fabricante,
+      validadeDias: dados.validadeDias,
+      ca: dados.ca,
+      valorUnitario: dados.valorUnitario,
+      estoqueMinimo: dados.estoqueMinimo,
+      ativo: dados.ativo,
+      grupoMaterial: dados.grupoMaterial,
+      numeroCalcado: dados.numeroCalcado,
+      numeroVestimenta: dados.numeroVestimenta,
+      numeroEspecifico: dados.numeroEspecifico,
+      descricao: dados.descricao,
+      chaveUnica: dados.chaveUnica,
       usuarioCadastro: usuario,
       dataCadastro: agora,
     }
 
-    const material = await executeSingle(
-      supabaseAdmin
-        .from('materiais')
-        .insert(materialPayload)
-        .select(MATERIAL_SELECT_COLUMNS),
-      'Falha ao criar material.'
+    await executeSingle(
+      supabaseAdmin.from('materiais').insert(materialPayload).select('id'),
+      'Falha ao criar material.',
     )
 
-    await registrarHistoricoPreco(material.id, dados.valorUnitario, usuario)
-    return material
+    await syncMaterialVinculos(materialId, {
+      corIds: dados.corIds || [],
+      caracteristicaIds: dados.caracteristicaIds || [],
+    })
+
+    await registrarHistoricoPreco(materialId, dados.valorUnitario, usuario)
+
+    return await obterMaterialPorId(materialId)
   },
   async update(id, payload, user) {
-    const atual = await executeMaybeSingle(
-      supabaseAdmin
-        .from('materiais')
-        .select(MATERIAL_SELECT_COLUMNS)
-        .eq('id', id),
-      'Falha ao obter material.'
-    )
+    const atual = await obterMaterialPorId(id)
     if (!atual) {
       throw createHttpError(404, 'Material nÃ£o encontrado.')
     }
 
-    const dados = sanitizeMaterialPayload({
+    const dados = await sanitizeMaterialPayload({
       ...atual,
       ...payload,
     })
@@ -1169,10 +1495,9 @@ export const MateriaisOperations = {
     await ensureMaterialChaveUnica(dados.chaveUnica, id)
 
     const usuario = resolveUsuarioNome(user)
+    const agora = nowIso()
 
-    const { corMaterial: corMaterialCamel } = dados
-
-    const materialAtualizado = await executeSingle(
+    await executeSingle(
       supabaseAdmin
         .from('materiais')
         .update({
@@ -1187,32 +1512,29 @@ export const MateriaisOperations = {
           numeroCalcado: dados.numeroCalcado,
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
-          caracteristicaEpi: dados.caracteristicaEpi,
-          cor_material: corMaterialCamel,
           descricao: dados.descricao,
           chaveUnica: dados.chaveUnica,
           usuarioAtualizacao: usuario,
-          atualizadoEm: nowIso(),
+          atualizadoEm: agora,
         })
         .eq('id', id)
-        .select(MATERIAL_SELECT_COLUMNS),
-      'Falha ao atualizar material.'
+        .select('id'),
+      'Falha ao atualizar material.',
     )
+
+    await syncMaterialVinculos(id, {
+      corIds: dados.corIds || [],
+      caracteristicaIds: dados.caracteristicaIds || [],
+    })
 
     if (Number(dados.valorUnitario) !== Number(atual.valorUnitario)) {
       await registrarHistoricoPreco(id, dados.valorUnitario, usuario)
     }
 
-    return materialAtualizado
+    return await obterMaterialPorId(id)
   },
   async get(id) {
-    return executeMaybeSingle(
-      supabaseAdmin
-        .from('materiais')
-        .select(MATERIAL_SELECT_COLUMNS)
-        .eq('id', id),
-      'Falha ao obter material.'
-    )
+    return await obterMaterialPorId(id)
   },
   async priceHistory(id) {
     return (
