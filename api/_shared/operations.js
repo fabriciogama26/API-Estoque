@@ -14,6 +14,29 @@ import { createHttpError } from './http.js'
 
 const GENERIC_SUPABASE_ERROR = 'Falha ao comunicar com o Supabase.'
 
+const MATERIAL_SELECT_COLUMNS = `
+  id,
+  nome,
+  fabricante,
+  "validadeDias",
+  ca,
+  "valorUnitario",
+  "estoqueMinimo",
+  ativo,
+  descricao,
+  "grupoMaterial",
+  "numeroCalcado",
+  "numeroVestimenta",
+  "numeroEspecifico",
+  "caracteristicaEpi",
+  cor_material,
+  "chaveUnica",
+  "usuarioCadastro",
+  "usuarioAtualizacao",
+  "dataCadastro",
+  "atualizadoEm"
+`
+
 async function execute(builder, fallbackMessage) {
   const { data, error } = await builder
   if (error) {
@@ -669,11 +692,15 @@ async function obterPessoaPorNome(nome) {
   return mapPessoaRecord(registros[0])
 }
 
-async function obterMaterialPorId(id)(id) {
+async function obterMaterialPorId(id) {
   if (!id) {
     return null
+  }
   return executeMaybeSingle(
-    supabaseAdmin.from('materiais').select('*').eq('id', id),
+    supabaseAdmin
+      .from('materiais')
+      .select(MATERIAL_SELECT_COLUMNS)
+      .eq('id', id),
     'Falha ao obter material.'
   )
 }
@@ -733,7 +760,13 @@ async function carregarMovimentacoes(params) {
     saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
 
   const [materiais, entradas, saidas] = await Promise.all([
-    execute(supabaseAdmin.from('materiais').select('*').order('nome'), 'Falha ao listar materiais.'),
+    execute(
+      supabaseAdmin
+        .from('materiais')
+        .select(MATERIAL_SELECT_COLUMNS)
+        .order('nome'),
+      'Falha ao listar materiais.'
+    ),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
     execute(saidasFiltered, 'Falha ao listar saÃ­das.'),
   ])
@@ -1027,7 +1060,10 @@ export const MateriaisOperations = {
   async list() {
     return (
       (await execute(
-        supabaseAdmin.from('materiais').select('*').order('nome'),
+        supabaseAdmin
+          .from('materiais')
+          .select(MATERIAL_SELECT_COLUMNS)
+          .order('nome'),
         'Falha ao listar materiais.'
       )) ?? []
     )
@@ -1106,7 +1142,7 @@ export const MateriaisOperations = {
       supabaseAdmin
         .from('materiais')
         .insert(materialPayload)
-        .select(),
+        .select(MATERIAL_SELECT_COLUMNS),
       'Falha ao criar material.'
     )
 
@@ -1115,7 +1151,10 @@ export const MateriaisOperations = {
   },
   async update(id, payload, user) {
     const atual = await executeMaybeSingle(
-      supabaseAdmin.from('materiais').select('*').eq('id', id),
+      supabaseAdmin
+        .from('materiais')
+        .select(MATERIAL_SELECT_COLUMNS)
+        .eq('id', id),
       'Falha ao obter material.'
     )
     if (!atual) {
@@ -1156,7 +1195,7 @@ export const MateriaisOperations = {
           atualizadoEm: nowIso(),
         })
         .eq('id', id)
-        .select(),
+        .select(MATERIAL_SELECT_COLUMNS),
       'Falha ao atualizar material.'
     )
 
@@ -1168,7 +1207,10 @@ export const MateriaisOperations = {
   },
   async get(id) {
     return executeMaybeSingle(
-      supabaseAdmin.from('materiais').select('*').eq('id', id),
+      supabaseAdmin
+        .from('materiais')
+        .select(MATERIAL_SELECT_COLUMNS)
+        .eq('id', id),
       'Falha ao obter material.'
     )
   },

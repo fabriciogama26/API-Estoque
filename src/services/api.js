@@ -133,6 +133,29 @@ const MATERIAL_HISTORY_FIELDS = [
   'chaveUnica',
 ]
 
+const MATERIAL_SELECT_COLUMNS = `
+  id,
+  nome,
+  fabricante,
+  "validadeDias",
+  ca,
+  "valorUnitario",
+  "estoqueMinimo",
+  ativo,
+  descricao,
+  "grupoMaterial",
+  "numeroCalcado",
+  "numeroVestimenta",
+  "numeroEspecifico",
+  "caracteristicaEpi",
+  cor_material,
+  "chaveUnica",
+  "usuarioCadastro",
+  "usuarioAtualizacao",
+  "dataCadastro",
+  "atualizadoEm"
+`
+
 const normalizeHistoryValue = (value) => {
   if (value === null || value === undefined) {
     return ''
@@ -838,7 +861,10 @@ function buildDateFilters(query, field, inicio, fim) {
 
 async function carregarMateriais() {
   const data = await execute(
-    supabase.from('materiais').select('*').order('nome', { ascending: true }),
+    supabase
+      .from('materiais')
+      .select(MATERIAL_SELECT_COLUMNS)
+      .order('nome', { ascending: true }),
     'Falha ao listar materiais.'
   )
   return (data ?? []).map(mapMaterialRecord)
@@ -1397,7 +1423,7 @@ export const api = {
         supabase
           .from('materiais')
           .insert(supabasePayload)
-          .select(),
+          .select(MATERIAL_SELECT_COLUMNS),
         'Falha ao criar material.'
       )
       return mapMaterialRecord(registro)
@@ -1409,7 +1435,7 @@ export const api = {
       const atualLista = await execute(
         supabase
           .from('materiais')
-          .select('*')
+          .select(MATERIAL_SELECT_COLUMNS)
           .eq('id', id)
           .limit(1),
         'Falha ao localizar material.'
@@ -1477,14 +1503,17 @@ export const api = {
           .from('materiais')
           .update(supabasePayload)
           .eq('id', id)
-          .select(),
+          .select(MATERIAL_SELECT_COLUMNS),
         'Falha ao atualizar material.'
       )
       return mapMaterialRecord(registro)
     },
     async get(id) {
       const registro = await executeSingle(
-        supabase.from('materiais').select('*').eq('id', id),
+        supabase
+          .from('materiais')
+          .select(MATERIAL_SELECT_COLUMNS)
+          .eq('id', id),
         'Falha ao obter material.'
       )
       return mapMaterialRecord(registro)
