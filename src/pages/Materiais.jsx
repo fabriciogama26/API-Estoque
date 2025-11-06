@@ -25,6 +25,12 @@ import {
   parseCaracteristicaEpi,
 } from '../rules/MateriaisRules.js'
 import { formatCurrency, formatCurrencyInput, sanitizeDigits } from '../utils/MateriaisUtils.js'
+import {
+  normalizeSelectionItem,
+  normalizeSelectionKey,
+  normalizeSelectionList,
+  selectionToArray,
+} from '../utils/selectionUtils.js'
 import '../styles/MateriaisPage.css'
 
 const normalizeGrupo = (value) =>
@@ -37,74 +43,6 @@ const normalizeGrupo = (value) =>
     : ''
 
 const isGrupo = (value, target) => normalizeGrupo(value) === normalizeGrupo(target)
-
-const normalizeSelectionItem = (value) => {
-  if (value === null || value === undefined) {
-    return null
-  }
-
-  if (typeof value === 'string') {
-    const nome = value.trim()
-    if (!nome) {
-      return null
-    }
-    return { id: value, nome }
-  }
-
-  if (typeof value === 'object') {
-    const nomeBase =
-      value.nome ?? value.label ?? value.valor ?? value.value ?? value.descricao ?? value.id ?? ''
-    const nome = typeof nomeBase === 'string' ? nomeBase.trim() : String(nomeBase ?? '').trim()
-
-    if (!nome) {
-      return null
-    }
-
-    const idBase = value.id ?? value.value ?? value.valor ?? value.nome ?? value.codigo
-    const id = idBase !== null && idBase !== undefined ? idBase : nome
-
-    return { id, nome }
-  }
-
-  const nome = String(value ?? '').trim()
-  if (!nome) {
-    return null
-  }
-  return { id: value, nome }
-}
-
-const normalizeSelectionKey = (value) =>
-  value
-    ? String(value)
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-    : ''
-
-const normalizeSelectionList = (lista) => {
-  if (!Array.isArray(lista)) {
-    return []
-  }
-
-  const normalizados = lista
-    .map((item) => normalizeSelectionItem(item))
-    .filter(Boolean)
-    .reduce((acc, item) => {
-      const exists = acc.some((existente) => {
-        if (existente.id && item.id) {
-          return existente.id === item.id
-        }
-        return normalizeSelectionKey(existente.nome) === normalizeSelectionKey(item.nome)
-      })
-      if (!exists) {
-        acc.push(item)
-      }
-      return acc
-    }, [])
-
-  return normalizados.sort((a, b) => a.nome.localeCompare(b.nome))
-}
 
 const findOptionByValue = (options, valor) => {
   const alvo = typeof valor === 'string' ? valor.trim() : valor
@@ -198,7 +136,7 @@ export function MateriaisPage() {
     setCaracteristicaError(null)
     try {
       const lista = await api.materiais.caracteristicas()
-      setCaracteristicaOptions(Array.isArray(lista) ? lista : [])
+      setCaracteristicaOptions(normalizeSelectionList(selectionToArray(lista)))
     } catch (err) {
       setCaracteristicaError(err.message)
       setCaracteristicaOptions([])
@@ -212,7 +150,7 @@ export function MateriaisPage() {
     setCorError(null)
     try {
       const lista = await api.materiais.cores()
-      setCorOptions(Array.isArray(lista) ? lista : [])
+      setCorOptions(normalizeSelectionList(selectionToArray(lista)))
     } catch (err) {
       setCorError(err.message)
       setCorOptions([])

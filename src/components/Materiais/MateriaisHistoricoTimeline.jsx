@@ -1,4 +1,5 @@
 import { formatCurrency } from '../../utils/MateriaisUtils.js'
+import { formatSelectionValue } from '../../utils/selectionUtils.js'
 
 const FIELD_LABELS = {
   nome: 'Nome',
@@ -14,7 +15,14 @@ const FIELD_LABELS = {
   numeroVestimenta: 'Número de vestimenta',
   numeroEspecifico: 'Número específico',
   chaveUnica: 'Chave única',
+  caracteristicaEpi: 'Características',
+  caracteristicas: 'Características',
+  caracteristicas_epi: 'Características',
+  cores: 'Cores',
+  corMaterial: 'Cor principal',
 }
+
+const SELECTION_FIELDS = new Set(['caracteristicaEpi', 'caracteristicas', 'caracteristicas_epi', 'cores'])
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -30,6 +38,14 @@ const formatDateTime = (value) => {
 const formatValue = (campo, valor) => {
   if (valor === null || valor === undefined || valor === '') {
     return '-'
+  }
+  if (SELECTION_FIELDS.has(campo)) {
+    const texto = formatSelectionValue(valor)
+    return texto || '-'
+  }
+  if (campo === 'corMaterial') {
+    const texto = formatSelectionValue(valor)
+    return texto || '-'
   }
   if (campo === 'valorUnitario') {
     const numero = Number(valor)
