@@ -742,11 +742,46 @@ async function replaceMaterialRelations({
   await execute(supabaseAdmin.from(table).insert(rows), insertMessage)
 }
 
+async function replaceMaterialRelationsWithFallback({
+  table,
+  materialId,
+  columnCandidates,
+  values,
+  deleteMessage,
+  insertMessage,
+}) {
+  let lastColumnError = null
+
+  for (const columnName of columnCandidates) {
+    try {
+      await replaceMaterialRelations({
+        table,
+        materialId,
+        columnName,
+        values,
+        deleteMessage,
+        insertMessage,
+      })
+      return
+    } catch (error) {
+      if (!error || error.code !== '42703') {
+        throw error
+      }
+
+      lastColumnError = error
+    }
+  }
+
+  if (lastColumnError) {
+    throw lastColumnError
+  }
+}
+
 async function replaceMaterialCorVinculos(materialId, corIds) {
-  await replaceMaterialRelations({
+  await replaceMaterialRelationsWithFallback({
     table: MATERIAL_COR_RELATION_TABLE,
     materialId,
-    columnName: 'grupo_cor_id',
+    columnCandidates: ['grupo_cor_id', 'grupo_material_cor'],
     values: corIds,
     deleteMessage: 'Falha ao limpar vínculos de cores do material.',
     insertMessage: 'Falha ao vincular cores ao material.',
@@ -754,10 +789,14 @@ async function replaceMaterialCorVinculos(materialId, corIds) {
 }
 
 async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
-  await replaceMaterialRelations({
+  await replaceMaterialRelationsWithFallback({
     table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
     materialId,
-    columnName: 'grupo_caracteristica_epi_id',
+    columnCandidates: [
+      'grupo_caracteristica_epi_id',
+      'caracteristica_epi_id',
+      'grupo_caracteristica_epi',
+    ],
     values: caracteristicaIds,
     deleteMessage: 'Falha ao limpar vínculos de características do material.',
     insertMessage: 'Falha ao vincular características ao material.',
