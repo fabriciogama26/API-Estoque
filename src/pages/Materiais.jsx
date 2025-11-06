@@ -249,22 +249,51 @@ export function MateriaisPage() {
       return
     }
 
+    if (name === 'corMaterial') {
+      const selecionada = corOptions.find((item) => (item.id ?? item.nome) === value)
+      setForm((prev) => ({
+        ...prev,
+        corMaterial: selecionada?.nome ?? '',
+        cores: selecionada ? [selecionada] : [],
+      }))
+      return
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleAddCaracteristica = (valor) => {
-    const item = valor?.trim()
-    if (!item) {
+    const idSelecionado = valor?.trim()
+    if (!idSelecionado) {
+      return
+    }
+    const opcao = caracteristicaOptions.find((item) => (item.id ?? item.nome) === idSelecionado)
+    if (!opcao) {
       return
     }
     setForm((prev) => {
       const atual = Array.isArray(prev.caracteristicaEpi) ? prev.caracteristicaEpi : []
-      if (atual.some((value) => value.toLowerCase() === item.toLowerCase())) {
+      if (
+        atual.some((value) => {
+          if (typeof value === 'string') {
+            return value === idSelecionado || value === opcao.nome
+          }
+          const comparador = value?.id ?? value?.nome
+          return comparador === idSelecionado || comparador === opcao.nome
+        })
+      ) {
         return prev
       }
       return {
         ...prev,
-        caracteristicaEpi: [...atual, item].sort((a, b) => a.localeCompare(b)),
+        caracteristicaEpi: [...atual, opcao]
+          .map((item) =>
+            typeof item === 'string'
+              ? { id: item, nome: item }
+              : { id: item?.id ?? item?.nome ?? '', nome: item?.nome ?? '' }
+          )
+          .filter((item) => item.nome)
+          .sort((a, b) => a.nome.localeCompare(b.nome)),
       }
     })
   }
@@ -272,9 +301,13 @@ export function MateriaisPage() {
   const handleRemoveCaracteristica = (valor) => {
     setForm((prev) => ({
       ...prev,
-      caracteristicaEpi: (prev.caracteristicaEpi || []).filter(
-        (item) => item.toLowerCase() !== valor.toLowerCase(),
-      ),
+      caracteristicaEpi: (prev.caracteristicaEpi || []).filter((item) => {
+        if (typeof item === 'string') {
+          return item !== valor
+        }
+        const comparador = item?.id ?? item?.nome
+        return comparador !== valor
+      }),
     }))
   }
 
@@ -382,8 +415,11 @@ export function MateriaisPage() {
       grupoMaterial: material.grupoMaterial || '',
       numeroCalcado: material.numeroCalcado || '',
       numeroVestimenta: material.numeroVestimenta || '',
-      caracteristicaEpi: parseCaracteristicaEpi(material.caracteristicaEpi),
-      corMaterial: material.corMaterial || '',
+      caracteristicaEpi: Array.isArray(material.caracteristicas)
+        ? material.caracteristicas
+        : parseCaracteristicaEpi(material.caracteristicaEpi).map((nome) => ({ id: nome, nome })),
+      corMaterial: material.corMaterial || material.cores?.[0]?.nome || '',
+      cores: Array.isArray(material.cores) ? material.cores : [],
       descricao: material.descricao || '',
     })
     setItemsError(null)
