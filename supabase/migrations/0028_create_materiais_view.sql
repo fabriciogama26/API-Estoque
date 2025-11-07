@@ -143,9 +143,9 @@ select
   coalesce(caracteristicas.caracteristicas_json, '[]'::jsonb) as caracteristicas_list,
   coalesce(caracteristicas.caracteristicas_nomes, '{}'::text[]) as caracteristicas_nomes,
   coalesce(caracteristicas.caracteristicas_nomes, '{}'::text[]) as caracteristicas_list_nomes,
-  coalesce(caracteristicas.caracteristicas_texto, '') as caracteristicasTexto,
+  coalesce(caracteristicas.caracteristicas_texto, '') as "caracteristicasTexto",
   coalesce(caracteristicas.caracteristicas_texto, '') as caracteristicas_texto,
-  coalesce(caracteristicas.caracteristicas_texto, '') as caracteristicaEpi,
+  coalesce(caracteristicas.caracteristicas_texto, '') as "caracteristicaEpi",
   coalesce(caracteristicas.caracteristicas_texto, '') as caracteristica_epi,
   coalesce(cores.cores_json, '[]'::jsonb) as cores,
   coalesce(cores.cores_json, '[]'::jsonb) as cores_vinculos,
@@ -153,9 +153,9 @@ select
   coalesce(cores.cores_json, '[]'::jsonb) as cores_list,
   coalesce(cores.cores_nomes, '{}'::text[]) as cores_nomes,
   coalesce(cores.cores_nomes, '{}'::text[]) as cores_list_nomes,
-  coalesce(cores.cores_texto, '') as coresTexto,
+  coalesce(cores.cores_texto, '') as "coresTexto",
   coalesce(cores.cores_texto, '') as cores_texto,
-  coalesce(cores.cores_texto, '') as corMaterial,
+  coalesce(cores.cores_texto, '') as "corMaterial",
   coalesce(cores.cores_texto, '') as cor_material
 from public.materiais as m
 left join caracteristicas on caracteristicas.material_id = m.id
