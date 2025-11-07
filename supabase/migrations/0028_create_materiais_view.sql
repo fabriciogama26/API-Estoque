@@ -7,9 +7,13 @@ DECLARE
   caracteristica_join_column text;
   cor_join_column text;
   create_view_sql text;
+  caracteristica_columns text;
+  cor_columns text;
+  caracteristica_candidate text;
+  cor_candidate text;
 BEGIN
-  SELECT column_name
-    INTO caracteristica_join_column
+  SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+    INTO caracteristica_columns
   FROM information_schema.columns
   WHERE table_schema = 'public'
     AND table_name = 'material_grupo_caracteristica_epi'
@@ -46,6 +50,44 @@ BEGIN
   IF cor_join_column IS NULL THEN
     RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de cores em material_grupo_cor.';
   END IF;
+
+  RAISE NOTICE 'Utilizando coluna de vínculo de características: %', caracteristica_join_column;
+
+  SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+    INTO cor_columns
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'material_grupo_cor';
+
+  RAISE NOTICE 'Colunas disponíveis em material_grupo_cor: %',
+    COALESCE(cor_columns, '<nenhuma>');
+
+  FOR cor_candidate IN
+    SELECT unnest(ARRAY[
+      'grupo_material_cor',
+      'grupo_cor_id',
+      'grupo_cor',
+      'cor_id',
+      'cor'
+    ])
+  LOOP
+    PERFORM 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'material_grupo_cor'
+      AND column_name = cor_candidate;
+
+    IF FOUND THEN
+      cor_join_column := cor_candidate;
+      EXIT;
+    END IF;
+  END LOOP;
+
+  IF cor_join_column IS NULL THEN
+    RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de cores em material_grupo_cor.';
+  END IF;
+
+  RAISE NOTICE 'Utilizando coluna de vínculo de cores: %', cor_join_column;
 
   create_view_sql := format($sql$
 create or replace view public.materiais_view as
