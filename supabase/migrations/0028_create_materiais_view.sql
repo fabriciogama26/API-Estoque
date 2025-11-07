@@ -235,7 +235,7 @@ cores as (
   group by material_id
 )
 select
-  m.*,
+  m.*%3$s%4$s,
   coalesce(caracteristicas.caracteristicas_json, '[]'::jsonb) as caracteristicas,
   coalesce(caracteristicas.caracteristicas_json, '[]'::jsonb) as caracteristicas_vinculos,
   coalesce(caracteristicas.caracteristicas_json, '[]'::jsonb) as caracteristicas_agg,
@@ -246,6 +246,7 @@ select
   coalesce(caracteristicas.caracteristicas_texto, '') as caracteristicas_texto,
   coalesce(caracteristicas.caracteristicas_texto, '') as "caracteristicaEpi",
   coalesce(caracteristicas.caracteristicas_texto, '') as caracteristica_epi,
+  coalesce(caracteristicas.caracteristicas_texto, '') as "caracteristicaNome",
   coalesce(cores.cores_json, '[]'::jsonb) as cores,
   coalesce(cores.cores_json, '[]'::jsonb) as cores_vinculos,
   coalesce(cores.cores_json, '[]'::jsonb) as cores_agg,
