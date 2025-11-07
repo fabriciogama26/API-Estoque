@@ -85,6 +85,20 @@ BEGIN
   RAISE NOTICE 'Colunas disponíveis em material_grupo_cor: %',
     COALESCE(cor_columns, '<nenhuma>');
 
+  SELECT string_agg(column_name, ', ')
+    INTO materiais_uuid_columns
+  FROM (
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'materiais'
+      AND data_type = 'uuid'
+    ORDER BY ordinal_position
+  ) as materiais_uuid_cols;
+
+  RAISE NOTICE 'Colunas UUID disponíveis em public.materiais: %',
+    COALESCE(materiais_uuid_columns, '<nenhuma>');
+
   FOR cor_candidate IN
     SELECT unnest(ARRAY[
       'grupo_material_cor',
