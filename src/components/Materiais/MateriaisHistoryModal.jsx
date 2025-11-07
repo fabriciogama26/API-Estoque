@@ -26,7 +26,7 @@ export function MateriaisHistoryModal({ modal, onClose }) {
           <h3 id="record-history-title">
             Historico de edicoes -
             {' '}
-            {modal.material?.nomeItemRelacionado || modal.material?.nome || '-'}
+            {modal.material?.id || '-'}
           </h3>
           <button
             type="button"
