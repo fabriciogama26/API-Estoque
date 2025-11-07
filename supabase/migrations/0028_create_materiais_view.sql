@@ -73,8 +73,16 @@ SELECT
   gmi2.nome AS "nomeItemRelacionado",
   mc.numero_calcado AS "numeroCalcadoNome",
   mv.medidas AS "numeroVestimentaNome",
-  uc.username AS "usuarioCadastroNome",
-  ua.username AS "usuarioAtualizacaoNome",
+  COALESCE(
+    NULLIF(TRIM(m."usuarioCadastro"), ''),
+    uc.display_name,
+    uc.username
+  ) AS "usuarioCadastroNome",
+  COALESCE(
+    NULLIF(TRIM(m."usuarioAtualizacao"), ''),
+    ua.display_name,
+    ua.username
+  ) AS "usuarioAtualizacaoNome",
   COALESCE(caracteristicas.caracteristicas_json, '[]'::jsonb) AS caracteristicas,
   COALESCE(caracteristicas.caracteristicas_nomes, '{}'::text[]) AS caracteristicas_nomes,
   COALESCE(caracteristicas.caracteristicas_texto, '') AS caracteristicas_texto,
