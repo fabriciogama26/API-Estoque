@@ -339,14 +339,26 @@ export function filterMateriais(materiais, filters) {
 
     const target = [
       material.nome,
+      material.nomeItemRelacionado,
       material.fabricante,
       material.ca,
       material.grupoMaterial,
+      material.grupoMaterialNome,
       material.numeroCalcado,
+      material.numeroCalcadoNome,
       material.numeroVestimenta,
+      material.numeroVestimentaNome,
       material.caracteristicaEpi,
+      material.caracteristicasTexto,
+      ...(Array.isArray(material.caracteristicasNomes) ? material.caracteristicasNomes : []),
       material.corMaterial,
+      material.coresTexto,
+      ...(Array.isArray(material.coresNomes) ? material.coresNomes : []),
       material.descricao,
+      material.usuarioCadastro,
+      material.usuarioCadastroNome,
+      material.usuarioAtualizacao,
+      material.usuarioAtualizacaoNome,
     ]
       .filter(Boolean)
       .join(' ')
