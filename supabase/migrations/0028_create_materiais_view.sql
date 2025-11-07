@@ -19,11 +19,15 @@ DECLARE
   grupo_material_item_join text := '';
   grupo_material_item_select text := E',\n  NULL::text as "grupoMaterialItemNome"';
 BEGIN
-  SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+  SELECT string_agg(column_name, ', ')
     INTO caracteristica_columns
-  FROM information_schema.columns
-  WHERE table_schema = 'public'
-    AND table_name = 'material_grupo_caracteristica_epi';
+  FROM (
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'material_grupo_caracteristica_epi'
+    ORDER BY ordinal_position
+  ) as caracteristica_cols;
 
   RAISE NOTICE 'Colunas disponíveis em material_grupo_caracteristica_epi: %',
     COALESCE(caracteristica_columns, '<nenhuma>');
@@ -66,21 +70,29 @@ BEGIN
 
   RAISE NOTICE 'Utilizando coluna de vínculo de características: %', caracteristica_join_column;
 
-  SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+  SELECT string_agg(column_name, ', ')
     INTO cor_columns
-  FROM information_schema.columns
-  WHERE table_schema = 'public'
-    AND table_name = 'material_grupo_cor';
+  FROM (
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'material_grupo_cor'
+    ORDER BY ordinal_position
+  ) as cor_cols;
 
   RAISE NOTICE 'Colunas disponíveis em material_grupo_cor: %',
     COALESCE(cor_columns, '<nenhuma>');
 
-  SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+  SELECT string_agg(column_name, ', ')
     INTO materiais_uuid_columns
-  FROM information_schema.columns
-  WHERE table_schema = 'public'
-    AND table_name = 'materiais'
-    AND data_type = 'uuid';
+  FROM (
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'materiais'
+      AND data_type = 'uuid'
+    ORDER BY ordinal_position
+  ) as materiais_uuid_cols;
 
   RAISE NOTICE 'Colunas UUID disponíveis em public.materiais: %',
     COALESCE(materiais_uuid_columns, '<nenhuma>');
