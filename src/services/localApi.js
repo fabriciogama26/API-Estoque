@@ -342,8 +342,8 @@ const mapLocalMaterialRecord = (material) => {
     coresIds: coresLista.map((item) => item?.id).filter(Boolean),
     coresNomes,
     coresTexto: coresNomes.join('; '),
-    usuarioCadastroNome: material.usuarioCadastroNome ?? material.usuarioCadastro ?? '',
-    usuarioAtualizacaoNome: material.usuarioAtualizacaoNome ?? material.usuarioAtualizacao ?? '',
+    usuarioCadastroNome: material.usuarioCadastroNome ?? '',
+    usuarioAtualizacaoNome: material.usuarioAtualizacaoNome ?? '',
   }
 }
 
@@ -1643,7 +1643,9 @@ const localApi = {
           id: randomId(),
           ...dados,
           usuarioCadastro: usuario,
+          usuarioCadastroNome: trim(payload.usuarioCadastroNome) || usuario,
           usuarioAtualizacao: null,
+          usuarioAtualizacaoNome: '',
           criadoEm: nowIso(),
           atualizadoEm: null,
         }
@@ -1720,6 +1722,7 @@ const localApi = {
           ...atual,
           ...dadosCompletos,
           usuarioAtualizacao: usuario,
+          usuarioAtualizacaoNome: trim(payload.usuarioAtualizacaoNome) || usuario,
           atualizadoEm: agora,
         }
 
