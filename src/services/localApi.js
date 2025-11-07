@@ -1578,9 +1578,6 @@ const localApi = {
     async listDetalhado() {
       return readState((state) => state.materiais.map((material) => mapLocalMaterialRecord(material)))
     },
-    async listDetalhado() {
-      return readState((state) => state.materiais.slice())
-    },
     async groups() {
       return readState((state) => {
         const set = new Set(gruposEpiPadrao)

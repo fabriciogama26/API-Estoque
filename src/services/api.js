@@ -784,6 +784,18 @@ function mapMaterialRecord(record) {
     trim(record.cores_texto ?? '') ||
     (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '') ||
     trim(record.corMaterial ?? record.cor_material ?? '')
+  const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
+  const usuarioCadastroNome =
+    trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
+    usuarioCadastroId
+
+  const usuarioAtualizacaoId = trim(
+    record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
+  )
+  const usuarioAtualizacaoNome =
+    trim(record.usuarioAtualizacaoNome ?? record.usuario_atualizacao_nome ?? '') ||
+    usuarioAtualizacaoId
+
   return {
     id: record.id,
     nome: record.nome ?? '',
@@ -813,10 +825,10 @@ function mapMaterialRecord(record) {
     coresIds: coresLista.map((item) => item.id).filter(Boolean),
     coresNomes: normalizeStringArray(record.cores_nomes ?? []),
     coresTexto,
-    usuarioCadastro: record.usuarioCadastro ?? record.usuario_cadastro ?? '',
-    usuarioCadastroNome: record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '',
-    usuarioAtualizacao: record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
-    usuarioAtualizacaoNome: record.usuarioAtualizacaoNome ?? record.usuario_atualizacao_nome ?? '',
+    usuarioCadastro: usuarioCadastroId,
+    usuarioCadastroNome,
+    usuarioAtualizacao: usuarioAtualizacaoId,
+    usuarioAtualizacaoNome,
     dataCadastro: record.dataCadastro ?? record.data_cadastro ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
   }
