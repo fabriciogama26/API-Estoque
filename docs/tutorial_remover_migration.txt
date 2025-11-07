@@ -1,0 +1,100 @@
+# Tutorial: Como Remover uma Migration no Supabase (Exemplo com 0029)
+
+## 1. Situação
+Você executou o comando `supabase db pull` e recebeu o erro:
+
+
+```
+Ficou em login, ou
+```
+The remote database's migration history does not match local files...
+```
+e o Supabase sugeriu algo como:
+```
+supabase migration repair --status reverted 0029
+```
+
+Isso indica que a migration **0029** está marcada como aplicada no banco remoto, mas não está sincronizada com os arquivos locais.
+
+---
+
+## 2. Objetivo
+Remover (reverter) a migration `0029` do histórico e do projeto local.
+
+---
+
+## 3. Passos para corrigir
+
+### ✅ Passo 1 — Reverter a migration no Supabase
+Execute o comando abaixo para marcar a migration como *revertida* no histórico remoto:
+
+```bash
+supabase migration repair --status reverted 0029
+```
+
+> Isso **não apaga** o SQL aplicado, apenas indica ao Supabase que a migration foi revertida.
+
+---
+
+### ✅ Passo 2 — Apagar o arquivo local da migration
+Apague manualmente o arquivo da migration em:
+
+```
+supabase/migrations/0029_create_material_view_tables.sql
+```
+
+---
+
+### ✅ Passo 3 — Verificar o status
+Depois, confira o status atual com:
+
+```bash
+supabase db status
+```
+
+Se tudo estiver certo, a migration 0029 não aparecerá mais como aplicada.
+
+---
+
+### ✅ Passo 4 — Sincronizar o esquema novamente
+Atualize o esquema local com o banco remoto:
+
+```bash
+supabase db pull
+```
+
+---
+
+## 4. (Opcional) Remover o que a migration criou
+Se você também quiser **remover as estruturas criadas** (ex: views, tabelas, policies), rode o SQL reverso manualmente.
+Exemplo:
+
+```sql
+DROP VIEW IF EXISTS materiais_view;
+DROP TABLE IF EXISTS material_view_aux;
+```
+
+---
+
+## 5. Resultado final
+- Migration 0029 revertida no histórico remoto.
+- Arquivo local 0029 removido.
+- Banco sincronizado novamente.
+- Nenhum conflito no `supabase db pull`.
+
+---
+
+## 6. Dica extra
+Se futuramente quiser criar uma nova migration corrigida:
+
+```bash
+supabase migration new create_material_view_tables_v2
+```
+
+Edite o arquivo gerado e rode:
+
+```bash
+supabase db push
+```
+
+Pronto!
