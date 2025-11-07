@@ -74,14 +74,14 @@ SELECT
   mc.numero_calcado AS "numeroCalcadoNome",
   mv.medidas AS "numeroVestimentaNome",
   COALESCE(
-    NULLIF(TRIM(m."usuarioCadastro"), ''),
-    uc.display_name,
-    uc.username
+    NULLIF(uc.display_name, ''),
+    NULLIF(uc.username, ''),
+    m."usuarioCadastro"::text
   ) AS "usuarioCadastroNome",
   COALESCE(
-    NULLIF(TRIM(m."usuarioAtualizacao"), ''),
-    ua.display_name,
-    ua.username
+    NULLIF(ua.display_name, ''),
+    NULLIF(ua.username, ''),
+    m."usuarioAtualizacao"::text
   ) AS "usuarioAtualizacaoNome",
   COALESCE(caracteristicas.caracteristicas_json, '[]'::jsonb) AS caracteristicas,
   COALESCE(caracteristicas.caracteristicas_nomes, '{}'::text[]) AS caracteristicas_nomes,
