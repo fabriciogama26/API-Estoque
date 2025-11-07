@@ -114,7 +114,7 @@ export function MateriaisPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const items = await api.materiais.list()
+      const items = await api.materiais.listDetalhado()
       setMateriais(items ?? [])
     } catch (err) {
       setError(err.message)

@@ -133,7 +133,7 @@ const MATERIAL_HISTORY_FIELDS = [
   'chaveUnica',
 ]
 
-const MATERIAL_SELECT_COLUMNS = `
+const MATERIAL_TABLE_SELECT_COLUMNS = `
   id,
   nome,
   fabricante,
@@ -148,11 +148,32 @@ const MATERIAL_SELECT_COLUMNS = `
   "numeroVestimenta",
   "numeroEspecifico",
   "caracteristicaEpi",
-  "caracteristica_epi",
-  caracteristicas,
-  cores,
-  corMaterial,
+  "corMaterial",
+  "chaveUnica",
+  "usuarioCadastro",
+  "usuarioAtualizacao",
+  "dataCadastro",
+  "atualizadoEm",
+  caracteristica_epi,
+  caracteristicas_epi,
   cor_material,
+  cores
+`
+
+const MATERIAL_SELECT_COLUMNS = `
+  id,
+  nome,
+  fabricante,
+  "validadeDias",
+  ca,
+  "valorUnitario",
+  "estoqueMinimo",
+  ativo,
+  descricao,
+  "grupoMaterial",
+  "numeroCalcado",
+  "numeroVestimenta",
+  "numeroEspecifico",
   "chaveUnica",
   "usuarioCadastro",
   "usuarioAtualizacao",
@@ -164,8 +185,10 @@ const MATERIAL_SELECT_COLUMNS = `
   "numeroVestimentaNome",
   "usuarioCadastroNome",
   "usuarioAtualizacaoNome",
+  caracteristicas,
   caracteristicas_nomes,
   caracteristicas_texto,
+  cores,
   cores_nomes,
   cores_texto
 `
@@ -1040,6 +1063,17 @@ function buildDateFilters(query, field, inicio, fim) {
 async function carregarMateriais() {
   const data = await execute(
     supabase
+      .from('materiais')
+      .select(MATERIAL_TABLE_SELECT_COLUMNS)
+      .order('nome', { ascending: true }),
+    'Falha ao listar materiais.'
+  )
+  return (data ?? []).map(mapMaterialRecord)
+}
+
+async function carregarMateriaisDetalhados() {
+  const data = await execute(
+    supabase
       .from('materiais_view')
       .select(MATERIAL_SELECT_COLUMNS)
       .order('nome', { ascending: true }),
@@ -1143,10 +1177,12 @@ async function carregarSaidas(params = {}) {
   if (termo) {
     const [pessoasRaw, materiaisRaw] = await Promise.all([
       execute(supabase.from('pessoas').select('id, nome, centro_servico'), 'Falha ao listar pessoas.'),
-    execute(
-      supabase.from('materiais_view').select('id, nome, fabricante, caracteristicas, cores, corMaterial'),
-      'Falha ao listar materiais.'
-    ),
+      execute(
+        supabase
+          .from('materiais_view')
+          .select('id, nome, fabricante, caracteristicas, caracteristicas_texto, cores, cores_texto'),
+        'Falha ao listar materiais.'
+      ),
     ])
     const pessoasMap = new Map((pessoasRaw ?? []).map((pessoa) => [pessoa.id, mapPessoaRecord(pessoa)]))
     const materiaisMap = new Map((materiaisRaw ?? []).map((material) => [material.id, mapMaterialRecord(material)]))
@@ -1582,6 +1618,9 @@ export const api = {
     async list() {
       return carregarMateriais()
     },
+    async listDetalhado() {
+      return carregarMateriaisDetalhados()
+    },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)
       if (!dados.nome || !dados.fabricante || !dados.validadeDias || dados.validadeDias <= 0) {
@@ -1633,7 +1672,7 @@ export const api = {
       }
       const atualLista = await execute(
         supabase
-          .from('materiais')
+          .from('materiais_view')
           .select(MATERIAL_SELECT_COLUMNS)
           .eq('id', id)
           .limit(1),
