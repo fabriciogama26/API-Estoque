@@ -21,6 +21,7 @@ DECLARE
 BEGIN
   EXECUTE 'drop view if exists public.vw_materiais_vinculos';
   EXECUTE 'drop view if exists public.materiais_view';
+
   SELECT string_agg(column_name, ', ')
     INTO caracteristica_columns
   FROM (
@@ -56,21 +57,6 @@ BEGIN
   IF caracteristica_join_column IS NULL THEN
     RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de características em material_grupo_caracteristica_epi.';
   END IF;
-
-  SELECT column_name
-    INTO cor_join_column
-  FROM information_schema.columns
-  WHERE table_schema = 'public'
-    AND table_name = 'material_grupo_cor'
-    AND column_name IN ('grupo_cor_id', 'grupo_material_cor')
-  ORDER BY CASE column_name
-             WHEN 'grupo_cor_id' THEN 0
-             WHEN 'grupo_material_cor' THEN 1
-             ELSE 2
-           END
-  LIMIT 1;
-
-  RAISE NOTICE 'Utilizando coluna de vínculo de características: %', caracteristica_join_column;
 
   SELECT string_agg(column_name, ', ')
     INTO cor_columns
@@ -124,7 +110,22 @@ BEGIN
     RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de cores em material_grupo_cor.';
   END IF;
 
+  RAISE NOTICE 'Utilizando coluna de vínculo de características: %', caracteristica_join_column;
   RAISE NOTICE 'Utilizando coluna de vínculo de cores: %', cor_join_column;
+
+  SELECT string_agg(column_name, ', ')
+    INTO materiais_uuid_columns
+  FROM (
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'materiais'
+      AND data_type = 'uuid'
+    ORDER BY ordinal_position
+  ) as materiais_uuid_cols;
+
+  RAISE NOTICE 'Colunas UUID disponíveis em public.materiais: %',
+    COALESCE(materiais_uuid_columns, '<nenhuma>');
 
   SELECT column_name
     INTO grupo_material_column
@@ -148,7 +149,7 @@ BEGIN
   LIMIT 1;
 
   IF grupo_material_column IS NOT NULL THEN
-    grupo_material_join := format(E'\nleft join public.grupos_material as gm on gm.id = m.%1$I', grupo_material_column);
+    grupo_material_join := format(E'\nleft join public.grupos_material as gm on gm.id = m.%I', grupo_material_column);
     grupo_material_select := E',\n  gm.nome as "grupoMaterialNome"';
     RAISE NOTICE 'Utilizando coluna de grupo de material: %', grupo_material_column;
   ELSE
@@ -181,7 +182,7 @@ BEGIN
   LIMIT 1;
 
   IF grupo_material_item_column IS NOT NULL THEN
-    grupo_material_item_join := format(E'\nleft join public.grupos_material_itens as gmi on gmi.id = m.%1$I', grupo_material_item_column);
+    grupo_material_item_join := format(E'\nleft join public.grupos_material_itens as gmi on gmi.id = m.%I', grupo_material_item_column);
     grupo_material_item_select := E',\n  gmi.nome as "grupoMaterialItemNome"';
     RAISE NOTICE 'Utilizando coluna de item de grupo de material: %', grupo_material_item_column;
   ELSE
@@ -256,8 +257,7 @@ select
   coalesce(cores.cores_texto, '') as "coresTexto",
   coalesce(cores.cores_texto, '') as cores_texto,
   coalesce(cores.cores_texto, '') as "corMaterial",
-  coalesce(cores.cores_texto, '') as cor_material%3$s%4$s,
-  coalesce(caracteristicas.caracteristicas_texto, '') as "caracteristicaNome",
+  coalesce(cores.cores_texto, '') as cor_material,
   coalesce(cores.cores_texto, '') as "corNome"
 from public.materiais as m%5$s%6$s
 left join caracteristicas on caracteristicas.material_id = m.id
