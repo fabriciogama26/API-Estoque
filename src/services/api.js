@@ -1818,7 +1818,19 @@ export const api = {
         supabase.from('cor').select('id, cor').order('cor', { ascending: true }),
         'Falha ao listar cores.',
       )
-      return normalizeCatalogoOptions(data)
+      const lista = (data ?? [])
+        .map((item) => {
+          const nome = trim(item?.cor ?? item?.nome ?? '')
+          if (!nome) {
+            return null
+          }
+          return {
+            id: item?.id ?? nome,
+            nome,
+          }
+        })
+        .filter(Boolean)
+      return normalizeCatalogoOptions(lista)
     },
     async medidasCalcado() {
       const data = await execute(

@@ -430,7 +430,19 @@ export function MateriaisPage() {
     setHistoryModal({ ...HISTORY_MODAL_DEFAULT, open: true, material, isLoading: true })
     try {
       const data = await api.materiais.priceHistory(material.id)
-      const items = data ?? []
+      const items = (data ?? []).map((registro) => {
+        const alteracoes = Array.isArray(registro?.camposAlterados)
+          ? registro.camposAlterados
+          : []
+        const isAtualizacao = alteracoes.length > 0
+        const usuarioResolved = (
+          isAtualizacao ? material.usuarioAtualizacaoNome : material.usuarioCadastroNome
+        )
+        return {
+          ...registro,
+          usuarioResponsavel: usuarioResolved || registro.usuarioResponsavel || '-',
+        }
+      })
       setHistoryCache((prev) => ({ ...prev, [material.id]: items }))
       setHistoryModal({ ...HISTORY_MODAL_DEFAULT, open: true, material, items })
     } catch (err) {
