@@ -19,6 +19,8 @@ DECLARE
   grupo_material_item_join text := '';
   grupo_material_item_select text := E',\n  NULL::text as "grupoMaterialItemNome"';
 BEGIN
+  EXECUTE 'drop view if exists public.vw_materiais_vinculos';
+  EXECUTE 'drop view if exists public.materiais_view';
   SELECT string_agg(column_name, ', ')
     INTO caracteristica_columns
   FROM (
@@ -254,7 +256,8 @@ select
   coalesce(cores.cores_texto, '') as "coresTexto",
   coalesce(cores.cores_texto, '') as cores_texto,
   coalesce(cores.cores_texto, '') as "corMaterial",
-  coalesce(cores.cores_texto, '') as cor_material,
+  coalesce(cores.cores_texto, '') as cor_material%3$s%4$s,
+  coalesce(caracteristicas.caracteristicas_texto, '') as "caracteristicaNome",
   coalesce(cores.cores_texto, '') as "corNome"
 from public.materiais as m%5$s%6$s
 left join caracteristicas on caracteristicas.material_id = m.id
