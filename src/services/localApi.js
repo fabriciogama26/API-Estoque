@@ -300,6 +300,53 @@ const mapLocalMaterialResumo = (material) => {
   }
 }
 
+const uniqueSorted = (lista) =>
+  Array.from(new Set((lista || []).map((item) => (item && String(item).trim()) || '').filter(Boolean))).sort(
+    (a, b) => a.localeCompare(b),
+  )
+
+const mapLocalMaterialRecord = (material) => {
+  if (!material || typeof material !== 'object') {
+    return null
+  }
+
+  const caracteristicasLista = normalizeSelectionList(
+    Array.isArray(material.caracteristicas) && material.caracteristicas.length
+      ? material.caracteristicas
+      : material.caracteristicaEpi,
+    'caracteristica',
+  )
+
+  const coresLista = normalizeSelectionList(
+    Array.isArray(material.cores) && material.cores.length ? material.cores : material.corMaterial,
+    'cor',
+  )
+
+  const caracteristicasNomes = uniqueSorted(caracteristicasLista.map((item) => item?.nome))
+  const coresNomes = uniqueSorted(coresLista.map((item) => item?.nome))
+
+  const corMaterialTexto = material.corMaterial || coresNomes.join('; ')
+
+  return {
+    ...material,
+    nomeItemRelacionado: material.nomeItemRelacionado ?? material.nome ?? '',
+    grupoMaterialNome: material.grupoMaterialNome ?? material.grupoMaterial ?? '',
+    numeroCalcadoNome: material.numeroCalcadoNome ?? material.numeroCalcado ?? '',
+    numeroVestimentaNome: material.numeroVestimentaNome ?? material.numeroVestimenta ?? '',
+    caracteristicas: caracteristicasLista,
+    caracteristicasIds: caracteristicasLista.map((item) => item?.id).filter(Boolean),
+    caracteristicasNomes,
+    caracteristicasTexto: formatCaracteristicaTexto(caracteristicasNomes),
+    corMaterial: corMaterialTexto,
+    cores: coresLista,
+    coresIds: coresLista.map((item) => item?.id).filter(Boolean),
+    coresNomes,
+    coresTexto: coresNomes.join('; '),
+    usuarioCadastroNome: material.usuarioCadastroNome ?? material.usuarioCadastro ?? '',
+    usuarioAtualizacaoNome: material.usuarioAtualizacaoNome ?? material.usuarioAtualizacao ?? '',
+  }
+}
+
 const resolveEmpresaInfoLocal = () => ({
   nome: import.meta.env.VITE_TERMO_EPI_EMPRESA_NOME || '',
   documento: import.meta.env.VITE_TERMO_EPI_EMPRESA_DOCUMENTO || '',
@@ -1526,7 +1573,10 @@ const localApi = {
   },
   materiais: {
     async list() {
-      return readState((state) => state.materiais.slice())
+      return readState((state) => state.materiais.map((material) => mapLocalMaterialRecord(material)))
+    },
+    async listDetalhado() {
+      return readState((state) => state.materiais.map((material) => mapLocalMaterialRecord(material)))
     },
     async listDetalhado() {
       return readState((state) => state.materiais.slice())
@@ -1611,7 +1661,7 @@ const localApi = {
           camposAlterados: [],
         })
 
-        return material
+        return mapLocalMaterialRecord(material)
       })
     },
     async update(id, payload) {
@@ -1689,11 +1739,14 @@ const localApi = {
           })
         }
 
-        return atualizado
+        return mapLocalMaterialRecord(atualizado)
       })
     },
     async get(id) {
-      return readState((state) => state.materiais.find((material) => material.id === id) || null)
+      return readState((state) => {
+        const material = state.materiais.find((item) => item.id === id) || null
+        return mapLocalMaterialRecord(material)
+      })
     },
     async priceHistory(id) {
       return readState((state) =>
