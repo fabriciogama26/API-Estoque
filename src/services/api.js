@@ -133,7 +133,7 @@ const MATERIAL_HISTORY_FIELDS = [
   'chaveUnica',
 ]
 
-const MATERIAL_SELECT_COLUMNS = `
+const MATERIAL_TABLE_SELECT_COLUMNS = `
   id,
   nome,
   fabricante,
@@ -148,16 +148,49 @@ const MATERIAL_SELECT_COLUMNS = `
   "numeroVestimenta",
   "numeroEspecifico",
   "caracteristicaEpi",
-  "caracteristica_epi",
-  caracteristicas,
-  cores,
-  corMaterial,
-  cor_material,
+  "corMaterial",
   "chaveUnica",
   "usuarioCadastro",
   "usuarioAtualizacao",
   "dataCadastro",
-  "atualizadoEm"
+  "atualizadoEm",
+  caracteristica_epi,
+  caracteristicas_epi,
+  cor_material,
+  cores
+`
+
+const MATERIAL_SELECT_COLUMNS = `
+  id,
+  nome,
+  fabricante,
+  "validadeDias",
+  ca,
+  "valorUnitario",
+  "estoqueMinimo",
+  ativo,
+  descricao,
+  "grupoMaterial",
+  "numeroCalcado",
+  "numeroVestimenta",
+  "numeroEspecifico",
+  "chaveUnica",
+  "usuarioCadastro",
+  "usuarioAtualizacao",
+  "dataCadastro",
+  "atualizadoEm",
+  "grupoMaterialNome",
+  "nomeItemRelacionado",
+  "numeroCalcadoNome",
+  "numeroVestimentaNome",
+  "usuarioCadastroNome",
+  "usuarioAtualizacaoNome",
+  caracteristicas,
+  caracteristicas_nomes,
+  caracteristicas_texto,
+  cores,
+  cores_nomes,
+  cores_texto
 `
 
 const normalizeHistoryValue = (value) => {
@@ -725,6 +758,7 @@ function mapMaterialRecord(record) {
       record.caracteristicas_agg ??
       record.caracteristicas_list_nomes ??
       record.caracteristicas_rel ??
+      record.caracteristicas_nomes ??
       record.caracteristicaEpi ??
       record.caracteristica_epi ??
       []
@@ -735,20 +769,37 @@ function mapMaterialRecord(record) {
       record.cores_list ??
       record.cores_agg ??
       record.cores_rel ??
+      record.cores_nomes ??
       record.coresTexto ??
       record.corMaterial ??
       record.cor_material ??
       []
   )
-  const caracteristicaTexto =
+  const caracteristicasTexto =
     formatCaracteristicaTexto(caracteristicasLista.map((item) => item.nome)) ||
+    formatCaracteristicaTexto(record.caracteristicas_nomes ?? []) ||
+    formatCaracteristicaTexto(record.caracteristicas_texto ?? '') ||
     formatCaracteristicaTexto(record.caracteristicaEpi ?? record.caracteristica_epi ?? '')
-  const corMaterialTexto =
-    trim(record.corMaterial ?? record.cor_material ?? '') ||
-    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '')
+  const coresTexto =
+    trim(record.cores_texto ?? '') ||
+    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '') ||
+    trim(record.corMaterial ?? record.cor_material ?? '')
+  const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
+  const usuarioCadastroNome =
+    trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
+    usuarioCadastroId
+
+  const usuarioAtualizacaoId = trim(
+    record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
+  )
+  const usuarioAtualizacaoNome =
+    trim(record.usuarioAtualizacaoNome ?? record.usuario_atualizacao_nome ?? '') ||
+    usuarioAtualizacaoId
+
   return {
     id: record.id,
     nome: record.nome ?? '',
+    nomeItemRelacionado: record.nomeItemRelacionado ?? record.nome_item_relacionado ?? '',
     fabricante: record.fabricante ?? '',
     validadeDias: record.validadeDias ?? record.validade_dias ?? null,
     ca: record.ca ?? record.ca_number ?? '',
@@ -756,19 +807,28 @@ function mapMaterialRecord(record) {
     estoqueMinimo: toNumber(record.estoqueMinimo ?? record.estoque_minimo),
     ativo: record.ativo ?? true,
     grupoMaterial: record.grupoMaterial ?? record.grupo_material ?? '',
+    grupoMaterialNome: record.grupoMaterialNome ?? record.grupo_material_nome ?? '',
     numeroCalcado: record.numeroCalcado ?? record.numero_calcado ?? '',
+    numeroCalcadoNome: record.numeroCalcadoNome ?? record.numero_calcado_nome ?? '',
     numeroVestimenta: record.numeroVestimenta ?? record.numero_vestimenta ?? '',
+    numeroVestimentaNome: record.numeroVestimentaNome ?? record.numero_vestimenta_nome ?? '',
     numeroEspecifico: record.numeroEspecifico ?? record.numero_especifico ?? '',
     chaveUnica: record.chaveUnica ?? record.chave_unica ?? '',
     descricao: record.descricao ?? '',
-    caracteristicaEpi: caracteristicaTexto,
+    caracteristicaEpi: caracteristicasTexto,
     caracteristicas: caracteristicasLista,
     caracteristicasIds: caracteristicasLista.map((item) => item.id).filter(Boolean),
-    corMaterial: corMaterialTexto,
+    caracteristicasNomes: normalizeStringArray(record.caracteristicas_nomes ?? []),
+    caracteristicasTexto,
+    corMaterial: coresTexto,
     cores: coresLista,
     coresIds: coresLista.map((item) => item.id).filter(Boolean),
-    usuarioCadastro: record.usuarioCadastro ?? record.usuario_cadastro ?? '',
-    usuarioAtualizacao: record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
+    coresNomes: normalizeStringArray(record.cores_nomes ?? []),
+    coresTexto,
+    usuarioCadastro: usuarioCadastroId,
+    usuarioCadastroNome,
+    usuarioAtualizacao: usuarioAtualizacaoId,
+    usuarioAtualizacaoNome,
     dataCadastro: record.dataCadastro ?? record.data_cadastro ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
   }
@@ -1015,6 +1075,17 @@ function buildDateFilters(query, field, inicio, fim) {
 async function carregarMateriais() {
   const data = await execute(
     supabase
+      .from('materiais')
+      .select(MATERIAL_TABLE_SELECT_COLUMNS)
+      .order('nome', { ascending: true }),
+    'Falha ao listar materiais.'
+  )
+  return (data ?? []).map(mapMaterialRecord)
+}
+
+async function carregarMateriaisDetalhados() {
+  const data = await execute(
+    supabase
       .from('materiais_view')
       .select(MATERIAL_SELECT_COLUMNS)
       .order('nome', { ascending: true }),
@@ -1118,10 +1189,12 @@ async function carregarSaidas(params = {}) {
   if (termo) {
     const [pessoasRaw, materiaisRaw] = await Promise.all([
       execute(supabase.from('pessoas').select('id, nome, centro_servico'), 'Falha ao listar pessoas.'),
-    execute(
-      supabase.from('materiais_view').select('id, nome, fabricante, caracteristicas, cores, corMaterial'),
-      'Falha ao listar materiais.'
-    ),
+      execute(
+        supabase
+          .from('materiais_view')
+          .select('id, nome, fabricante, caracteristicas, caracteristicas_texto, cores, cores_texto'),
+        'Falha ao listar materiais.'
+      ),
     ])
     const pessoasMap = new Map((pessoasRaw ?? []).map((pessoa) => [pessoa.id, mapPessoaRecord(pessoa)]))
     const materiaisMap = new Map((materiaisRaw ?? []).map((material) => [material.id, mapMaterialRecord(material)]))
@@ -1557,6 +1630,9 @@ export const api = {
     async list() {
       return carregarMateriais()
     },
+    async listDetalhado() {
+      return carregarMateriaisDetalhados()
+    },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)
       if (!dados.nome || !dados.fabricante || !dados.validadeDias || dados.validadeDias <= 0) {
@@ -1608,7 +1684,7 @@ export const api = {
       }
       const atualLista = await execute(
         supabase
-          .from('materiais')
+          .from('materiais_view')
           .select(MATERIAL_SELECT_COLUMNS)
           .eq('id', id)
           .limit(1),
@@ -1754,7 +1830,19 @@ export const api = {
         supabase.from('cor').select('id, cor').order('cor', { ascending: true }),
         'Falha ao listar cores.',
       )
-      return normalizeCatalogoOptions(data)
+      const lista = (data ?? [])
+        .map((item) => {
+          const nome = trim(item?.cor ?? item?.nome ?? '')
+          if (!nome) {
+            return null
+          }
+          return {
+            id: item?.id ?? nome,
+            nome,
+          }
+        })
+        .filter(Boolean)
+      return normalizeCatalogoOptions(lista)
     },
     async medidasCalcado() {
       const data = await execute(
