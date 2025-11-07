@@ -785,16 +785,16 @@ function mapMaterialRecord(record) {
     (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '') ||
     trim(record.corMaterial ?? record.cor_material ?? '')
   const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
-  const usuarioCadastroNome = trim(
-    record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '',
-  )
+  const usuarioCadastroNome =
+    trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
+    usuarioCadastroId
 
   const usuarioAtualizacaoId = trim(
     record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
   )
-  const usuarioAtualizacaoNome = trim(
-    record.usuarioAtualizacaoNome ?? record.usuario_atualizacao_nome ?? '',
-  )
+  const usuarioAtualizacaoNome =
+    trim(record.usuarioAtualizacaoNome ?? record.usuario_atualizacao_nome ?? '') ||
+    usuarioAtualizacaoId
 
   return {
     id: record.id,
