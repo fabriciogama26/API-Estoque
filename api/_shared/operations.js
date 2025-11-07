@@ -742,30 +742,25 @@ async function replaceMaterialRelations({
   await execute(supabaseAdmin.from(table).insert(rows), insertMessage)
 }
 
-async function replaceMaterialCorVinculos(materialId, corIds) {
-  await replaceMaterialRelations({
-    table: MATERIAL_COR_RELATION_TABLE,
-    materialId,
-    columnName: 'grupo_cor_id',
-    values: corIds,
-    deleteMessage: 'Falha ao limpar vínculos de cores do material.',
-    insertMessage: 'Falha ao vincular cores ao material.',
-  })
-}
-
-async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
-  const columnCandidates = ['grupo_caracteristica_epi_id', 'caracteristica_epi_id']
+async function replaceMaterialRelationsWithFallback({
+  table,
+  materialId,
+  columnCandidates,
+  values,
+  deleteMessage,
+  insertMessage,
+}) {
   let lastColumnError = null
 
   for (const columnName of columnCandidates) {
     try {
       await replaceMaterialRelations({
-        table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
+        table,
         materialId,
         columnName,
-        values: caracteristicaIds,
-        deleteMessage: 'Falha ao limpar vínculos de características do material.',
-        insertMessage: 'Falha ao vincular características ao material.',
+        values,
+        deleteMessage,
+        insertMessage,
       })
       return
     } catch (error) {
@@ -780,6 +775,41 @@ async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaI
   if (lastColumnError) {
     throw lastColumnError
   }
+}
+
+async function replaceMaterialCorVinculos(materialId, corIds) {
+  await replaceMaterialRelationsWithFallback({
+    table: MATERIAL_COR_RELATION_TABLE,
+    materialId,
+    columnCandidates: [
+      'grupo_material_cor',
+      'grupo_cor_id',
+      'grupo_cor',
+      'cor_id',
+      'cor',
+    ],
+    values: corIds,
+    deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+    insertMessage: 'Falha ao vincular cores ao material.',
+  })
+}
+
+async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
+  await replaceMaterialRelationsWithFallback({
+    table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
+    materialId,
+    columnCandidates: [
+      'grupo_caracteristica_epi',
+      'grupo_caracteristica_epi_id',
+      'caracteristica_epi_id',
+      'caracteristica_epi',
+      'caracteristica_id',
+      'caracteristica',
+    ],
+    values: caracteristicaIds,
+    deleteMessage: 'Falha ao limpar vínculos de características do material.',
+    insertMessage: 'Falha ao vincular características ao material.',
+  })
 }
 
 async function syncMaterialVinculos(materialId, { corIds, caracteristicaIds }) {

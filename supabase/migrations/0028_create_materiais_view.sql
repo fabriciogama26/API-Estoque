@@ -1,27 +1,89 @@
 -- Cria uma view consolidando materiais com cores e características agregadas.
 -- A view expõe estruturas em JSON e listas auxiliares para facilitar filtros
--- no backend e frontend. A definição ajusta dinamicamente o nome da coluna
--- de vínculo de características para lidar com diferenças entre ambientes.
+-- no backend e frontend. A definição ajusta dinamicamente os nomes das colunas
+-- de vínculo de características e de cores para lidar com diferenças entre ambientes.
 DO $$
 DECLARE
   caracteristica_join_column text;
+  cor_join_column text;
   create_view_sql text;
+  caracteristica_columns text;
+  cor_columns text;
+  caracteristica_candidate text;
+  cor_candidate text;
 BEGIN
-  SELECT column_name
-    INTO caracteristica_join_column
+  SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+    INTO caracteristica_columns
   FROM information_schema.columns
   WHERE table_schema = 'public'
-    AND table_name = 'material_grupo_caracteristica_epi'
-    AND column_name IN ('grupo_caracteristica_epi_id', 'caracteristica_epi_id')
-  ORDER BY CASE column_name
-             WHEN 'grupo_caracteristica_epi_id' THEN 0
-             ELSE 1
-           END
-  LIMIT 1;
+    AND table_name = 'material_grupo_caracteristica_epi';
+
+  RAISE NOTICE 'Colunas disponíveis em material_grupo_caracteristica_epi: %',
+    COALESCE(caracteristica_columns, '<nenhuma>');
+
+  FOR caracteristica_candidate IN
+    SELECT unnest(ARRAY[
+      'grupo_caracteristica_epi',
+      'grupo_caracteristica_epi_id',
+      'caracteristica_epi_id',
+      'caracteristica_epi',
+      'caracteristica_id',
+      'caracteristica'
+    ])
+  LOOP
+    PERFORM 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'material_grupo_caracteristica_epi'
+      AND column_name = caracteristica_candidate;
+
+    IF FOUND THEN
+      caracteristica_join_column := caracteristica_candidate;
+      EXIT;
+    END IF;
+  END LOOP;
 
   IF caracteristica_join_column IS NULL THEN
-    RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo em material_grupo_caracteristica_epi.';
+    RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de características em material_grupo_caracteristica_epi.';
   END IF;
+
+  RAISE NOTICE 'Utilizando coluna de vínculo de características: %', caracteristica_join_column;
+
+  SELECT string_agg(column_name, ', ' ORDER BY ordinal_position)
+    INTO cor_columns
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'material_grupo_cor';
+
+  RAISE NOTICE 'Colunas disponíveis em material_grupo_cor: %',
+    COALESCE(cor_columns, '<nenhuma>');
+
+  FOR cor_candidate IN
+    SELECT unnest(ARRAY[
+      'grupo_material_cor',
+      'grupo_cor_id',
+      'grupo_cor',
+      'cor_id',
+      'cor'
+    ])
+  LOOP
+    PERFORM 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'material_grupo_cor'
+      AND column_name = cor_candidate;
+
+    IF FOUND THEN
+      cor_join_column := cor_candidate;
+      EXIT;
+    END IF;
+  END LOOP;
+
+  IF cor_join_column IS NULL THEN
+    RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de cores em material_grupo_cor.';
+  END IF;
+
+  RAISE NOTICE 'Utilizando coluna de vínculo de cores: %', cor_join_column;
 
   create_view_sql := format($sql$
 create or replace view public.materiais_view as
@@ -54,7 +116,7 @@ cores_base as (
     trim(c.cor) as cor_nome
   from public.material_grupo_cor as mgc
   join public.cor as c
-    on c.id = mgc.grupo_cor_id
+    on c.id = mgc.%2$I
   where trim(coalesce(c.cor, '')) <> ''
 ),
 cores as (
@@ -94,7 +156,7 @@ select
 from public.materiais as m
 left join caracteristicas on caracteristicas.material_id = m.id
 left join cores on cores.material_id = m.id;
-$sql$, caracteristica_join_column);
+$sql$, caracteristica_join_column, cor_join_column);
 
   EXECUTE create_view_sql;
   EXECUTE 'create or replace view public.vw_materiais_vinculos as select * from public.materiais_view';
