@@ -1528,6 +1528,9 @@ const localApi = {
     async list() {
       return readState((state) => state.materiais.slice())
     },
+    async listDetalhado() {
+      return readState((state) => state.materiais.slice())
+    },
     async groups() {
       return readState((state) => {
         const set = new Set(gruposEpiPadrao)

@@ -52,15 +52,21 @@ export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSavi
             {paginatedMateriais.map((material) => (
               <tr key={material.id}>
                 <td>
-                  <strong>{material.nome}</strong>
+                  <strong>{material.nomeItemRelacionado || '-'}</strong>
                 </td>
-                <td>{material.grupoMaterial || '-'}</td>
-                <td>{material.numeroCalcado || material.numeroVestimenta || '-'}</td>
+                <td>{material.grupoMaterialNome || material.grupoMaterial || '-'}</td>
+                <td>
+                  {material.numeroCalcadoNome ||
+                    material.numeroVestimentaNome ||
+                    material.numeroCalcado ||
+                    material.numeroVestimenta ||
+                    '-'}
+                </td>
                 <td>{material.ca || '-'}</td>
                 <td>{material.validadeDias}</td>
                 <td>{formatCurrency(material.valorUnitario)}</td>
                 <td>{material.fabricante || '-'}</td>
-                <td>{material.usuarioCadastro || '-'}</td>
+                <td>{material.usuarioCadastroNome || '-'}</td>
                 <td>
                   <MateriaisActions
                     material={material}
