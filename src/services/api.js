@@ -157,7 +157,17 @@ const MATERIAL_SELECT_COLUMNS = `
   "usuarioCadastro",
   "usuarioAtualizacao",
   "dataCadastro",
-  "atualizadoEm"
+  "atualizadoEm",
+  "grupoMaterialNome",
+  "nomeItemRelacionado",
+  "numeroCalcadoNome",
+  "numeroVestimentaNome",
+  "usuarioCadastroNome",
+  "usuarioAtualizacaoNome",
+  caracteristicas_nomes,
+  caracteristicas_texto,
+  cores_nomes,
+  cores_texto
 `
 
 const normalizeHistoryValue = (value) => {
@@ -725,6 +735,7 @@ function mapMaterialRecord(record) {
       record.caracteristicas_agg ??
       record.caracteristicas_list_nomes ??
       record.caracteristicas_rel ??
+      record.caracteristicas_nomes ??
       record.caracteristicaEpi ??
       record.caracteristica_epi ??
       []
@@ -735,20 +746,25 @@ function mapMaterialRecord(record) {
       record.cores_list ??
       record.cores_agg ??
       record.cores_rel ??
+      record.cores_nomes ??
       record.coresTexto ??
       record.corMaterial ??
       record.cor_material ??
       []
   )
-  const caracteristicaTexto =
+  const caracteristicasTexto =
     formatCaracteristicaTexto(caracteristicasLista.map((item) => item.nome)) ||
+    formatCaracteristicaTexto(record.caracteristicas_nomes ?? []) ||
+    formatCaracteristicaTexto(record.caracteristicas_texto ?? '') ||
     formatCaracteristicaTexto(record.caracteristicaEpi ?? record.caracteristica_epi ?? '')
-  const corMaterialTexto =
-    trim(record.corMaterial ?? record.cor_material ?? '') ||
-    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '')
+  const coresTexto =
+    trim(record.cores_texto ?? '') ||
+    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '') ||
+    trim(record.corMaterial ?? record.cor_material ?? '')
   return {
     id: record.id,
     nome: record.nome ?? '',
+    nomeItemRelacionado: record.nomeItemRelacionado ?? record.nome_item_relacionado ?? '',
     fabricante: record.fabricante ?? '',
     validadeDias: record.validadeDias ?? record.validade_dias ?? null,
     ca: record.ca ?? record.ca_number ?? '',
@@ -756,19 +772,28 @@ function mapMaterialRecord(record) {
     estoqueMinimo: toNumber(record.estoqueMinimo ?? record.estoque_minimo),
     ativo: record.ativo ?? true,
     grupoMaterial: record.grupoMaterial ?? record.grupo_material ?? '',
+    grupoMaterialNome: record.grupoMaterialNome ?? record.grupo_material_nome ?? '',
     numeroCalcado: record.numeroCalcado ?? record.numero_calcado ?? '',
+    numeroCalcadoNome: record.numeroCalcadoNome ?? record.numero_calcado_nome ?? '',
     numeroVestimenta: record.numeroVestimenta ?? record.numero_vestimenta ?? '',
+    numeroVestimentaNome: record.numeroVestimentaNome ?? record.numero_vestimenta_nome ?? '',
     numeroEspecifico: record.numeroEspecifico ?? record.numero_especifico ?? '',
     chaveUnica: record.chaveUnica ?? record.chave_unica ?? '',
     descricao: record.descricao ?? '',
-    caracteristicaEpi: caracteristicaTexto,
+    caracteristicaEpi: caracteristicasTexto,
     caracteristicas: caracteristicasLista,
     caracteristicasIds: caracteristicasLista.map((item) => item.id).filter(Boolean),
-    corMaterial: corMaterialTexto,
+    caracteristicasNomes: normalizeStringArray(record.caracteristicas_nomes ?? []),
+    caracteristicasTexto,
+    corMaterial: coresTexto,
     cores: coresLista,
     coresIds: coresLista.map((item) => item.id).filter(Boolean),
+    coresNomes: normalizeStringArray(record.cores_nomes ?? []),
+    coresTexto,
     usuarioCadastro: record.usuarioCadastro ?? record.usuario_cadastro ?? '',
+    usuarioCadastroNome: record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '',
     usuarioAtualizacao: record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
+    usuarioAtualizacaoNome: record.usuarioAtualizacaoNome ?? record.usuario_atualizacao_nome ?? '',
     dataCadastro: record.dataCadastro ?? record.data_cadastro ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
   }
