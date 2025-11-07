@@ -16,35 +16,39 @@ BEGIN
     INTO caracteristica_columns
   FROM information_schema.columns
   WHERE table_schema = 'public'
-    AND table_name = 'material_grupo_caracteristica_epi';
-
-  RAISE NOTICE 'Colunas disponíveis em material_grupo_caracteristica_epi: %',
-    COALESCE(caracteristica_columns, '<nenhuma>');
-
-  FOR caracteristica_candidate IN
-    SELECT unnest(ARRAY[
-      'grupo_caracteristica_epi',
+    AND table_name = 'material_grupo_caracteristica_epi'
+    AND column_name IN (
       'grupo_caracteristica_epi_id',
       'caracteristica_epi_id',
-      'caracteristica_epi',
-      'caracteristica_id',
-      'caracteristica'
-    ])
-  LOOP
-    PERFORM 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'material_grupo_caracteristica_epi'
-      AND column_name = caracteristica_candidate;
-
-    IF FOUND THEN
-      caracteristica_join_column := caracteristica_candidate;
-      EXIT;
-    END IF;
-  END LOOP;
+      'grupo_caracteristica_epi'
+    )
+  ORDER BY CASE column_name
+             WHEN 'grupo_caracteristica_epi_id' THEN 0
+             WHEN 'caracteristica_epi_id' THEN 1
+             WHEN 'grupo_caracteristica_epi' THEN 2
+             ELSE 3
+           END
+  LIMIT 1;
 
   IF caracteristica_join_column IS NULL THEN
     RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de características em material_grupo_caracteristica_epi.';
+  END IF;
+
+  SELECT column_name
+    INTO cor_join_column
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'material_grupo_cor'
+    AND column_name IN ('grupo_cor_id', 'grupo_material_cor')
+  ORDER BY CASE column_name
+             WHEN 'grupo_cor_id' THEN 0
+             WHEN 'grupo_material_cor' THEN 1
+             ELSE 2
+           END
+  LIMIT 1;
+
+  IF cor_join_column IS NULL THEN
+    RAISE EXCEPTION 'Não foi possível localizar a coluna de vínculo de cores em material_grupo_cor.';
   END IF;
 
   RAISE NOTICE 'Utilizando coluna de vínculo de características: %', caracteristica_join_column;
