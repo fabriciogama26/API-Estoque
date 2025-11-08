@@ -3,10 +3,13 @@
 export const createMateriaisFormDefault = () => ({
   nome: '',
   fabricante: '',
+  fabricanteId: '',
   validadeDias: '',
   ca: '',
   valorUnitario: '',
+  grupoMaterialId: '',
   grupoMaterial: '',
+  grupoMaterialNome: '',
   numeroCalcado: '',
   numeroVestimenta: '',
   caracteristicaEpi: [],

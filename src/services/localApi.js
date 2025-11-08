@@ -282,13 +282,18 @@ const mapLocalMaterialResumo = (material) => {
   }
   return {
     id: material.id,
-    nome: material.nome || '',
-    fabricante: material.fabricante || '',
+    nome: material.nome || material.materialItemNome || '',
+    materialItemNome: material.materialItemNome || material.nome || '',
+    fabricante: material.fabricanteNome || material.fabricante || '',
+    fabricanteNome: material.fabricanteNome || material.fabricante || '',
+    fabricanteId: material.fabricanteId || null,
     ca: material.ca || '',
     numeroEspecifico: material.numeroEspecifico || '',
     numeroCalcado: material.numeroCalcado || '',
     numeroVestimenta: material.numeroVestimenta || '',
-    grupoMaterial: material.grupoMaterial || '',
+    grupoMaterial: material.grupoMaterialNome || material.grupoMaterial || '',
+    grupoMaterialNome: material.grupoMaterialNome || material.grupoMaterial || '',
+    grupoMaterialId: material.grupoMaterialId || null,
     caracteristicaEpi: material.caracteristicaEpi || '',
     caracteristicas: Array.isArray(material.caracteristicas)
       ? material.caracteristicas
@@ -329,8 +334,23 @@ const mapLocalMaterialRecord = (material) => {
 
   return {
     ...material,
-    nomeItemRelacionado: material.nomeItemRelacionado ?? material.nome ?? '',
+    nome: material.nome ?? material.materialItemNome ?? '',
+    nomeItemRelacionado: material.nomeItemRelacionado ?? material.materialItemNome ?? material.nome ?? '',
+    materialItemNome: material.materialItemNome ?? material.nome ?? '',
+    fabricante: material.fabricanteNome ?? material.fabricante ?? '',
+    fabricanteNome: material.fabricanteNome ?? material.fabricante ?? '',
+    fabricanteId:
+      material.fabricanteId ||
+      (material.fabricanteNome || material.fabricante
+        ? buildOptionId('fabricante', material.fabricanteNome || material.fabricante)
+        : null),
+    grupoMaterial: material.grupoMaterialNome ?? material.grupoMaterial ?? '',
     grupoMaterialNome: material.grupoMaterialNome ?? material.grupoMaterial ?? '',
+    grupoMaterialId:
+      material.grupoMaterialId ||
+      (material.grupoMaterialNome || material.grupoMaterial
+        ? buildOptionId('grupo', material.grupoMaterialNome || material.grupoMaterial)
+        : null),
     numeroCalcadoNome: material.numeroCalcadoNome ?? material.numeroCalcado ?? '',
     numeroVestimentaNome: material.numeroVestimentaNome ?? material.numeroVestimenta ?? '',
     caracteristicas: caracteristicasLista,
@@ -570,6 +590,9 @@ const buildOptionId = (prefix, nome, index = 0) => {
   return `${prefix}-${base}`
 }
 
+const buildGrupoItemId = (grupoNome, itemNome) =>
+  buildOptionId('item', `${grupoNome || 'grupo'}-${itemNome || ''}`)
+
 const normalizeCatalogoOptions = (lista, prefix) => {
   const valores = []
   const vistos = new Set()
@@ -744,6 +767,8 @@ const catalogoCores = ['AMARELA', 'AZUL', 'BRANCA', 'LARANJA', 'PRETA', 'VERDE',
 const catalogoMedidasCalcado = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44']
 
 const catalogoMedidasVestimenta = ['PP', 'P', 'M', 'G', 'GG', 'XG']
+
+const catalogoFabricantesPadrao = ['3M', 'Honeywell', 'MSA', 'Vulkan', 'Volk do Brasil']
 
 const gruposEpiFonte = (() => {
   if (Array.isArray(gruposEpi)) {
@@ -1016,9 +1041,18 @@ const catalogoAcidenteLesoes = [
 ];
 
 const sanitizeMaterialPayload = (payload = {}) => {
-  const grupoMaterial = trim(payload.grupoMaterial)
+  const grupoMaterialNome = trim(payload.grupoMaterialNome || payload.grupoMaterial)
+  const grupoMaterialIdBase = trim(payload.grupoMaterialId)
+  const grupoMaterialId = grupoMaterialIdBase || (grupoMaterialNome ? buildOptionId('grupo', grupoMaterialNome) : '')
+  const grupoMaterial = grupoMaterialNome
   const numeroCalcado = sanitizeDigitsOnly(payload.numeroCalcado)
   const numeroVestimenta = trim(payload.numeroVestimenta)
+  const materialItemNomeBase = trim(
+    payload.nome || payload.materialItemNome || payload.nomeItemRelacionado || '',
+  )
+  const fabricanteNomeBase = trim(payload.fabricanteNome || payload.fabricante)
+  const fabricanteIdBase = trim(payload.fabricanteId)
+  const fabricanteId = fabricanteIdBase || (fabricanteNomeBase ? buildOptionId('fabricante', fabricanteNomeBase) : '')
   const caracteristicasSelecionadas = normalizeSelectionList(
     payload.caracteristicas ??
       payload.caracteristicasEpi ??
@@ -1040,14 +1074,18 @@ const sanitizeMaterialPayload = (payload = {}) => {
     ? coresSelecionadas.map((item) => item.nome).join('; ')
     : trim(payload.corMaterial)
   const numeroEspecifico = buildNumeroEspecifico({
-    grupoMaterial,
+    grupoMaterial: grupoMaterialNome,
     numeroCalcado,
     numeroVestimenta,
   })
 
   return {
-    nome: trim(payload.nome),
-    fabricante: trim(payload.fabricante),
+    nome: materialItemNomeBase,
+    nomeItemRelacionado: materialItemNomeBase,
+    materialItemNome: materialItemNomeBase,
+    fabricante: fabricanteNomeBase,
+    fabricanteNome: fabricanteNomeBase,
+    fabricanteId: fabricanteId || null,
     validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
     ca: trim(payload.ca),
     valorUnitario: Number(payload.valorUnitario ?? 0),
@@ -1057,8 +1095,10 @@ const sanitizeMaterialPayload = (payload = {}) => {
         : null,
     ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
     grupoMaterial,
-    numeroCalcado: isGrupo(grupoMaterial, 'Calçado') ? numeroCalcado : '',
-    numeroVestimenta: requiresTamanho(grupoMaterial) ? numeroVestimenta : '',
+    grupoMaterialNome,
+    grupoMaterialId: grupoMaterialId || null,
+    numeroCalcado: isGrupo(grupoMaterialNome, 'Calçado') ? numeroCalcado : '',
+    numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimenta : '',
     numeroEspecifico,
     caracteristicaEpi,
     caracteristicas: caracteristicasSelecionadas,
@@ -1069,10 +1109,11 @@ const sanitizeMaterialPayload = (payload = {}) => {
     descricao: String(payload.descricao || '').trim(),
     chaveUnica: buildChaveUnica({
       grupoMaterial,
-      nome: payload.nome,
-      fabricante: payload.fabricante,
-      numeroCalcado: isGrupo(grupoMaterial, 'Calçado') ? numeroCalcado : '',
-      numeroVestimenta: requiresTamanho(grupoMaterial) ? numeroVestimenta : '',
+      grupoMaterialNome,
+      nome: materialItemNomeBase,
+      fabricante: fabricanteNomeBase,
+      numeroCalcado: isGrupo(grupoMaterialNome, 'Calçado') ? numeroCalcado : '',
+      numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimenta : '',
       caracteristicaEpi,
       corMaterial,
       ca: payload.ca,
@@ -1085,20 +1126,23 @@ const validateMaterialPayload = (payload) => {
   if (/\d/.test(payload.nome)) {
     throw createError(400, 'O campo EPI não pode conter números.')
   }
-  if (!payload.fabricante) throw createError(400, 'Fabricante obrigatorio.')
+  if (!payload.fabricante && !payload.fabricanteNome) {
+    throw createError(400, 'Fabricante obrigatorio.')
+  }
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
     throw createError(400, 'Validade deve ser maior que zero.')
   }
   if (Number.isNaN(Number(payload.valorUnitario)) || Number(payload.valorUnitario) <= 0) {
     throw createError(400, 'Valor unitario deve ser maior que zero.')
   }
-  if (!payload.grupoMaterial) {
+  const grupoNome = payload.grupoMaterialNome || payload.grupoMaterial || ''
+  if (!payload.grupoMaterialId && !grupoNome) {
     throw createError(400, 'Grupo de material obrigatorio.')
   }
-  if (isGrupo(payload.grupoMaterial, 'Calçado') && !payload.numeroCalcado) {
+  if (isGrupo(grupoNome, 'Calçado') && !payload.numeroCalcado) {
     throw createError(400, 'Informe o número do calçado.')
   }
-  if (requiresTamanho(payload.grupoMaterial) && !payload.numeroVestimenta) {
+  if (requiresTamanho(grupoNome) && !payload.numeroVestimenta) {
     throw createError(400, 'Informe o tamanho.')
   }
   if (
@@ -1580,29 +1624,97 @@ const localApi = {
     },
     async groups() {
       return readState((state) => {
-        const set = new Set(gruposEpiPadrao)
+        const mapa = new Map()
+        const registrarGrupo = (nome) => {
+          const texto = trim(nome)
+          if (!texto) {
+            return
+          }
+          const id = buildOptionId('grupo', texto)
+          if (!mapa.has(id)) {
+            mapa.set(id, { id, nome: texto })
+          }
+        }
+        gruposEpiPadrao.forEach(registrarGrupo)
         state.materiais
-          .map((material) => material.grupoMaterial && material.grupoMaterial.trim())
+          .map((material) => material.grupoMaterialNome || material.grupoMaterial || '')
           .filter(Boolean)
-          .forEach((grupo) => set.add(grupo))
-        return Array.from(set).sort((a, b) => a.localeCompare(b))
+          .forEach((grupo) => registrarGrupo(grupo))
+        return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome))
       })
     },
-    async items(grupoNome) {
-      const nome = trim(grupoNome)
-      if (!nome) {
+    async items(grupoId) {
+      const normalizedGrupoId = normalizeKeyPart(grupoId)
+      if (!normalizedGrupoId) {
         return []
       }
+      const normalizeGrupoKey = (nome) => normalizeKeyPart(buildOptionId('grupo', nome))
+      const resolveNomeGrupo = () => {
+        const candidatos = [...gruposEpiPadrao, ...Object.keys(catalogoGruposMateriais)]
+        for (const candidato of candidatos) {
+          if (normalizeGrupoKey(candidato) === normalizedGrupoId) {
+            return trim(candidato)
+          }
+        }
+        return ''
+      }
+      const grupoNomeReferencia = resolveNomeGrupo()
       const base =
-        Object.prototype.hasOwnProperty.call(catalogoGruposMateriais, nome)
-          ? catalogoGruposMateriais[nome]
+        Object.prototype.hasOwnProperty.call(catalogoGruposMateriais, grupoNomeReferencia)
+          ? catalogoGruposMateriais[grupoNomeReferencia]
           : []
       return readState((state) => {
         const extras = state.materiais
-          .filter((material) => normalizeKeyPart(material.grupoMaterial) === normalizeKeyPart(nome))
-          .map((material) => trim(material.nome))
-          .filter(Boolean)
-        return Array.from(new Set([...(base || []), ...extras])).sort((a, b) => a.localeCompare(b))
+          .filter((material) =>
+            normalizeKeyPart(material.grupoMaterialId || buildOptionId('grupo', material.grupoMaterialNome || material.grupoMaterial)) ===
+              normalizedGrupoId,
+          )
+          .map((material) => {
+            const nomeMaterial = trim(material.nome) || trim(material.materialItemNome) || ''
+            return {
+              id: buildGrupoItemId(
+                grupoNomeReferencia || material.grupoMaterialNome || material.grupoMaterial,
+                nomeMaterial,
+              ),
+              nome: nomeMaterial,
+            }
+          })
+          .filter((item) => item.nome)
+        const listaPadrao = normalizeCatalogoOptions(
+          (base || []).map((nome) => ({
+            id: buildGrupoItemId(grupoNomeReferencia || grupoId, nome),
+            nome,
+          })),
+          'item',
+        )
+        const mapa = new Map(listaPadrao.map((item) => [normalizeKeyPart(item.id) || normalizeKeyPart(item.nome), item]))
+        extras.forEach((item) => {
+          const chave = normalizeKeyPart(item.id) || normalizeKeyPart(item.nome)
+          if (!mapa.has(chave)) {
+            mapa.set(chave, { id: item.id, nome: item.nome })
+          }
+        })
+        return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome))
+      })
+    },
+    async fabricantes() {
+      return readState((state) => {
+        const mapa = new Map()
+        const registrar = (nome, idBase) => {
+          const texto = trim(nome)
+          if (!texto) {
+            return
+          }
+          const id = idBase || buildOptionId('fabricante', texto)
+          if (!mapa.has(id)) {
+            mapa.set(id, { id, nome: texto })
+          }
+        }
+        catalogoFabricantesPadrao.forEach((nome) => registrar(nome))
+        state.materiais.forEach((material) => {
+          registrar(material.fabricanteNome || material.fabricante, material.fabricanteId)
+        })
+        return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome))
       })
     },
     async caracteristicas() {
@@ -1688,7 +1800,11 @@ const localApi = {
 
         const camposComparacao = [
           'nome',
+          'nomeItemRelacionado',
+          'materialItemNome',
           'fabricante',
+          'fabricanteNome',
+          'fabricanteId',
           'validadeDias',
           'ca',
           'valorUnitario',
@@ -1696,6 +1812,8 @@ const localApi = {
           'ativo',
           'descricao',
           'grupoMaterial',
+          'grupoMaterialNome',
+          'grupoMaterialId',
           'numeroCalcado',
           'numeroVestimenta',
           'numeroEspecifico',

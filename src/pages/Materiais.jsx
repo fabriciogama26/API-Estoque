@@ -73,6 +73,9 @@ export function MateriaisPage() {
   const [materialItems, setMaterialItems] = useState([])
   const [isLoadingItems, setIsLoadingItems] = useState(false)
   const [itemsError, setItemsError] = useState(null)
+  const [fabricanteOptions, setFabricanteOptions] = useState([])
+  const [isLoadingFabricantes, setIsLoadingFabricantes] = useState(false)
+  const [fabricanteError, setFabricanteError] = useState(null)
   const [caracteristicaOptions, setCaracteristicaOptions] = useState([])
   const [isLoadingCaracteristicas, setIsLoadingCaracteristicas] = useState(false)
   const [caracteristicaError, setCaracteristicaError] = useState(null)
@@ -91,22 +94,27 @@ export function MateriaisPage() {
     setGroupsError(null)
     try {
       const grupos = await api.materiais.groups()
-      const lista =
-        Array.isArray(grupos)
-          ? Array.from(
-              new Set(
-                grupos
-                  .map((grupo) => (grupo && typeof grupo === 'string' ? grupo.trim() : ''))
-                  .filter(Boolean)
-              )
-            ).sort((a, b) => a.localeCompare(b))
-          : []
+      const lista = normalizeSelectionList(selectionToArray(grupos))
       setMaterialGroups(lista)
     } catch (err) {
       setGroupsError(err.message)
       setMaterialGroups([])
     } finally {
       setIsLoadingGroups(false)
+    }
+  }, [])
+
+  const loadFabricantes = useCallback(async () => {
+    setIsLoadingFabricantes(true)
+    setFabricanteError(null)
+    try {
+      const lista = await api.materiais.fabricantes?.()
+      setFabricanteOptions(normalizeSelectionList(selectionToArray(lista)))
+    } catch (err) {
+      setFabricanteError(err.message)
+      setFabricanteOptions([])
+    } finally {
+      setIsLoadingFabricantes(false)
     }
   }, [])
 
@@ -192,11 +200,12 @@ export function MateriaisPage() {
     loadCores()
     loadCalcados()
     loadTamanhos()
-  }, [loadCaracteristicas, loadCores, loadCalcados, loadTamanhos])
+    loadFabricantes()
+  }, [loadCaracteristicas, loadCores, loadCalcados, loadTamanhos, loadFabricantes])
 
   useEffect(() => {
-    const grupo = form.grupoMaterial?.trim()
-    if (!grupo) {
+    const grupoId = form.grupoMaterialId?.toString().trim()
+    if (!grupoId) {
       setMaterialItems([])
       setItemsError(null)
       setIsLoadingItems(false)
@@ -206,10 +215,10 @@ export function MateriaisPage() {
     setIsLoadingItems(true)
     setItemsError(null)
     api.materiais
-      .items(grupo)
+      .items(grupoId)
       .then((lista) => {
         if (!cancelado) {
-          setMaterialItems(Array.isArray(lista) ? lista : [])
+          setMaterialItems(normalizeSelectionList(selectionToArray(lista)))
         }
       })
       .catch((err) => {
@@ -226,7 +235,7 @@ export function MateriaisPage() {
     return () => {
       cancelado = true
     }
-  }, [form.grupoMaterial])
+  }, [form.grupoMaterialId])
 
   const handleFormChange = (event) => {
     const { name, value } = event.target
@@ -241,19 +250,43 @@ export function MateriaisPage() {
       return
     }
 
-    if (name === 'grupoMaterial') {
+    if (name === 'grupoMaterialId') {
+      const selecionado = findOptionByValue(materialGroups, value) ?? null
+      const nomeGrupo = selecionado?.nome ?? ''
       setForm((prev) => ({
         ...prev,
-        grupoMaterial: value,
+        grupoMaterialId: value,
+        grupoMaterial: nomeGrupo,
+        grupoMaterialNome: nomeGrupo,
         nome: '',
-        numeroCalcado: isGrupo(value, GRUPO_MATERIAL_CALCADO) ? prev.numeroCalcado : '',
+        numeroCalcado: isGrupo(nomeGrupo, GRUPO_MATERIAL_CALCADO) ? prev.numeroCalcado : '',
         numeroVestimenta:
-          isGrupo(value, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(value, GRUPO_MATERIAL_PROTECAO_MAOS)
+          isGrupo(nomeGrupo, GRUPO_MATERIAL_VESTIMENTA) ||
+          isGrupo(nomeGrupo, GRUPO_MATERIAL_PROTECAO_MAOS)
             ? prev.numeroVestimenta
             : '',
       }))
       setMaterialItems([])
       setItemsError(null)
+      return
+    }
+
+    if (name === 'nome') {
+      const selecionado = findOptionByValue(materialItems, value) ?? normalizeSelectionItem(value)
+      setForm((prev) => ({
+        ...prev,
+        nome: selecionado?.nome ?? value,
+      }))
+      return
+    }
+
+    if (name === 'fabricanteId') {
+      const selecionado = findOptionByValue(fabricanteOptions, value) ?? normalizeSelectionItem(value)
+      setForm((prev) => ({
+        ...prev,
+        fabricanteId: value,
+        fabricante: selecionado?.nome ?? value,
+      }))
       return
     }
 
@@ -468,6 +501,18 @@ export function MateriaisPage() {
       material.numeroCalcadoNome || material.numeroCalcado || ''
     const numeroVestimentaDisplay =
       material.numeroVestimentaNome || material.numeroVestimenta || ''
+    const grupoSelecionado = normalizeSelectionItem({
+      id: material.grupoMaterialId || material.grupoMaterial || grupoMaterialDisplay || material.id,
+      nome: grupoMaterialDisplay,
+    })
+    const itemSelecionado = normalizeSelectionItem({
+      id: material.materialItemNome || nomeEpiDisplay,
+      nome: nomeEpiDisplay,
+    })
+    const fabricanteSelecionado = normalizeSelectionItem({
+      id: material.fabricanteId || material.fabricanteNome || material.fabricante,
+      nome: material.fabricanteNome || material.fabricante || '',
+    })
 
     const caracteristicas = normalizeSelectionList(
       Array.isArray(material.caracteristicas) && material.caracteristicas.length
@@ -484,22 +529,25 @@ export function MateriaisPage() {
     )
 
     setEditingMaterial(material)
-    setMaterialGroups((prev) => {
-      if (!grupoMaterialDisplay) {
-        return prev
-      }
-      if (prev.includes(grupoMaterialDisplay)) {
-        return prev
-      }
-      return [...prev, grupoMaterialDisplay].sort((a, b) => a.localeCompare(b))
-    })
+    if (grupoSelecionado) {
+      setMaterialGroups((prev) => normalizeSelectionList([...prev, grupoSelecionado]))
+    }
+    if (itemSelecionado) {
+      setMaterialItems((prev) => normalizeSelectionList([...prev, itemSelecionado]))
+    }
+    if (fabricanteSelecionado) {
+      setFabricanteOptions((prev) => normalizeSelectionList([...prev, fabricanteSelecionado]))
+    }
     setForm({
       nome: nomeEpiDisplay,
-      fabricante: material.fabricante || '',
+      fabricante: fabricanteSelecionado?.nome || '',
+      fabricanteId: fabricanteSelecionado?.id ?? '',
       validadeDias: String(material.validadeDias ?? ''),
       ca: material.ca || '',
       valorUnitario: formatCurrency(material.valorUnitario),
       grupoMaterial: grupoMaterialDisplay,
+      grupoMaterialNome: grupoMaterialDisplay,
+      grupoMaterialId: grupoSelecionado?.id ?? '',
       numeroCalcado: numeroCalcadoDisplay,
       numeroVestimenta: numeroVestimentaDisplay,
       caracteristicaEpi: caracteristicas,
@@ -510,7 +558,6 @@ export function MateriaisPage() {
       descricao: material.descricao || '',
     })
     setItemsError(null)
-    setMaterialItems([])
   }
 
   const cancelEdit = () => {
@@ -549,6 +596,9 @@ export function MateriaisPage() {
         materialItems={materialItems}
         isLoadingItems={isLoadingItems}
         itemsError={itemsError}
+        fabricanteOptions={fabricanteOptions}
+        isLoadingFabricantes={isLoadingFabricantes}
+        fabricanteError={fabricanteError}
         caracteristicaOptions={caracteristicaOptions}
         isLoadingCaracteristicas={isLoadingCaracteristicas}
         caracteristicaError={caracteristicaError}

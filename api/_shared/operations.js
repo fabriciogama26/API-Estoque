@@ -439,17 +439,19 @@ const buildChaveUnicaMaterial = ({
 }
 
 async function sanitizeMaterialPayload(payload = {}) {
-  const nome = trim(payload.nome)
-  const fabricante = trim(payload.fabricante)
-  const grupoMaterial = trim(payload.grupoMaterial)
+  const nome = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado)
+  const fabricante = trim(payload.fabricante ?? payload.fabricanteNome)
+  const fabricanteId = trim(payload.fabricanteId)
+  const grupoMaterialNome = trim(payload.grupoMaterialNome ?? payload.grupoMaterial)
+  const grupoMaterialId = trim(payload.grupoMaterialId)
   const numeroCalcadoRaw = sanitizeDigits(payload.numeroCalcado)
   const numeroVestimentaRaw = trim(payload.numeroVestimenta)
-  const numeroCalcado = isGrupo(grupoMaterial, 'Calçado') ? numeroCalcadoRaw : ''
-  const numeroVestimenta = requiresTamanho(grupoMaterial) ? numeroVestimentaRaw : ''
+  const numeroCalcado = isGrupo(grupoMaterialNome, 'Calçado') ? numeroCalcadoRaw : ''
+  const numeroVestimenta = requiresTamanho(grupoMaterialNome) ? numeroVestimentaRaw : ''
   const descricao = trim(payload.descricao)
   const ca = sanitizeDigits(payload.ca)
   const numeroEspecifico = buildNumeroReferenciaMaterial({
-    grupoMaterial,
+    grupoMaterial: grupoMaterialNome,
     numeroCalcado,
     numeroVestimenta,
   })
@@ -471,7 +473,11 @@ async function sanitizeMaterialPayload(payload = {}) {
 
   return {
     nome,
+    nomeItemRelacionado: nome,
+    materialItemNome: nome,
     fabricante,
+    fabricanteNome: fabricante,
+    fabricanteId: fabricanteId || null,
     validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
     ca,
     valorUnitario: Number(payload.valorUnitario ?? 0),
@@ -480,13 +486,16 @@ async function sanitizeMaterialPayload(payload = {}) {
         ? Number(payload.estoqueMinimo)
         : null,
     ativo: payload.ativo !== undefined ? Boolean(payload.ativo) : true,
-    grupoMaterial,
+    grupoMaterial: grupoMaterialNome,
+    grupoMaterialNome,
+    grupoMaterialId: grupoMaterialId || null,
     numeroCalcado,
     numeroVestimenta,
     numeroEspecifico,
     descricao,
     chaveUnica: buildChaveUnicaMaterial({
-      grupoMaterial,
+      grupoMaterial: grupoMaterialNome,
+      grupoMaterialNome,
       nome,
       fabricante,
       numeroCalcado,
@@ -507,18 +516,23 @@ async function sanitizeMaterialPayload(payload = {}) {
 function validateMaterialPayload(payload) {
   if (!payload.nome) throw createHttpError(400, 'Nome do EPI obrigatorio.')
   if (/\\d/.test(payload.nome)) throw createHttpError(400, 'O campo EPI nao pode conter numeros.')
-  if (!payload.grupoMaterial) throw createHttpError(400, 'Grupo de material obrigatorio.')
-  if (!payload.fabricante) throw createHttpError(400, 'Fabricante obrigatorio.')
+  if (!payload.grupoMaterial && !payload.grupoMaterialNome) {
+    throw createHttpError(400, 'Grupo de material obrigatorio.')
+  }
+  if (!payload.fabricante && !payload.fabricanteNome) {
+    throw createHttpError(400, 'Fabricante obrigatorio.')
+  }
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
     throw createHttpError(400, 'Validade deve ser maior que zero.')
   }
   if (Number.isNaN(Number(payload.valorUnitario)) || Number(payload.valorUnitario) <= 0) {
     throw createHttpError(400, 'Valor unitario deve ser maior que zero.')
   }
-  if (isGrupo(payload.grupoMaterial, 'Calçado') && !payload.numeroCalcado) {
+  const grupoNome = payload.grupoMaterialNome || payload.grupoMaterial || ''
+  if (isGrupo(grupoNome, 'Calçado') && !payload.numeroCalcado) {
     throw createHttpError(400, 'Informe o numero do calcado.')
   }
-  if (requiresTamanho(payload.grupoMaterial) && !payload.numeroVestimenta) {
+  if (requiresTamanho(grupoNome) && !payload.numeroVestimenta) {
     throw createHttpError(400, 'Informe o tamanho.')
   }
   if (
@@ -1429,17 +1443,16 @@ export const MateriaisOperations = {
     const registros =
       (await execute(
         supabaseAdmin
-          .from('materiais')
-          .select('grupoMaterial', { distinct: true })
-          .not('grupoMaterial', 'is', null)
-          .neq('grupoMaterial', '')
-          .order('grupoMaterial'),
+          .from('grupos_material')
+          .select('id, nome, ativo, ordem')
+          .order('ordem', { ascending: true, nullsFirst: false })
+          .order('nome', { ascending: true }),
         'Falha ao listar grupos de materiais.'
       )) ?? []
     return registros
-      .map((item) => (item.grupoMaterial && item.grupoMaterial.trim()) || '')
-      .filter((value) => Boolean(value))
-      .sort((a, b) => a.localeCompare(b))
+      .filter((item) => item && item.nome && item.ativo !== false)
+      .map((item) => ({ id: item.id ?? null, nome: item.nome.trim() }))
+      .filter((item) => Boolean(item.nome))
   },
   async caracteristicas() {
     const registros = await execute(
@@ -1450,6 +1463,19 @@ export const MateriaisOperations = {
       'Falha ao listar caracteristicas de EPI.',
     )
     return normalizeCatalogoLista(registros)
+  },
+  async fabricantes() {
+    const registros = await execute(
+      supabaseAdmin
+        .from('fabricantes')
+        .select('id, fabricante')
+        .order('fabricante'),
+      'Falha ao listar fabricantes.',
+    )
+    return (registros ?? [])
+      .filter((item) => item && item.fabricante)
+      .map((item) => ({ id: item.id ?? null, nome: item.fabricante.trim() }))
+      .filter((item) => Boolean(item.nome))
   },
   async cores() {
     const registros = await execute(
@@ -1490,13 +1516,13 @@ export const MateriaisOperations = {
     const materialPayload = {
       id: materialId,
       nome: dados.nome,
-      fabricante: dados.fabricante,
+      fabricante: dados.fabricanteId || dados.fabricante,
       validadeDias: dados.validadeDias,
       ca: dados.ca,
       valorUnitario: dados.valorUnitario,
       estoqueMinimo: dados.estoqueMinimo,
       ativo: dados.ativo,
-      grupoMaterial: dados.grupoMaterial,
+      grupoMaterial: dados.grupoMaterialId || dados.grupoMaterial,
       numeroCalcado: dados.numeroCalcado,
       numeroVestimenta: dados.numeroVestimenta,
       numeroEspecifico: dados.numeroEspecifico,
@@ -1541,13 +1567,13 @@ export const MateriaisOperations = {
         .from('materiais')
         .update({
           nome: dados.nome,
-          fabricante: dados.fabricante,
+          fabricante: dados.fabricanteId || dados.fabricante,
           validadeDias: dados.validadeDias,
           ca: dados.ca,
           valorUnitario: dados.valorUnitario,
           estoqueMinimo: dados.estoqueMinimo,
           ativo: dados.ativo,
-          grupoMaterial: dados.grupoMaterial,
+          grupoMaterial: dados.grupoMaterialId || dados.grupoMaterial,
           numeroCalcado: dados.numeroCalcado,
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
