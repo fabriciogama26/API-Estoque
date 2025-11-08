@@ -16,6 +16,16 @@ DECLARE
   cor_id_fallback text;
   cor_id_expr_sql text;
   cor_nome_expr_sql text;
+  material_item_id_column text;
+  material_item_nome_column text;
+  nome_item_relacionado_column text;
+  material_item_id_base text;
+  material_item_nome_base text;
+  nome_item_relacionado_base text;
+  material_item_id_expr_sql text;
+  material_item_nome_expr_sql text;
+  nome_item_relacionado_expr_sql text;
+  material_item_join_expr text;
   create_view_sql text;
 BEGIN
   -- Remove a view antiga para recriar com segurança
@@ -78,6 +88,67 @@ BEGIN
       'nome_cor',
       'nomeCor'
     )
+  LIMIT 1;
+
+  SELECT column_name
+  INTO material_item_id_column
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'materiais'
+    AND column_name IN (
+      'materialItemId',
+      'material_item_id',
+      'item_relacionado_id',
+      'itemRelacionadoId',
+      'grupoMaterialItemId',
+      'grupo_material_item_id'
+    )
+  ORDER BY array_position(ARRAY[
+      'materialItemId',
+      'material_item_id',
+      'item_relacionado_id',
+      'itemRelacionadoId',
+      'grupoMaterialItemId',
+      'grupo_material_item_id'
+    ], column_name)
+  LIMIT 1;
+
+  SELECT column_name
+  INTO material_item_nome_column
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'materiais'
+    AND column_name IN (
+      'materialItemNome',
+      'material_item_nome',
+      'item_relacionado_nome',
+      'itemRelacionadoNome'
+    )
+  ORDER BY array_position(ARRAY[
+      'materialItemNome',
+      'material_item_nome',
+      'item_relacionado_nome',
+      'itemRelacionadoNome'
+    ], column_name)
+  LIMIT 1;
+
+  SELECT column_name
+  INTO nome_item_relacionado_column
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'materiais'
+    AND column_name IN (
+      'nomeItemRelacionado',
+      'nome_item_relacionado',
+      'nomeRelacionado',
+      'nome_relacionado'
+    )
+  ORDER BY array_position(ARRAY[
+      'nomeItemRelacionado',
+      'nome_item_relacionado',
+      'nomeRelacionado',
+      'nome_relacionado'
+    ], column_name)
   LIMIT 1;
 
   caracteristica_join_clause := CASE
@@ -146,6 +217,51 @@ BEGIN
     cor_id_fallback
   );
 
+  material_item_id_base := CASE
+    WHEN material_item_id_column IS NOT NULL THEN
+      format('NULLIF(m.%I::text, '''')', material_item_id_column)
+    ELSE
+      'NULL'
+  END;
+
+  material_item_nome_base := CASE
+    WHEN material_item_nome_column IS NOT NULL THEN
+      format('NULLIF(TRIM(m.%I::text), '''')', material_item_nome_column)
+    ELSE
+      'NULL'
+  END;
+
+  nome_item_relacionado_base := CASE
+    WHEN nome_item_relacionado_column IS NOT NULL THEN
+      format('NULLIF(TRIM(m.%I::text), '''')', nome_item_relacionado_column)
+    ELSE
+      'NULL'
+  END;
+
+  material_item_join_expr := CASE
+    WHEN material_item_id_column IS NOT NULL THEN
+      format('COALESCE(NULLIF(m.%I::text, ''''), NULLIF(m.nome::text, ''''))', material_item_id_column)
+    ELSE
+      'NULLIF(m.nome::text, '''')'
+  END;
+
+  material_item_id_expr_sql := format(
+    'COALESCE(%s, NULLIF(gmi2.id::text, ''''), NULLIF(m.nome::text, ''''))',
+    material_item_id_base
+  );
+
+  material_item_nome_expr_sql := format(
+    'COALESCE(%s, %s, NULLIF(gmi2.nome, ''''), NULLIF(m.nome, ''''))',
+    material_item_nome_base,
+    nome_item_relacionado_base
+  );
+
+  nome_item_relacionado_expr_sql := format(
+    'COALESCE(%s, %s, NULLIF(gmi2.nome, ''''), NULLIF(m.nome, ''''))',
+    nome_item_relacionado_base,
+    material_item_nome_base
+  );
+
   -- Cria view principal
   create_view_sql := format($sql$
 CREATE OR REPLACE VIEW public.materiais_view AS
@@ -187,8 +303,10 @@ cores AS (
 )
 SELECT
   m.*,
+  %7$s AS "materialItemId",
+  %8$s AS "materialItemNome",
+  %9$s AS "nomeItemRelacionado",
   gm.nome AS "grupoMaterialNome",
-  gmi2.nome AS "nomeItemRelacionado",
   mc.numero_calcado AS "numeroCalcadoNome",
   mv.medidas AS "numeroVestimentaNome",
   COALESCE(
@@ -209,7 +327,7 @@ SELECT
   COALESCE(cores.cores_texto, '') AS cores_texto
 FROM public.materiais AS m
 LEFT JOIN public.grupos_material AS gm ON gm.id::text = m."grupoMaterial"::text
-LEFT JOIN public.grupos_material_itens AS gmi2 ON gmi2.id::text = m.nome::text
+LEFT JOIN public.grupos_material_itens AS gmi2 ON gmi2.id::text = %10$s
 LEFT JOIN public.medidas_calcado AS mc ON mc.id::text = m."numeroCalcado"::text
 LEFT JOIN public.medidas_vestimentas AS mv ON mv.id::text = m."numeroVestimenta"::text
 LEFT JOIN public.app_users AS uc ON uc.id::text = m."usuarioCadastro"::text
@@ -222,7 +340,11 @@ $sql$,
     caracteristica_join_clause,
     cor_id_expr_sql,
     cor_nome_expr_sql,
-    cor_join_clause);
+    cor_join_clause,
+    material_item_id_expr_sql,
+    material_item_nome_expr_sql,
+    nome_item_relacionado_expr_sql,
+    material_item_join_expr);
 
   EXECUTE create_view_sql;
 
