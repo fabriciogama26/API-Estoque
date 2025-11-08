@@ -828,6 +828,40 @@ async function syncMaterialRelations(materialId, { corIds, caracteristicaIds }) 
   await replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds)
 }
 
+function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
+  const payload = {
+    nome: dados.nome ?? '',
+    fabricante: dados.fabricante ?? '',
+    validadeDias: dados.validadeDias ?? null,
+    ca: dados.ca ?? '',
+    valorUnitario: dados.valorUnitario ?? 0,
+    estoqueMinimo: dados.estoqueMinimo ?? 0,
+    ativo: dados.ativo ?? true,
+    descricao: dados.descricao ?? '',
+    grupoMaterial: dados.grupoMaterial ?? '',
+    numeroCalcado: dados.numeroCalcado ?? '',
+    numeroVestimenta: dados.numeroVestimenta ?? '',
+    numeroEspecifico: dados.numeroEspecifico ?? '',
+    chaveUnica: dados.chaveUnica ?? '',
+    cor_material: dados.corMaterial ?? '',
+    caracteristica_epi: dados.caracteristicaEpi ?? '',
+    caracteristicas_epi: Array.isArray(dados.caracteristicasIds) ? dados.caracteristicasIds : [],
+    cores: Array.isArray(dados.coresIds) ? dados.coresIds : [],
+  }
+
+  if (includeCreateAudit) {
+    payload.usuarioCadastro = usuario ?? ''
+    payload.dataCadastro = agora ?? new Date().toISOString()
+  }
+
+  if (includeUpdateAudit) {
+    payload.usuarioAtualizacao = usuario ?? ''
+    payload.atualizadoEm = agora ?? new Date().toISOString()
+  }
+
+  return payload
+}
+
 async function resolveUsuarioResponsavel() {
   ensureSupabase()
   const { data } = await supabase.auth.getSession()
@@ -1741,25 +1775,15 @@ export const api = {
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
 
-      const {
-        corMaterial: corMaterialCamel,
-        caracteristicaEpi: caracteristicaEpiTexto,
-        caracteristicasIds,
-        coresIds,
-        caracteristicas: _caracteristicasSelecionadas,
-        cores: _coresSelecionadas,
-        ...dadosSemCor
-      } = dados
-      const supabasePayload = {
-        ...dadosSemCor,
-        cor_material: corMaterialCamel,
-        caracteristica_epi: caracteristicaEpiTexto,
-        caracteristicas_epi: Array.isArray(caracteristicasIds) ? caracteristicasIds : [],
-        cores: Array.isArray(coresIds) ? coresIds : [],
-        usuarioCadastro: usuario,
-        dataCadastro: agora,
-        usuarioAtualizacao: usuario,
-        atualizadoEm: agora,
+      const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
+      const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
+        ? dados.caracteristicasIds
+        : []
+      const supabasePayload = buildMaterialSupabasePayload(dados, {
+        usuario,
+        agora,
+        includeCreateAudit: true,
+        includeUpdateAudit: true,
       })
 
       let materialCriadoId
@@ -1774,8 +1798,8 @@ export const api = {
         }
 
         await syncMaterialRelations(materialCriadoId, {
-          corIds: Array.isArray(coresIds) ? coresIds : [],
-          caracteristicaIds: Array.isArray(caracteristicasIds) ? caracteristicasIds : [],
+          corIds: coresIds,
+          caracteristicaIds,
         })
       } catch (error) {
         if (materialCriadoId) {
@@ -1865,52 +1889,23 @@ export const api = {
         }
       }
       const dados = sanitizeMaterialPayload(payload)
-      const {
-        corMaterial: corMaterialCamel,
-        caracteristicaEpi: caracteristicaEpiTexto,
-        caracteristicasIds,
-        coresIds,
-        caracteristicas: _caracteristicasSelecionadas,
-        cores: _coresSelecionadas,
-        ...dadosSemCor
-      } = dados
-      const supabasePayload = {
-        ...dadosSemCor,
-        cor_material: corMaterialCamel,
-        caracteristica_epi: caracteristicaEpiTexto,
-        caracteristicas_epi: Array.isArray(caracteristicasIds) ? caracteristicasIds : [],
-        cores: Array.isArray(coresIds) ? coresIds : [],
-        usuarioAtualizacao: usuario,
-        atualizadoEm: agora,
+      const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
+      const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
+        ? dados.caracteristicasIds
+        : []
+      const supabasePayload = buildMaterialSupabasePayload(dados, {
+        usuario,
+        agora,
+        includeUpdateAudit: true,
       })
-      const supabasePayloadOriginal = buildMaterialSupabasePayload(dadosOriginais, {
-        usuarioAtualizacao:
-          registroAtual.usuarioAtualizacao ??
-          registroAtual.usuario_atualizacao ??
-          materialAtual.usuarioAtualizacao ??
-          materialAtual.usuarioCadastro ??
-          null,
-        atualizadoEm:
-          registroAtual.atualizadoEm ??
-          registroAtual.atualizado_em ??
-          materialAtual.atualizadoEm ??
-          materialAtual.dataCadastro ??
-          null,
-      })
-      const relacoesOriginais = {
-        corIds: Array.isArray(materialAtual.coresIds) ? materialAtual.coresIds : [],
-        caracteristicaIds: Array.isArray(materialAtual.caracteristicasIds)
-          ? materialAtual.caracteristicasIds
-          : [],
-      }
 
       await execute(
         supabase.from('materiais').update(supabasePayload).eq('id', id),
         'Falha ao atualizar material.'
       )
       await syncMaterialRelations(id, {
-        corIds: Array.isArray(coresIds) ? coresIds : [],
-        caracteristicaIds: Array.isArray(caracteristicasIds) ? caracteristicasIds : [],
+        corIds: coresIds,
+        caracteristicaIds,
       })
       const registro = await executeSingle(
         supabase
