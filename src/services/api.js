@@ -118,20 +118,27 @@ const ACIDENTE_HISTORY_FIELDS = [
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
 
-const MATERIAL_COR_RELATION_COLUMNS = [
-  'grupo_cor_id',
+const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_cor_id', 'cor_id']
+const MATERIAL_COR_RELATION_TEXT_COLUMNS = [
+  'cor',
+  'cor_nome',
+  'nome_cor',
+  'nomeCor',
   'grupo_material_cor',
   'grupo_cor',
-  'cor_id',
-  'cor',
 ]
 
-const MATERIAL_CARACTERISTICA_RELATION_COLUMNS = [
+const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = [
   'grupo_caracteristica_epi_id',
   'caracteristica_epi_id',
-  'grupo_caracteristica_epi',
-  'caracteristica_epi',
 ]
+const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = [
+  'caracteristica_epi',
+  'caracteristicaEpi',
+  'nome_caracteristica',
+  'nomeCaracteristica',
+]
+
 
 const MATERIAL_HISTORY_FIELDS = [
   'nome',
@@ -745,16 +752,38 @@ async function executeSingle(builder, fallbackMessage) {
   return data
 }
 
-async function replaceMaterialRelations({
+const isUuidValue = (value) => typeof value === 'string' && UUID_REGEX.test(value)
+
+const extractTextualNames = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  const seen = new Set()
+  return lista
+    .map((item) => (typeof item?.nome === 'string' ? item.nome.trim() : ''))
+    .filter(Boolean)
+    .filter((nome) => {
+      if (seen.has(nome)) {
+        return false
+      }
+      seen.add(nome)
+      return true
+    })
+}
+
+const isFallbackError = (error) => error && (error.code === '42703' || error.code === '22P02')
+
+async function deleteMaterialRelations(table, materialId, deleteMessage) {
+  await execute(supabase.from(table).delete().eq('material_id', materialId), deleteMessage)
+}
+
+async function insertMaterialRelations({
   table,
   materialId,
   columnName,
   values,
-  deleteMessage,
   insertMessage,
 }) {
-  await execute(supabase.from(table).delete().eq('material_id', materialId), deleteMessage)
-
   if (!Array.isArray(values) || values.length === 0) {
     return
   }
@@ -774,25 +803,43 @@ async function replaceMaterialRelationsWithFallback({
   values,
   deleteMessage,
   insertMessage,
+  deleteFirst = true,
 }) {
   let lastColumnError = null
 
-  for (const columnName of columnCandidates) {
+  if (deleteFirst) {
+    await deleteMaterialRelations(table, materialId, deleteMessage)
+  }
+
+  if (!Array.isArray(values) || values.length === 0) {
+    return
+  }
+
+  const valuesAreUuidOnly = values.every((value) => isUuidValue(value))
+  const idColumns = columnCandidates.filter((columnName) => /_id$/i.test(columnName))
+  const nonIdColumns = columnCandidates.filter((columnName) => !/_id$/i.test(columnName))
+  const orderedColumns =
+    valuesAreUuidOnly && idColumns.length ? [...idColumns, ...nonIdColumns] : [...nonIdColumns, ...idColumns]
+
+  for (const columnName of orderedColumns) {
     try {
-      await replaceMaterialRelations({
+      await insertMaterialRelations({
         table,
         materialId,
         columnName,
         values,
-        deleteMessage,
         insertMessage,
       })
       return
     } catch (error) {
-      if (!error || error.code !== '42703') {
+      if (!error) {
         throw error
       }
-      lastColumnError = error
+      if (error.code === '42703' || error.code === '22P02') {
+        lastColumnError = error
+        continue
+      }
+      throw error
     }
   }
 
@@ -801,31 +848,88 @@ async function replaceMaterialRelationsWithFallback({
   }
 }
 
-async function replaceMaterialCorVinculos(materialId, corIds) {
-  await replaceMaterialRelationsWithFallback({
-    table: MATERIAL_COR_RELATION_TABLE,
-    materialId,
-    columnCandidates: MATERIAL_COR_RELATION_COLUMNS,
-    values: Array.isArray(corIds) ? corIds : [],
-    deleteMessage: 'Falha ao limpar vínculos de cores do material.',
-    insertMessage: 'Falha ao vincular cores ao material.',
-  })
+async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
+  const idValues = Array.isArray(corIds) ? corIds : []
+  const nameValues = Array.isArray(corNames) ? corNames : []
+
+  let idInserted = false
+  try {
+    await replaceMaterialRelationsWithFallback({
+      table: MATERIAL_COR_RELATION_TABLE,
+      materialId,
+      columnCandidates: MATERIAL_COR_RELATION_ID_COLUMNS,
+      values: idValues,
+      deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+      insertMessage: 'Falha ao vincular cores ao material.',
+    })
+    idInserted = idValues.length > 0
+  } catch (error) {
+    if (!isFallbackError(error)) {
+      throw error
+    }
+  }
+
+  if (!idInserted && nameValues.length) {
+    await replaceMaterialRelationsWithFallback({
+      table: MATERIAL_COR_RELATION_TABLE,
+      materialId,
+      columnCandidates: MATERIAL_COR_RELATION_TEXT_COLUMNS,
+      values: nameValues,
+      deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+      insertMessage: 'Falha ao vincular cores ao material.',
+      deleteFirst: false,
+    })
+  }
 }
 
-async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
-  await replaceMaterialRelationsWithFallback({
-    table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
-    materialId,
-    columnCandidates: MATERIAL_CARACTERISTICA_RELATION_COLUMNS,
-    values: Array.isArray(caracteristicaIds) ? caracteristicaIds : [],
-    deleteMessage: 'Falha ao limpar vínculos de características do material.',
-    insertMessage: 'Falha ao vincular características ao material.',
-  })
+async function replaceMaterialCaracteristicaVinculos(
+  materialId,
+  caracteristicaIds,
+  caracteristicaNames,
+) {
+  const idValues = Array.isArray(caracteristicaIds) ? caracteristicaIds : []
+  const nameValues = Array.isArray(caracteristicaNames) ? caracteristicaNames : []
+
+  let idInserted = false
+  try {
+    await replaceMaterialRelationsWithFallback({
+      table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
+      materialId,
+      columnCandidates: MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS,
+      values: idValues,
+      deleteMessage: 'Falha ao limpar vínculos de características do material.',
+      insertMessage: 'Falha ao vincular características ao material.',
+    })
+    idInserted = idValues.length > 0
+  } catch (error) {
+    if (!isFallbackError(error)) {
+      throw error
+    }
+  }
+
+  if (!idInserted && nameValues.length) {
+    await replaceMaterialRelationsWithFallback({
+      table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
+      materialId,
+      columnCandidates: MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS,
+      values: nameValues,
+      deleteMessage: 'Falha ao limpar vínculos de características do material.',
+      insertMessage: 'Falha ao vincular características ao material.',
+      deleteFirst: false,
+    })
+  }
 }
 
-async function syncMaterialRelations(materialId, { corIds, caracteristicaIds }) {
-  await replaceMaterialCorVinculos(materialId, corIds)
-  await replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds)
+async function syncMaterialRelations(
+  materialId,
+  { corIds, corNames, caracteristicaIds, caracteristicaNames },
+) {
+  await replaceMaterialCorVinculos(materialId, corIds, corNames)
+  await replaceMaterialCaracteristicaVinculos(
+    materialId,
+    caracteristicaIds,
+    caracteristicaNames,
+  )
 }
 
 function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
@@ -843,10 +947,6 @@ function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudi
     numeroVestimenta: dados.numeroVestimenta ?? '',
     numeroEspecifico: dados.numeroEspecifico ?? '',
     chaveUnica: dados.chaveUnica ?? '',
-    cor_material: dados.corMaterial ?? '',
-    caracteristica_epi: dados.caracteristicaEpi ?? '',
-    caracteristicas_epi: Array.isArray(dados.caracteristicasIds) ? dados.caracteristicasIds : [],
-    cores: Array.isArray(dados.coresIds) ? dados.coresIds : [],
   }
 
   if (includeCreateAudit) {
@@ -1779,6 +1879,8 @@ export const api = {
       const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
         ? dados.caracteristicasIds
         : []
+      const corNames = extractTextualNames(dados.cores)
+      const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const supabasePayload = buildMaterialSupabasePayload(dados, {
         usuario,
         agora,
@@ -1797,10 +1899,12 @@ export const api = {
           throw new Error('Falha ao criar material.')
         }
 
-        await syncMaterialRelations(materialCriadoId, {
-          corIds: coresIds,
-          caracteristicaIds,
-        })
+      await syncMaterialRelations(materialCriadoId, {
+        corIds: coresIds,
+        corNames,
+        caracteristicaIds,
+        caracteristicaNames,
+      })
       } catch (error) {
         if (materialCriadoId) {
           try {
@@ -1893,6 +1997,8 @@ export const api = {
       const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
         ? dados.caracteristicasIds
         : []
+      const corNames = extractTextualNames(dados.cores)
+      const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const supabasePayload = buildMaterialSupabasePayload(dados, {
         usuario,
         agora,
@@ -1905,7 +2011,9 @@ export const api = {
       )
       await syncMaterialRelations(id, {
         corIds: coresIds,
+        corNames,
         caracteristicaIds,
+        caracteristicaNames,
       })
       const registro = await executeSingle(
         supabase

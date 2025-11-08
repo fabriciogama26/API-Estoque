@@ -461,6 +461,14 @@ export function MateriaisPage() {
   }
 
   const startEdit = (material) => {
+    const grupoMaterialDisplay =
+      material.grupoMaterialNome || material.grupoMaterial || ''
+    const nomeEpiDisplay = material.nomeItemRelacionado || material.nome || ''
+    const numeroCalcadoDisplay =
+      material.numeroCalcadoNome || material.numeroCalcado || ''
+    const numeroVestimentaDisplay =
+      material.numeroVestimentaNome || material.numeroVestimenta || ''
+
     const caracteristicas = normalizeSelectionList(
       Array.isArray(material.caracteristicas) && material.caracteristicas.length
         ? material.caracteristicas
@@ -477,23 +485,23 @@ export function MateriaisPage() {
 
     setEditingMaterial(material)
     setMaterialGroups((prev) => {
-      if (!material.grupoMaterial) {
+      if (!grupoMaterialDisplay) {
         return prev
       }
-      if (prev.includes(material.grupoMaterial)) {
+      if (prev.includes(grupoMaterialDisplay)) {
         return prev
       }
-      return [...prev, material.grupoMaterial].sort((a, b) => a.localeCompare(b))
+      return [...prev, grupoMaterialDisplay].sort((a, b) => a.localeCompare(b))
     })
     setForm({
-      nome: material.nome || '',
+      nome: nomeEpiDisplay,
       fabricante: material.fabricante || '',
       validadeDias: String(material.validadeDias ?? ''),
       ca: material.ca || '',
       valorUnitario: formatCurrency(material.valorUnitario),
-      grupoMaterial: material.grupoMaterial || '',
-      numeroCalcado: material.numeroCalcado || '',
-      numeroVestimenta: material.numeroVestimenta || '',
+      grupoMaterial: grupoMaterialDisplay,
+      numeroCalcado: numeroCalcadoDisplay,
+      numeroVestimenta: numeroVestimentaDisplay,
       caracteristicaEpi: caracteristicas,
       caracteristicas_epi: caracteristicas.map((item) => item.id).filter(Boolean),
       corMaterial: cores[0]?.nome ?? '',
