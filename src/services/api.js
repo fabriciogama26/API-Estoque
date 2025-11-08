@@ -172,7 +172,6 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
   "numeroCalcado",
   "numeroVestimenta",
   "numeroEspecifico",
-  "corMaterial",
   "chaveUnica",
   "usuarioCadastro",
   "usuarioAtualizacao",
@@ -1058,8 +1057,6 @@ function mapMaterialRecord(record) {
       record.caracteristicas_list_nomes ??
       record.caracteristicas_rel ??
       record.caracteristicas_nomes ??
-      record.caracteristicaEpi ??
-      record.caracteristica_epi ??
       []
   )
   const coresLista = normalizeOptionList(
@@ -1070,19 +1067,15 @@ function mapMaterialRecord(record) {
       record.cores_rel ??
       record.cores_nomes ??
       record.coresTexto ??
-      record.corMaterial ??
-      record.cor_material ??
       []
   )
   const caracteristicasTexto =
     formatCaracteristicaTexto(caracteristicasLista.map((item) => item.nome)) ||
     formatCaracteristicaTexto(record.caracteristicas_nomes ?? []) ||
-    formatCaracteristicaTexto(record.caracteristicas_texto ?? '') ||
-    formatCaracteristicaTexto(record.caracteristicaEpi ?? record.caracteristica_epi ?? '')
+    formatCaracteristicaTexto(record.caracteristicas_texto ?? '')
   const coresTexto =
     trim(record.cores_texto ?? '') ||
-    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '') ||
-    trim(record.corMaterial ?? record.cor_material ?? '')
+    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '')
   const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
   const usuarioCadastroNome =
     trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
