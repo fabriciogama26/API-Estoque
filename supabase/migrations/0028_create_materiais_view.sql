@@ -3,7 +3,19 @@
 DO $$
 DECLARE
   caracteristica_join_column text;
+  caracteristica_nome_column text;
+  caracteristica_join_clause text;
+  caracteristica_nome_fallback text;
+  caracteristica_id_fallback text;
+  caracteristica_id_expr_sql text;
+  caracteristica_nome_expr_sql text;
   cor_join_column text;
+  cor_nome_column text;
+  cor_join_clause text;
+  cor_nome_fallback text;
+  cor_id_fallback text;
+  cor_id_expr_sql text;
+  cor_nome_expr_sql text;
   create_view_sql text;
 BEGIN
   -- Remove a view antiga para recriar com segurança
@@ -15,7 +27,27 @@ BEGIN
   FROM information_schema.columns
   WHERE table_schema = 'public'
     AND table_name = 'material_grupo_caracteristica_epi'
-    AND column_name IN ('grupo_caracteristica_epi_id','caracteristica_epi_id','grupo_caracteristica_epi')
+    AND column_name IN (
+      'grupo_caracteristica_epi_id',
+      'caracteristica_epi_id',
+      'grupo_caracteristica_epi',
+      'grupoCaracteristicaEpiId',
+      'caracteristicaEpiId',
+      'grupoCaracteristicaEpi'
+    )
+  LIMIT 1;
+
+  SELECT column_name
+  INTO caracteristica_nome_column
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'material_grupo_caracteristica_epi'
+    AND column_name IN (
+      'caracteristica_epi',
+      'caracteristicaEpi',
+      'nome_caracteristica',
+      'nomeCaracteristica'
+    )
   LIMIT 1;
 
   SELECT column_name
@@ -23,8 +55,96 @@ BEGIN
   FROM information_schema.columns
   WHERE table_schema = 'public'
     AND table_name = 'material_grupo_cor'
-    AND column_name IN ('grupo_material_cor','grupo_cor_id','grupo_cor','cor_id','cor')
+    AND column_name IN (
+      'grupo_material_cor',
+      'grupo_cor_id',
+      'grupo_cor',
+      'cor_id',
+      'grupoMaterialCorId',
+      'grupoCorId',
+      'grupoCor',
+      'corId'
+    )
   LIMIT 1;
+
+  SELECT column_name
+  INTO cor_nome_column
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'material_grupo_cor'
+    AND column_name IN (
+      'cor',
+      'cor_nome',
+      'nome_cor',
+      'nomeCor'
+    )
+  LIMIT 1;
+
+  caracteristica_join_clause := CASE
+    WHEN caracteristica_join_column IS NOT NULL THEN
+      format('LEFT JOIN public.caracteristica_epi AS ce ON ce.id::text = mgce.%I::text', caracteristica_join_column)
+    ELSE
+      'LEFT JOIN public.caracteristica_epi AS ce ON FALSE'
+  END;
+
+  caracteristica_nome_fallback := CASE
+    WHEN caracteristica_nome_column IS NOT NULL THEN
+      format('NULLIF(TRIM(mgce.%I::text), '''')', caracteristica_nome_column)
+    ELSE
+      'NULL'
+  END;
+
+  caracteristica_id_fallback := CASE
+    WHEN caracteristica_join_column IS NOT NULL THEN
+      format('NULLIF(mgce.%I::text, '''')', caracteristica_join_column)
+    WHEN caracteristica_nome_column IS NOT NULL THEN
+      format('NULLIF(mgce.%I::text, '''')', caracteristica_nome_column)
+    ELSE
+      'NULL'
+  END;
+
+  caracteristica_nome_expr_sql := format(
+    'TRIM(COALESCE(ce.caracteristica_material, %s))',
+    caracteristica_nome_fallback
+  );
+
+  caracteristica_id_expr_sql := format(
+    'COALESCE(ce.id::text, %s)',
+    caracteristica_id_fallback
+  );
+
+  cor_join_clause := CASE
+    WHEN cor_join_column IS NOT NULL THEN
+      format('LEFT JOIN public.cor AS c ON c.id::text = mgc.%I::text', cor_join_column)
+    ELSE
+      'LEFT JOIN public.cor AS c ON FALSE'
+  END;
+
+  cor_nome_fallback := CASE
+    WHEN cor_nome_column IS NOT NULL THEN
+      format('NULLIF(TRIM(mgc.%I::text), '''')', cor_nome_column)
+    ELSE
+      'NULL'
+  END;
+
+  cor_id_fallback := CASE
+    WHEN cor_join_column IS NOT NULL THEN
+      format('NULLIF(mgc.%I::text, '''')', cor_join_column)
+    WHEN cor_nome_column IS NOT NULL THEN
+      format('NULLIF(mgc.%I::text, '''')', cor_nome_column)
+    ELSE
+      'NULL'
+  END;
+
+  cor_nome_expr_sql := format(
+    'TRIM(COALESCE(c.cor, %s))',
+    cor_nome_fallback
+  );
+
+  cor_id_expr_sql := format(
+    'COALESCE(c.id::text, %s)',
+    cor_id_fallback
+  );
 
   -- Cria view principal
   create_view_sql := format($sql$
@@ -32,17 +152,16 @@ CREATE OR REPLACE VIEW public.materiais_view AS
 WITH caracteristicas_base AS (
   SELECT DISTINCT
     mgce.material_id,
-    ce.id,
-    TRIM(ce.caracteristica_material) AS caracteristica_material
+    %1$s AS caracteristica_id,
+    %2$s AS caracteristica_material
   FROM public.material_grupo_caracteristica_epi AS mgce
-  JOIN public.caracteristica_epi AS ce
-    ON ce.id = mgce.%1$I
-  WHERE TRIM(COALESCE(ce.caracteristica_material, '')) <> ''
+  %3$s
+  WHERE %2$s IS NOT NULL AND %2$s <> ''
 ),
 caracteristicas AS (
   SELECT
     material_id,
-    JSONB_AGG(JSONB_BUILD_OBJECT('id', id, 'nome', caracteristica_material) ORDER BY LOWER(caracteristica_material)) AS caracteristicas_json,
+    JSONB_AGG(JSONB_BUILD_OBJECT('id', caracteristica_id, 'nome', caracteristica_material) ORDER BY LOWER(caracteristica_material)) AS caracteristicas_json,
     ARRAY_AGG(caracteristica_material ORDER BY LOWER(caracteristica_material)) AS caracteristicas_nomes,
     STRING_AGG(caracteristica_material, '; ' ORDER BY LOWER(caracteristica_material)) AS caracteristicas_texto
   FROM caracteristicas_base
@@ -51,17 +170,16 @@ caracteristicas AS (
 cores_base AS (
   SELECT DISTINCT
     mgc.material_id,
-    c.id,
-    TRIM(c.cor) AS cor_nome
+    %4$s AS cor_id,
+    %5$s AS cor_nome
   FROM public.material_grupo_cor AS mgc
-  JOIN public.cor AS c
-    ON c.id = mgc.%2$I
-  WHERE TRIM(COALESCE(c.cor, '')) <> ''
+  %6$s
+  WHERE %5$s IS NOT NULL AND %5$s <> ''
 ),
 cores AS (
   SELECT
     material_id,
-    JSONB_AGG(JSONB_BUILD_OBJECT('id', id, 'nome', cor_nome) ORDER BY LOWER(cor_nome)) AS cores_json,
+    JSONB_AGG(JSONB_BUILD_OBJECT('id', cor_id, 'nome', cor_nome) ORDER BY LOWER(cor_nome)) AS cores_json,
     ARRAY_AGG(cor_nome ORDER BY LOWER(cor_nome)) AS cores_nomes,
     STRING_AGG(cor_nome, '; ' ORDER BY LOWER(cor_nome)) AS cores_texto
   FROM cores_base
@@ -98,7 +216,13 @@ LEFT JOIN public.app_users AS uc ON uc.id::text = m."usuarioCadastro"::text
 LEFT JOIN public.app_users AS ua ON ua.id::text = m."usuarioAtualizacao"::text
 LEFT JOIN caracteristicas ON caracteristicas.material_id = m.id
 LEFT JOIN cores ON cores.material_id = m.id;
-$sql$, caracteristica_join_column, cor_join_column);
+$sql$,
+    caracteristica_id_expr_sql,
+    caracteristica_nome_expr_sql,
+    caracteristica_join_clause,
+    cor_id_expr_sql,
+    cor_nome_expr_sql,
+    cor_join_clause);
 
   EXECUTE create_view_sql;
 
