@@ -177,11 +177,7 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
   "usuarioCadastro",
   "usuarioAtualizacao",
   "dataCadastro",
-  "atualizadoEm",
-  caracteristica_epi,
-  caracteristicas_epi,
-  cor_material,
-  cores
+  "atualizadoEm"
 `
 
 const MATERIAL_SELECT_COLUMNS = `
@@ -1016,10 +1012,6 @@ function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudi
     numeroVestimenta: dados.numeroVestimenta ?? '',
     numeroEspecifico: dados.numeroEspecifico ?? '',
     chaveUnica: dados.chaveUnica ?? '',
-    cor_material: dados.corMaterial ?? '',
-    caracteristica_epi: dados.caracteristicaEpi ?? '',
-    caracteristicas_epi: normalizeRelationIds(dados.caracteristicasIds ?? []),
-    cores: normalizeRelationIds(dados.coresIds ?? []),
   }
 
   if (includeCreateAudit) {
