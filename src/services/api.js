@@ -1760,7 +1760,7 @@ export const api = {
         dataCadastro: agora,
         usuarioAtualizacao: usuario,
         atualizadoEm: agora,
-      }
+      })
 
       let materialCriadoId
       try {
@@ -1882,6 +1882,26 @@ export const api = {
         cores: Array.isArray(coresIds) ? coresIds : [],
         usuarioAtualizacao: usuario,
         atualizadoEm: agora,
+      })
+      const supabasePayloadOriginal = buildMaterialSupabasePayload(dadosOriginais, {
+        usuarioAtualizacao:
+          registroAtual.usuarioAtualizacao ??
+          registroAtual.usuario_atualizacao ??
+          materialAtual.usuarioAtualizacao ??
+          materialAtual.usuarioCadastro ??
+          null,
+        atualizadoEm:
+          registroAtual.atualizadoEm ??
+          registroAtual.atualizado_em ??
+          materialAtual.atualizadoEm ??
+          materialAtual.dataCadastro ??
+          null,
+      })
+      const relacoesOriginais = {
+        corIds: Array.isArray(materialAtual.coresIds) ? materialAtual.coresIds : [],
+        caracteristicaIds: Array.isArray(materialAtual.caracteristicasIds)
+          ? materialAtual.caracteristicasIds
+          : [],
       }
 
       await execute(

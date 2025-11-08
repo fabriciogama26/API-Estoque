@@ -4,6 +4,93 @@ import { TablePagination } from '../TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../../config/pagination.js'
 import { formatCurrency } from '../../utils/MateriaisUtils.js'
 
+const SPLIT_PATTERN = /[\n;,]/
+
+const normalizeDisplayValue = (value) => {
+  if (!value) {
+    return []
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (!item) {
+          return null
+        }
+        if (typeof item === 'string') {
+          return item.trim()
+        }
+        if (typeof item === 'object') {
+          const nome =
+            (typeof item.nome === 'string' && item.nome.trim()) ||
+            (typeof item.name === 'string' && item.name.trim()) ||
+            (typeof item.label === 'string' && item.label.trim()) ||
+            (typeof item.valor === 'string' && item.valor.trim()) ||
+            (typeof item.value === 'string' && item.value.trim())
+          return nome || null
+        }
+        return null
+      })
+      .filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(SPLIT_PATTERN)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
+  if (typeof value === 'object') {
+    const nome =
+      (typeof value.nome === 'string' && value.nome.trim()) ||
+      (typeof value.name === 'string' && value.name.trim()) ||
+      (typeof value.label === 'string' && value.label.trim()) ||
+      (typeof value.valor === 'string' && value.valor.trim()) ||
+      (typeof value.value === 'string' && value.value.trim())
+    return nome ? [nome] : []
+  }
+
+  return []
+}
+
+const collectUniqueValues = (...sources) => {
+  const seen = new Set()
+  const resultado = []
+
+  sources.forEach((source) => {
+    normalizeDisplayValue(source).forEach((item) => {
+      const texto = item.trim()
+      if (!texto) {
+        return
+      }
+      const chave = texto.toLowerCase()
+      if (!seen.has(chave)) {
+        seen.add(chave)
+        resultado.push(texto)
+      }
+    })
+  })
+
+  return resultado
+}
+
+const renderMultiValue = (valores) => {
+  if (!valores.length) {
+    return <span>-</span>
+  }
+
+  return (
+    <div className="materiais-table__tags">
+      {valores.map((item, index) => (
+        <span key={`${item}-${index}`} className="materiais-table__tag">
+          {item}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 const PAGE_SIZE = TABLE_PAGE_SIZE
 
 export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSaving, historyModal }) {
@@ -40,6 +127,9 @@ export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSavi
               <th>Material</th>
               <th>Grupo</th>
               <th>Tamanho</th>
+              <th>Cores</th>
+              <th>Características</th>
+              <th>Descrição</th>
               <th>CA</th>
               <th>Validade (dias)</th>
               <th>Valor unitario</th>
@@ -61,6 +151,33 @@ export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSavi
                     material.numeroCalcado ||
                     material.numeroVestimenta ||
                     '-'}
+                </td>
+                <td>
+                  {renderMultiValue(
+                    collectUniqueValues(
+                      material.cores,
+                      material.coresNomes,
+                      material.coresTexto,
+                      material.corMaterial,
+                    ),
+                  )}
+                </td>
+                <td>
+                  {renderMultiValue(
+                    collectUniqueValues(
+                      material.caracteristicas,
+                      material.caracteristicasNomes,
+                      material.caracteristicasTexto,
+                      material.caracteristicaEpi,
+                    ),
+                  )}
+                </td>
+                <td>
+                  {material.descricao?.trim() ? (
+                    <span className="materiais-table__description">{material.descricao.trim()}</span>
+                  ) : (
+                    '-' 
+                  )}
                 </td>
                 <td>{material.ca || '-'}</td>
                 <td>{material.validadeDias}</td>
