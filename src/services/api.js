@@ -998,11 +998,14 @@ async function syncMaterialRelations(
 
 function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
   const nomePersist = dados.nome || ''
-  const fabricantePersist = dados.fabricanteId || dados.fabricante || ''
+  const fabricanteNomePersist = dados.fabricanteNome || dados.fabricante || ''
+  const fabricanteIdPersist = dados.fabricanteId ?? null
   const grupoMaterialPersist = dados.grupoMaterialId || dados.grupoMaterial || ''
   const payload = {
     nome: nomePersist,
-    fabricante: fabricantePersist,
+    fabricante: fabricanteNomePersist,
+    fabricanteId: fabricanteIdPersist,
+    fabricanteNome: fabricanteNomePersist,
     validadeDias: dados.validadeDias ?? null,
     ca: dados.ca ?? '',
     valorUnitario: dados.valorUnitario ?? 0,
