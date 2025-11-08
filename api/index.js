@@ -41,6 +41,9 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/materiais/groups' && method === 'GET') {
       return sendJson(res, 200, await MateriaisOperations.groups())
     }
+    if (path === '/api/materiais/fabricantes' && method === 'GET') {
+      return sendJson(res, 200, await MateriaisOperations.fabricantes())
+    }
     if (path === '/api/materiais/caracteristicas' && method === 'GET') {
       return sendJson(res, 200, await MateriaisOperations.caracteristicas())
     }

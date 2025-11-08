@@ -142,7 +142,12 @@ const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = [
 
 const MATERIAL_HISTORY_FIELDS = [
   'nome',
+  'nomeItemRelacionado',
+  'materialItemNome',
+  'materialItemId',
   'fabricante',
+  'fabricanteNome',
+  'fabricanteId',
   'validadeDias',
   'ca',
   'valorUnitario',
@@ -150,6 +155,8 @@ const MATERIAL_HISTORY_FIELDS = [
   'ativo',
   'descricao',
   'grupoMaterial',
+  'grupoMaterialNome',
+  'grupoMaterialId',
   'numeroCalcado',
   'numeroVestimenta',
   'numeroEspecifico',
@@ -180,24 +187,7 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
 `
 
 const MATERIAL_SELECT_COLUMNS = `
-  id,
-  nome,
-  fabricante,
-  "validadeDias",
-  ca,
-  "valorUnitario",
-  "estoqueMinimo",
-  ativo,
-  descricao,
-  "grupoMaterial",
-  "numeroCalcado",
-  "numeroVestimenta",
-  "numeroEspecifico",
-  "chaveUnica",
-  "usuarioCadastro",
-  "usuarioAtualizacao",
-  "dataCadastro",
-  "atualizadoEm",
+  ${MATERIAL_TABLE_SELECT_COLUMNS},
   "grupoMaterialNome",
   "nomeItemRelacionado",
   "numeroCalcadoNome",
@@ -452,6 +442,11 @@ const normalizeRelationIds = (lista) => {
     })
 
   return valores
+}
+
+const normalizeRelationId = (value) => {
+  const id = normalizeOptionId(value)
+  return id || null
 }
 
 const normalizeOptionList = (lista) => {
@@ -997,16 +992,19 @@ async function syncMaterialRelations(
 }
 
 function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
+  const nomePersist = dados.materialItemId || dados.nome || ''
+  const fabricantePersist = dados.fabricanteId || dados.fabricante || ''
+  const grupoMaterialPersist = dados.grupoMaterialId || dados.grupoMaterial || ''
   const payload = {
-    nome: dados.nome ?? '',
-    fabricante: dados.fabricante ?? '',
+    nome: nomePersist,
+    fabricante: fabricantePersist,
     validadeDias: dados.validadeDias ?? null,
     ca: dados.ca ?? '',
     valorUnitario: dados.valorUnitario ?? 0,
     estoqueMinimo: dados.estoqueMinimo ?? 0,
     ativo: dados.ativo ?? true,
     descricao: dados.descricao ?? '',
-    grupoMaterial: dados.grupoMaterial ?? '',
+    grupoMaterial: grupoMaterialPersist,
     numeroCalcado: dados.numeroCalcado ?? '',
     numeroVestimenta: dados.numeroVestimenta ?? '',
     numeroEspecifico: dados.numeroEspecifico ?? '',
@@ -1049,6 +1047,26 @@ function mapMaterialRecord(record) {
   if (!record) {
     return null
   }
+  const rawGrupoMaterial = trim(record.grupoMaterial ?? record.grupo_material ?? '')
+  const grupoMaterialId =
+    normalizeUuid(trim(record.grupoMaterialId ?? record.grupo_material_id ?? '')) || normalizeUuid(rawGrupoMaterial)
+  const grupoMaterialNome =
+    trim(record.grupoMaterialNome ?? record.grupo_material_nome ?? '') ||
+    (!grupoMaterialId ? rawGrupoMaterial : '')
+  const nomeItemRelacionado =
+    trim(record.nomeItemRelacionado ?? record.nome_item_relacionado ?? record.materialItemNome ?? '') || ''
+  const rawNome = trim(record.nome ?? '')
+  const materialItemId =
+    normalizeUuid(trim(record.materialItemId ?? record.material_item_id ?? '')) || normalizeUuid(rawNome) || null
+  const materialItemNome =
+    trim(record.materialItemNome ?? nomeItemRelacionado) || (materialItemId ? '' : rawNome)
+  const nome = materialItemNome || rawNome
+  const rawFabricante = trim(record.fabricante ?? '')
+  const fabricanteId =
+    normalizeUuid(trim(record.fabricanteId ?? record.fabricante_id ?? '')) || normalizeUuid(rawFabricante) || null
+  const fabricanteNome =
+    trim(record.fabricanteNome ?? record.fabricante_nome ?? '') ||
+    (!fabricanteId ? rawFabricante : '')
   const caracteristicasLista = normalizeOptionList(
     record.caracteristicas ??
       record.caracteristicas_vinculos ??
@@ -1090,16 +1108,21 @@ function mapMaterialRecord(record) {
 
   return {
     id: record.id,
-    nome: record.nome ?? '',
-    nomeItemRelacionado: record.nomeItemRelacionado ?? record.nome_item_relacionado ?? '',
-    fabricante: record.fabricante ?? '',
+    nome,
+    nomeItemRelacionado,
+    materialItemId: materialItemId || null,
+    materialItemNome,
+    fabricante: fabricanteNome,
+    fabricanteNome,
+    fabricanteId: fabricanteId || null,
     validadeDias: record.validadeDias ?? record.validade_dias ?? null,
     ca: record.ca ?? record.ca_number ?? '',
     valorUnitario: toNumber(record.valorUnitario ?? record.valor_unitario),
     estoqueMinimo: toNumber(record.estoqueMinimo ?? record.estoque_minimo),
     ativo: record.ativo ?? true,
-    grupoMaterial: record.grupoMaterial ?? record.grupo_material ?? '',
-    grupoMaterialNome: record.grupoMaterialNome ?? record.grupo_material_nome ?? '',
+    grupoMaterial: grupoMaterialNome,
+    grupoMaterialNome,
+    grupoMaterialId: grupoMaterialId || null,
     numeroCalcado: record.numeroCalcado ?? record.numero_calcado ?? '',
     numeroCalcadoNome: record.numeroCalcadoNome ?? record.numero_calcado_nome ?? '',
     numeroVestimenta: record.numeroVestimenta ?? record.numero_vestimenta ?? '',
@@ -1283,9 +1306,26 @@ function sanitizePessoaPayload(payload = {}) {
 }
 
 function sanitizeMaterialPayload(payload = {}) {
-  const grupoMaterial = trim(payload.grupoMaterial ?? payload.grupo_material ?? '')
+  const grupoMaterialId = trim(payload.grupoMaterialId ?? payload.grupo_material_id ?? '')
+  const grupoMaterialNome =
+    trim(
+      payload.grupoMaterialNome ??
+        payload.grupo_material_nome ??
+        payload.grupoMaterial ??
+        payload.grupo_material ??
+        '',
+    ) || ''
+  const grupoMaterial = grupoMaterialNome
   const numeroCalcado = trim(payload.numeroCalcado ?? payload.numero_calcado ?? '')
   const numeroVestimenta = trim(payload.numeroVestimenta ?? payload.numero_vestimenta ?? '')
+  const materialItemId = trim(payload.materialItemId ?? payload.material_item_id ?? '')
+  const nomeEpi =
+    trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado ?? '') || ''
+  const materialItemNome =
+    nomeEpi || trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
+  const fabricanteId = trim(payload.fabricanteId ?? payload.fabricante_id ?? '')
+  const fabricanteNome =
+    trim(payload.fabricanteNome ?? payload.fabricante ?? payload.fabricante_nome ?? '') || ''
   const caracteristicasSelecionadas = normalizeOptionList(
     payload.caracteristicas ??
       payload.caracteristicasSelecionadas ??
@@ -1315,8 +1355,13 @@ function sanitizeMaterialPayload(payload = {}) {
       : trim(payload.corMaterial ?? payload.cor_material ?? '')
   const numeroEspecifico = trim(payload.numeroEspecifico ?? payload.numero_especifico ?? '')
   return {
-    nome: trim(payload.nome),
-    fabricante: trim(payload.fabricante),
+    nome: nomeEpi,
+    nomeItemRelacionado: materialItemNome || nomeEpi,
+    materialItemNome: materialItemNome || nomeEpi,
+    materialItemId: normalizeRelationId(materialItemId),
+    fabricante: fabricanteNome,
+    fabricanteNome,
+    fabricanteId: normalizeRelationId(fabricanteId),
     validadeDias: toNullableNumber(payload.validadeDias ?? payload.validade_dias),
     ca: trim(payload.ca ?? ''),
     valorUnitario: toNumber(payload.valorUnitario ?? payload.valor_unitario ?? 0),
@@ -1324,6 +1369,8 @@ function sanitizeMaterialPayload(payload = {}) {
     ativo: payload.ativo ?? true,
     descricao: trim(payload.descricao ?? ''),
     grupoMaterial,
+    grupoMaterialNome,
+    grupoMaterialId: normalizeRelationId(grupoMaterialId),
     numeroCalcado,
     numeroVestimenta,
     numeroEspecifico,
@@ -1936,7 +1983,7 @@ export const api = {
       const agora = new Date().toISOString()
 
       const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
-      const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
+      const caracteristicaIds = Array.isArray(dados.caracteristicasIds)
         ? dados.caracteristicasIds
         : []
       const corNames = extractTextualNames(dados.cores)
@@ -1959,12 +2006,12 @@ export const api = {
           throw new Error('Falha ao criar material.')
         }
 
-      await syncMaterialRelations(materialCriadoId, {
-        corIds: coresIds,
-        corNames,
-        caracteristicaIds,
-        caracteristicaNames,
-      })
+        await syncMaterialRelations(materialCriadoId, {
+          corIds: coresIds,
+          corNames,
+          caracteristicaIds,
+          caracteristicaNames,
+        })
       } catch (error) {
         if (materialCriadoId) {
           try {
@@ -2054,7 +2101,7 @@ export const api = {
       }
       const dados = sanitizeMaterialPayload(payload)
       const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
-      const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
+      const caracteristicaIds = Array.isArray(dados.caracteristicasIds)
         ? dados.caracteristicasIds
         : []
       const corNames = extractTextualNames(dados.cores)
@@ -2118,15 +2165,18 @@ export const api = {
       const data = await execute(
         supabase
           .from('grupos_material')
-          .select('nome, ativo, ordem')
+          .select('id, nome, ativo, ordem')
           .order('ordem', { ascending: true, nullsFirst: false })
           .order('nome', { ascending: true }),
         'Falha ao listar grupos de materiais.'
       )
       return (data ?? [])
         .filter((item) => item && item.nome && item.ativo !== false)
-        .map((item) => item.nome.trim())
-        .filter(Boolean)
+        .map((item) => ({
+          id: item.id ?? null,
+          nome: String(item.nome).trim(),
+        }))
+        .filter((item) => Boolean(item.nome))
     },
     async caracteristicas() {
       const data = await execute(
@@ -2177,42 +2227,43 @@ export const api = {
       )
       return normalizeCatalogoLista(data)
     },
-    async items(grupoNome) {
-      const nome = trim(grupoNome)
-      if (!nome) {
-        return []
-      }
-      const grupos = await execute(
-        supabase
-          .from('grupos_material')
-          .select('id')
-          .eq('nome', nome)
-          .limit(1),
-        'Falha ao localizar grupo de material.'
-      )
-      const grupoId = grupos?.[0]?.id
-      if (!grupoId) {
+    async items(grupoId) {
+      const id = normalizeOptionId(grupoId)
+      if (!id) {
         return []
       }
       const data = await execute(
         supabase
           .from('grupos_material_itens')
-          .select('nome, ativo, ordem')
-          .eq('grupo_id', grupoId)
+          .select('id, nome, ativo, ordem')
+          .eq('grupo_id', id)
           .order('ordem', { ascending: true, nullsFirst: false })
           .order('nome', { ascending: true }),
         'Falha ao listar EPIs do grupo.'
       )
-      const itens = new Set()
-      ;(data ?? []).forEach((item) => {
-        if (item && item.nome && item.ativo !== false) {
-          const nomeItem = String(item.nome).trim()
-          if (nomeItem) {
-            itens.add(nomeItem)
-          }
-        }
-      })
-      return Array.from(itens)
+      return (data ?? [])
+        .filter((item) => item && item.nome && item.ativo !== false)
+        .map((item) => ({
+          id: item.id ?? null,
+          nome: String(item.nome).trim(),
+        }))
+        .filter((item) => Boolean(item.nome))
+    },
+    async fabricantes() {
+      const data = await execute(
+        supabase
+          .from('fabricantes')
+          .select('id, fabricante, ativo')
+          .order('fabricante', { ascending: true }),
+        'Falha ao listar fabricantes.',
+      )
+      return (data ?? [])
+        .filter((item) => item && item.fabricante && item.ativo !== false)
+        .map((item) => ({
+          id: item.id ?? null,
+          nome: String(item.fabricante).trim(),
+        }))
+        .filter((item) => Boolean(item.nome))
     },
   },
   entradas: {
