@@ -283,7 +283,6 @@ const mapLocalMaterialResumo = (material) => {
   return {
     id: material.id,
     nome: material.nome || material.materialItemNome || '',
-    materialItemId: material.materialItemId || null,
     materialItemNome: material.materialItemNome || material.nome || '',
     fabricante: material.fabricanteNome || material.fabricante || '',
     fabricanteNome: material.fabricanteNome || material.fabricante || '',
@@ -338,11 +337,6 @@ const mapLocalMaterialRecord = (material) => {
     nome: material.nome ?? material.materialItemNome ?? '',
     nomeItemRelacionado: material.nomeItemRelacionado ?? material.materialItemNome ?? material.nome ?? '',
     materialItemNome: material.materialItemNome ?? material.nome ?? '',
-    materialItemId:
-      material.materialItemId ||
-      (material.materialItemNome || material.nome
-        ? buildGrupoItemId(material.grupoMaterialNome || material.grupoMaterialId, material.materialItemNome || material.nome)
-        : null),
     fabricante: material.fabricanteNome ?? material.fabricante ?? '',
     fabricanteNome: material.fabricanteNome ?? material.fabricante ?? '',
     fabricanteId:
@@ -1056,10 +1050,6 @@ const sanitizeMaterialPayload = (payload = {}) => {
   const materialItemNomeBase = trim(
     payload.nome || payload.materialItemNome || payload.nomeItemRelacionado || '',
   )
-  const materialItemIdBase = trim(payload.materialItemId)
-  const materialItemId =
-    materialItemIdBase ||
-    (materialItemNomeBase ? buildGrupoItemId(grupoMaterialNome || grupoMaterialIdBase, materialItemNomeBase) : '')
   const fabricanteNomeBase = trim(payload.fabricanteNome || payload.fabricante)
   const fabricanteIdBase = trim(payload.fabricanteId)
   const fabricanteId = fabricanteIdBase || (fabricanteNomeBase ? buildOptionId('fabricante', fabricanteNomeBase) : '')
@@ -1093,7 +1083,6 @@ const sanitizeMaterialPayload = (payload = {}) => {
     nome: materialItemNomeBase,
     nomeItemRelacionado: materialItemNomeBase,
     materialItemNome: materialItemNomeBase,
-    materialItemId: materialItemId || null,
     fabricante: fabricanteNomeBase,
     fabricanteNome: fabricanteNomeBase,
     fabricanteId: fabricanteId || null,
@@ -1680,10 +1669,16 @@ const localApi = {
             normalizeKeyPart(material.grupoMaterialId || buildOptionId('grupo', material.grupoMaterialNome || material.grupoMaterial)) ===
               normalizedGrupoId,
           )
-          .map((material) => ({
-            id: material.materialItemId || buildGrupoItemId(grupoNomeReferencia || material.grupoMaterialNome || material.grupoMaterial, material.nome),
-            nome: trim(material.nome) || trim(material.materialItemNome) || '',
-          }))
+          .map((material) => {
+            const nomeMaterial = trim(material.nome) || trim(material.materialItemNome) || ''
+            return {
+              id: buildGrupoItemId(
+                grupoNomeReferencia || material.grupoMaterialNome || material.grupoMaterial,
+                nomeMaterial,
+              ),
+              nome: nomeMaterial,
+            }
+          })
           .filter((item) => item.nome)
         const listaPadrao = normalizeCatalogoOptions(
           (base || []).map((nome) => ({
@@ -1807,7 +1802,6 @@ const localApi = {
           'nome',
           'nomeItemRelacionado',
           'materialItemNome',
-          'materialItemId',
           'fabricante',
           'fabricanteNome',
           'fabricanteId',

@@ -259,7 +259,6 @@ export function MateriaisPage() {
         grupoMaterial: nomeGrupo,
         grupoMaterialNome: nomeGrupo,
         nome: '',
-        materialItemId: '',
         numeroCalcado: isGrupo(nomeGrupo, GRUPO_MATERIAL_CALCADO) ? prev.numeroCalcado : '',
         numeroVestimenta:
           isGrupo(nomeGrupo, GRUPO_MATERIAL_VESTIMENTA) ||
@@ -272,11 +271,10 @@ export function MateriaisPage() {
       return
     }
 
-    if (name === 'materialItemId') {
+    if (name === 'nome') {
       const selecionado = findOptionByValue(materialItems, value) ?? normalizeSelectionItem(value)
       setForm((prev) => ({
         ...prev,
-        materialItemId: value,
         nome: selecionado?.nome ?? value,
       }))
       return
@@ -508,7 +506,7 @@ export function MateriaisPage() {
       nome: grupoMaterialDisplay,
     })
     const itemSelecionado = normalizeSelectionItem({
-      id: material.materialItemId || material.materialItemNome || nomeEpiDisplay,
+      id: material.materialItemNome || nomeEpiDisplay,
       nome: nomeEpiDisplay,
     })
     const fabricanteSelecionado = normalizeSelectionItem({
@@ -542,7 +540,6 @@ export function MateriaisPage() {
     }
     setForm({
       nome: nomeEpiDisplay,
-      materialItemId: itemSelecionado?.id ?? '',
       fabricante: fabricanteSelecionado?.nome || '',
       fabricanteId: fabricanteSelecionado?.id ?? '',
       validadeDias: String(material.validadeDias ?? ''),

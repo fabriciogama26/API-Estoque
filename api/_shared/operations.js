@@ -440,7 +440,6 @@ const buildChaveUnicaMaterial = ({
 
 async function sanitizeMaterialPayload(payload = {}) {
   const nome = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado)
-  const materialItemId = trim(payload.materialItemId)
   const fabricante = trim(payload.fabricante ?? payload.fabricanteNome)
   const fabricanteId = trim(payload.fabricanteId)
   const grupoMaterialNome = trim(payload.grupoMaterialNome ?? payload.grupoMaterial)
@@ -476,7 +475,6 @@ async function sanitizeMaterialPayload(payload = {}) {
     nome,
     nomeItemRelacionado: nome,
     materialItemNome: nome,
-    materialItemId: materialItemId || null,
     fabricante,
     fabricanteNome: fabricante,
     fabricanteId: fabricanteId || null,
@@ -1470,12 +1468,12 @@ export const MateriaisOperations = {
     const registros = await execute(
       supabaseAdmin
         .from('fabricantes')
-        .select('id, fabricante, ativo')
+        .select('id, fabricante')
         .order('fabricante'),
       'Falha ao listar fabricantes.',
     )
     return (registros ?? [])
-      .filter((item) => item && item.fabricante && item.ativo !== false)
+      .filter((item) => item && item.fabricante)
       .map((item) => ({ id: item.id ?? null, nome: item.fabricante.trim() }))
       .filter((item) => Boolean(item.nome))
   },
@@ -1517,7 +1515,7 @@ export const MateriaisOperations = {
 
     const materialPayload = {
       id: materialId,
-      nome: dados.materialItemId || dados.nome,
+      nome: dados.nome,
       fabricante: dados.fabricanteId || dados.fabricante,
       validadeDias: dados.validadeDias,
       ca: dados.ca,
@@ -1568,7 +1566,7 @@ export const MateriaisOperations = {
       supabaseAdmin
         .from('materiais')
         .update({
-          nome: dados.materialItemId || dados.nome,
+          nome: dados.nome,
           fabricante: dados.fabricanteId || dados.fabricante,
           validadeDias: dados.validadeDias,
           ca: dados.ca,

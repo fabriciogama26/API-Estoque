@@ -70,7 +70,7 @@ export function MateriaisForm({
     [...(materialGroups || []), grupoAtual].filter(Boolean),
   )
   const itemAtual = normalizeSelectionItem({
-    id: form.materialItemId || form.nome,
+    id: form.nome,
     nome: form.nome,
   })
   const itemOptions = normalizeSelectionList(
@@ -131,8 +131,8 @@ export function MateriaisForm({
         <label className="field">
           <span>EPI <span className="asterisco">*</span></span>
           <select
-            name="materialItemId"
-            value={form.materialItemId || ''}
+            name="nome"
+            value={form.nome || ''}
             onChange={onChange}
             required
             disabled={!form.grupoMaterialId || (isLoadingItems && !itemOptions.length)}
@@ -147,7 +147,7 @@ export function MateriaisForm({
                   : 'Selecione um grupo primeiro'}
             </option>
             {itemOptions.map((item) => (
-              <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+              <option key={item.id ?? item.nome} value={item.nome}>
                 {item.nome}
               </option>
             ))}

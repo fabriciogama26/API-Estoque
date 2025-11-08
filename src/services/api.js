@@ -144,7 +144,6 @@ const MATERIAL_HISTORY_FIELDS = [
   'nome',
   'nomeItemRelacionado',
   'materialItemNome',
-  'materialItemId',
   'fabricante',
   'fabricanteNome',
   'fabricanteId',
@@ -998,7 +997,7 @@ async function syncMaterialRelations(
 }
 
 function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
-  const nomePersist = dados.materialItemId || dados.nome || ''
+  const nomePersist = dados.nome || ''
   const fabricantePersist = dados.fabricanteId || dados.fabricante || ''
   const grupoMaterialPersist = dados.grupoMaterialId || dados.grupoMaterial || ''
   const payload = {
@@ -1060,9 +1059,7 @@ function mapMaterialRecord(record) {
   const nomeItemRelacionado =
     trim(record.nomeItemRelacionado ?? record.nome_item_relacionado ?? record.materialItemNome ?? '') || ''
   const rawNome = trim(record.nome ?? '')
-  const materialItemId = normalizeUuid(rawNome) || null
-  const materialItemNome =
-    trim(record.materialItemNome ?? nomeItemRelacionado) || (materialItemId ? '' : rawNome)
+  const materialItemNome = trim(record.materialItemNome ?? nomeItemRelacionado) || rawNome
   const nome = materialItemNome || rawNome
   const rawFabricante = trim(record.fabricante ?? '')
   const fabricanteId = normalizeUuid(rawFabricante) || null
@@ -1111,7 +1108,6 @@ function mapMaterialRecord(record) {
     id: record.id,
     nome,
     nomeItemRelacionado,
-    materialItemId: materialItemId || null,
     materialItemNome,
     fabricante: fabricanteNome,
     fabricanteNome,
@@ -1319,7 +1315,6 @@ function sanitizeMaterialPayload(payload = {}) {
   const grupoMaterial = grupoMaterialNome
   const numeroCalcado = trim(payload.numeroCalcado ?? payload.numero_calcado ?? '')
   const numeroVestimenta = trim(payload.numeroVestimenta ?? payload.numero_vestimenta ?? '')
-  const materialItemId = trim(payload.materialItemId ?? payload.material_item_id ?? '')
   const nomeEpi =
     trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado ?? '') || ''
   const materialItemNome =
@@ -1359,7 +1354,6 @@ function sanitizeMaterialPayload(payload = {}) {
     nome: nomeEpi,
     nomeItemRelacionado: materialItemNome || nomeEpi,
     materialItemNome: materialItemNome || nomeEpi,
-    materialItemId: normalizeRelationId(materialItemId),
     fabricante: fabricanteNome,
     fabricanteNome,
     fabricanteId: normalizeRelationId(fabricanteId),
@@ -2254,12 +2248,12 @@ export const api = {
       const data = await execute(
         supabase
           .from('fabricantes')
-          .select('id, fabricante, ativo')
+          .select('id, fabricante')
           .order('fabricante', { ascending: true }),
         'Falha ao listar fabricantes.',
       )
       return (data ?? [])
-        .filter((item) => item && item.fabricante && item.ativo !== false)
+        .filter((item) => item && item.fabricante)
         .map((item) => ({
           id: item.id ?? null,
           nome: String(item.fabricante).trim(),
