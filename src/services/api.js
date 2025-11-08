@@ -193,17 +193,12 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
 const MATERIAL_SELECT_COLUMNS = `
   ${MATERIAL_TABLE_SELECT_COLUMNS},
   "grupoMaterialNome",
+  "fabricantesNome",
   "nomeItemRelacionado",
   "numeroCalcadoNome",
   "numeroVestimentaNome",
   "usuarioCadastroNome",
-  "usuarioAtualizacaoNome",
-  caracteristicas,
-  caracteristicas_nomes,
-  caracteristicas_texto,
-  cores,
-  cores_nomes,
-  cores_texto
+  "usuarioAtualizacaoNome"
 `
 
 const normalizeHistoryValue = (value) => {
@@ -1060,10 +1055,21 @@ function mapMaterialRecord(record) {
   const rawNome = trim(record.nome ?? '')
   const materialItemNome = trim(record.materialItemNome ?? nomeItemRelacionado) || rawNome
   const nome = materialItemNome || rawNome
+  const rawFabricanteId = trim(
+    record.fabricanteId ?? record.fabricante_id ?? '',
+  )
   const rawFabricante = trim(record.fabricante ?? '')
-  const fabricanteId = normalizeUuid(rawFabricante) || null
-  const fabricanteNomeBase = trim(record.fabricanteNome ?? record.fabricante_nome ?? '')
-  const fabricanteNome = fabricanteNomeBase || (fabricanteId ? '' : rawFabricante)
+  const fabricanteId =
+    normalizeUuid(rawFabricanteId) || normalizeUuid(rawFabricante) || null
+  const fabricanteNomeBase = trim(
+    record.fabricantesNome ??
+      record.fabricantes_nome ??
+      record.fabricanteNome ??
+      record.fabricante_nome ??
+      '',
+  )
+  const fabricanteNome =
+    fabricanteNomeBase || (fabricanteId ? '' : rawFabricante || rawFabricanteId)
   const caracteristicasLista = normalizeOptionList(
     record.caracteristicas ??
       record.caracteristicas_vinculos ??
@@ -1110,6 +1116,7 @@ function mapMaterialRecord(record) {
     materialItemNome,
     fabricante: fabricanteNome,
     fabricanteNome,
+    fabricantesNome: fabricanteNome,
     fabricanteId: fabricanteId || null,
     validadeDias: record.validadeDias ?? record.validade_dias ?? null,
     ca: record.ca ?? record.ca_number ?? '',
@@ -1527,7 +1534,7 @@ async function carregarSaidas(params = {}) {
       execute(
         supabase
           .from('materiais_view')
-          .select('id, nome, fabricante, caracteristicas, caracteristicas_texto, cores, cores_texto'),
+          .select('id, nome, fabricante, "fabricanteNome", "fabricantesNome", "fabricanteId"'),
         'Falha ao listar materiais.'
       ),
     ])
