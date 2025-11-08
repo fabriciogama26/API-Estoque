@@ -4,6 +4,10 @@ import {
   GRUPO_MATERIAL_VESTIMENTA,
   GRUPO_MATERIAL_PROTECAO_MAOS,
 } from '../../rules/MateriaisRules.js'
+import {
+  normalizeSelectionItem,
+  normalizeSelectionList,
+} from '../../utils/selectionUtils.js'
 
 const normalize = (value) =>
   value
@@ -35,6 +39,9 @@ export function MateriaisForm({
   materialItems = [],
   isLoadingItems = false,
   itemsError = null,
+  fabricanteOptions = [],
+  isLoadingFabricantes = false,
+  fabricanteError = null,
   caracteristicaOptions = [],
   isLoadingCaracteristicas = false,
   caracteristicaError = null,
@@ -52,15 +59,29 @@ export function MateriaisForm({
   onAddCor,
   onRemoveCor,
 }) {
-  const isCalcado = isGrupo(form.grupoMaterial, GRUPO_MATERIAL_CALCADO)
+  const grupoAtualNome = form.grupoMaterialNome || form.grupoMaterial || ''
+  const grupoAtualId = form.grupoMaterialId || grupoAtualNome
+  const grupoAtual = normalizeSelectionItem({ id: grupoAtualId, nome: grupoAtualNome })
+  const isCalcado = isGrupo(grupoAtualNome, GRUPO_MATERIAL_CALCADO)
   const isVestimenta =
-    isGrupo(form.grupoMaterial, GRUPO_MATERIAL_VESTIMENTA) ||
-    isGrupo(form.grupoMaterial, GRUPO_MATERIAL_PROTECAO_MAOS)
-  const groupOptions = Array.from(
-    new Set([...(materialGroups || []), form.grupoMaterial].filter(Boolean))
+    isGrupo(grupoAtualNome, GRUPO_MATERIAL_VESTIMENTA) ||
+    isGrupo(grupoAtualNome, GRUPO_MATERIAL_PROTECAO_MAOS)
+  const groupOptions = normalizeSelectionList(
+    [...(materialGroups || []), grupoAtual].filter(Boolean),
   )
-  const itemOptions = Array.from(
-    new Set([...(materialItems || []), form.nome].filter(Boolean))
+  const itemAtual = normalizeSelectionItem({
+    id: form.materialItemId || form.nome,
+    nome: form.nome,
+  })
+  const itemOptions = normalizeSelectionList(
+    [...(materialItems || []), itemAtual].filter(Boolean),
+  )
+  const fabricanteAtual = normalizeSelectionItem({
+    id: form.fabricanteId || form.fabricante,
+    nome: form.fabricante,
+  })
+  const fabricanteLista = normalizeSelectionList(
+    [...(fabricanteOptions || []), fabricanteAtual].filter(Boolean),
   )
   const caracteristicasSelecionadas = Array.isArray(form.caracteristicaEpi)
     ? form.caracteristicaEpi
@@ -91,8 +112,8 @@ export function MateriaisForm({
         <label className="field">
           <span>Grupo de material <span className="asterisco">*</span></span>
           <select
-            name="grupoMaterial"
-            value={form.grupoMaterial}
+            name="grupoMaterialId"
+            value={form.grupoMaterialId || ''}
             onChange={onChange}
             required
             disabled={isLoadingGroups && !materialGroups.length}
@@ -101,8 +122,8 @@ export function MateriaisForm({
               {isLoadingGroups ? 'Carregando grupos...' : 'Selecione um grupo'}
             </option>
             {groupOptions.map((grupo) => (
-              <option key={grupo} value={grupo}>
-                {grupo}
+              <option key={grupo.id ?? grupo.nome} value={grupo.id ?? grupo.nome}>
+                {grupo.nome}
               </option>
             ))}
           </select>
@@ -110,37 +131,51 @@ export function MateriaisForm({
         <label className="field">
           <span>EPI <span className="asterisco">*</span></span>
           <select
-            name="nome"
-            value={form.nome}
+            name="materialItemId"
+            value={form.materialItemId || ''}
             onChange={onChange}
             required
-            disabled={!form.grupoMaterial || (isLoadingItems && !itemOptions.length)}
+            disabled={!form.grupoMaterialId || (isLoadingItems && !itemOptions.length)}
           >
             <option value="">
               {isLoadingItems
                 ? 'Carregando EPIs...'
-                : form.grupoMaterial
+                : form.grupoMaterialId
                   ? itemOptions.length
                     ? 'Selecione o EPI'
                     : 'Nenhum EPI cadastrado para o grupo'
                   : 'Selecione um grupo primeiro'}
             </option>
             {itemOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
+              <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                {item.nome}
               </option>
             ))}
           </select>
         </label>
         <label className="field">
           <span>Fabricante <span className="asterisco">*</span></span>
-          <input
-            name="fabricante"
-            value={form.fabricante}
+          <select
+            name="fabricanteId"
+            value={form.fabricanteId || ''}
             onChange={onChange}
             required
-            placeholder="3M"
-          />
+            disabled={isLoadingFabricantes && !fabricanteLista.length}
+          >
+            <option value="">
+              {isLoadingFabricantes
+                ? 'Carregando fabricantes...'
+                : fabricanteLista.length
+                ? 'Selecione o fabricante'
+                : 'Nenhum fabricante disponível'}
+            </option>
+            {fabricanteLista.map((item) => (
+              <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                {item.nome}
+              </option>
+            ))}
+          </select>
+          {fabricanteError ? <p className="feedback feedback--error">{fabricanteError}</p> : null}
         </label>
         <label className="field">
           <span>Característica <span className="asterisco">*</span></span>

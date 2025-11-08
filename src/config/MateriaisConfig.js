@@ -2,11 +2,15 @@
 // Configurações e estados padrão relacionados a materiais
 export const createMateriaisFormDefault = () => ({
   nome: '',
+  materialItemId: '',
   fabricante: '',
+  fabricanteId: '',
   validadeDias: '',
   ca: '',
   valorUnitario: '',
+  grupoMaterialId: '',
   grupoMaterial: '',
+  grupoMaterialNome: '',
   numeroCalcado: '',
   numeroVestimenta: '',
   caracteristicaEpi: [],
