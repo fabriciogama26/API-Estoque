@@ -159,16 +159,18 @@ const buildChaveUnica = ({
   nome,
   fabricante,
   grupoMaterial,
+  grupoMaterialNome,
   numeroCalcado,
   numeroVestimenta,
   caracteristicaEpi,
   corMaterial,
   ca,
 }) => {
+  const grupoDisplay = grupoMaterialNome ?? grupoMaterial
   const partes = [
     normalizeKeyPart(nome),
     normalizeKeyPart(fabricante),
-    normalizeKeyPart(grupoMaterial),
+    normalizeKeyPart(grupoDisplay),
   ]
 
   const numeroReferencia = normalizeKeyPart(numeroCalcado || numeroVestimenta)
@@ -206,24 +208,28 @@ export function validateMaterialForm(form) {
   if (/\d/.test(form.nome || '')) {
     return 'O campo EPI nao pode conter numeros.'
   }
-  if (!form.grupoMaterial?.trim()) {
+  const grupoMaterialNome = sanitizeAlphanumeric(
+    form.grupoMaterialNome || form.grupoMaterial || '',
+  )
+  if (!form.grupoMaterialId && !grupoMaterialNome) {
     return 'Selecione o grupo de material.'
   }
 
-  if (isGrupo(form.grupoMaterial, GRUPO_MATERIAL_CALCADO)) {
+  if (isGrupo(grupoMaterialNome, GRUPO_MATERIAL_CALCADO)) {
     const numero = sanitizeDigits(form.numeroCalcado)
     if (!numero) {
       return 'Informe o numero do calcado.'
     }
   }
 
-  if (requiresTamanho(form.grupoMaterial)) {
+  if (requiresTamanho(grupoMaterialNome)) {
     if (!String(form.numeroVestimenta || '').trim()) {
       return 'Informe o tamanho.'
     }
   }
 
-  if (!form.fabricante?.trim()) {
+  const fabricanteNome = sanitizeAlphanumeric(form.fabricante || '')
+  if (!form.fabricanteId && !fabricanteNome) {
     return 'Informe o fabricante.'
   }
 
@@ -251,11 +257,17 @@ export function validateMaterialForm(form) {
 }
 
 const buildMaterialPayload = (form) => {
-  const grupoMaterial = form.grupoMaterial.trim()
+  const grupoMaterialNome = sanitizeAlphanumeric(
+    form.grupoMaterialNome || form.grupoMaterial || '',
+  )
+  const grupoMaterialId = sanitizeAlphanumeric(form.grupoMaterialId || '')
+  const grupoMaterial = grupoMaterialNome
   const numeroCalcadoRaw = sanitizeDigits(form.numeroCalcado)
   const numeroVestimentaRaw = sanitizeAlphanumeric(form.numeroVestimenta)
   const numeroCalcado = numeroCalcadoRaw ? String(numeroCalcadoRaw) : ''
   const numeroVestimenta = numeroVestimentaRaw
+  const materialItemId = sanitizeAlphanumeric(form.materialItemId || '')
+  const nomeEpi = sanitizeMaterialNome(form.nome).trim()
   const caracteristicasSelecionadas = mergeSelectionLists(
     form.caracteristicaEpi,
     form.caracteristicas,
@@ -267,15 +279,18 @@ const buildMaterialPayload = (form) => {
   )
   const coresSelecionadas = mergeSelectionLists(form.cores, form.coresIds)
   const corPrincipal = coresSelecionadas[0]?.nome ?? form.corMaterial
+  const fabricanteNome = sanitizeAlphanumeric(form.fabricante)
+  const fabricanteId = sanitizeAlphanumeric(form.fabricanteId || '')
   const numeroEspecifico = buildNumeroReferencia({
-    grupoMaterial,
+    grupoMaterial: grupoMaterialNome,
     numeroCalcado,
     numeroVestimenta,
   })
   const chaveUnica = buildChaveUnica({
     grupoMaterial,
-    nome: form.nome,
-    fabricante: form.fabricante,
+    grupoMaterialNome,
+    nome: nomeEpi,
+    fabricante: fabricanteNome,
     numeroCalcado,
     numeroVestimenta,
     caracteristicaEpi: caracteristicaTexto,
@@ -284,14 +299,21 @@ const buildMaterialPayload = (form) => {
   })
 
   return {
-    nome: sanitizeMaterialNome(form.nome).trim(),
-    fabricante: form.fabricante.trim(),
+    nome: nomeEpi,
+    nomeItemRelacionado: nomeEpi,
+    materialItemNome: nomeEpi,
+    materialItemId: materialItemId || null,
+    fabricante: fabricanteNome.trim(),
+    fabricanteNome: fabricanteNome.trim(),
+    fabricanteId: fabricanteId || null,
     validadeDias: Number(form.validadeDias) || 0,
     ca: sanitizeDigits(form.ca),
     valorUnitario: parseCurrencyToNumber(form.valorUnitario),
     grupoMaterial,
-    numeroCalcado: isGrupo(grupoMaterial, GRUPO_MATERIAL_CALCADO) ? numeroCalcado : '',
-    numeroVestimenta: requiresTamanho(grupoMaterial) ? numeroVestimenta : '',
+    grupoMaterialNome,
+    grupoMaterialId: grupoMaterialId || null,
+    numeroCalcado: isGrupo(grupoMaterialNome, GRUPO_MATERIAL_CALCADO) ? numeroCalcado : '',
+    numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimenta : '',
     numeroEspecifico,
     chaveUnica,
     caracteristicaEpi: caracteristicaTexto,
@@ -340,7 +362,9 @@ export function filterMateriais(materiais, filters) {
     const target = [
       material.nome,
       material.nomeItemRelacionado,
+      material.materialItemNome,
       material.fabricante,
+      material.fabricanteNome,
       material.ca,
       material.grupoMaterial,
       material.grupoMaterialNome,
