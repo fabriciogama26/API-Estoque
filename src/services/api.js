@@ -165,16 +165,11 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
   "numeroCalcado",
   "numeroVestimenta",
   "numeroEspecifico",
-  "corMaterial",
   "chaveUnica",
   "usuarioCadastro",
   "usuarioAtualizacao",
   "dataCadastro",
-  "atualizadoEm",
-  caracteristica_epi,
-  caracteristicas_epi,
-  cor_material,
-  cores
+  "atualizadoEm"
 `
 
 const MATERIAL_SELECT_COLUMNS = `
@@ -331,6 +326,26 @@ const normalizeUuid = (value) => {
   return UUID_REGEX.test(texto) ? texto : null
 }
 
+const normalizeOptionId = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : null
+  }
+
+  if (typeof value === 'string') {
+    const texto = trim(value)
+    if (!texto) {
+      return null
+    }
+    return normalizeUuid(texto) ?? texto
+  }
+
+  return null
+}
+
 const unwrapOptionRecord = (value) => {
   if (!value || typeof value !== 'object') {
     return value
@@ -365,15 +380,13 @@ const normalizeOptionItem = (value) => {
     return null
   }
 
-  if (typeof value === 'string') {
-    const texto = trim(value)
-    if (!texto) {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const id = normalizeOptionId(value)
+    if (!id) {
       return null
     }
-    return {
-      id: normalizeUuid(texto),
-      nome: resolveTextValue(texto),
-    }
+    const nome = resolveTextValue(value)
+    return { id, nome }
   }
 
   const record = unwrapOptionRecord(value)
@@ -381,19 +394,57 @@ const normalizeOptionItem = (value) => {
     return null
   }
 
-  const id =
-    normalizeUuid(record.id) ??
-    normalizeUuid(record.uuid) ??
-    normalizeUuid(record.valor) ??
-    normalizeUuid(record.value) ??
-    null
+  const idFields = [
+    record.id,
+    record.uuid,
+    record.valor,
+    record.value,
+    record.codigo,
+    record.code,
+  ]
 
-  const nome = resolveCatalogoNome(record)
-  if (!nome) {
-    return id ? { id, nome: id } : null
+  let id = null
+  for (const fieldValue of idFields) {
+    id = normalizeOptionId(fieldValue)
+    if (id) {
+      break
+    }
   }
 
-  return { id, nome }
+  const nome = resolveCatalogoNome(record)
+  if (!id) {
+    if (!nome) {
+      return null
+    }
+    return { id: null, nome }
+  }
+
+  return { id, nome: nome || id }
+}
+
+const normalizeRelationIds = (lista) => {
+  const valores = []
+  const vistos = new Set()
+
+  const itens = Array.isArray(lista) ? lista : [lista]
+  itens
+    .map((item) => {
+      if (item && typeof item === 'object') {
+        const candidato =
+          item.id ?? item.uuid ?? item.valor ?? item.value ?? item.codigo ?? item.code
+        return normalizeOptionId(candidato)
+      }
+      return normalizeOptionId(item)
+    })
+    .filter(Boolean)
+    .forEach((id) => {
+      if (!vistos.has(id)) {
+        vistos.add(id)
+        valores.push(id)
+      }
+    })
+
+  return valores
 }
 
 const normalizeOptionList = (lista) => {
@@ -775,6 +826,7 @@ async function replaceMaterialRelationsWithFallback({
   deleteMessage,
   insertMessage,
 }) {
+  const normalizedValues = normalizeRelationIds(values ?? [])
   let lastColumnError = null
 
   for (const columnName of columnCandidates) {
@@ -783,13 +835,24 @@ async function replaceMaterialRelationsWithFallback({
         table,
         materialId,
         columnName,
-        values,
+        values: normalizedValues,
         deleteMessage,
         insertMessage,
       })
       return
     } catch (error) {
       if (!error || error.code !== '42703') {
+        if (normalizedValues.length > 0) {
+          console.warn(
+            'Supabase rejeitou IDs de vínculo de material.',
+            {
+              table,
+              columnName,
+              values: normalizedValues,
+            },
+            error
+          )
+        }
         throw error
       }
       lastColumnError = error
@@ -843,10 +906,6 @@ function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudi
     numeroVestimenta: dados.numeroVestimenta ?? '',
     numeroEspecifico: dados.numeroEspecifico ?? '',
     chaveUnica: dados.chaveUnica ?? '',
-    cor_material: dados.corMaterial ?? '',
-    caracteristica_epi: dados.caracteristicaEpi ?? '',
-    caracteristicas_epi: Array.isArray(dados.caracteristicasIds) ? dados.caracteristicasIds : [],
-    cores: Array.isArray(dados.coresIds) ? dados.coresIds : [],
   }
 
   if (includeCreateAudit) {
@@ -893,8 +952,6 @@ function mapMaterialRecord(record) {
       record.caracteristicas_list_nomes ??
       record.caracteristicas_rel ??
       record.caracteristicas_nomes ??
-      record.caracteristicaEpi ??
-      record.caracteristica_epi ??
       []
   )
   const coresLista = normalizeOptionList(
@@ -905,19 +962,15 @@ function mapMaterialRecord(record) {
       record.cores_rel ??
       record.cores_nomes ??
       record.coresTexto ??
-      record.corMaterial ??
-      record.cor_material ??
       []
   )
   const caracteristicasTexto =
     formatCaracteristicaTexto(caracteristicasLista.map((item) => item.nome)) ||
     formatCaracteristicaTexto(record.caracteristicas_nomes ?? []) ||
-    formatCaracteristicaTexto(record.caracteristicas_texto ?? '') ||
-    formatCaracteristicaTexto(record.caracteristicaEpi ?? record.caracteristica_epi ?? '')
+    formatCaracteristicaTexto(record.caracteristicas_texto ?? '')
   const coresTexto =
     trim(record.cores_texto ?? '') ||
-    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '') ||
-    trim(record.corMaterial ?? record.cor_material ?? '')
+    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '')
   const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
   const usuarioCadastroNome =
     trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
@@ -1171,9 +1224,11 @@ function sanitizeMaterialPayload(payload = {}) {
     numeroEspecifico,
     caracteristicaEpi,
     caracteristicas: caracteristicasSelecionadas,
-    caracteristicasIds: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
+    caracteristicasIds: normalizeRelationIds(
+      caracteristicasSelecionadas.map((item) => item?.id)
+    ),
     cores: coresSelecionadas,
-    coresIds: coresSelecionadas.map((item) => item.id).filter(Boolean),
+    coresIds: normalizeRelationIds(coresSelecionadas.map((item) => item?.id)),
     corMaterial: corMaterialTexto,
     chaveUnica: trim(payload.chaveUnica ?? payload.chave_unica ?? ''),
   }
