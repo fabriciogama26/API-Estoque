@@ -1054,25 +1054,20 @@ function mapMaterialRecord(record) {
     return null
   }
   const rawGrupoMaterial = trim(record.grupoMaterial ?? record.grupo_material ?? '')
-  const grupoMaterialId =
-    normalizeUuid(trim(record.grupoMaterialId ?? record.grupo_material_id ?? '')) || normalizeUuid(rawGrupoMaterial)
-  const grupoMaterialNome =
-    trim(record.grupoMaterialNome ?? record.grupo_material_nome ?? '') ||
-    (!grupoMaterialId ? rawGrupoMaterial : '')
+  const grupoMaterialId = normalizeUuid(rawGrupoMaterial)
+  const grupoMaterialNomeBase = trim(record.grupoMaterialNome ?? record.grupo_material_nome ?? '')
+  const grupoMaterialNome = grupoMaterialNomeBase || (grupoMaterialId ? '' : rawGrupoMaterial)
   const nomeItemRelacionado =
     trim(record.nomeItemRelacionado ?? record.nome_item_relacionado ?? record.materialItemNome ?? '') || ''
   const rawNome = trim(record.nome ?? '')
-  const materialItemId =
-    normalizeUuid(trim(record.materialItemId ?? record.material_item_id ?? '')) || normalizeUuid(rawNome) || null
+  const materialItemId = normalizeUuid(rawNome) || null
   const materialItemNome =
     trim(record.materialItemNome ?? nomeItemRelacionado) || (materialItemId ? '' : rawNome)
   const nome = materialItemNome || rawNome
   const rawFabricante = trim(record.fabricante ?? '')
-  const fabricanteId =
-    normalizeUuid(trim(record.fabricanteId ?? record.fabricante_id ?? '')) || normalizeUuid(rawFabricante) || null
-  const fabricanteNome =
-    trim(record.fabricanteNome ?? record.fabricante_nome ?? '') ||
-    (!fabricanteId ? rawFabricante : '')
+  const fabricanteId = normalizeUuid(rawFabricante) || null
+  const fabricanteNomeBase = trim(record.fabricanteNome ?? record.fabricante_nome ?? '')
+  const fabricanteNome = fabricanteNomeBase || (fabricanteId ? '' : rawFabricante)
   const caracteristicasLista = normalizeOptionList(
     record.caracteristicas ??
       record.caracteristicas_vinculos ??
