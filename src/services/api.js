@@ -167,7 +167,6 @@ const MATERIAL_HISTORY_FIELDS = [
 const MATERIAL_TABLE_SELECT_COLUMNS = `
   id,
   nome,
-  "materialItemId",
   "materialItemNome",
   fabricante,
   "fabricanteId",
