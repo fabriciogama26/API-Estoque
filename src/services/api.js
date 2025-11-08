@@ -115,6 +115,24 @@ const ACIDENTE_HISTORY_FIELDS = [
   'observacao',
 ]
 
+const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
+const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
+
+const MATERIAL_COR_RELATION_COLUMNS = [
+  'grupo_cor_id',
+  'grupo_material_cor',
+  'grupo_cor',
+  'cor_id',
+  'cor',
+]
+
+const MATERIAL_CARACTERISTICA_RELATION_COLUMNS = [
+  'grupo_caracteristica_epi_id',
+  'caracteristica_epi_id',
+  'grupo_caracteristica_epi',
+  'caracteristica_epi',
+]
+
 const MATERIAL_HISTORY_FIELDS = [
   'nome',
   'fabricante',
@@ -147,7 +165,6 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
   "numeroCalcado",
   "numeroVestimenta",
   "numeroEspecifico",
-  "caracteristicaEpi",
   "corMaterial",
   "chaveUnica",
   "usuarioCadastro",
@@ -726,6 +743,123 @@ async function executeSingle(builder, fallbackMessage) {
     throw mapSupabaseError(error, fallbackMessage)
   }
   return data
+}
+
+async function replaceMaterialRelations({
+  table,
+  materialId,
+  columnName,
+  values,
+  deleteMessage,
+  insertMessage,
+}) {
+  await execute(supabase.from(table).delete().eq('material_id', materialId), deleteMessage)
+
+  if (!Array.isArray(values) || values.length === 0) {
+    return
+  }
+
+  const rows = values.map((value) => ({
+    material_id: materialId,
+    [columnName]: value,
+  }))
+
+  await execute(supabase.from(table).insert(rows), insertMessage)
+}
+
+async function replaceMaterialRelationsWithFallback({
+  table,
+  materialId,
+  columnCandidates,
+  values,
+  deleteMessage,
+  insertMessage,
+}) {
+  let lastColumnError = null
+
+  for (const columnName of columnCandidates) {
+    try {
+      await replaceMaterialRelations({
+        table,
+        materialId,
+        columnName,
+        values,
+        deleteMessage,
+        insertMessage,
+      })
+      return
+    } catch (error) {
+      if (!error || error.code !== '42703') {
+        throw error
+      }
+      lastColumnError = error
+    }
+  }
+
+  if (lastColumnError) {
+    throw lastColumnError
+  }
+}
+
+async function replaceMaterialCorVinculos(materialId, corIds) {
+  await replaceMaterialRelationsWithFallback({
+    table: MATERIAL_COR_RELATION_TABLE,
+    materialId,
+    columnCandidates: MATERIAL_COR_RELATION_COLUMNS,
+    values: Array.isArray(corIds) ? corIds : [],
+    deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+    insertMessage: 'Falha ao vincular cores ao material.',
+  })
+}
+
+async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
+  await replaceMaterialRelationsWithFallback({
+    table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
+    materialId,
+    columnCandidates: MATERIAL_CARACTERISTICA_RELATION_COLUMNS,
+    values: Array.isArray(caracteristicaIds) ? caracteristicaIds : [],
+    deleteMessage: 'Falha ao limpar vínculos de características do material.',
+    insertMessage: 'Falha ao vincular características ao material.',
+  })
+}
+
+async function syncMaterialRelations(materialId, { corIds, caracteristicaIds }) {
+  await replaceMaterialCorVinculos(materialId, corIds)
+  await replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds)
+}
+
+function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
+  const payload = {
+    nome: dados.nome ?? '',
+    fabricante: dados.fabricante ?? '',
+    validadeDias: dados.validadeDias ?? null,
+    ca: dados.ca ?? '',
+    valorUnitario: dados.valorUnitario ?? 0,
+    estoqueMinimo: dados.estoqueMinimo ?? 0,
+    ativo: dados.ativo ?? true,
+    descricao: dados.descricao ?? '',
+    grupoMaterial: dados.grupoMaterial ?? '',
+    numeroCalcado: dados.numeroCalcado ?? '',
+    numeroVestimenta: dados.numeroVestimenta ?? '',
+    numeroEspecifico: dados.numeroEspecifico ?? '',
+    chaveUnica: dados.chaveUnica ?? '',
+    cor_material: dados.corMaterial ?? '',
+    caracteristica_epi: dados.caracteristicaEpi ?? '',
+    caracteristicas_epi: Array.isArray(dados.caracteristicasIds) ? dados.caracteristicasIds : [],
+    cores: Array.isArray(dados.coresIds) ? dados.coresIds : [],
+  }
+
+  if (includeCreateAudit) {
+    payload.usuarioCadastro = usuario ?? ''
+    payload.dataCadastro = agora ?? new Date().toISOString()
+  }
+
+  if (includeUpdateAudit) {
+    payload.usuarioAtualizacao = usuario ?? ''
+    payload.atualizadoEm = agora ?? new Date().toISOString()
+  }
+
+  return payload
 }
 
 async function resolveUsuarioResponsavel() {
@@ -1641,33 +1775,48 @@ export const api = {
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
 
-      const {
-        corMaterial: corMaterialCamel,
-        caracteristicasIds,
-        coresIds,
-        caracteristicas: _caracteristicasSelecionadas,
-        cores: _coresSelecionadas,
-        ...dadosSemCor
-      } = dados
-      const supabasePayload = {
-        ...dadosSemCor,
-        cor_material: corMaterialCamel,
-        caracteristica_epi: dados.caracteristicaEpi,
-        caracteristicas_epi: Array.isArray(caracteristicasIds) ? caracteristicasIds : [],
-        cores: Array.isArray(coresIds) ? coresIds : [],
-        usuarioCadastro: usuario,
-        dataCadastro: agora,
-        usuarioAtualizacao: usuario,
-        atualizadoEm: agora,
-      }
+      const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
+      const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
+        ? dados.caracteristicasIds
+        : []
+      const supabasePayload = buildMaterialSupabasePayload(dados, {
+        usuario,
+        agora,
+        includeCreateAudit: true,
+        includeUpdateAudit: true,
+      })
 
-      const inseridos = await execute(
-        supabase.from('materiais').insert(supabasePayload).select('id'),
-        'Falha ao criar material.'
-      )
-      const materialCriadoId = Array.isArray(inseridos) && inseridos.length ? inseridos[0].id : inseridos?.id
-      if (!materialCriadoId) {
-        throw new Error('Falha ao criar material.')
+      let materialCriadoId
+      try {
+        const inseridos = await execute(
+          supabase.from('materiais').insert(supabasePayload).select('id'),
+          'Falha ao criar material.'
+        )
+        materialCriadoId = Array.isArray(inseridos) && inseridos.length ? inseridos[0].id : inseridos?.id
+        if (!materialCriadoId) {
+          throw new Error('Falha ao criar material.')
+        }
+
+        await syncMaterialRelations(materialCriadoId, {
+          corIds: coresIds,
+          caracteristicaIds,
+        })
+      } catch (error) {
+        if (materialCriadoId) {
+          try {
+            ensureSupabase()
+            const { error: cleanupError } = await supabase
+              .from('materiais')
+              .delete()
+              .eq('id', materialCriadoId)
+            if (cleanupError) {
+              console.error('Falha ao remover material apos erro de vinculo.', cleanupError)
+            }
+          } catch (cleanupError) {
+            console.error('Falha ao limpar material apos erro de vinculo.', cleanupError)
+          }
+        }
+        throw error
       }
       const registro = await executeSingle(
         supabase
@@ -1740,28 +1889,24 @@ export const api = {
         }
       }
       const dados = sanitizeMaterialPayload(payload)
-      const {
-        corMaterial: corMaterialCamel,
-        caracteristicasIds,
-        coresIds,
-        caracteristicas: _caracteristicasSelecionadas,
-        cores: _coresSelecionadas,
-        ...dadosSemCor
-      } = dados
-      const supabasePayload = {
-        ...dadosSemCor,
-        cor_material: corMaterialCamel,
-        caracteristica_epi: dados.caracteristicaEpi,
-        caracteristicas_epi: Array.isArray(caracteristicasIds) ? caracteristicasIds : [],
-        cores: Array.isArray(coresIds) ? coresIds : [],
-        usuarioAtualizacao: usuario,
-        atualizadoEm: agora,
-      }
+      const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
+      const caracteristicasIds = Array.isArray(dados.caracteristicasIds)
+        ? dados.caracteristicasIds
+        : []
+      const supabasePayload = buildMaterialSupabasePayload(dados, {
+        usuario,
+        agora,
+        includeUpdateAudit: true,
+      })
 
       await execute(
         supabase.from('materiais').update(supabasePayload).eq('id', id),
         'Falha ao atualizar material.'
       )
+      await syncMaterialRelations(id, {
+        corIds: coresIds,
+        caracteristicaIds,
+      })
       const registro = await executeSingle(
         supabase
           .from('materiais_view')
