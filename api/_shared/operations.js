@@ -1470,13 +1470,13 @@ export const MateriaisOperations = {
     const registros = await execute(
       supabaseAdmin
         .from('fabricantes')
-        .select('id, nome, ativo')
-        .order('nome'),
+        .select('id, fabricante, ativo')
+        .order('fabricante'),
       'Falha ao listar fabricantes.',
     )
     return (registros ?? [])
-      .filter((item) => item && item.nome && item.ativo !== false)
-      .map((item) => ({ id: item.id ?? null, nome: item.nome.trim() }))
+      .filter((item) => item && item.fabricante && item.ativo !== false)
+      .map((item) => ({ id: item.id ?? null, nome: item.fabricante.trim() }))
       .filter((item) => Boolean(item.nome))
   },
   async cores() {
@@ -1517,21 +1517,14 @@ export const MateriaisOperations = {
 
     const materialPayload = {
       id: materialId,
-      nome: dados.nome,
-      nomeItemRelacionado: dados.nomeItemRelacionado,
-      materialItemId: dados.materialItemId,
-      materialItemNome: dados.materialItemNome,
-      fabricante: dados.fabricante,
-      fabricanteId: dados.fabricanteId,
-      fabricanteNome: dados.fabricanteNome ?? dados.fabricante,
+      nome: dados.materialItemId || dados.nome,
+      fabricante: dados.fabricanteId || dados.fabricante,
       validadeDias: dados.validadeDias,
       ca: dados.ca,
       valorUnitario: dados.valorUnitario,
       estoqueMinimo: dados.estoqueMinimo,
       ativo: dados.ativo,
-      grupoMaterial: dados.grupoMaterial,
-      grupoMaterialId: dados.grupoMaterialId,
-      grupoMaterialNome: dados.grupoMaterialNome ?? dados.grupoMaterial,
+      grupoMaterial: dados.grupoMaterialId || dados.grupoMaterial,
       numeroCalcado: dados.numeroCalcado,
       numeroVestimenta: dados.numeroVestimenta,
       numeroEspecifico: dados.numeroEspecifico,
@@ -1575,21 +1568,14 @@ export const MateriaisOperations = {
       supabaseAdmin
         .from('materiais')
         .update({
-          nome: dados.nome,
-          nomeItemRelacionado: dados.nomeItemRelacionado,
-          materialItemId: dados.materialItemId,
-          materialItemNome: dados.materialItemNome,
-          fabricante: dados.fabricante,
-          fabricanteId: dados.fabricanteId,
-          fabricanteNome: dados.fabricanteNome ?? dados.fabricante,
+          nome: dados.materialItemId || dados.nome,
+          fabricante: dados.fabricanteId || dados.fabricante,
           validadeDias: dados.validadeDias,
           ca: dados.ca,
           valorUnitario: dados.valorUnitario,
           estoqueMinimo: dados.estoqueMinimo,
           ativo: dados.ativo,
-          grupoMaterial: dados.grupoMaterial,
-          grupoMaterialId: dados.grupoMaterialId,
-          grupoMaterialNome: dados.grupoMaterialNome ?? dados.grupoMaterial,
+          grupoMaterial: dados.grupoMaterialId || dados.grupoMaterial,
           numeroCalcado: dados.numeroCalcado,
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
