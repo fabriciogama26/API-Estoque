@@ -331,6 +331,26 @@ const normalizeUuid = (value) => {
   return UUID_REGEX.test(texto) ? texto : null
 }
 
+const normalizeOptionId = (value) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : null
+  }
+
+  if (typeof value === 'string') {
+    const texto = trim(value)
+    if (!texto) {
+      return null
+    }
+    return normalizeUuid(texto) ?? texto
+  }
+
+  return null
+}
+
 const unwrapOptionRecord = (value) => {
   if (!value || typeof value !== 'object') {
     return value
@@ -365,15 +385,13 @@ const normalizeOptionItem = (value) => {
     return null
   }
 
-  if (typeof value === 'string') {
-    const texto = trim(value)
-    if (!texto) {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const id = normalizeOptionId(value)
+    if (!id) {
       return null
     }
-    return {
-      id: normalizeUuid(texto),
-      nome: resolveTextValue(texto),
-    }
+    const nome = resolveTextValue(value)
+    return { id, nome }
   }
 
   const record = unwrapOptionRecord(value)
@@ -381,19 +399,57 @@ const normalizeOptionItem = (value) => {
     return null
   }
 
-  const id =
-    normalizeUuid(record.id) ??
-    normalizeUuid(record.uuid) ??
-    normalizeUuid(record.valor) ??
-    normalizeUuid(record.value) ??
-    null
+  const idFields = [
+    record.id,
+    record.uuid,
+    record.valor,
+    record.value,
+    record.codigo,
+    record.code,
+  ]
 
-  const nome = resolveCatalogoNome(record)
-  if (!nome) {
-    return id ? { id, nome: id } : null
+  let id = null
+  for (const fieldValue of idFields) {
+    id = normalizeOptionId(fieldValue)
+    if (id) {
+      break
+    }
   }
 
-  return { id, nome }
+  const nome = resolveCatalogoNome(record)
+  if (!id) {
+    if (!nome) {
+      return null
+    }
+    return { id: null, nome }
+  }
+
+  return { id, nome: nome || id }
+}
+
+const normalizeRelationIds = (lista) => {
+  const valores = []
+  const vistos = new Set()
+
+  const itens = Array.isArray(lista) ? lista : [lista]
+  itens
+    .map((item) => {
+      if (item && typeof item === 'object') {
+        const candidato =
+          item.id ?? item.uuid ?? item.valor ?? item.value ?? item.codigo ?? item.code
+        return normalizeOptionId(candidato)
+      }
+      return normalizeOptionId(item)
+    })
+    .filter(Boolean)
+    .forEach((id) => {
+      if (!vistos.has(id)) {
+        vistos.add(id)
+        valores.push(id)
+      }
+    })
+
+  return valores
 }
 
 const normalizeOptionList = (lista) => {
@@ -775,6 +831,7 @@ async function replaceMaterialRelationsWithFallback({
   deleteMessage,
   insertMessage,
 }) {
+  const normalizedValues = normalizeRelationIds(values ?? [])
   let lastColumnError = null
 
   for (const columnName of columnCandidates) {
@@ -783,13 +840,24 @@ async function replaceMaterialRelationsWithFallback({
         table,
         materialId,
         columnName,
-        values,
+        values: normalizedValues,
         deleteMessage,
         insertMessage,
       })
       return
     } catch (error) {
       if (!error || error.code !== '42703') {
+        if (normalizedValues.length > 0) {
+          console.warn(
+            'Supabase rejeitou IDs de vínculo de material.',
+            {
+              table,
+              columnName,
+              values: normalizedValues,
+            },
+            error
+          )
+        }
         throw error
       }
       lastColumnError = error
@@ -845,8 +913,8 @@ function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudi
     chaveUnica: dados.chaveUnica ?? '',
     cor_material: dados.corMaterial ?? '',
     caracteristica_epi: dados.caracteristicaEpi ?? '',
-    caracteristicas_epi: Array.isArray(dados.caracteristicasIds) ? dados.caracteristicasIds : [],
-    cores: Array.isArray(dados.coresIds) ? dados.coresIds : [],
+    caracteristicas_epi: normalizeRelationIds(dados.caracteristicasIds ?? []),
+    cores: normalizeRelationIds(dados.coresIds ?? []),
   }
 
   if (includeCreateAudit) {
@@ -1171,9 +1239,11 @@ function sanitizeMaterialPayload(payload = {}) {
     numeroEspecifico,
     caracteristicaEpi,
     caracteristicas: caracteristicasSelecionadas,
-    caracteristicasIds: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
+    caracteristicasIds: normalizeRelationIds(
+      caracteristicasSelecionadas.map((item) => item?.id)
+    ),
     cores: coresSelecionadas,
-    coresIds: coresSelecionadas.map((item) => item.id).filter(Boolean),
+    coresIds: normalizeRelationIds(coresSelecionadas.map((item) => item?.id)),
     corMaterial: corMaterialTexto,
     chaveUnica: trim(payload.chaveUnica ?? payload.chave_unica ?? ''),
   }
