@@ -28,6 +28,7 @@ const sanitizeAlphanumeric = (value = '') => String(value).trim()
 const sanitizeMaterialNome = (value = '') => value.replace(/\d/g, '')
 
 const normalizeSelectionKey = (value) => normalizeKeyPart(value || '')
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const normalizeSelectionItem = (item) => {
   if (item === null || item === undefined) {
@@ -201,11 +202,13 @@ export function resolveUsuarioNome(user) {
 }
 
 export function validateMaterialForm(form) {
-  const nomeSanitizado = sanitizeMaterialNome(form.nome)
+  const nomeSanitizado = sanitizeMaterialNome(form.materialItemNome || form.nome)
   if (!nomeSanitizado.trim()) {
     return 'Informe o nome do EPI (somente letras).'
   }
-  if (/\d/.test(form.nome || '')) {
+  const nomeDisplay = form.materialItemNome || ''
+  const isExistingEpi = UUID_REGEX.test(String(form.nome || ''))
+  if (!isExistingEpi && /\d/.test(nomeDisplay)) {
     return 'O campo EPI nao pode conter numeros.'
   }
   const grupoMaterialNome = sanitizeAlphanumeric(
@@ -214,16 +217,21 @@ export function validateMaterialForm(form) {
   if (!form.grupoMaterialId && !grupoMaterialNome) {
     return 'Selecione o grupo de material.'
   }
+  if (!form.nome) {
+    return 'Selecione o EPI.'
+  }
 
   if (isGrupo(grupoMaterialNome, GRUPO_MATERIAL_CALCADO)) {
-    const numero = sanitizeDigits(form.numeroCalcado)
+    const numero = form.numeroCalcadoNome?.trim() || form.numeroCalcado?.trim() || ''
     if (!numero) {
       return 'Informe o numero do calcado.'
     }
   }
 
   if (requiresTamanho(grupoMaterialNome)) {
-    if (!String(form.numeroVestimenta || '').trim()) {
+    const numeroVestimentaTexto =
+      form.numeroVestimentaNome?.trim() || form.numeroVestimenta?.trim() || ''
+    if (!numeroVestimentaTexto) {
       return 'Informe o tamanho.'
     }
   }
@@ -262,11 +270,12 @@ const buildMaterialPayload = (form) => {
   )
   const grupoMaterialId = sanitizeAlphanumeric(form.grupoMaterialId || '')
   const grupoMaterial = grupoMaterialNome
-  const numeroCalcadoRaw = sanitizeDigits(form.numeroCalcado)
-  const numeroVestimentaRaw = sanitizeAlphanumeric(form.numeroVestimenta)
-  const numeroCalcado = numeroCalcadoRaw ? String(numeroCalcadoRaw) : ''
-  const numeroVestimenta = numeroVestimentaRaw
-  const nomeEpi = sanitizeMaterialNome(form.nome).trim()
+  const numeroCalcadoId = form.numeroCalcado || ''
+  const numeroCalcadoNome = sanitizeAlphanumeric(form.numeroCalcadoNome || '')
+  const numeroVestimentaId = form.numeroVestimenta || ''
+  const numeroVestimentaNome = sanitizeAlphanumeric(form.numeroVestimentaNome || '')
+  const nomeEpi = sanitizeMaterialNome(form.materialItemNome || form.nome).trim()
+  const nomeId = sanitizeAlphanumeric(form.nome)
   const caracteristicasSelecionadas = mergeSelectionLists(
     form.caracteristicaEpi,
     form.caracteristicas,
@@ -278,29 +287,30 @@ const buildMaterialPayload = (form) => {
   )
   const coresSelecionadas = mergeSelectionLists(form.cores, form.coresIds)
   const corPrincipal = coresSelecionadas[0]?.nome ?? form.corMaterial
-  const fabricanteNome = sanitizeAlphanumeric(form.fabricante)
+  const fabricanteId = sanitizeAlphanumeric(form.fabricante || '')
+  const fabricanteNome = sanitizeAlphanumeric(form.fabricanteNome || form.fabricante || '')
   const numeroEspecifico = buildNumeroReferencia({
     grupoMaterial: grupoMaterialNome,
-    numeroCalcado,
-    numeroVestimenta,
+    numeroCalcado: numeroCalcadoNome,
+    numeroVestimenta: numeroVestimentaNome,
   })
   const chaveUnica = buildChaveUnica({
     grupoMaterial,
     grupoMaterialNome,
     nome: nomeEpi,
     fabricante: fabricanteNome,
-    numeroCalcado,
-    numeroVestimenta,
+    numeroCalcado: numeroCalcadoNome,
+    numeroVestimenta: numeroVestimentaNome,
     caracteristicaEpi: caracteristicaTexto,
     corMaterial: corPrincipal,
     ca: form.ca,
   })
 
   return {
-    nome: nomeEpi,
+    nome: nomeId,
     nomeItemRelacionado: nomeEpi,
     materialItemNome: nomeEpi,
-    fabricante: fabricanteNome.trim(),
+    fabricante: fabricanteId || '',
     fabricanteNome: fabricanteNome.trim(),
     validadeDias: Number(form.validadeDias) || 0,
     ca: sanitizeDigits(form.ca),
@@ -308,8 +318,10 @@ const buildMaterialPayload = (form) => {
     grupoMaterial,
     grupoMaterialNome,
     grupoMaterialId: grupoMaterialId || null,
-    numeroCalcado: isGrupo(grupoMaterialNome, GRUPO_MATERIAL_CALCADO) ? numeroCalcado : '',
-    numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimenta : '',
+    numeroCalcado: isGrupo(grupoMaterialNome, GRUPO_MATERIAL_CALCADO)
+      ? numeroCalcadoId || null
+      : null,
+    numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimentaId || null : null,
     numeroEspecifico,
     chaveUnica,
     caracteristicaEpi: caracteristicaTexto,

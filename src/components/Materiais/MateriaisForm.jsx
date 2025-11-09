@@ -147,7 +147,7 @@ export function MateriaisForm({
                   : 'Selecione um grupo primeiro'}
             </option>
             {itemOptions.map((item) => (
-              <option key={item.id ?? item.nome} value={item.nome}>
+              <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
                 {item.nome}
               </option>
             ))}
@@ -263,7 +263,7 @@ export function MateriaisForm({
         </label>
         <label className="field">
           <span>
-            Numero calcado {isCalcado ? <span className="asterisco">*</span> : null}
+            Numero calçado {isCalcado ? <span className="asterisco">*</span> : null}
           </span>
           <select
             name="numeroCalcado"
@@ -280,8 +280,8 @@ export function MateriaisForm({
                 : 'Não se aplica ao grupo'}
             </option>
             {calcadoOptions.map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {opcao}
+              <option key={opcao.id ?? opcao.nome} value={opcao.id ?? opcao.nome}>
+                {opcao.nome}
               </option>
             ))}
           </select>
@@ -306,15 +306,15 @@ export function MateriaisForm({
                 : 'Não se aplica ao grupo'}
             </option>
             {tamanhoOptions.map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {opcao}
+              <option key={opcao.id ?? opcao.nome} value={opcao.id ?? opcao.nome}>
+                {opcao.nome}
               </option>
             ))}
           </select>
           {tamanhoError ? <p className="feedback feedback--error">{tamanhoError}</p> : null}
         </label>
         <label className="field">
-          <span>Cor</span>
+          <span>Cor <span className="asterisco">*</span></span>
           <div className="field__inline">
             <select
               value={corSelecionada}

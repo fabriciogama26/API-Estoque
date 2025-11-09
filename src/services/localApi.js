@@ -1044,7 +1044,8 @@ const sanitizeMaterialPayload = (payload = {}) => {
   const materialItemNomeBase = trim(
     payload.nome || payload.materialItemNome || payload.nomeItemRelacionado || '',
   )
-  const fabricanteNomeBase = trim(payload.fabricanteNome || payload.fabricante)
+  const fabricanteIdBase = trim(payload.fabricante ?? payload.fabricanteId ?? '')
+  const fabricanteNomeBase = trim(payload.fabricanteNome || payload.fabricante || '')
   const caracteristicasSelecionadas = normalizeSelectionList(
     payload.caracteristicas ??
       payload.caracteristicasEpi ??
@@ -1075,7 +1076,7 @@ const sanitizeMaterialPayload = (payload = {}) => {
     nome: materialItemNomeBase,
     nomeItemRelacionado: materialItemNomeBase,
     materialItemNome: materialItemNomeBase,
-    fabricante: fabricanteNomeBase,
+    fabricante: fabricanteIdBase,
     fabricanteNome: fabricanteNomeBase,
     validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
     ca: trim(payload.ca),
