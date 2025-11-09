@@ -1703,7 +1703,7 @@ const localApi = {
         }
         catalogoFabricantesPadrao.forEach((nome) => registrar(nome))
         state.materiais.forEach((material) => {
-          registrar(material.fabricanteNome || material.fabricante, material.fabricanteId)
+          registrar(material.fabricanteNome || material.fabricante, material.fabricante)
         })
         return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome))
       })
@@ -1795,7 +1795,6 @@ const localApi = {
           'materialItemNome',
           'fabricante',
           'fabricanteNome',
-          'fabricanteId',
           'validadeDias',
           'ca',
           'valorUnitario',

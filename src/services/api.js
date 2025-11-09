@@ -192,7 +192,8 @@ const MATERIAL_SELECT_COLUMNS = `
   "numeroCalcadoNome",
   "numeroVestimentaNome",
   "usuarioCadastroNome",
-  "usuarioAtualizacaoNome"
+  "usuarioAtualizacaoNome",
+  "fabricanteNome"
 `
 
 const normalizeHistoryValue = (value) => {
@@ -986,12 +987,11 @@ async function syncMaterialRelations(
 
 function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
   const nomePersist = dados.nome || ''
-  const fabricanteNomePersist = dados.fabricanteNome || dados.fabricante || ''
+  const fabricantePersist = dados.fabricante || ''
   const grupoMaterialPersist = dados.grupoMaterialId || dados.grupoMaterial || ''
   const payload = {
     nome: nomePersist,
-    fabricante: fabricanteNomePersist,
-    fabricanteNome: fabricanteNomePersist,
+    fabricante: fabricantePersist,
     validadeDias: dados.validadeDias ?? null,
     ca: dados.ca ?? '',
     valorUnitario: dados.valorUnitario ?? 0,
@@ -1491,7 +1491,7 @@ async function carregarSaidas(params = {}) {
       execute(
         supabase
           .from('materiais_view')
-        .select('id, nome, fabricante, "fabricanteNome", "fabricantesNome"'),
+        .select('id, nome, fabricante'),
         'Falha ao listar materiais.'
       ),
     ])

@@ -440,7 +440,7 @@ const buildChaveUnicaMaterial = ({
 
 async function sanitizeMaterialPayload(payload = {}) {
   const nome = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado)
-  const fabricante = trim(payload.fabricante ?? payload.fabricanteNome)
+  const fabricante = trim(payload.fabricante ?? payload.fabricante)
   const grupoMaterialNome = trim(payload.grupoMaterialNome ?? payload.grupoMaterial)
   const grupoMaterialId = trim(payload.grupoMaterialId)
   const numeroCalcadoRaw = sanitizeDigits(payload.numeroCalcado)
@@ -517,7 +517,7 @@ function validateMaterialPayload(payload) {
   if (!payload.grupoMaterial && !payload.grupoMaterialNome) {
     throw createHttpError(400, 'Grupo de material obrigatorio.')
   }
-  if (!payload.fabricante && !payload.fabricanteNome) {
+  if (!payload.fabricante && !payload.fabricante)
     throw createHttpError(400, 'Fabricante obrigatorio.')
   }
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
