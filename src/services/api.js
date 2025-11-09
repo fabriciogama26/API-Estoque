@@ -192,7 +192,8 @@ const MATERIAL_SELECT_COLUMNS = `
   "numeroCalcadoNome",
   "numeroVestimentaNome",
   "usuarioCadastroNome",
-  "usuarioAtualizacaoNome"
+  "usuarioAtualizacaoNome",
+  "fabricanteNome"
 `
 
 const normalizeHistoryValue = (value) => {
@@ -1490,7 +1491,7 @@ async function carregarSaidas(params = {}) {
       execute(
         supabase
           .from('materiais_view')
-        .select('id, nome, fabricante, "fabricanteNome"'),
+        .select('id, nome, fabricante'),
         'Falha ao listar materiais.'
       ),
     ])

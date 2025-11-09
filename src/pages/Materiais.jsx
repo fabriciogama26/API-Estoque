@@ -284,8 +284,7 @@ export function MateriaisPage() {
       const selecionado = findOptionByValue(fabricanteOptions, value) ?? normalizeSelectionItem(value)
       setForm((prev) => ({
         ...prev,
-        fabricante: value,
-        fabricanteNome: selecionado?.nome ?? value,
+        fabricante: selecionado?.nome ?? value,
       }))
       return
     }
