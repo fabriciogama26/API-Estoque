@@ -3,54 +3,28 @@ Tela: Materiais
 
 Visão geral
 -----------
-- Cadastro completo de EPIs com suporte a grupos, numeração específica, histórico de valores e filtros por status.
-- Componentes dedicados encapsulam formulário, filtros, tabela e modal de histórico.
-- Opera com os mesmos comportamentos tanto no modo Supabase quanto no modo local.
+- Tela mais completa do módulo: cadastra/edita materiais de EPI, gerencia catálogos auxiliares (grupos, características, cores, numerações) e exibe histórico de preços.
+- A página orquestra múltiplas requisições paralelas (`api.materiais.listDetalhado`, `groups`, `caracteristicas`, `cores`, `medidasCalcado`, `medidasVestimenta`, `fabricantes`) com tratamento individual de erros e indicadores de carregamento.【F:src/pages/Materiais.jsx†L33-L153】
 
-Fluxo principal
----------------
-1. `MateriaisPage` carrega a lista de materiais (`dataClient.materiais.list`) e os grupos disponíveis (`dataClient.materiais.groups`) logo após montar.
-2. O formulário utiliza `validateMaterialForm` e `createMaterialPayload`/`updateMaterialPayload` para normalizar e validar os campos antes de salvar.
-3. Criação e edição chamam `dataClient.materiais.create` ou `.update`, adicionando `usuarioResponsavel` com base no `AuthContext`.
-4. O modal de histórico (`MateriaisHistoryModal`) busca os registros sob demanda com `dataClient.materiais.priceHistory(materialId)` e mantém cache em memória.
+Formulário
+----------
+- Campos principais: grupo de material (define comportamentos para calcado/vestimenta), item do catálogo, nome, fabricante, validade (dias), CA, valor unitário, descrição, centros de custo, numeração, características e cores.
+- `handleFormChange` normaliza valores (remove não dígitos do CA, formata moeda, propaga centro de serviço) e garante consistência ao trocar o grupo (limpa nome/números incompatíveis).【F:src/pages/Materiais.jsx†L154-L286】
+- Botões de adicionar/remover características e cores trabalham com listas normalizadas (`normalizeSelectionList`) para evitar duplicidades e manter referência aos IDs quando disponíveis.【F:src/pages/Materiais.jsx†L288-L414】
+- Ao iniciar edição (`startEdit`) o formulário é preenchido com dados existentes, mantendo caches locais de grupos/itens/fabricantes para facilitar reuso; `cancelEdit` restaura o estado inicial.【F:src/pages/Materiais.jsx†L418-L521】
 
-Campos e regras principais
---------------------------
-- `nome` e `fabricante`: obrigatórios, sem números no nome (regra aplicada em `validateMaterialForm`).
-- `validadeDias`: inteiro > 0.
-- `ca`: dígitos apenas (`sanitizeDigits`).
-- `valorUnitario`: monetário com formatação amigável (`formatCurrencyInput`).
-- `estoqueMinimo`: inteiro ≥ 0 (pode ficar em branco para considerar 0).
-- `grupoMaterial`: obrigatório; ao mudar, reinicia campos dependentes (`numeroCalcado`, `numeroVestimenta`).
-- `numeroCalcado`: obrigatório apenas para grupos identificados como calçados.
-- `numeroVestimenta`: obrigatório apenas para grupos classificados como vestimenta.
-- `descricao` e `ativo`: opcionais (toggle na tabela).
-- `numeroEspecifico`/`chaveUnica`: calculados pelo backend para garantir unicidade por grupo + número.
-
-Filtros e tabela
-----------------
-- Filtros por termo (nome/fabricante), status (`ativo`) e grupo.
-- `filterMateriais` aplica a filtragem no cliente; a ordenação padrão utiliza `sortMateriaisByNome`.
-- Tabela mostra valores formatados (`formatCurrency`) e realça materiais inativos.
-- Ações por linha: editar (preenche o formulário) e histórico de preços.
+Listagem e filtros
+------------------
+- `MateriaisFilters` permite filtrar por termo, grupo, fabricante, validade mínima/máxima e status de estoque. Os filtros alimentam `filterMateriais`/`sortMateriaisByNome` antes de repassar para a tabela.【F:src/pages/Materiais.jsx†L523-L603】
+- A tabela mostra ações de editar e histórico. O botão **Atualizar** refaz a consulta no Supabase/local API mantendo a ordenação alfabética.【F:src/pages/Materiais.jsx†L605-L640】
 
 Histórico de preços
 -------------------
-- `MateriaisHistoryModal` exibe cada alteração de `valorUnitario` com data/hora, valor anterior e usuário responsável.
-- O backend registra entradas na tabela `material_price_history` sempre que o valor muda (`src/services/api.js`).
+- Ao abrir o modal de histórico, a página consulta `api.materiais.history(material.id)` apenas uma vez e armazena em `historyCache`; chamadas subsequentes reutilizam o cache local para evitar requisições redundantes.【F:src/pages/Materiais.jsx†L57-L75】【F:src/pages/Materiais.jsx†L457-L520】
+- `MateriaisHistoryModal` recebe o estado `historyModal` com bandeiras de carregamento/erro e exibe a linha do tempo de alterações.
 
-Componentes e arquivos relevantes
----------------------------------
-- `src/pages/Materiais.jsx`
-- `src/components/Materiais/MateriaisForm.jsx`
-- `src/components/Materiais/MateriaisFilters.jsx`
-- `src/components/Materiais/MateriaisTable.jsx`
-- `src/components/Materiais/MateriaisHistoryModal.jsx`
-- `src/rules/MateriaisRules.js`
-- `src/utils/MateriaisUtils.js`
-
-Integração com outros módulos
------------------------------
-- Materiais são usados por Entradas, Saídas, Estoque e Termo de EPI.
-- A edição de estoque mínimo reflete imediatamente na tela de Estoque (`docs/Estoque.txt`).
-- Os grupos retornados aqui alimentam formulários e filtros nos módulos de movimentação.
+Boas práticas
+-------------
+- Popule as tabelas de referência (grupos, características, cores, medidas) antes de abrir a tela em produção para evitar formulários vazios.
+- Ao adicionar novos campos no Supabase, atualize `createMateriaisFormDefault`, `MateriaisForm` e `createMaterialPayload`/`updateMaterialPayload` em `src/rules/MateriaisRules.js` para manter coerência.
+- Use o histórico para auditar alterações manuais feitas via Studio ou integrações externas.

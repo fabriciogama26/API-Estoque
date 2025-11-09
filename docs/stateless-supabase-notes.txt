@@ -5,51 +5,48 @@ Notas de Migração Stateless
 
 Visão geral da arquitetura
 --------------------------
-- O frontend (Vite/React) é publicado como assets estáticos (ex.: Vercel).
-- Todas as requisições de dados partem do navegador usando `@supabase/supabase-js`; não há camada obrigatória de backend.
-- Os tokens do Supabase Auth são mantidos pelo SDK e utilizados em cada chamada, respeitando as políticas RLS configuradas.
+- O frontend (Vite/React) é publicado como assets estáticos (ex.: Vercel). Todas as telas consomem dados direto do Supabase ou da API local sem backend próprio.
+- As chamadas utilizam `@supabase/supabase-js` configurado em `src/services/api.js`, incluindo funções utilitárias para montar dashboards e calcular saldo de estoque.【F:src/services/api.js†L1-L48】
+- Os tokens do Supabase Auth são mantidos pelo SDK e reutilizados em cada requisição, respeitando as políticas RLS configuradas.
 
 Variáveis de ambiente
 ---------------------
 - `VITE_SUPABASE_URL`: URL pública do projeto Supabase.
-- `VITE_SUPABASE_ANON_KEY`: chave `anon` (respeita RLS).
-- `VITE_DATA_MODE`: `remote` para Supabase, `local` para persistir no navegador.
-- Variáveis opcionais para o termo de EPI (`VITE_TERMO_EPI_EMPRESA_*`) e modo local (`VITE_LOCAL_*`).
+- `VITE_SUPABASE_ANON_KEY`: chave `anon` usada pelo SDK.
+- `VITE_DATA_MODE`: `remote` (padrão) ou `local` (usa `localStorage`).【F:src/config/runtime.js†L1-L12】
+- `VITE_TERMO_EPI_EMPRESA_*`, `VITE_SUPABASE_FUNCTIONS_URL`, `VITE_LOCAL_*` complementam recursos de documentos e modo offline.【F:src/utils/TermoEpiUtils.js†L1-L94】【F:src/context/AuthContext.jsx†L7-L84】
 
 Expectativas do schema Supabase
 -------------------------------
-As migrations em `supabase/migrations` já alinham as tabelas esperadas. Principais entidades:
-- `pessoas`: inclui campos de centro de serviço, setor, cargo, tipo de execução, data de admissão e histórico (`pessoas_historico`).
-- `materiais`: contém validações de estoque mínimo, histórico de preço (`material_price_history`) e chave única por grupo/número.
-- `entradas` / `saidas`: registram movimentações com auditoria (`usuarioResponsavel`, `dataEntrada`, `dataEntrega`, `dataTroca`).
-- `acidentes`: armazena dados completos de SST, vinculando-se às tabelas de domínio (`acidente_agentes`, `acidente_partes`, `acidente_lesoes`, `acidente_tipos`).
-- Tabelas de referência: centros de serviço, centros de custo, setores, cargos, tipos de execução e catálogos de acidentes.
+- Migrations em `supabase/migrations` criam as tabelas e políticas esperadas. Destaques:
+  - `pessoas` + `pessoas_historico` armazenam dados cadastrais e auditoria.
+  - `materiais` + `material_price_history` tratam estoque mínimo e histórico de preços.
+  - `entradas`/`saidas` registram movimentações com campos de auditoria (`usuarioResponsavel`, datas).
+  - `acidentes` relaciona agentes/tipos/partes/lesões (migrations 0014-0017) para alimentar a tela e dashboards.【F:supabase/README.md†L12-L55】
 
 Fluxo de dados no frontend
 --------------------------
-- `src/services/api.js` monta queries Supabase, normaliza registros (`map*Record`) e reaproveita funções de domínio (`src/lib`).
-- `src/services/localApi.js` oferece o mesmo contrato utilizando o seed local.
-- Dashboards e cálculos (estoque atual, agregações de acidentes, termo de EPI) são executados no cliente via helpers puros.
+- `src/services/api.js` executa queries Supabase e normaliza registros via helpers (`montarEstoqueAtual`, `montarDashboard`, `montarDashboardAcidentes`).【F:src/services/api.js†L1-L48】
+- `src/services/localApi.js` replica o mesmo contrato utilizando seeds em `src/data/local-seed.json`, permitindo desenvolvimento offline.【F:src/services/localApi.js†L1-L160】
+- Regras de domínio ficam em `src/lib/` e `src/rules/`, reaproveitadas por páginas e serviços.
 
 Destaques da lógica de negócios
 -------------------------------
-- Pessoas: valida campos obrigatórios, garante matrícula única e registra histórico de alterações.
-- Materiais: valida grupos, numerações específicas e gera histórico de preço a cada mudança de `valorUnitario`.
-- Entradas: verifica existência do material e registra centro de custo e responsável.
-- Saídas: checa saldo disponível (`calcularSaldoMaterialAtual`), calcula `dataTroca` e vincula colaborador/centro de serviço.
-- Termo de EPI: combina dados de pessoas e saídas para montar o documento, com geração de PDF client-side.
-- Dashboards: `montarDashboard` e `montarDashboardAcidentes` recalculam métricas sob demanda.
+- Pessoas: valida matrícula, sincroniza centro de serviço/local e gera histórico ao alterar registros.【F:src/pages/Pessoas.jsx†L52-L210】
+- Materiais: controla catálogos de grupo/itens, características, cores e histórico de preço a cada alteração de valor unitário.【F:src/pages/Materiais.jsx†L33-L521】
+- Entradas/Saídas: usam catálogos carregados previamente, calculam valores monetários e registram responsável autenticado.【F:src/pages/EntradasPage.jsx†L29-L276】【F:src/pages/SaidasPage.jsx†L1-L318】
+- Estoque/Dashboards: cálculos são feitos client-side via hooks e helpers (`agruparPorPeriodo`, `montarRanking`, `montarEstoquePorMaterial`).【F:src/pages/DashboardPage.jsx†L41-L213】
+- Termo de EPI: combina dados de colaboradores e entregas para gerar HTML e PDF através da função serverless.【F:src/pages/TermosEpiPage.jsx†L1-L178】【F:src/utils/TermoEpiUtils.js†L1-L94】
 
 Recomendações de segurança
 --------------------------
-- Habilite RLS em todas as tabelas e crie políticas específicas para cada perfil (ver [`docs/rls-policies-guide.txt`](rls-policies-guide.txt)).
-- Para funções serverless opcionais, use a chave `service_role` apenas no backend e adicione políticas explícitas (`auth.role() = 'service_role'`).
-- Monitore acessos sensíveis (históricos, indicadores) e registre auditoria quando necessário.
+- Habilite RLS em todas as tabelas e mantenha políticas atualizadas (ver [`docs/rls-policies-guide.txt`](rls-policies-guide.txt)).
+- Funções serverless devem usar `service_role` apenas no backend e validar `apikey` em cada requisição.【F:supabase/functions/termo-epi/index.ts†L1-L160】
+- Monitore logs do Supabase (Auth/SQL) para auditar acessos a históricos e dashboards.
 
 Próximos passos sugeridos
 -------------------------
-- Configurar provedores de autenticação (email, OAuth) no painel Supabase.
-- Popular tabelas de domínio (centros, cargos, agentes) antes de liberar o cadastro operacional.
-- Automatizar migrations no pipeline de deploy (`supabase db push`).
-- Avaliar métricas de uso e, se necessário, criar views/materialized views para dashboards pesados.
-- Revisar periodicamente políticas de acesso e documentar mudanças neste diretório.
+- Configurar provedores adicionais de autenticação (email magic link, OAuth) no painel Supabase.
+- Popular tabelas de domínio antes de liberar o cadastro operacional (centros de serviço, cargos, agentes, lesões, tipos).
+- Automatizar migrations no pipeline (`supabase db push`) e revisar periodicamente com `supabase db pull`.
+- Documentar alterações relevantes neste diretório para manter o time alinhado.

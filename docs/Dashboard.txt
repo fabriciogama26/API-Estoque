@@ -3,54 +3,31 @@ Tela: Dashboards de Estoque
 
 Visão geral
 -----------
-- Resumo consolidado das movimentações de estoque (entradas x saídas), valores financeiros e materiais em alerta.
-- Componentes reutilizam os mesmos dados tanto no modo Supabase quanto no modo local, já que todo o cálculo é feito no cliente.
-- Filtros controlam apenas a faixa de períodos consultada no `dataClient`; a busca textual (`termo`) atua em memória.
+- Consolida indicadores de movimentação de estoque (entradas, saídas, valor total e reposição) no período filtrado.
+- Agrupa dados por período (mês/ano) e apresenta gráficos de barras/linhas para evolução, ranking de materiais e distribuição por categoria.
+- Fonte de dados é `api.estoque.dashboard`, que retorna blocos específicos para cada widget.【F:src/pages/DashboardPage.jsx†L63-L107】
 
-Fluxo principal
----------------
-1. Ao montar a página, `DashboardPage` define filtros padrão para o ano corrente e chama `dataClient.estoque.dashboard(params)`.
-2. O client remoto (`src/services/api.js`) consulta Supabase (`materiais`, `entradas`, `saidas`, `pessoas`) e delega a agregação para `montarDashboard` (`src/lib/estoque.js`).
-3. O client local (`src/services/localApi.js`) utiliza os mesmos helpers com os dados do `localStorage`.
-4. O resultado alimenta os cards de destaque, os gráficos e as tabelas derivadas.
-
-Filtros
--------
-- `periodoInicio` / `periodoFim`: inputs `type="month"` que limitam a consulta ao `dataClient`.
-- `termo`: texto livre aplicado sobre nome e fabricante dos materiais já carregados.
-- Botões de "Filtrar" e "Limpar" disparam o recálculo e reposicionam os filtros para os valores padrão.
-
-Cards principais
-----------------
-- **Movimentações:** quantidade total de entradas + saídas, com breakdown na legenda.
-- **Valor movimentado:** soma de `quantidade * valorUnitario` para as movimentações do período.
-- **Materiais no estoque:** total de itens (quantidade) e número de materiais distintos.
-- **Alertas:** quantidade de materiais abaixo do estoque mínimo atual.
-
-Gráficos e tabelas
-------------------
-- `EntradasSaidasChart`: série temporal mensal construída por `agruparPorPeriodo` (em `DashboardPage.jsx`).
-- `ValorMovimentadoChart`: aproveita os mesmos dados da série temporal para representar valores financeiros.
-- `EstoquePorMaterialChart`: top materiais com maior quantidade disponível.
-- `EstoquePorCategoriaChart`: distribuição por categorias (primeira palavra do nome do material por padrão).
-- `MateriaisMaisUsadosChart`: ranking de materiais mais movimentados (entradas + saídas).
-
-Estados e mensagens
+Filtros disponíveis
 -------------------
-- `isLoading`: desabilita o formulário de filtros e exibe o estado de carregamento nos cards e gráficos.
-- `error`: mensagem de erro global abaixo do cabeçalho quando o `dataClient` falha.
-- Cada componente de gráfico mostra fallback "Nenhum dado disponível" quando recebe arrays vazios.
+- **Período inicial/final (AAAA-MM):** aplica recorte mensal inclusive nas consultas de entradas/saídas.
+- **Termo livre:** busca por nome/fabricante, reutilizado em todos os cards para limitar os materiais exibidos.
+- Botão *Aplicar filtros* dispara nova chamada; *Limpar filtros* restaura o ano corrente completo.【F:src/pages/DashboardPage.jsx†L34-L61】【F:src/pages/DashboardPage.jsx†L109-L139】
 
-Componentes relacionados
+Indicadores principais
+----------------------
+- **Cards de resumo:** total de entradas (quantidade + valor), total de saídas e saldo do estoque atual. Valores formatados com `Intl.NumberFormat` para BRL.【F:src/pages/DashboardPage.jsx†L18-L33】【F:src/pages/DashboardPage.jsx†L141-L178】
+- **Série histórica (EntradasSaidasChart):** soma de quantidades e valores mês a mês a partir de `entradasDetalhadas`/`saidasDetalhadas`. A agregação é feita pela função `agruparPorPeriodo` antes de renderizar o gráfico de barras combinadas.【F:src/pages/DashboardPage.jsx†L41-L76】【F:src/pages/DashboardPage.jsx†L180-L190】
+- **Estoque por material:** lista top-N ordenada por quantidade disponível, exibida em gráfico horizontal (`EstoquePorMaterialChart`).【F:src/pages/DashboardPage.jsx†L192-L197】
+- **Categorias:** monta mapa por primeira palavra do nome (fallback “Não classificado”) para agrupar famílias de EPIs.【F:src/pages/DashboardPage.jsx†L198-L205】
+- **Materiais mais movimentados:** ranking das saídas acumuladas (quantidade) no período analisado.【F:src/pages/DashboardPage.jsx†L206-L213】
+
+Estados e tratamento de erros
+-----------------------------
+- `isLoading` exibe mensagem na área principal enquanto aguarda os dados; erros exibem `feedback--error` com a mensagem retornada pela API.【F:src/pages/DashboardPage.jsx†L113-L122】【F:src/pages/DashboardPage.jsx†L232-L251】
+- Em caso de retorno vazio, cada gráfico mostra feedback neutro (“sem dados”) implementado nos componentes de chart.
+
+Boas práticas para dados
 ------------------------
-- `src/pages/DashboardPage.jsx`
-- `src/components/charts/EntradasSaidasChart.jsx`
-- `src/components/charts/EstoqueCharts.jsx`
-- `src/components/charts/EstoqueCategoriaChart.jsx`
-- `src/styles/DashboardPage.css` e `src/styles/charts.css`
-
-Dependências
-------------
-- `src/services/api.js` e `src/services/localApi.js` para consulta de dados.
-- `src/lib/estoque.js` para agregações de estoque e cálculo de alertas.
-- `AuthContext` não interfere diretamente na tela, mas o usuário logado aparece na barra lateral (`SystemStatus`).
+- Garanta que a API retorne `valorUnitario` para entradas/saídas; sem isso o cálculo `quantidade * valorUnitario` ficará zerado.
+- Para novos indicadores, estenda `api.estoque.dashboard` mantendo a estrutura atual (`entradas`, `saidas`, `estoqueAtual`, `materiaisMaisMovimentados`, etc.) para evitar ajustes na página.
+- Use seeds de `src/data/local-seed.json` como referência de formatos quando desenvolver no modo local.
