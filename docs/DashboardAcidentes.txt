@@ -3,53 +3,29 @@ Tela: Dashboard de Acidentes
 
 Visão geral
 -----------
-- Reúne indicadores de SST (taxa de frequência/gravidade, totais e distribuições) utilizando a mesma UI para Supabase e modo local.
-- Quando executado em modo Supabase, consulta a view `vw_indicadores_acidentes` (ou estrutura equivalente) e adapta o formato recebido.
-- Em modo local, usa `localApi.acidentes.dashboard` para calcular agregados a partir dos registros armazenados no navegador.
+- Reúne indicadores de segurança do trabalho (taxas, distribuição por agentes/tipos/partes/cargos) com base nos acidentes registrados.
+- Funciona tanto no modo local (`localApi.acidentes.dashboard`) quanto no modo remoto via view `vw_indicadores_acidentes` do Supabase.【F:src/pages/DashboardAcidentes.jsx†L1-L79】
 
-Fluxo de dados
---------------
-1. `DashboardAcidentes` inicializa os filtros com o ano corrente e chama `load(initialFilters())` no `useEffect` inicial.
-2. A função `load`:
-   - Valida se o Supabase está configurado (modo remoto) e exibe erro amigável caso contrário.
-   - No modo local: chama `dataClient.acidentes.dashboard(params)` e extrai `resumo`, séries e listas de opções.
-   - No modo remoto: monta uma consulta sobre `vw_indicadores_acidentes` usando `supabase.from(...).maybeSingle()`, filtrando por ano e unidade quando informados.
-3. A resposta é normalizada (`normalizeResumo`, `normalizeArray`) para alimentar os componentes `DashboardCards`, `ChartTendencia`, `ChartTipos`, `ChartPartesLesionadas`, `ChartCargos` e `ChartAgentes`.
+Fluxo de carregamento
+---------------------
+1. Ao montar, carrega os filtros padrão (ano/período corrente) e busca os dados.
+2. No modo local, a API deve retornar `{ resumo, tendencia, tipos, partesLesionadas, cargos, agentes, options }`.
+3. No modo remoto, consulta a view e normaliza as colunas (`resumo`, `tendencia`, `tipos`, `partes_lesionadas`, etc.). Em ausência de dados, exibe estado vazio e limpa opções.【F:src/pages/DashboardAcidentes.jsx†L81-L152】
 
 Filtros suportados
 ------------------
-- Ano (campo numérico tratado como string) e unidade (quando a view disponibiliza a coluna).
-- Período inicial/final (`type="month"`), centro de serviço, tipo, lesão, parte lesionada, agente e cargo.
-- Os selects adicionais (centro/tipo/lesão/parte/agente/cargo) são populados somente no modo local, pois a view remota fornece dados consolidados já filtrados por ano/unidade.
+- Ano, unidade (todas ou específica), período inicial/final, centro de serviço, tipo, lesão, parte lesionada, agente e cargo.
+- Alterações atualizam o estado local; *Aplicar* dispara `load(filters)` e *Limpar* restaura `initialFilters()`.【F:src/pages/DashboardAcidentes.jsx†L30-L59】【F:src/pages/DashboardAcidentes.jsx†L154-L172】
 
-Indicadores exibidos
---------------------
-- Cartões com total de acidentes, taxa de frequência (TF), taxa de gravidade (TG) e horas homem trabalhadas.
-- Série temporal mensal de acidentes (`ChartTendencia`).
-- Distribuições por tipo, parte lesionada, cargo e agente de acidente.
-- Cada gráfico mostra mensagens de vazio quando o array correspondente está sem valores > 0.
-
-Estados e mensagens
+Componentes visuais
 -------------------
-- `isLoading`: exibe feedback de carregamento enquanto aguarda a consulta.
-- `error`: mensagem global quando a consulta falha (inclui validação de configuração do Supabase).
-- Ao limpar filtros (`handleReset`) o estado volta ao padrão e recarrega os dados.
+- **DashboardCards:** mostra totais (acidentes, taxa de frequência/gravidade, dias perdidos) calculados via `resolveIndicadorValor` a partir do resumo normalizado.【F:src/pages/DashboardAcidentes.jsx†L174-L193】
+- **ChartTendencia:** curva temporal (por mês) usando `tendencia`.
+- **ChartTipos / ChartAgentes / ChartPartesLesionadas / ChartCargos:** gráficos de barras/pizza para distribuições categóricas. Esses componentes tratam dados vazios exibindo mensagens neutras.
+- **FiltrosDashboard:** exibe selects dinâmicos conforme opções disponíveis (modo local). No modo remoto as listas permanecem vazias e os selects padrão exibem somente “todas”.【F:src/pages/DashboardAcidentes.jsx†L1-L32】【F:src/components/FiltrosDashboard.jsx†L1-L104】
 
-Componentes e utilitários relacionados
---------------------------------------
-- `src/pages/DashboardAcidentes.jsx`
-- `src/components/DashboardCards.jsx`
-- `src/components/charts/ChartTendencia.jsx`
-- `src/components/charts/ChartTipos.jsx`
-- `src/components/charts/ChartPartesLesionadas.jsx`
-- `src/components/charts/ChartCargos.jsx`
-- `src/components/charts/ChartAgentes.jsx`
-- `src/components/FiltrosDashboard.jsx`
-- `src/utils/indicadores.js` (helper `resolveIndicadorValor`)
-- `src/lib/acidentesDashboard.js` (cálculos do modo local)
-
-Requisitos de dados no Supabase
--------------------------------
-- View `vw_indicadores_acidentes` (ou similar) deve expor, no mínimo, os campos utilizados na normalização: `resumo`, `tendencia`, `tipos`, `partes_lesionadas`, `cargos`, `agentes`.
-- As tabelas de apoio (`acidente_agentes`, `acidente_partes`, `acidente_lesoes`, `acidente_tipos`) alimentam o modo local e o formulário de cadastro de acidentes.
-- HHT, dias perdidos e debitados precisam estar preenchidos nos registros para que TF/TG retornem valores consistentes.
+Erros e pré-requisitos
+----------------------
+- Quando `VITE_SUPABASE_URL` ou `VITE_SUPABASE_ANON_KEY` não estão configuradas e o modo não é local, a tela mostra erro orientando a configurar Supabase antes de prosseguir.【F:src/pages/DashboardAcidentes.jsx†L60-L96】
+- Certifique-se de criar/atualizar a view `vw_indicadores_acidentes` durante as migrations — o dashboard espera colunas agregadas compatíveis (ver `supabase/migrations/0023_*.sql` em diante).
+- Seeds locais devem incluir exemplos em `localApi.acidentes.dashboard` para manter os gráficos populados durante desenvolvimento offline.

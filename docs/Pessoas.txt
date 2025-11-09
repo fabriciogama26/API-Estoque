@@ -3,49 +3,28 @@ Tela: Pessoas
 
 Visão geral
 -----------
-- Gerenciar colaboradores com cadastro completo (centro de serviço, setor, cargo, tipo de execução, data de admissão) e histórico de alterações.
-- Disponibiliza filtros por termo, centro de serviço, setor e cargo; combina dados do Supabase ou do modo local conforme configuração.
-- Modal de histórico apresenta mudanças campo a campo com responsável e timestamp.
+- Administra o cadastro de colaboradores, incluindo vínculos com centros de serviço, cargos, setores e tipos de execução.
+- Trabalha com cache local de opções (`pessoasOptionsRef`) para reaproveitar dados enquanto filtra resultados específicos.【F:src/pages/Pessoas.jsx†L1-L86】
 
-Fluxo principal
----------------
-1. Ao montar, `PessoasPage` chama `loadPessoas` com filtros padrão e, quando necessário, atualiza as referências (`api.references.pessoas`).
-2. O formulário utiliza `createPessoaPayload` e `updatePessoaPayload` para normalizar os dados antes de chamar `dataClient.pessoas.create/update`.
-3. Após salvar, a tabela é recarregada, o formulário é resetado e o cache do histórico é limpo para refletir os novos valores.
-4. O modal de histórico busca dados apenas quando aberto (`dataClient.pessoas.history(id)`), mantendo cache local por pessoa.
+Formulário
+----------
+- Campos principais: matrícula, nome, centro de serviço/local, cargo, setor, tipo de execução, datas de admissão/demissão, contato e observações.
+- `handleFormChange` sincroniza centro de serviço e local automaticamente, e normaliza `tipoExecucao` para maiúsculas.【F:src/pages/Pessoas.jsx†L88-L150】
+- Na criação/edição utiliza `createPessoaPayload` e `updatePessoaPayload` das regras para enviar ao Supabase/local API.
 
-Campos e validações
--------------------
-- `nome`, `matricula`, `centroServico`, `setor`, `cargo`, `tipoExecucao`: obrigatórios.
-- `dataAdmissao`: opcional; aceito no formato ISO e convertido para `yyyy-mm-dd` para inputs do tipo `date`.
-- `matricula` deve ser única e não vazia (validação em `src/services/api.js` e `localApi.js`).
-- `tipoExecucao` é armazenado em caixa alta para facilitar filtros.
-- `AuthContext` fornece `usuarioResponsavel` para registrar quem realizou a operação.
+Filtros e listagem
+------------------
+- Filtros por termo, centro de serviço, cargo, setor e tipo de execução. Botões “Aplicar” e “Limpar” recompõem a listagem através de `loadPessoas`.
+- A tabela mostra ações de editar e histórico; `historyState` evita múltiplas chamadas simultâneas. A paginação é controlada dentro do componente `PessoasTable`.
+- `refreshReferencias` carrega listas auxiliares de centros/setores/cargos/tipos a partir do endpoint `api.references.pessoas`.【F:src/pages/Pessoas.jsx†L52-L117】
 
-Filtros
--------
-- Termo (nome, matrícula, centro de serviço ou cargo).
-- Centro de serviço, setor e cargo: selects pré-preenchidos a partir das referências retornadas pelo `dataClient`.
-- Os filtros são tratados no cliente, mas a tela também suporta consultas reduzidas ao backend via `buildPessoasQuery`.
+Histórico
+---------
+- Ao abrir o modal, a página consulta `api.pessoas.history(id)` (via componente) e mantém cache em `historyCache` para reutilização posterior.
+- `PessoasHistoryModal` mostra linha do tempo com usuário, campos alterados e timestamp.【F:src/pages/Pessoas.jsx†L57-L86】【F:src/pages/Pessoas.jsx†L152-L210】
 
-Histórico de alterações
------------------------
-- A tabela `pessoas_historico` (Supabase) ou o array de histórico local registra mudanças.
-- `PessoasHistoryModal` apresenta registros em ordem cronológica com campos alterados destacados.
-- O cache (`historyCache`) evita chamadas repetidas durante a mesma sessão.
-
-Componentes e arquivos relevantes
----------------------------------
-- `src/pages/Pessoas.jsx`
-- `src/components/Pessoas/PessoasForm.jsx`
-- `src/components/Pessoas/PessoasFilters.jsx`
-- `src/components/Pessoas/PessoasTable.jsx`
-- `src/components/Pessoas/PessoasHistoryModal.jsx`
-- `src/rules/PessoasRules.js`
-- `src/utils/PessoasUtils.js`
-
-Integração com outros módulos
------------------------------
-- Cadastros de pessoas abastecem Saídas e Acidentes (preenchimento automático de dados do colaborador).
-- Termo de EPI depende das informações aqui registradas (centro de serviço, cargo, tipo de execução).
-- Os filtros dinamicamente carregados são reutilizados em `docs/Acidentes.txt` e outras telas operacionais.
+Boas práticas
+-------------
+- Garanta que migrations que criam tabelas de referência (centros_servico, cargos, setores, tipos_execucao) estejam aplicadas antes de popular a tela.
+- Utilize o histórico para auditar atualizações feitas via importação ou scripts externos.
+- Ao operar offline, mantenha os seeds em `src/data/local-seed.json` atualizados para refletir o schema atual.

@@ -3,46 +3,28 @@ Tela: Termo de EPI
 
 Visão geral
 -----------
-- Permite localizar um colaborador e gerar o termo de responsabilidade de EPI com preview imediato e download em PDF no próprio navegador.
-- Funciona em ambos os modos de dados: consulta direta ao Supabase ou dados locais sem precisar de backend dedicado.
+- Gera o termo de responsabilidade de EPI para colaboradores, com pré-visualização em HTML e opção de download em PDF.
+- O contexto é buscado via `dataClient.documentos.termoEpiContext` usando matrícula ou nome; o HTML é montado por `buildEpiTermHtml` (template compartilhado).【F:src/pages/TermosEpiPage.jsx†L1-L87】【F:shared/documents/epiTermTemplate.js†L38-L120】
 
-Fluxo principal
----------------
-1. Usuário informa matrícula (preferencial) ou nome do colaborador.
-2. Ao enviar, `TermosEpiPage` chama `dataClient.documentos.termoEpiContext(query)`.
-   - **Modo Supabase:** `src/services/api.js` consulta `pessoas` e `saidas`, monta o contexto com `montarContextoTermoEpi` e inclui metadados da empresa via variáveis `VITE_TERMO_EPI_EMPRESA_*`.
-   - **Modo local:** `src/services/localApi.js` reproduz a mesma lógica com os dados do `localStorage`.
-3. O HTML é gerado com `buildEpiTermHtml` (`shared/documents/epiTermTemplate.js`) e exibido em um `<iframe>` com ajuste automático de altura (`AutoResizeIframe`).
-4. O botão "Baixar PDF" usa `downloadTermoEpiPdf` (`html2pdf.js` no cliente) para converter o HTML renderizado em arquivo.
+Fluxo do usuário
+----------------
+1. Preencher matrícula ou nome e clicar em **Gerar termo**.
+2. A página exibe mensagens de carregamento/erro conforme resposta. Ao receber o contexto, renderiza resumo (nome, centro de serviço, última entrega) e o documento dentro de `AutoResizeIframe`.
+3. O botão **Baixar PDF** chama `downloadTermoEpiPdf`, que envia o HTML normalizado para a função serverless `/termo-epi` (Vercel/Supabase Functions) e faz download do arquivo nomeado automaticamente.【F:src/pages/TermosEpiPage.jsx†L89-L178】【F:src/utils/TermoEpiUtils.js†L1-L94】
 
-Estados e mensagens
--------------------
-- `preview.isLoading`: exibe "Carregando documento..." e desabilita ações enquanto aguarda o contexto.
-- `preview.error`: mostra erros retornados pelo `dataClient` (colaborador não encontrado, nenhuma saída registrada etc.).
-- `isDownloading`: feedback enquanto o PDF é gerado.
-- Badge de origem indica se os dados vieram do modo local ou do Supabase (`context.origem`).
+Pré-requisitos
+--------------
+- Variáveis `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` e `VITE_SUPABASE_FUNCTIONS_URL` devem estar configuradas para o PDF (modo remoto).
+- Em modo local, apenas a pré-visualização HTML funciona; o download retornará erro se as variáveis estiverem ausentes.
+- A função serverless espera o campo `html` no corpo e utiliza a mesma chave `anon` para autenticação.
 
-Campos obrigatórios
--------------------
-- Pelo menos um dos campos deve ser informado (matrícula ou nome). Caso contrário, a página exibe mensagem de validação e não chama a API.
+Personalização do documento
+---------------------------
+- Metadados da empresa podem ser definidos via `VITE_TERMO_EPI_EMPRESA_*` (nome, documento, endereço, contato, URLs de logos). O template renderiza até duas logos (principal + secundária) e repete dados de contato no cabeçalho.【F:shared/documents/epiTermTemplate.js†L40-L78】【F:shared/documents/epiTermTemplate.js†L96-L140】
+- A tabela de entregas mostra as últimas movimentações com campos: data, quantidade, descrição, CA, responsável, data de troca, motivo e assinatura. Linhas vazias completam até 10 registros por padrão.【F:shared/documents/epiTermTemplate.js†L18-L37】【F:shared/documents/epiTermTemplate.js†L122-L188】
 
-Customização
-------------
-- Logos, razão social e dados da empresa são configurados via `VITE_TERMO_EPI_EMPRESA_*`.
-- O template HTML está em `shared/documents/epiTermTemplate.js`; alterações neste arquivo impactam tanto o preview quanto o PDF.
-
-Componentes e utilitários
--------------------------
-- `src/pages/TermosEpiPage.jsx`
-- `shared/documents/epiTermTemplate.js`
-- `src/utils/TermoEpiUtils.js`
-- `src/components/AutoResizeIframe.jsx`
-
-Dependências de dados
----------------------
-- Requer saídas registradas para o colaborador. Se nenhuma for encontrada, o `dataClient` retorna erro orientando o usuário a registrar entregas.
-- Campos adicionais no Supabase (`centroServico`, `tipoExecucao`, `dataAdmissao`) enriquecem o documento, mas o template lida com ausência dos valores.
-
-Recursos relacionados
----------------------
-- [`docs/ambiente-termos-epi.txt`](ambiente-termos-epi.txt) descreve configurações do ambiente e dicas para alternar modos.
+Boas práticas
+-------------
+- Certifique-se de que `termoEpiContext` retorne `colaborador`, `entregas`, `totais` e `empresa` para aproveitar todas as seções do template.
+- Ajuste a função serverless para fazer cache do arquivo ou registrar logs de auditoria conforme requisitos de compliance.
+- Valide links de logo (`https://...`) para evitar bloqueios por mixed content quando a aplicação estiver sob HTTPS.

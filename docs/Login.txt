@@ -1,35 +1,24 @@
 Tela: Login
-============
+===========
 
 Visão geral
 -----------
-- Porta de entrada para as rotas protegidas (`ProtectedRoute`).
-- Suporta dois fluxos de autenticação:
-  - **Modo Supabase:** utiliza `supabase.auth.signInWithPassword` e oferece recuperação de senha via email.
-  - **Modo local:** valida credenciais configuradas em `.env.local` (`VITE_LOCAL_USERNAME`, `VITE_LOCAL_PASSWORD`).
+- Tela inicial para autenticação do usuário, com suporte a modo remoto (Supabase) e modo local (credenciais em `.env.local`).
+- A interface inclui campos de email e senha, botão para recuperação de senha (apenas modo remoto) e mensagens de feedback contextual.【F:src/pages/LoginPage.jsx†L1-L118】
 
-Comportamento do formulário
----------------------------
-- Campos obrigatórios: email (`username`) e senha (`password`).
-- Botão "Entrar" exibe estado de carregamento enquanto aguarda o `AuthContext.login`.
-- Link "Esqueceu a senha?" chama `AuthContext.recoverPassword` (apenas no modo Supabase). Exige email preenchido e exibe mensagens de sucesso/erro na própria tela.
-- Mensagens de feedback (`feedback--error`/`feedback--success`) aparecem abaixo dos campos.
+Comportamento
+-------------
+- Ao submeter, chama `useAuth().login`. Em caso de sucesso redireciona para a rota anterior (`location.state.from`) ou `/`.
+- Erros de autenticação são exibidos logo acima do botão principal.
+- Botão “Esqueceu a senha?” chama `useAuth().recoverPassword`. No modo local lança erro informando indisponibilidade; no remoto envia e-mail via Supabase Auth (respeitando `VITE_SUPABASE_PASSWORD_REDIRECT`).【F:src/pages/LoginPage.jsx†L120-L190】【F:src/context/AuthContext.jsx†L90-L168】
 
-Fluxo de dados
---------------
-1. Ao enviar o formulário, `AuthContext.login` decide entre modo local ou Supabase conforme `VITE_DATA_MODE`.
-2. Em sucesso, o usuário é redirecionado para a rota originalmente solicitada (`location.state.from` ou `/`).
-3. `AuthContext` persiste o usuário normalizado em `localStorage` (`api-estoque-auth`) para restaurar a sessão na próxima visita.
-4. No modo Supabase, o SDK administra refresh tokens automaticamente.
+Credenciais por modo
+--------------------
+- **Local:** valores definidos por `VITE_LOCAL_USERNAME`, `VITE_LOCAL_PASSWORD`, `VITE_LOCAL_DISPLAY_NAME` (defaults `admin`/`admin123`). A sessão fica no `localStorage` e existe timeout de inatividade de 10 minutos.【F:src/context/AuthContext.jsx†L7-L84】【F:src/context/AuthContext.jsx†L170-L238】
+- **Remoto:** exige `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`. O login usa `supabase.auth.signInWithPassword` e a recuperação `resetPasswordForEmail` com redirect opcional.【F:src/context/AuthContext.jsx†L96-L151】【F:src/context/AuthContext.jsx†L153-L200】
 
 Boas práticas
 -------------
-- Limpe `localStorage.api-estoque-auth` ao alternar entre os modos para evitar conflitos de credenciais.
-- Mantenha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` válidos no `.env.local` para o modo remoto.
-- Configure os templates de email de recuperação no painel do Supabase (ver [`docs/supabase-auth-setup.txt`](supabase-auth-setup.txt)).
-
-Componentes e estilos
----------------------
-- `src/pages/LoginPage.jsx`
-- `src/context/AuthContext.jsx`
-- `src/styles/LoginPage.css`
+- Configure SSL/Custom Domain no Supabase antes de habilitar recuperação de senha em produção (link enviado precisa apontar para domínio válido).
+- Personalize `logo2.png` em `public/` para refletir a identidade visual da empresa.
+- Evite usar usuários com `service_role` no frontend; restrinja ao perfil `anon` com políticas RLS adequadas.

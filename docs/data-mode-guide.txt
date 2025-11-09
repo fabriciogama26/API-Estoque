@@ -3,71 +3,30 @@ Guia: alternar modo local e Supabase
 
 Resumo
 ------
-- **Modo remoto (padrão):** usa Supabase para autenticação e banco de dados. Requer `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` configurados no `.env.local` e no ambiente de deploy.
-- **Modo local:** ignora Supabase, persiste dados no navegador (`localStorage`) e usa seeds de `src/data/local-seed.json`. Ideal para desenvolvimento offline ou demonstrações rápidas.
+O frontend pode operar com duas origens de dados: Supabase (remoto) ou armazenamento local (`localStorage`). Este guia mostra como alternar entre os modos sem inconsistências.
 
-Requisitos para modo local
---------------------------
-1. Inicie o Vite normalmente (`npm run dev`).
-2. Configure `.env.local` com:
-   ```
-   VITE_DATA_MODE=local
-   VITE_LOCAL_USERNAME=admin        # opcional (padrão: admin)
-   VITE_LOCAL_PASSWORD=admin123     # opcional (padrão: admin123)
-   VITE_LOCAL_DISPLAY_NAME=Administrador Local  # opcional
-   ```
-3. Limpe dados anteriores se quiser reiniciar o ambiente:
-   - Remova a chave `api-estoque-local-data-v1` do `localStorage`.
-   - Opcional: apague `api-estoque-auth` para forçar novo login.
-4. O login aceitará apenas as credenciais definidas acima.
-
-Requisitos para modo Supabase
------------------------------
-1. Defina as variáveis:
-   ```
-   VITE_SUPABASE_URL=...
-   VITE_SUPABASE_ANON_KEY=...
-   ```
-2. Deixe `VITE_DATA_MODE` ausente ou defina `VITE_DATA_MODE=remote`.
-3. Garanta que usuários e dados estejam cadastrados no projeto Supabase correspondente.
-
-Como alternar rapidamente
--------------------------
-1. **Ir para modo local:**
-   - Ajuste `.env.local` com `VITE_DATA_MODE=local` e as credenciais desejadas.
-   - Reinicie o servidor Vite.
-   - (Opcional) Limpe `api-estoque-auth` e `api-estoque-local-data-v1` no navegador para começar do zero.
-2. **Voltar ao modo Supabase:**
-   - Remova `VITE_DATA_MODE` ou defina `remote`.
-   - Confirme as variáveis `VITE_SUPABASE_*`.
-   - Reinicie o Vite e limpe `api-estoque-auth` se ainda existir sessão local.
-
-O que muda entre os modos
--------------------------
-- **Autenticação:**
-  - Local: `AuthContext` valida usuário/senha definidos em `.env.local`.
-  - Supabase: usa `supabase.auth.signInWithPassword` e mantém sessão via SDK.
-- **Persistência:**
-  - Local: `localStorage` (`api-estoque-local-data-v1`). Seeds são carregados uma única vez.
-  - Supabase: tabelas reais (`pessoas`, `materiais`, `entradas`, `saidas`, `acidentes`, `material_price_history`, domínios etc.).
-- **Referências dinâmicas:**
-  - Local: listas (centros, cargos, tipos, agentes) vêm do seed.
-  - Supabase: consultas às tabelas de domínio via `api.references.*` e `api.acidentes.*`.
-- **Status na interface:**
-  - O componente `SystemStatus` (sidebar) exibe "Modo local" ou "Modo Supabase" conforme a configuração.
-
-Boas práticas
+Como funciona
 -------------
-- Versione um `.env.local.example` com placeholders para lembrar as variáveis suportadas.
-- Sempre reinicie o Vite após mudar `VITE_DATA_MODE`.
-- Ao mudar para Supabase, valide rapidamente realizando login e acessando uma tela que consulte dados (Estoque ou Dashboard).
-- Para resetar apenas os dados locais, mantenha o modo local ativo e limpe `api-estoque-local-data-v1`.
+- `VITE_DATA_MODE` controla o modo. Qualquer valor diferente de `local` ativa o modo remoto.
+- `src/config/runtime.js` expõe `dataMode`, `isLocalMode` e `isRemoteMode`. `dataClient` escolhe entre `src/services/api.js` (Supabase) e `src/services/localApi.js` com base nessas flags.【F:src/config/runtime.js†L1-L12】【F:src/services/dataClient.js†L1-L6】
+- No modo local, os dados são persistidos no `localStorage` com chave `api-estoque-local-data-v1`. Seeds iniciais ficam em `src/data/local-seed.json` e são carregados por `localDataStore` quando não há dados prévios.【F:src/config/runtime.js†L6-L12】【F:src/services/localApi.js†L1-L120】
 
-Solução de problemas
+Alternando para modo local
+--------------------------
+1. Crie/edite `.env.local` com `VITE_DATA_MODE=local`.
+2. (Opcional) Configure `VITE_LOCAL_USERNAME`, `VITE_LOCAL_PASSWORD`, `VITE_LOCAL_DISPLAY_NAME` para personalizar o login offline.【F:src/context/AuthContext.jsx†L7-L84】
+3. Execute `npm run dev`. No login use as credenciais locais e confirme o badge “Dados locais” no componente `SystemStatus` (sidebar).
+4. Para reiniciar os dados, limpe o `localStorage` (chave `api-estoque-local-data-v1`) ou apague manualmente em `Application Storage` do navegador.
+
+Alternando para modo Supabase
+-----------------------------
+1. Remova ou defina `VITE_DATA_MODE=remote` no `.env.local`.
+2. Informe `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (e demais variáveis necessárias: `VITE_SUPABASE_PASSWORD_REDIRECT`, `VITE_SUPABASE_FUNCTIONS_URL`, etc.).
+3. Garanta que o usuário exista no Supabase Auth e tenha permissão RLS adequada.
+4. Reinicie o Vite (`npm run dev`) e faça login com o e-mail cadastrado no Supabase. O badge do `SystemStatus` deve indicar “Supabase”.
+
+Cuidados ao alternar
 --------------------
-- **Login falha no modo local:** verifique `VITE_LOCAL_*` e se `api-estoque-auth` não guarda credenciais antigas.
-- **Dashboard vazio no modo local:** confirme se os seeds foram carregados no `localStorage`. Caso contrário, apague `api-estoque-local-data-v1`.
-  * Estoque: calculado por `localApi.estoque.dashboard` (`src/lib/estoque.js`).
-  * Acidentes: calculado por `localApi.acidentes.dashboard` (`src/lib/acidentesDashboard.js`).
-- **Erros de Supabase no modo local:** confirme `VITE_DATA_MODE=local` e reinicie o Vite. O `SystemStatus` deve indicar modo local.
-- **Erros 401 no modo Supabase:** a sessão pode ter expirado. Refazer login normalmente renova o token.
+- Mudanças no modo não migram dados automaticamente. Registros criados offline permanecem no navegador.
+- Verifique se chaves de cache (`api-estoque-auth`, `api-estoque-local-data-v1`) não conflitam entre ambientes. Limpe-as ao alternar para evitar dados inconsistentes.
+- Alguns recursos dependem exclusivamente do Supabase (ex.: dashboard de acidentes remoto, geração de PDF). No modo local esses recursos podem mostrar mensagem de indisponibilidade.【F:src/pages/DashboardAcidentes.jsx†L60-L118】【F:src/utils/TermoEpiUtils.js†L1-L94】

@@ -3,51 +3,38 @@ Tela: Cadastro de Acidentes
 
 Visão geral
 -----------
-- Registro completo de acidentes com colaboradores, incluindo dados de SST (tipo, agente, lesão, parte lesionada, HHT, dias perdidos/debitados).
-- Filtros permitem localizar registros existentes por termo, tipo, agente e centro de serviço; histórico detalha alterações campo a campo.
-- Compatível com modo Supabase e modo local (mesmo conjunto de componentes e validações).
+- Tela responsável por registrar, editar e consultar acidentes de trabalho vinculados às pessoas cadastradas.
+- Mantém relacionamento com catálogos de agentes, tipos, lesões e partes lesionadas carregados do Supabase/local API e guarda histórico das alterações.
+- Permite filtrar a listagem por termo livre, tipo, centro de serviço e agente.
 
-Fluxo principal
----------------
-1. Ao montar, `AcidentesPage` carrega a lista de acidentes (`dataClient.acidentes.list`) e popula datalists com colaboradores (`dataClient.pessoas.list`).
-2. Lists auxiliares (agentes, partes lesionadas, tipos, lesões, locais) são buscadas com `api.acidentes.agents/parts/types/lesions/locals` e exibidas como sugestões.
-3. `validateAcidenteForm` garante consistência dos dados antes de criar ou atualizar (`dataClient.acidentes.create/update`).
-4. Após salvar, a página recarrega a lista de acidentes, limpa o formulário e mantém cache de históricos separado por ID.
-5. O modal de histórico (`AcidentesHistoryModal`) consulta `dataClient.acidentes.history(id)` apenas quando o usuário solicita, armazenando a resposta em cache.
-
-Campos principais
+Fluxos principais
 -----------------
-- Dados do colaborador: matrícula, nome (preenchido automaticamente ao selecionar a matrícula), cargo, centro de serviço/local.
-- Informações do acidente: data, tipo, agente, lesão, parte lesionada, local, CID, CAT, observação.
-- Métricas: dias perdidos, dias debitados, HHT (horas homem trabalhadas).
-- Controle de status: `registradoPor` e `atualizadoPor` são preenchidos a partir do usuário autenticado.
+1. **Cadastro/edição**
+   - Selecionar uma matrícula existente. O formulário bloqueia o campo enquanto os colaboradores estão sendo carregados para evitar edições incorretas.
+   - Campos obrigatórios: matrícula, nome/cargo (preenchidos automaticamente após a matrícula), data, dias perdidos, dias debitados, HHT, centro de serviço, local, agente(s), tipo(s), lesão(ões) e parte(s) lesionada(s).
+   - Campos auxiliares: CAT, observação, CID.
+   - Botão *Registrar acidente* cria o registro; durante uma edição é exibido *Salvar alterações* e o atalho *Cancelar edição* volta ao estado inicial.【F:src/components/Acidentes/AcidentesForm.jsx†L377-L444】【F:src/components/Acidentes/AcidentesForm.jsx†L520-L738】
+2. **Multiseleção de agentes, tipos, lesões e partes**
+   - Cada seção possui um `select` alimentado pelas opções carregadas da API. Ao clicar em **Adicionar** o valor atual é movido para uma lista de chips, permitindo múltiplos valores.
+   - Os chips exibem botão “x” para remoção e são obrigatórios (não é possível salvar sem pelo menos um item em cada categoria). Placeholders mudam conforme o carregamento para guiar o usuário.【F:src/components/Acidentes/AcidentesForm.jsx†L552-L719】
+3. **Histórico**
+   - O botão de relógio na tabela abre o modal de histórico para revisar alterações cronológicas (origem Supabase x modo local). O estado `historyState` impede múltiplas requisições simultâneas e mostra carregamento individual por linha.【F:src/components/Acidentes/AcidentesTable.jsx†L26-L116】【F:src/pages/Acidentes.jsx†L51-L87】
+4. **Filtros**
+   - Barra superior aceita termo livre (nome, matrícula, centro), filtro de tipo, centro de serviço e agente. Botão *Aplicar* envia para `filterAcidentes` no serviço; *Limpar* restaura os defaults.【F:src/components/Acidentes/AcidentesFilters.jsx†L1-L36】【F:src/pages/Acidentes.jsx†L18-L49】
 
-Validações
-----------
-- Matrícula obrigatória; quando informada, o sistema busca os dados da pessoa para preencher nome/cargo/centro de serviço.
-- Data precisa ser válida (`yyyy-mm-dd`).
-- Campos numéricos (dias, HHT) devem ser ≥ 0.
-- Tipos/listas: os valores precisam existir nas listas retornadas pelo backend para evitar inconsistências.
-- Modo Supabase verifica referências no banco e mantém histórico em `acidente_historico`.
+Carregamento de dados
+---------------------
+- Pessoas, centros de serviço e locais são carregados em paralelo (`api.pessoas.list`, `api.acidentes.locals`) para alimentar autocomplete e selects.
+- Catálogos de agentes, tipos, lesões e partes possuem tratamento de erro individual — cada conjunto exibe `feedback--error` específico quando a requisição falha.
+- A listagem principal vem de `api.acidentes.list()` e é atualizada ao salvar/editar registros ou limpar filtros.【F:src/pages/Acidentes.jsx†L51-L170】【F:src/components/Acidentes/AcidentesForm.jsx†L720-L738】
 
-Filtros e tabela
-----------------
-- Filtros por termo (nome/matrícula), tipo, centro de serviço e agente (`filterAcidentes`).
-- A tabela mostra os principais campos e disponibiliza ações de editar e visualizar histórico.
-- Mensagens de erro do formulário e da listagem são exibidas separadamente (`formError` e `listError`).
+Regras e validações
+-------------------
+- As funções `validateAcidenteForm`, `createAcidentePayload` e `updateAcidentePayload` garantem payload coerente antes de enviar ao Supabase/local API (ver `src/rules/AcidentesRules.js`).
+- O formulário mantém consistência de dados entre campos derivados (por exemplo, chips x campos ocultos `lesao`/`parteLesionada`) para compatibilidade com tabelas antigas.【F:src/pages/Acidentes.jsx†L21-L38】【F:src/components/Acidentes/AcidentesForm.jsx†L661-L705】
 
-Componentes e utilitários
--------------------------
-- `src/pages/Acidentes.jsx`
-- `src/components/Acidentes/AcidentesForm.jsx`
-- `src/components/Acidentes/AcidentesFilters.jsx`
-- `src/components/Acidentes/AcidentesTable.jsx`
-- `src/components/Acidentes/AcidentesHistoryModal.jsx`
-- `src/rules/AcidentesRules.js`
-- `src/config/AcidentesConfig.js`
-
-Integração com dashboards
--------------------------
-- Os registros alimentam o dashboard de acidentes (`docs/DashboardAcidentes.txt`).
-- Campos de HHT, dias perdidos e debitados são fundamentais para calcular TF/TG.
-- As listas de agentes/partes/lesões reaproveitam tabelas de domínio mantidas nas migrations Supabase.
+Boas práticas
+-------------
+- Carregue a tela após configurar catálogos de domínio no banco (agentes, tipos, lesões, partes) para evitar placeholders vazios.
+- Prefira usar a matrícula como chave primária durante importações em massa — o componente atualiza nome/cargo automaticamente com base nessa referência.
+- Utilize o modal de histórico para auditar ajustes manuais ou sincronizações feitas via Supabase Studio.

@@ -3,69 +3,42 @@ Guia de Estrutura Supabase
 
 Objetivo
 --------
-Fornecer um checklist rápido para validar se o schema do Supabase está alinhado com o esperado pelo frontend e (opcionalmente) pelas funções serverless.
+Checklist rápido para garantir que o schema do Supabase está alinhado com o esperado pelo frontend e funções auxiliares.
 
 Pré-requisitos
 --------------
-- Extensões habilitadas: `uuid-ossp`, `pgcrypto`.
-- RLS ativo em todas as tabelas acessadas pelo aplicativo.
-- Migrations aplicadas até `0027_expand_material_history.sql`.
+- Extensões `uuid-ossp` e `pgcrypto` habilitadas (inclusas nas migrations iniciais).
+- Todas as migrations aplicadas até `0027_expand_material_history.sql` (ver `supabase/README.md`).【F:supabase/README.md†L12-L55】
+- RLS ativo nas tabelas acessadas pelo aplicativo (consultar [`docs/rls-policies-guide.txt`](rls-policies-guide.txt)).
 
 Tabelas principais
 ------------------
-`public.app_users`
-- Campos: `id uuid pk`, `auth_user_id uuid unique`, `username text unique`, `display_name text`, `created_at`, `updated_at`.
-- Uso: mapear usuários do Supabase Auth para permissões internas (opcional).
-
-`public.pessoas`
-- Campos relevantes: `nome`, `matricula` (unique, not blank), `centro_servico`, `setor`, `cargo`, `tipo_execucao_id`, `centro_custo_id`, `dataAdmissao`, `usuarioCadastro`, `usuarioEdicao`, `criadoEm`, `atualizadoEm`.
-- Histórico: tabela `pessoas_historico` registra alterações (`camposAlterados`, `usuario`, `criadoEm`).
-- FKs: `centro_servico_id`, `setor_id`, `cargo_id`, `centro_custo_id`, `tipo_execucao_id` (ver tabelas de referência abaixo).
-
-`public.materiais`
-- Campos: `nome`, `fabricante`, `validadeDias`, `ca`, `valorUnitario numeric(14,2)`, `estoqueMinimo`, `ativo`, `grupoMaterial`, `numeroCalcado`, `numeroVestimenta`, `numeroEspecifico`, `chaveUnica`, `descricao`, `usuarioCadastro`, `usuarioAtualizacao`, `dataCadastro`, `atualizadoEm`.
-- Índices esperados: `materiais_chave_unica_idx`, `materiais_nome_fabricante_idx`.
-- Histórico: `material_price_history` (FK `materialId`, `valorUnitario`, `usuarioResponsavel`, `criadoEm`, `valorAnterior`).
-
-`public.entradas`
-- Campos: `id`, `materialId`, `quantidade`, `centro_custo`, `centro_servico`, `dataEntrada`, `usuarioResponsavel`.
-- Índices: `(materialId, dataEntrada desc)` para consultas rápidas.
-
-`public.saidas`
-- Campos: `id`, `materialId`, `pessoaId`, `quantidade`, `centro_custo`, `centro_servico`, `dataEntrega`, `dataTroca`, `status`, `usuarioResponsavel`.
-- Índices: `(materialId, dataEntrega desc)` e `(pessoaId, dataEntrega desc)`.
-- Histórico opcional: tabela `saidas_historico` (dependendo das migrations mais recentes).
-
-`public.acidentes`
-- Campos: `id`, `matricula`, `nome`, `cargo`, `data`, `tipo_id`, `agente_id`, `lesao_id`, `parte_id`, `centro_servico`, `local`, `diasPerdidos`, `diasDebitados`, `hht`, `cid`, `cat`, `observacao`, `registradoPor`, `atualizadoPor`, `criadoEm`, `atualizadoEm`.
-- Histórico: `acidente_historico` registra alterações.
+- **app_users**: mapeia usuários do Auth (`auth_user_id`, `username`, `display_name`). Opcional para perfis internos.【F:supabase/README.md†L12-L55】
+- **pessoas + pessoas_historico**: dados cadastrais (centro de serviço, cargo, setor, tipo de execução, datas) e auditoria de mudanças.【F:supabase/README.md†L12-L55】
+- **materiais + material_price_history**: cadastro de EPIs com estoque mínimo, CA, valor unitário e histórico de preço.【F:supabase/README.md†L12-L55】
+- **entradas / saidas**: movimentação de estoque com campos de auditoria (`usuarioResponsavel`, datas).【F:supabase/README.md†L12-L55】
+- **acidentes + acidente_historico**: registros completos de SST com vínculo a agentes, tipos, partes e lesões.【F:supabase/README.md†L12-L55】
 
 Tabelas de referência
 ---------------------
-- `centros_servico`, `setores`, `cargos`, `centros_custo`, `tipo_execucao`.
-- `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`.
-- `grupos_material` / `grupos_material_itens` (catálogo de grupos e itens de apoio).
-- Todas com colunas `nome`, `ativo`, `ordem` (quando aplicável) e RLS habilitado para leitura.
+- **Catálogos operacionais**: `centros_servico`, `setores`, `cargos`, `centros_custo`, `tipo_execucao`.
+- **Catálogos de acidentes**: `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`.
+- **Catálogo de materiais**: `grupos_material`, `grupos_material_itens`, `grupos_material_cor`, `grupos_material_caracteristica_epi`.
+- Todas devem ter RLS habilitado e políticas de leitura para `authenticated` (ver migration `0013_rls_reference_tables.sql`).【F:supabase/migrations/0013_rls_reference_tables.sql†L1-L36】
 
 Views e suportes
 ----------------
-- `vw_indicadores_acidentes`: utilizada pelo dashboard de acidentes. Deve expor ao menos `resumo`, `tendencia`, `tipos`, `partes_lesionadas`, `cargos`, `agentes`, `hht_total`, `total_acidentes`.
-- Outras views opcionais podem ser criadas para relatórios, mas devem respeitar RLS.
+- `vw_indicadores_acidentes`: alimenta o dashboard de acidentes (resumo, tendência, distribuições por tipo/agente/cargo/parte). Certifique-se de atualizar ao alterar o schema.【F:src/pages/DashboardAcidentes.jsx†L81-L152】
+- Outras views podem ser adicionadas para relatórios, desde que respeitem RLS.
 
-Políticas recomendadas
+Checklist de validação
 ----------------------
-- Leitura (`SELECT`) liberada para `auth.role() = 'authenticated'` nas tabelas consultadas pelo frontend.
-- Escrita (`INSERT`/`UPDATE`) restrita conforme responsabilidades (ver [`docs/rls-policies-guide.txt`](rls-policies-guide.txt)).
-- Histórico e tabelas de domínio podem permitir escrita apenas para `service_role` ou perfis administrativos.
-
-Checklist rápido
-----------------
-- [ ] Todas as migrations foram aplicadas (`supabase db status` limpo).
-- [ ] Usuários de teste conseguem listar pessoas, materiais, entradas, saídas e acidentes no frontend.
-- [ ] Dashboards retornam dados (verificar view `vw_indicadores_acidentes`).
-- [ ] Termo de EPI encontra colaboradores e saídas sem erros.
-- [ ] Políticas RLS revisadas e testadas para cada perfil.
-- [ ] Seeds locais não foram aplicados em produção (remova `0003_seed_sample_data.sql` do pipeline de produção se necessário).
+- [ ] `supabase db status` sem migrations pendentes.
+- [ ] Usuário autenticado consegue listar/cadastrar pessoas, materiais, entradas, saídas e acidentes no frontend.
+- [ ] Dashboards retornam dados (estoque + acidentes) após aplicar seeds ou inserir registros reais.【F:src/pages/DashboardPage.jsx†L113-L213】【F:src/pages/DashboardAcidentes.jsx†L81-L193】
+- [ ] Termo de EPI encontra colaboradores e saídas (ver [`docs/TermosEpi.txt`](TermosEpi.txt)).
+- [ ] Políticas RLS revisadas e testadas com diferentes perfis.
+- [ ] Seeds de desenvolvimento (`0003_seed_sample_data.sql`) não executam em produção.【F:supabase/README.md†L37-L55】
 
 Links úteis
 -----------

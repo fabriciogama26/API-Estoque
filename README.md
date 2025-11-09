@@ -120,7 +120,15 @@ A pasta [`docs/`](docs) descreve fluxos específicos (cadastros, dashboards, ter
 - [`docs/Estoque.txt`](docs/Estoque.txt) – regras da tela de estoque e edição de mínimos.
 - [`docs/Dashboard.txt`](docs/Dashboard.txt) – indicadores e gráficos de movimentação.
 - [`docs/DashboardAcidentes.txt`](docs/DashboardAcidentes.txt) – painel de SST (Supabase x modo local).
-- [`docs/TermosEpi.txt`](docs/TermosEpi.txt) – geração de documentos e variáveis de ambiente.
+- [`docs/Acidentes.txt`](docs/Acidentes.txt) – formulário, filtros e histórico de acidentes.
+- [`docs/Materiais.txt`](docs/Materiais.txt) – cadastro avançado de EPIs, catálogos e histórico de preços.
+- [`docs/Pessoas.txt`](docs/Pessoas.txt) – gestão de colaboradores, filtros e auditoria.
+- [`docs/Entradas.txt`](docs/Entradas.txt) e [`docs/Saidas.txt`](docs/Saidas.txt) – movimentações de estoque com filtros e paginação.
+- [`docs/TermosEpi.txt`](docs/TermosEpi.txt) e [`docs/ambiente-termos-epi.txt`](docs/ambiente-termos-epi.txt) – geração do termo e requisitos de infraestrutura.
+- [`docs/data-mode-guide.txt`](docs/data-mode-guide.txt) – alternância entre Supabase e modo local.
+- [`docs/supabase-auth-setup.txt`](docs/supabase-auth-setup.txt) e [`docs/supabase-esquema-checklist.txt`](docs/supabase-esquema-checklist.txt) – configuração de Auth e verificação do schema.
+- [`docs/rls-policies-guide.txt`](docs/rls-policies-guide.txt) e [`docs/stateless-supabase-notes.txt`](docs/stateless-supabase-notes.txt) – segurança, políticas e visão arquitetural.
+- [`docs/tutorial_remover_migration.txt`](docs/tutorial_remover_migration.txt) – fluxo para reparar migrations divergentes.
 
 ## Próximos passos sugeridos
 

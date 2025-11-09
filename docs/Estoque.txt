@@ -3,55 +3,35 @@ Tela: Estoque Atual
 
 Visão geral
 -----------
-- Consolida o saldo de cada material combinando entradas e saídas a partir do `dataClient`.
-- Permite ajustar o estoque mínimo diretamente na tabela com feedback imediato.
-- Opera com os mesmos componentes no modo Supabase ou no modo local (dados em `localStorage`).
+- Consolida o saldo por material, apresenta alertas de estoque mínimo e permite ajuste desse parâmetro por item.
+- O carregamento principal utiliza `api.estoque.current({ periodoInicio, periodoFim })`, que retorna `itens` e `alertas`.
+- Valores monetários são formatados em BRL e quantidades usam `Intl.NumberFormat` para consistência.【F:src/pages/EstoquePage.jsx†L15-L117】
 
-Fluxo de dados
+Filtros
+-------
+- **Período (mês inicial/final):** converte para `Date` UTC para filtrar itens pela última atualização (`ultimaAtualizacao`).
+- **Termo de busca:** busca em nome, fabricante e centros de custo.
+- **Centro de custo:** select preenchido com valores únicos derivados dos itens carregados.
+- Botões *Aplicar filtros* (submete o formulário) e *Limpar filtros* (restaura defaults e recarrega).【F:src/pages/EstoquePage.jsx†L119-L200】
+
+Alertas
+-------
+- Lista resumida na primeira seção com badge, quantidade atual, mínimo, déficit e valor estimado de reposição.
+- Apenas itens filtrados entram nos alertas; se não houver, mensagem neutra informa ausência de pendências.【F:src/pages/EstoquePage.jsx†L202-L266】
+
+Resumo geral
+------------
+- Total em estoque (valor), total de itens, valor necessário para reposição (soma do déficit) e data da última movimentação.
+- As métricas consideram apenas itens filtrados e são recalculadas em `useMemo` para eficiência.【F:src/pages/EstoquePage.jsx†L268-L318】
+
+Lista de itens
 --------------
-1. `EstoquePage` monta filtros (`periodoInicio`, `periodoFim`) e chama `dataClient.estoque.current(params)` ao carregar ou enviar o formulário.
-2. O client remoto (`src/services/api.js`) carrega materiais, entradas e saídas do Supabase e delega o cálculo para `montarEstoqueAtual` (`src/lib/estoque.js`).
-3. O client local (`src/services/localApi.js`) reutiliza o mesmo helper com os dados armazenados em `localStorage`.
-4. Ao salvar o estoque mínimo de um item a página chama `dataClient.materiais.update(materialId, { estoqueMinimo, usuarioResponsavel })` e recarrega a lista.
+- Cada cartão exibe fabricante, quantidade, valor unitário/total, validade (dias), CA, centros de custo e última atualização formatada.
+- Campo **Estoque mínimo** permite edição inline; ao salvar dispara `api.materiais.update` com `estoqueMinimo` e `usuarioResponsavel`, recarregando os dados na sequência.
+- Mensagens de erro por item informam entradas inválidas; botões ficam desativados enquanto a requisição está em andamento.【F:src/pages/EstoquePage.jsx†L320-L407】
 
-Filtros e ordenação
--------------------
-- `periodoInicio`/`periodoFim`: inputs `type="month"` que limitam os movimentos considerados nos cálculos.
-- `termo`: filtragem em memória por nome, fabricante ou centro de custo.
-- `centroCusto`: lista derivada dos itens carregados; o filtro ocorre apenas no cliente.
-- A tabela é ordenada pela quantidade disponível em ordem decrescente (`montarEstoqueAtual` já entrega os dados ordenados).
-
-Campos exibidos
----------------
-- Nome do material, fabricante e centros de custo associados.
-- Quantidade atual, estoque mínimo, déficit e valor estimado para reposição.
-- Datas da última entrada/saída relevantes para o item.
-- Botão de salvar por linha que permanece desabilitado enquanto a atualização estiver em andamento (`savingMinStock`).
-
-Regras de validação
--------------------
-- O formulário de filtros impede submissão com datas inválidas (os inputs `month` garantem formato `yyyy-mm`).
-- Na edição inline:
-  - O valor precisa ser numérico inteiro ≥ 0.
-  - Se o valor não mudar, a requisição não é enviada.
-  - Erros retornados pelo `dataClient` são exibidos no topo da página (`setError`).
-- O usuário responsável é resolvido pelo `AuthContext` (`user?.name || user?.username || 'sistema'`).
-
-Estados de interface
---------------------
-- `isLoading`: exibe mensagem "Carregando estoque..." e desabilita as ações.
-- `error`: mostra mensagem de falha quando o carregamento ou a gravação não são concluídos.
-- `savingMinStock[materialId]`: ativa o loader no botão de salvar para cada linha.
-- `minStockErrors[materialId]`: exibe feedback de validação logo abaixo do campo editável.
-
-Componentes relacionados
-------------------------
-- `src/pages/EstoquePage.jsx`
-- `src/lib/estoque.js` (cálculo de saldos, alertas e resumo)
-- `src/services/api.js` e `src/services/localApi.js` (fonte de dados)
-- `src/styles/EstoquePage.css` (layout da tabela e do formulário)
-
-Integração com outras áreas
----------------------------
-- Os dados alimentam o dashboard principal via `dataClient.estoque.dashboard` (ver [`docs/Dashboard.txt`](Dashboard.txt)).
-- Alertas de estoque mínimo são reutilizados em cards do dashboard para destacar materiais críticos.
+Boas práticas
+-------------
+- Configure políticas no Supabase para permitir que usuários autenticados atualizem `estoque_minimo` na tabela `materiais`.
+- Utilize os filtros de período para auditar movimentações específicas antes de gerar relatórios externos.
+- No modo local, mantenha `localApi.estoque.current` sincronizado com a estrutura esperada (`alertas` + `itens`) para evitar que cartões fiquem vazios.
