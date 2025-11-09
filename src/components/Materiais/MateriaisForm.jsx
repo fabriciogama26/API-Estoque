@@ -77,8 +77,8 @@ export function MateriaisForm({
     [...(materialItems || []), itemAtual].filter(Boolean),
   )
   const fabricanteAtual = normalizeSelectionItem({
-    id: form.fabricanteId || form.fabricante,
-    nome: form.fabricante,
+    id: form.fabricante,
+    nome: form.fabricanteNome || form.fabricante || '',
   })
   const fabricanteLista = normalizeSelectionList(
     [...(fabricanteOptions || []), fabricanteAtual].filter(Boolean),
@@ -153,15 +153,15 @@ export function MateriaisForm({
             ))}
           </select>
         </label>
-        <label className="field">
-          <span>Fabricante <span className="asterisco">*</span></span>
-          <select
-            name="fabricanteId"
-            value={form.fabricanteId || ''}
-            onChange={onChange}
-            required
-            disabled={isLoadingFabricantes && !fabricanteLista.length}
-          >
+          <label className="field">
+            <span>Fabricante <span className="asterisco">*</span></span>
+            <select
+              name="fabricante"
+              value={form.fabricante || ''}
+              onChange={onChange}
+              required
+              disabled={isLoadingFabricantes && !fabricanteLista.length}
+            >
             <option value="">
               {isLoadingFabricantes
                 ? 'Carregando fabricantes...'

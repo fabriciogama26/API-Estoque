@@ -4,7 +4,6 @@ export const createMateriaisFormDefault = () => ({
   nome: '',
   materialItemId: '',
   fabricante: '',
-  fabricanteId: '',
   validadeDias: '',
   ca: '',
   valorUnitario: '',

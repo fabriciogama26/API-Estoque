@@ -286,7 +286,6 @@ const mapLocalMaterialResumo = (material) => {
     materialItemNome: material.materialItemNome || material.nome || '',
     fabricante: material.fabricanteNome || material.fabricante || '',
     fabricanteNome: material.fabricanteNome || material.fabricante || '',
-    fabricanteId: material.fabricanteId || null,
     ca: material.ca || '',
     numeroEspecifico: material.numeroEspecifico || '',
     numeroCalcado: material.numeroCalcado || '',
@@ -339,11 +338,6 @@ const mapLocalMaterialRecord = (material) => {
     materialItemNome: material.materialItemNome ?? material.nome ?? '',
     fabricante: material.fabricanteNome ?? material.fabricante ?? '',
     fabricanteNome: material.fabricanteNome ?? material.fabricante ?? '',
-    fabricanteId:
-      material.fabricanteId ||
-      (material.fabricanteNome || material.fabricante
-        ? buildOptionId('fabricante', material.fabricanteNome || material.fabricante)
-        : null),
     grupoMaterial: material.grupoMaterialNome ?? material.grupoMaterial ?? '',
     grupoMaterialNome: material.grupoMaterialNome ?? material.grupoMaterial ?? '',
     grupoMaterialId:
@@ -1051,8 +1045,6 @@ const sanitizeMaterialPayload = (payload = {}) => {
     payload.nome || payload.materialItemNome || payload.nomeItemRelacionado || '',
   )
   const fabricanteNomeBase = trim(payload.fabricanteNome || payload.fabricante)
-  const fabricanteIdBase = trim(payload.fabricanteId)
-  const fabricanteId = fabricanteIdBase || (fabricanteNomeBase ? buildOptionId('fabricante', fabricanteNomeBase) : '')
   const caracteristicasSelecionadas = normalizeSelectionList(
     payload.caracteristicas ??
       payload.caracteristicasEpi ??
@@ -1085,7 +1077,6 @@ const sanitizeMaterialPayload = (payload = {}) => {
     materialItemNome: materialItemNomeBase,
     fabricante: fabricanteNomeBase,
     fabricanteNome: fabricanteNomeBase,
-    fabricanteId: fabricanteId || null,
     validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
     ca: trim(payload.ca),
     valorUnitario: Number(payload.valorUnitario ?? 0),

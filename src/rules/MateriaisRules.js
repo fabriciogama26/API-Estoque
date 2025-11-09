@@ -229,7 +229,7 @@ export function validateMaterialForm(form) {
   }
 
   const fabricanteNome = sanitizeAlphanumeric(form.fabricante || '')
-  if (!form.fabricanteId && !fabricanteNome) {
+  if (!form.fabricante && !fabricanteNome) {
     return 'Informe o fabricante.'
   }
 
@@ -279,7 +279,6 @@ const buildMaterialPayload = (form) => {
   const coresSelecionadas = mergeSelectionLists(form.cores, form.coresIds)
   const corPrincipal = coresSelecionadas[0]?.nome ?? form.corMaterial
   const fabricanteNome = sanitizeAlphanumeric(form.fabricante)
-  const fabricanteId = sanitizeAlphanumeric(form.fabricanteId || '')
   const numeroEspecifico = buildNumeroReferencia({
     grupoMaterial: grupoMaterialNome,
     numeroCalcado,
@@ -303,7 +302,6 @@ const buildMaterialPayload = (form) => {
     materialItemNome: nomeEpi,
     fabricante: fabricanteNome.trim(),
     fabricanteNome: fabricanteNome.trim(),
-    fabricanteId: fabricanteId || null,
     validadeDias: Number(form.validadeDias) || 0,
     ca: sanitizeDigits(form.ca),
     valorUnitario: parseCurrencyToNumber(form.valorUnitario),
