@@ -2,8 +2,8 @@ import { formatCurrency } from '../../utils/MateriaisUtils.js'
 import { formatSelectionValue } from '../../utils/selectionUtils.js'
 
 const FIELD_LABELS = {
-  nome: 'Nome',
-  fabricante: 'Fabricante',
+  materialItemNome: 'Nome',
+  fabricanteNome: 'Fabricante',
   validadeDias: 'Validade (dias)',
   ca: 'CA',
   valorUnitario: 'Valor unitário',

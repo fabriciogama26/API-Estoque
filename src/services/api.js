@@ -118,32 +118,15 @@ const ACIDENTE_HISTORY_FIELDS = [
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
 
-const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_cor_id', 'cor_id']
-const MATERIAL_COR_RELATION_TEXT_COLUMNS = [
-  'cor',
-  'cor_nome',
-  'nome_cor',
-  'nomeCor',
-  'grupo_material_cor',
-  'grupo_cor',
-]
+const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_material_cor']
+const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
 
-const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = [
-  'grupo_caracteristica_epi_id',
-  'caracteristica_epi_id',
-]
-const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = [
-  'caracteristica_epi',
-  'caracteristicaEpi',
-  'nome_caracteristica',
-  'nomeCaracteristica',
-]
+const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = ['grupo_caracteristica_epi']
+const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 
 
 const MATERIAL_HISTORY_FIELDS = [
-  'nome',
   'materialItemNome',
-  'fabricante',
   'fabricanteNome',
   'validadeDias',
   'ca',
@@ -999,8 +982,8 @@ function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudi
     ativo: dados.ativo ?? true,
     descricao: dados.descricao ?? '',
     grupoMaterial: grupoMaterialPersist,
-    numeroCalcado: dados.numeroCalcado ?? '',
-    numeroVestimenta: dados.numeroVestimenta ?? '',
+    numeroCalcado: dados.numeroCalcado || null,
+    numeroVestimenta: dados.numeroVestimenta || null,
     numeroEspecifico: dados.numeroEspecifico ?? '',
     chaveUnica: dados.chaveUnica ?? '',
   }
@@ -1026,15 +1009,7 @@ async function resolveUsuarioResponsavel() {
     return 'anônimo'
   }
   const metadata = user.user_metadata ?? {}
-  return (
-    metadata.nome ||
-    metadata.full_name ||
-    metadata.display_name ||
-    user.email ||
-    user.phone ||
-    user.id ||
-    'anônimo'
-  )
+  return user.id || 'anônimo'
 }
 
 function mapMaterialRecord(record) {
@@ -1074,7 +1049,7 @@ function mapMaterialRecord(record) {
     nome,
     nomeItemRelacionado,
     materialItemNome,
-    fabricante: fabricanteNome,
+    fabricante: rawFabricante,
     fabricanteNome,
     fabricantesNome: fabricanteNome,
     validadeDias: record.validadeDias ?? record.validade_dias ?? null,
@@ -1280,10 +1255,13 @@ function sanitizeMaterialPayload(payload = {}) {
   const grupoMaterial = grupoMaterialNome
   const numeroCalcado = trim(payload.numeroCalcado ?? payload.numero_calcado ?? '')
   const numeroVestimenta = trim(payload.numeroVestimenta ?? payload.numero_vestimenta ?? '')
+  const nomeDisplayId = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
   const nomeEpi =
-    trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado ?? '') || ''
+    trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? payload.nome ?? '') || ''
   const materialItemNome =
     nomeEpi || trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
+  const fabricanteId = normalizeRelationId(payload.fabricante ?? payload.fabricante_id ?? '')
+  const nomeId = normalizeRelationId(nomeDisplayId)
   const fabricanteNome =
     trim(payload.fabricanteNome ?? payload.fabricante ?? payload.fabricante_nome ?? '') || ''
   const caracteristicasSelecionadas = normalizeOptionList(
@@ -1315,10 +1293,10 @@ function sanitizeMaterialPayload(payload = {}) {
       : trim(payload.corMaterial ?? payload.cor_material ?? '')
   const numeroEspecifico = trim(payload.numeroEspecifico ?? payload.numero_especifico ?? '')
   return {
-    nome: nomeEpi,
+    nome: nomeId || '',
     nomeItemRelacionado: materialItemNome || nomeEpi,
     materialItemNome: materialItemNome || nomeEpi,
-    fabricante: fabricanteNome,
+    fabricante: fabricanteId ?? '',
     fabricanteNome,
     validadeDias: toNullableNumber(payload.validadeDias ?? payload.validade_dias),
     ca: trim(payload.ca ?? ''),
@@ -2169,21 +2147,37 @@ export const api = {
       const data = await execute(
         supabase
           .from('medidas_calcado')
-          .select('numero_calcado')
+          .select('id, numero_calcado')
           .order('numero_calcado', { ascending: true }),
         'Falha ao listar medidas de calçado.',
       )
-      return normalizeCatalogoLista(data)
+      return (data ?? [])
+        .map((item) => {
+          const nome = resolveCatalogoNome(item)
+          if (!nome) {
+            return null
+          }
+          return { id: item.id ?? nome, nome }
+        })
+        .filter(Boolean)
     },
     async medidasVestimenta() {
       const data = await execute(
         supabase
           .from('medidas_vestimentas')
-          .select('medidas')
+          .select('id, medidas')
           .order('medidas', { ascending: true }),
         'Falha ao listar tamanhos de vestimenta.',
       )
-      return normalizeCatalogoLista(data)
+      return (data ?? [])
+        .map((item) => {
+          const nome = resolveCatalogoNome(item)
+          if (!nome) {
+            return null
+          }
+          return { id: item.id ?? nome, nome }
+        })
+        .filter(Boolean)
     },
     async items(grupoId) {
       const id = normalizeOptionId(grupoId)

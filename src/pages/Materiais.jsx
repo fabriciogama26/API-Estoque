@@ -56,6 +56,10 @@ const findOptionByValue = (options, valor) => {
   })
 }
 
+const isValidUuid = (value) =>
+  typeof value === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+
 export function MateriaisPage() {
   const { user } = useAuth()
   const [form, setForm] = useState(() => createMateriaisFormDefault())
@@ -237,6 +241,37 @@ export function MateriaisPage() {
     }
   }, [form.grupoMaterialId])
 
+  useEffect(() => {
+    if (!editingMaterial) {
+      return
+    }
+    const targetValue =
+      editingMaterial.materialItemNome || editingMaterial.nome || editingMaterial.nomeItemRelacionado || ''
+    const targetKey = normalizeSelectionKey(targetValue)
+    const matchedById =
+      materialItems.find((item) => item.id && item.id === editingMaterial.nome) ?? null
+    const matchedByName =
+      materialItems.find((item) => normalizeSelectionKey(item.nome) === targetKey) ?? null
+    const candidate = matchedById || matchedByName
+    if (!candidate || !candidate.id) {
+      return
+    }
+
+    const currentNome = form.nome || ''
+    const shouldReset =
+      !currentNome || !isValidUuid(currentNome) || currentNome === (editingMaterial.nome || '')
+    if (!shouldReset || candidate.id === currentNome) {
+      return
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      nome: candidate.id,
+      materialItemNome: candidate.nome,
+      nomeItemRelacionado: candidate.nome,
+    }))
+  }, [editingMaterial, materialItems, form.nome])
+
   const handleFormChange = (event) => {
     const { name, value } = event.target
 
@@ -250,20 +285,29 @@ export function MateriaisPage() {
       return
     }
 
+    // 🧩 Grupo de material (UUID + nome legível)
     if (name === 'grupoMaterialId') {
       const selecionado = findOptionByValue(materialGroups, value) ?? null
       const nomeGrupo = selecionado?.nome ?? ''
       setForm((prev) => ({
         ...prev,
-        grupoMaterialId: value,
+        grupoMaterialId: selecionado?.id ?? null, // UUID real ou null
         grupoMaterial: nomeGrupo,
         grupoMaterialNome: nomeGrupo,
         nome: '',
         numeroCalcado: isGrupo(nomeGrupo, GRUPO_MATERIAL_CALCADO) ? prev.numeroCalcado : '',
+        numeroCalcadoNome: isGrupo(nomeGrupo, GRUPO_MATERIAL_CALCADO)
+          ? prev.numeroCalcadoNome
+          : '',
         numeroVestimenta:
           isGrupo(nomeGrupo, GRUPO_MATERIAL_VESTIMENTA) ||
           isGrupo(nomeGrupo, GRUPO_MATERIAL_PROTECAO_MAOS)
             ? prev.numeroVestimenta
+            : '',
+        numeroVestimentaNome:
+          isGrupo(nomeGrupo, GRUPO_MATERIAL_VESTIMENTA) ||
+          isGrupo(nomeGrupo, GRUPO_MATERIAL_PROTECAO_MAOS)
+            ? prev.numeroVestimentaNome
             : '',
       }))
       setMaterialItems([])
@@ -272,10 +316,11 @@ export function MateriaisPage() {
     }
 
     if (name === 'nome') {
-      const selecionado = findOptionByValue(materialItems, value) ?? normalizeSelectionItem(value)
+      const selecionado = findOptionByValue(materialItems, value)
       setForm((prev) => ({
         ...prev,
-        nome: selecionado?.nome ?? value,
+        nome: selecionado?.id ?? '',
+        materialItemNome: selecionado?.materialItemNome ?? value, // ← texto legível
       }))
       return
     }
@@ -284,22 +329,34 @@ export function MateriaisPage() {
       const selecionado = findOptionByValue(fabricanteOptions, value) ?? normalizeSelectionItem(value)
       setForm((prev) => ({
         ...prev,
-        fabricante: selecionado?.nome ?? value,
+        fabricante: selecionado?.id ?? value,
+        fabricanteNome: selecionado?.nome ?? value,
       }))
       return
     }
 
     if (name === 'numeroCalcado') {
-      setForm((prev) => ({ ...prev, numeroCalcado: sanitizeDigits(value) }))
+      const selecionado = findOptionByValue(calcadoOptions, value)
+      setForm((prev) => ({
+        ...prev,
+        numeroCalcado: selecionado?.id ?? '',
+        numeroCalcadoNome: selecionado?.nome ?? value,
+      }))
       return
     }
 
     if (name === 'numeroVestimenta') {
-      setForm((prev) => ({ ...prev, numeroVestimenta: value }))
+      const selecionado = findOptionByValue(tamanhoOptions, value)
+      setForm((prev) => ({
+        ...prev,
+        numeroVestimenta: selecionado?.id ?? '',
+        numeroVestimentaNome: selecionado?.nome ?? value,
+      }))
       return
     }
 
     setForm((prev) => ({ ...prev, [name]: value }))
+
   }
 
   const handleAddCaracteristica = (valor) => {
@@ -495,7 +552,8 @@ export function MateriaisPage() {
   const startEdit = (material) => {
     const grupoMaterialDisplay =
       material.grupoMaterialNome || material.grupoMaterial || ''
-    const nomeEpiDisplay = material.nomeItemRelacionado || material.nome || ''
+    const nomeEpiDisplay =
+      material.nomeItemRelacionado || material.materialItemNome || material.nome || ''
     const numeroCalcadoDisplay =
       material.numeroCalcadoNome || material.numeroCalcado || ''
     const numeroVestimentaDisplay =
@@ -505,7 +563,7 @@ export function MateriaisPage() {
       nome: grupoMaterialDisplay,
     })
     const itemSelecionado = normalizeSelectionItem({
-      id: material.materialItemNome || nomeEpiDisplay,
+      id: material.nome || material.materialItemNome || nomeEpiDisplay,
       nome: nomeEpiDisplay,
     })
     const fabricanteSelecionado = normalizeSelectionItem({
@@ -538,16 +596,20 @@ export function MateriaisPage() {
       setFabricanteOptions((prev) => normalizeSelectionList([...prev, fabricanteSelecionado]))
     }
     setForm({
-      nome: nomeEpiDisplay,
-      fabricante: fabricanteSelecionado?.nome || '',
+      nome: material.nome || '',
+      materialItemNome: nomeEpiDisplay,
+      fabricante: fabricanteSelecionado?.id ?? '',
+      fabricanteNome: fabricanteSelecionado?.nome ?? '',
       validadeDias: String(material.validadeDias ?? ''),
       ca: material.ca || '',
       valorUnitario: formatCurrency(material.valorUnitario),
       grupoMaterial: grupoMaterialDisplay,
       grupoMaterialNome: grupoMaterialDisplay,
       grupoMaterialId: grupoSelecionado?.id ?? '',
-      numeroCalcado: numeroCalcadoDisplay,
-      numeroVestimenta: numeroVestimentaDisplay,
+      numeroCalcado: material.numeroCalcado || '',
+      numeroCalcadoNome: numeroCalcadoDisplay,
+      numeroVestimenta: material.numeroVestimenta || '',
+      numeroVestimentaNome: numeroVestimentaDisplay,
       caracteristicaEpi: caracteristicas,
       caracteristicas_epi: caracteristicas.map((item) => item.id).filter(Boolean),
       corMaterial: cores[0]?.nome ?? '',

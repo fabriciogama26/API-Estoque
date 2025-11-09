@@ -182,7 +182,7 @@ export function MateriaisTable({ materiais, onEdit, onHistory, editingId, isSavi
                 <td>{material.ca || '-'}</td>
                 <td>{material.validadeDias}</td>
                 <td>{formatCurrency(material.valorUnitario)}</td>
-                <td>{material.fabricante || '-'}</td>
+                <td>{material.fabricanteNome || material.fabricante || '-'}</td>
                 <td>{material.usuarioCadastroNome || '-'}</td>
                 <td>
                   <MateriaisActions
