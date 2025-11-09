@@ -441,7 +441,6 @@ const buildChaveUnicaMaterial = ({
 async function sanitizeMaterialPayload(payload = {}) {
   const nome = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado)
   const fabricante = trim(payload.fabricante ?? payload.fabricanteNome)
-  const fabricanteId = trim(payload.fabricanteId)
   const grupoMaterialNome = trim(payload.grupoMaterialNome ?? payload.grupoMaterial)
   const grupoMaterialId = trim(payload.grupoMaterialId)
   const numeroCalcadoRaw = sanitizeDigits(payload.numeroCalcado)
@@ -477,7 +476,6 @@ async function sanitizeMaterialPayload(payload = {}) {
     materialItemNome: nome,
     fabricante,
     fabricanteNome: fabricante,
-    fabricanteId: fabricanteId || null,
     validadeDias: payload.validadeDias !== undefined ? Number(payload.validadeDias) : null,
     ca,
     valorUnitario: Number(payload.valorUnitario ?? 0),
@@ -1516,7 +1514,7 @@ export const MateriaisOperations = {
     const materialPayload = {
       id: materialId,
       nome: dados.nome,
-      fabricante: dados.fabricanteId || dados.fabricante,
+      fabricante: dados.fabricante,
       validadeDias: dados.validadeDias,
       ca: dados.ca,
       valorUnitario: dados.valorUnitario,
@@ -1567,7 +1565,7 @@ export const MateriaisOperations = {
         .from('materiais')
         .update({
           nome: dados.nome,
-          fabricante: dados.fabricanteId || dados.fabricante,
+          fabricante: dados.fabricante,
           validadeDias: dados.validadeDias,
           ca: dados.ca,
           valorUnitario: dados.valorUnitario,

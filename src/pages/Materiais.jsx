@@ -280,12 +280,12 @@ export function MateriaisPage() {
       return
     }
 
-    if (name === 'fabricanteId') {
+    if (name === 'fabricante') {
       const selecionado = findOptionByValue(fabricanteOptions, value) ?? normalizeSelectionItem(value)
       setForm((prev) => ({
         ...prev,
-        fabricanteId: value,
-        fabricante: selecionado?.nome ?? value,
+        fabricante: value,
+        fabricanteNome: selecionado?.nome ?? value,
       }))
       return
     }
@@ -510,7 +510,7 @@ export function MateriaisPage() {
       nome: nomeEpiDisplay,
     })
     const fabricanteSelecionado = normalizeSelectionItem({
-      id: material.fabricanteId || material.fabricanteNome || material.fabricante,
+      id: material.fabricante || material.fabricanteNome,
       nome: material.fabricanteNome || material.fabricante || '',
     })
 
@@ -541,7 +541,6 @@ export function MateriaisPage() {
     setForm({
       nome: nomeEpiDisplay,
       fabricante: fabricanteSelecionado?.nome || '',
-      fabricanteId: fabricanteSelecionado?.id ?? '',
       validadeDias: String(material.validadeDias ?? ''),
       ca: material.ca || '',
       valorUnitario: formatCurrency(material.valorUnitario),

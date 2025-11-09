@@ -987,12 +987,10 @@ async function syncMaterialRelations(
 function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
   const nomePersist = dados.nome || ''
   const fabricanteNomePersist = dados.fabricanteNome || dados.fabricante || ''
-  const fabricanteIdPersist = dados.fabricanteId ?? null
   const grupoMaterialPersist = dados.grupoMaterialId || dados.grupoMaterial || ''
   const payload = {
     nome: nomePersist,
     fabricante: fabricanteNomePersist,
-    fabricanteId: fabricanteIdPersist,
     fabricanteNome: fabricanteNomePersist,
     validadeDias: dados.validadeDias ?? null,
     ca: dados.ca ?? '',
@@ -1052,13 +1050,9 @@ function mapMaterialRecord(record) {
   const rawNome = trim(record.nome ?? '')
   const materialItemNome = trim(record.materialItemNome ?? nomeItemRelacionado) || rawNome
   const nome = materialItemNome || rawNome
-  const rawFabricanteId = trim(record.fabricanteId ?? record.fabricante_id ?? '')
   const rawFabricante = trim(record.fabricante ?? '')
-  const fabricanteId =
-    normalizeUuid(rawFabricanteId) || normalizeUuid(rawFabricante) || null
   const fabricanteNomeBase = trim(record.fabricanteNome ?? record.fabricante_nome ?? '')
-  const fabricanteNome =
-    fabricanteNomeBase || (fabricanteId ? '' : rawFabricante || rawFabricanteId)
+  const fabricanteNome = fabricanteNomeBase || rawFabricante
   const caracteristicasTexto = trim(
     record.caracteristicaNome ?? record.caracteristicas_texto ?? ''
   )
@@ -1083,7 +1077,6 @@ function mapMaterialRecord(record) {
     fabricante: fabricanteNome,
     fabricanteNome,
     fabricantesNome: fabricanteNome,
-    fabricanteId: fabricanteId || null,
     validadeDias: record.validadeDias ?? record.validade_dias ?? null,
     ca: record.ca ?? record.ca_number ?? '',
     valorUnitario: toNumber(record.valorUnitario ?? record.valor_unitario),
@@ -1291,7 +1284,6 @@ function sanitizeMaterialPayload(payload = {}) {
     trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado ?? '') || ''
   const materialItemNome =
     nomeEpi || trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
-  const fabricanteId = trim(payload.fabricanteId ?? payload.fabricante_id ?? '')
   const fabricanteNome =
     trim(payload.fabricanteNome ?? payload.fabricante ?? payload.fabricante_nome ?? '') || ''
   const caracteristicasSelecionadas = normalizeOptionList(
@@ -1328,7 +1320,6 @@ function sanitizeMaterialPayload(payload = {}) {
     materialItemNome: materialItemNome || nomeEpi,
     fabricante: fabricanteNome,
     fabricanteNome,
-    fabricanteId: normalizeRelationId(fabricanteId),
     validadeDias: toNullableNumber(payload.validadeDias ?? payload.validade_dias),
     ca: trim(payload.ca ?? ''),
     valorUnitario: toNumber(payload.valorUnitario ?? payload.valor_unitario ?? 0),
@@ -1383,8 +1374,8 @@ function buildDateFilters(query, field, inicio, fim) {
 async function carregarMateriais() {
   const data = await execute(
     supabase
-      .from('materiais')
-      .select(MATERIAL_TABLE_SELECT_COLUMNS)
+      .from('materiais_view')
+      .select(MATERIAL_SELECT_COLUMNS)
       .order('nome', { ascending: true }),
     'Falha ao listar materiais.'
   )
