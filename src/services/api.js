@@ -1490,7 +1490,7 @@ async function carregarSaidas(params = {}) {
       execute(
         supabase
           .from('materiais_view')
-        .select('id, nome, fabricante, "fabricanteNome", "fabricantesNome"'),
+        .select('id, nome, fabricante, "fabricanteNome"'),
         'Falha ao listar materiais.'
       ),
     ])
