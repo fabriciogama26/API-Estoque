@@ -10,7 +10,6 @@ class Material {
     numeroCalcado = '',
     numeroVestimenta = '',
     numeroEspecifico = '',
-    chaveUnica,
     caracteristicaEpi = '',
     corMaterial = '',
     descricao = '',
@@ -29,7 +28,6 @@ class Material {
     this.numeroCalcado = numeroCalcado;
     this.numeroVestimenta = numeroVestimenta;
     this.numeroEspecifico = numeroEspecifico;
-    this.chaveUnica = chaveUnica;
     this.caracteristicaEpi = caracteristicaEpi;
     this.corMaterial = corMaterial;
     this.descricao = descricao;

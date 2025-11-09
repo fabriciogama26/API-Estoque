@@ -71,3 +71,8 @@ Materiais: erros conhecidos e correções
      O efeito que sincroniza o dropdown agora compara `editingMaterial.nomeId`, garantindo que o form sempre mantenha o UUID e que salvar, seja edição ou novo cadastro, nunca insira o texto exibido no backend.
 
 Faça testes manuais criando/atualizando materiais e observe os logs do Supabase para confirmar que os UUIDs corretos são enviados e os históricos trazem apenas mudanças relevantes.
+
+8. **Duplicidade agora é controlada pela view `materiais_unicos_view` (sem `chaveUnica`)**
+   - **Arquivos:** `supabase/migrations/0028_create_materiais_view.sql`, `supabase/migrations/0029_drop_chaveunica_from_materiais.sql`
+   - **Contexto:** a coluna `chaveUnica` foi removida do patrimônio; a visão deduplica os materiais com base no hash (fabricante+grupo+numeroEspecifico+CA+cores+características+valorUnitario+validadeDias). A trigger `evitar_duplicidade_material()` consultará essa view em vez da coluna antiga.
+   - **Como testar:** rode inserts/updates com os mesmos valores e observe o erro `Material duplicado...` gerado pela trigger. Essa view também embasa as rotinas de backend, então atualize validações/documentação para não tentarem mais ler `chaveUnica`.
