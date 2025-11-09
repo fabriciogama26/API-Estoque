@@ -1099,17 +1099,6 @@ const sanitizeMaterialPayload = (payload = {}) => {
     cores: coresSelecionadas,
     coresIds: coresSelecionadas.map((item) => item.id).filter(Boolean),
     descricao: String(payload.descricao || '').trim(),
-    chaveUnica: buildChaveUnica({
-      grupoMaterial,
-      grupoMaterialNome,
-      nome: materialItemNomeBase,
-      fabricante: fabricanteNomeBase,
-      numeroCalcado: isGrupo(grupoMaterialNome, 'Calçado') ? numeroCalcado : '',
-      numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimenta : '',
-      caracteristicaEpi,
-      corMaterial,
-      ca: payload.ca,
-    }),
   }
 }
 
@@ -1736,13 +1725,6 @@ const localApi = {
       const usuario = trim(payload.usuarioCadastro) || 'sistema'
 
       return writeState((state) => {
-        const existe = state.materiais.find(
-          (item) => item.chaveUnica && item.chaveUnica === dados.chaveUnica
-        )
-        if (existe) {
-          throw createError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
-        }
-
         const material = {
           id: randomId(),
           ...dados,
@@ -1783,13 +1765,6 @@ const localApi = {
         validateMaterialPayload(dadosCompletos)
         const usuario = trim(payload.usuarioResponsavel) || 'sistema'
 
-        const existe = state.materiais.find(
-          (item) => item.id !== id && item.chaveUnica && item.chaveUnica === dadosCompletos.chaveUnica
-        )
-        if (existe) {
-          throw createError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
-        }
-
         const camposComparacao = [
           'nome',
           'nomeItemRelacionado',
@@ -1810,7 +1785,6 @@ const localApi = {
           'numeroEspecifico',
           'caracteristicaEpi',
           'corMaterial',
-          'chaveUnica',
         ]
 
         const camposAlterados = []

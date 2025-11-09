@@ -156,47 +156,6 @@ const buildNumeroReferencia = ({ grupoMaterial, numeroCalcado, numeroVestimenta 
   return ''
 }
 
-const buildChaveUnica = ({
-  nome,
-  fabricante,
-  grupoMaterial,
-  grupoMaterialNome,
-  numeroCalcado,
-  numeroVestimenta,
-  caracteristicaEpi,
-  corMaterial,
-  ca,
-}) => {
-  const grupoDisplay = grupoMaterialNome ?? grupoMaterial
-  const partes = [
-    normalizeKeyPart(nome),
-    normalizeKeyPart(fabricante),
-    normalizeKeyPart(grupoDisplay),
-  ]
-
-  const numeroReferencia = normalizeKeyPart(numeroCalcado || numeroVestimenta)
-  if (numeroReferencia) {
-    partes.push(numeroReferencia)
-  }
-
-  const caracteristicas = ordenarCaracteristicas(normalizeCaracteristicaLista(caracteristicaEpi))
-  if (caracteristicas.length) {
-    partes.push(caracteristicas.map((item) => normalizeKeyPart(item)).filter(Boolean).join('||'))
-  }
-
-  const cor = normalizeKeyPart(corMaterial)
-  if (cor) {
-    partes.push(cor)
-  }
-
-  const caNormalizado = normalizeKeyPart(sanitizeDigits(ca))
-  if (caNormalizado) {
-    partes.push(caNormalizado)
-  }
-
-  return partes.join('||')
-}
-
 export function resolveUsuarioNome(user) {
   return user?.name || user?.username || user?.email || 'sistema'
 }
@@ -294,17 +253,6 @@ const buildMaterialPayload = (form) => {
     numeroCalcado: numeroCalcadoNome,
     numeroVestimenta: numeroVestimentaNome,
   })
-  const chaveUnica = buildChaveUnica({
-    grupoMaterial,
-    grupoMaterialNome,
-    nome: nomeEpi,
-    fabricante: fabricanteNome,
-    numeroCalcado: numeroCalcadoNome,
-    numeroVestimenta: numeroVestimentaNome,
-    caracteristicaEpi: caracteristicaTexto,
-    corMaterial: corPrincipal,
-    ca: form.ca,
-  })
 
   return {
     nome: nomeId,
@@ -323,7 +271,6 @@ const buildMaterialPayload = (form) => {
       : null,
     numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimentaId || null : null,
     numeroEspecifico,
-    chaveUnica,
     caracteristicaEpi: caracteristicaTexto,
     corMaterial: sanitizeAlphanumeric(corPrincipal),
     caracteristicas: caracteristicasSelecionadas,

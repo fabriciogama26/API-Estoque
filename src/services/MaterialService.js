@@ -120,16 +120,6 @@ function normalizeMaterialInput(payload) {
     numeroCalcado,
     numeroVestimenta,
   });
-  const chaveUnica = materialRules.buildChaveUnica({
-    grupoMaterial,
-    nome,
-    fabricante,
-    numeroCalcado,
-    numeroVestimenta,
-    caracteristicaEpi: caracteristicaEpiTexto,
-    corMaterial,
-    ca,
-  });
   const caracteristicasIds = caracteristicasLista.map((item) => item.id).filter(Boolean);
   const coresIds = coresLista.map((item) => item.id).filter(Boolean);
 
@@ -145,7 +135,6 @@ function normalizeMaterialInput(payload) {
     caracteristicaEpi: caracteristicaEpiTexto,
     corMaterial,
     descricao,
-    chaveUnica,
     caracteristicas: caracteristicasLista,
     caracteristicasIds,
     caracteristicas_epi: caracteristicasIds,
@@ -163,11 +152,6 @@ class MaterialService {
     const valorUnitario = Number(payload.valorUnitario);
     if (Number.isNaN(valorUnitario) || valorUnitario <= 0) {
       throw new Error('Valor unitario deve ser maior que zero');
-    }
-
-    const existente = repositories.materiais.findByChaveUnica(normalized.chaveUnica);
-    if (existente) {
-      throw new Error('Já existe um EPI com essas mesmas informações cadastrado.');
     }
 
     const material = new Material({
@@ -239,13 +223,6 @@ class MaterialService {
       payload.valorUnitario !== undefined ? Number(payload.valorUnitario) : material.valorUnitario;
     if (Number.isNaN(valorUnitarioAtualizado) || valorUnitarioAtualizado <= 0) {
       throw new Error('Valor unitario deve ser maior que zero');
-    }
-
-    const duplicado = repositories.materiais
-      .findAll()
-      .find((item) => item.id !== id && item.chaveUnica === normalized.chaveUnica);
-    if (duplicado) {
-      throw new Error('Já existe um EPI com essas mesmas informações cadastrado.');
     }
 
     const atualizacoes = {

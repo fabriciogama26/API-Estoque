@@ -387,57 +387,6 @@ const buildNumeroReferenciaMaterial = ({ grupoMaterial, numeroCalcado, numeroVes
   return ''
 }
 
-const buildChaveUnicaMaterial = ({
-  grupoMaterial,
-  nome,
-  fabricante,
-  numeroCalcado,
-  numeroVestimenta,
-  caracteristicas,
-  cores,
-  ca,
-}) => {
-  const partes = [
-    normalizeKeyPart(nome),
-    normalizeKeyPart(fabricante),
-    normalizeKeyPart(grupoMaterial),
-  ]
-
-  const numeroReferencia = normalizeKeyPart(numeroCalcado || numeroVestimenta)
-  if (numeroReferencia) {
-    partes.push(numeroReferencia)
-  }
-
-  const caracteristicasNomes = normalizeCatalogoLista(caracteristicas)
-  if (caracteristicasNomes.length) {
-    partes.push(
-      caracteristicasNomes
-        .map((item) => normalizeKeyPart(item))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b))
-        .join('||'),
-    )
-  }
-
-  const coresNomes = normalizeCatalogoLista(cores)
-  if (coresNomes.length) {
-    partes.push(
-      coresNomes
-        .map((item) => normalizeKeyPart(item))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b))
-        .join('||'),
-    )
-  }
-
-  const caNormalizado = normalizeKeyPart(sanitizeDigits(ca))
-  if (caNormalizado) {
-    partes.push(caNormalizado)
-  }
-
-  return partes.join('||')
-}
-
 async function sanitizeMaterialPayload(payload = {}) {
   const nome = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado)
   const fabricante = trim(payload.fabricante ?? payload.fabricante)
@@ -491,17 +440,6 @@ async function sanitizeMaterialPayload(payload = {}) {
     numeroVestimenta,
     numeroEspecifico,
     descricao,
-    chaveUnica: buildChaveUnicaMaterial({
-      grupoMaterial: grupoMaterialNome,
-      grupoMaterialNome,
-      nome,
-      fabricante,
-      numeroCalcado,
-      numeroVestimenta,
-      caracteristicas,
-      cores,
-      ca,
-    }),
     caracteristicaEpi,
     corMaterial,
     caracteristicas,
@@ -864,24 +802,6 @@ function normalizeMaterialRelationItems(value) {
 
 const buildCatalogoTexto = (lista) => normalizeCatalogoLista(lista).join('; ')
 
-
-async function ensureMaterialChaveUnica(chaveUnica, ignoreId) {
-  if (!chaveUnica) {
-    return
-
-  let query = supabaseAdmin
-    .from('materiais')
-    .select('id')
-    .eq('chaveUnica', chaveUnica)
-    .limit(1)
-
-  if (ignoreId) {
-    query = query.neq('id', ignoreId)
-
-  const existente = await executeMaybeSingle(query, 'Falha ao validar material.')
-  if (existente) {
-    throw createHttpError(409, 'Já existe um EPI com essas mesmas informações cadastrado.')
-}
 
 function sanitizeEntradaPayload(payload = {}) {
   const dataEntradaRaw = trim(payload.dataEntrada);
@@ -1505,7 +1425,6 @@ export const MateriaisOperations = {
   async create(payload, user) {
     const dados = await sanitizeMaterialPayload(payload)
     validateMaterialPayload(dados)
-    await ensureMaterialChaveUnica(dados.chaveUnica)
 
     const agora = nowIso()
     const usuario = resolveUsuarioNome(user)
@@ -1525,7 +1444,6 @@ export const MateriaisOperations = {
       numeroVestimenta: dados.numeroVestimenta,
       numeroEspecifico: dados.numeroEspecifico,
       descricao: dados.descricao,
-      chaveUnica: dados.chaveUnica,
       usuarioCadastro: usuario,
       dataCadastro: agora,
     }
@@ -1555,7 +1473,6 @@ export const MateriaisOperations = {
       ...payload,
     })
     validateMaterialPayload(dados)
-    await ensureMaterialChaveUnica(dados.chaveUnica, id)
 
     const usuario = resolveUsuarioNome(user)
     const agora = nowIso()
@@ -1576,7 +1493,6 @@ export const MateriaisOperations = {
           numeroVestimenta: dados.numeroVestimenta,
           numeroEspecifico: dados.numeroEspecifico,
           descricao: dados.descricao,
-          chaveUnica: dados.chaveUnica,
           usuarioAtualizacao: usuario,
           atualizadoEm: agora,
         })

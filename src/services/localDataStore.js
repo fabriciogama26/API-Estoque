@@ -78,46 +78,6 @@ const buildNumeroEspecificoLocal = ({ grupoMaterial, numeroCalcado, numeroVestim
   return ''
 }
 
-const buildChaveUnicaLocal = ({
-  grupoMaterial,
-  nome,
-  fabricante,
-  numeroCalcado,
-  numeroVestimenta,
-  caracteristicaEpi,
-  corMaterial,
-  ca,
-}) => {
-  const partes = [
-    normalizeKeyPart(nome),
-    normalizeKeyPart(fabricante),
-    normalizeKeyPart(grupoMaterial),
-  ]
-  const numero = normalizeKeyPart(numeroCalcado || numeroVestimenta)
-  if (numero) {
-    partes.push(numero)
-  }
-  const caracteristicas = normalizeCaracteristicaListaLocal(caracteristicaEpi)
-  if (caracteristicas.length) {
-    partes.push(
-      caracteristicas
-        .map((item) => normalizeKeyPart(item))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b))
-        .join('||'),
-    )
-  }
-  const cor = normalizeKeyPart(corMaterial)
-  if (cor) {
-    partes.push(cor)
-  }
-  const caNormalizado = normalizeKeyPart(String(ca || '').trim())
-  if (caNormalizado) {
-    partes.push(caNormalizado)
-  }
-  return partes.join('||')
-}
-
 const buildLocalOptionId = (prefix, nome, index = 0) => {
   const base = normalizeKeyPart(nome)
   if (!base) {
@@ -231,18 +191,6 @@ function normalizeState(state) {
         numeroCalcado,
         numeroVestimenta,
       })
-    const chaveUnica =
-      material.chaveUnica ??
-      buildChaveUnicaLocal({
-        grupoMaterial,
-        nome: material.nome || '',
-        fabricante: material.fabricante || '',
-        numeroCalcado,
-        numeroVestimenta,
-        caracteristicaEpi,
-        corMaterial,
-        ca,
-      })
     return {
       ...material,
       grupoMaterial,
@@ -255,7 +203,6 @@ function normalizeState(state) {
       corMaterial,
       cores: coresLista,
       coresIds: coresLista.map((item) => item.id).filter(Boolean),
-      chaveUnica,
     }
   })
   sanitized.entradas = normalizeArray(sanitized.entradas).map((entrada) => {

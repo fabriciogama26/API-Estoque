@@ -14,7 +14,6 @@ const FIELD_LABELS = {
   numeroCalcado: 'Número de calçado',
   numeroVestimenta: 'Número de vestimenta',
   numeroEspecifico: 'Número específico',
-  chaveUnica: 'Chave única',
   caracteristicaEpi: 'Características',
   caracteristicas: 'Características',
   caracteristicas_epi: 'Características',

@@ -53,8 +53,7 @@
       "numeroEspecifico": "",
       "caracteristicaEpi": "Resistente a corte",
       "corMaterial": "AZUL",
-      "descricao": "Luva nitrilica azul com reforço",
-      "chaveUnica": "luva nitrilica||protecbras||luva||resistente a corte||azul||12345"
+      "descricao": "Luva nitrilica azul com reforço"
     },
     {
       "id": "seed-material-bota",
@@ -75,8 +74,7 @@
       "numeroEspecifico": "42",
       "caracteristicaEpi": "Impermeável",
       "corMaterial": "PRETA",
-      "descricao": "Bota de PVC preta impermeavel",
-      "chaveUnica": "bota pvc||safestep||calçado||42||impermeável||preta||67890"
+      "descricao": "Bota de PVC preta impermeavel"
     }
   ],
   "materialPriceHistory": [

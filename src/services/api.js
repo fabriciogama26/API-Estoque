@@ -141,7 +141,6 @@ const MATERIAL_HISTORY_FIELDS = [
   'numeroEspecifico',
   'caracteristicaNome',
   'corNome',
-  'chaveUnica',
 ]
 
 const MATERIAL_TABLE_SELECT_COLUMNS = `
@@ -161,7 +160,6 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
   "numeroCalcado",
   "numeroVestimenta",
   "numeroEspecifico",
-  "chaveUnica",
   "usuarioCadastro",
   "usuarioAtualizacao",
   "dataCadastro",
@@ -985,7 +983,6 @@ function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudi
     numeroCalcado: dados.numeroCalcado || null,
     numeroVestimenta: dados.numeroVestimenta || null,
     numeroEspecifico: dados.numeroEspecifico ?? '',
-    chaveUnica: dados.chaveUnica ?? '',
   }
 
   if (includeCreateAudit) {
@@ -1025,6 +1022,7 @@ function mapMaterialRecord(record) {
   const rawNome = trim(record.nome ?? '')
   const materialItemNome = trim(record.materialItemNome ?? nomeItemRelacionado) || rawNome
   const nome = materialItemNome || rawNome
+  const nomeId = rawNome
   const rawFabricante = trim(record.fabricante ?? '')
   const fabricanteNomeBase = trim(record.fabricanteNome ?? record.fabricante_nome ?? '')
   const fabricanteNome = fabricanteNomeBase || rawFabricante
@@ -1047,6 +1045,7 @@ function mapMaterialRecord(record) {
   return {
     id: record.id,
     nome,
+    nomeId,
     nomeItemRelacionado,
     materialItemNome,
     fabricante: rawFabricante,
@@ -1065,7 +1064,6 @@ function mapMaterialRecord(record) {
     numeroVestimenta: record.numeroVestimenta ?? record.numero_vestimenta ?? '',
     numeroVestimentaNome: record.numeroVestimentaNome ?? record.numero_vestimenta_nome ?? '',
     numeroEspecifico: record.numeroEspecifico ?? record.numero_especifico ?? '',
-    chaveUnica: record.chaveUnica ?? record.chave_unica ?? '',
     descricao: record.descricao ?? '',
     caracteristicaEpi: caracteristicasTexto,
     caracteristicas: [],
@@ -1318,7 +1316,6 @@ function sanitizeMaterialPayload(payload = {}) {
     cores: coresSelecionadas,
     coresIds: normalizeRelationIds(coresSelecionadas.map((item) => item?.id)),
     corMaterial: corMaterialTexto,
-    chaveUnica: trim(payload.chaveUnica ?? payload.chave_unica ?? ''),
   }
 }
 

@@ -51,45 +51,6 @@ const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta 
   return '';
 };
 
-const buildChaveUnica = ({
-  grupoMaterial,
-  nome,
-  fabricante,
-  numeroCalcado,
-  numeroVestimenta,
-  caracteristicaEpi,
-  corMaterial,
-  ca,
-}) => {
-  const partes = [
-    normalizeKeyPart(nome),
-    normalizeKeyPart(fabricante),
-    normalizeKeyPart(grupoMaterial),
-  ];
-  const numero = normalizeKeyPart(numeroCalcado || numeroVestimenta);
-  if (numero) {
-    partes.push(numero);
-  }
-  const caracteristicas = normalizeCaracteristicaLista(caracteristicaEpi);
-  if (caracteristicas.length) {
-    partes.push(
-      caracteristicas
-        .map((item) => normalizeKeyPart(item))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b))
-        .join('||'),
-    );
-  }
-  const cor = normalizeKeyPart(corMaterial);
-  if (cor) {
-    partes.push(cor);
-  }
-  const caNormalizado = normalizeKeyPart(sanitizeDigits(ca));
-  if (caNormalizado) {
-    partes.push(caNormalizado);
-  }
-  return partes.join('||');
-};
 
 function validarDadosObrigatorios({
   nome,
@@ -148,7 +109,6 @@ module.exports = {
   validarEstoqueMinimo,
   sanitizeNomeEpi,
   buildNumeroEspecifico,
-  buildChaveUnica,
   sanitizeDigits,
   isGrupoCalcado: (valor) => isGrupo(valor, GRUPO_MATERIAL_CALCADO),
   isGrupoVestimenta: (valor) => isGrupo(valor, GRUPO_MATERIAL_VESTIMENTA),
