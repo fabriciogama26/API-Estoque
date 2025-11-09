@@ -142,11 +142,9 @@ const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = [
 
 const MATERIAL_HISTORY_FIELDS = [
   'nome',
-  'nomeItemRelacionado',
   'materialItemNome',
   'fabricante',
   'fabricanteNome',
-  'fabricanteId',
   'validadeDias',
   'ca',
   'valorUnitario',
@@ -155,12 +153,11 @@ const MATERIAL_HISTORY_FIELDS = [
   'descricao',
   'grupoMaterial',
   'grupoMaterialNome',
-  'grupoMaterialId',
   'numeroCalcado',
   'numeroVestimenta',
   'numeroEspecifico',
-  'caracteristicaEpi',
-  'corMaterial',
+  'caracteristicaNome',
+  'corNome',
   'chaveUnica',
 ]
 
@@ -169,7 +166,6 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
   nome,
   "materialItemNome",
   fabricante,
-  "fabricanteId",
   "fabricanteNome",
   "validadeDias",
   ca,
@@ -177,7 +173,6 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
   "estoqueMinimo",
   ativo,
   descricao,
-  "grupoMaterialId",
   "grupoMaterial",
   "grupoMaterialNome",
   "numeroCalcado",
@@ -192,9 +187,8 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
 
 const MATERIAL_SELECT_COLUMNS = `
   ${MATERIAL_TABLE_SELECT_COLUMNS},
-  "grupoMaterialNome",
-  "fabricantesNome",
-  "nomeItemRelacionado",
+  "caracteristicaNome",
+  "corNome",
   "numeroCalcadoNome",
   "numeroVestimentaNome",
   "usuarioCadastroNome",
@@ -1058,48 +1052,17 @@ function mapMaterialRecord(record) {
   const rawNome = trim(record.nome ?? '')
   const materialItemNome = trim(record.materialItemNome ?? nomeItemRelacionado) || rawNome
   const nome = materialItemNome || rawNome
-  const rawFabricanteId = trim(
-    record.fabricanteId ?? record.fabricante_id ?? '',
-  )
+  const rawFabricanteId = trim(record.fabricanteId ?? record.fabricante_id ?? '')
   const rawFabricante = trim(record.fabricante ?? '')
   const fabricanteId =
     normalizeUuid(rawFabricanteId) || normalizeUuid(rawFabricante) || null
-  const fabricanteNomeBase = trim(
-    record.fabricantesNome ??
-      record.fabricantes_nome ??
-      record.fabricanteNome ??
-      record.fabricante_nome ??
-      '',
-  )
+  const fabricanteNomeBase = trim(record.fabricanteNome ?? record.fabricante_nome ?? '')
   const fabricanteNome =
     fabricanteNomeBase || (fabricanteId ? '' : rawFabricante || rawFabricanteId)
-  const caracteristicasLista = normalizeOptionList(
-    record.caracteristicas ??
-      record.caracteristicas_vinculos ??
-      record.caracteristicas_list ??
-      record.caracteristicas_agg ??
-      record.caracteristicas_list_nomes ??
-      record.caracteristicas_rel ??
-      record.caracteristicas_nomes ??
-      []
+  const caracteristicasTexto = trim(
+    record.caracteristicaNome ?? record.caracteristicas_texto ?? ''
   )
-  const coresLista = normalizeOptionList(
-    record.cores ??
-      record.cores_vinculos ??
-      record.cores_list ??
-      record.cores_agg ??
-      record.cores_rel ??
-      record.cores_nomes ??
-      record.coresTexto ??
-      []
-  )
-  const caracteristicasTexto =
-    formatCaracteristicaTexto(caracteristicasLista.map((item) => item.nome)) ||
-    formatCaracteristicaTexto(record.caracteristicas_nomes ?? []) ||
-    formatCaracteristicaTexto(record.caracteristicas_texto ?? '')
-  const coresTexto =
-    trim(record.cores_texto ?? '') ||
-    (coresLista.length ? coresLista.map((item) => item.nome).join('; ') : '')
+  const coresTexto = trim(record.corNome ?? record.cores_texto ?? '')
   const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
   const usuarioCadastroNome =
     trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
@@ -1137,14 +1100,14 @@ function mapMaterialRecord(record) {
     chaveUnica: record.chaveUnica ?? record.chave_unica ?? '',
     descricao: record.descricao ?? '',
     caracteristicaEpi: caracteristicasTexto,
-    caracteristicas: caracteristicasLista,
-    caracteristicasIds: caracteristicasLista.map((item) => item.id).filter(Boolean),
-    caracteristicasNomes: normalizeStringArray(record.caracteristicas_nomes ?? []),
+    caracteristicas: [],
+    caracteristicasIds: [],
+    caracteristicasNomes: [],
     caracteristicasTexto,
     corMaterial: coresTexto,
-    cores: coresLista,
-    coresIds: coresLista.map((item) => item.id).filter(Boolean),
-    coresNomes: normalizeStringArray(record.cores_nomes ?? []),
+    cores: [],
+    coresIds: [],
+    coresNomes: [],
     coresTexto,
     usuarioCadastro: usuarioCadastroId,
     usuarioCadastroNome,
@@ -1537,7 +1500,7 @@ async function carregarSaidas(params = {}) {
       execute(
         supabase
           .from('materiais_view')
-          .select('id, nome, fabricante, "fabricanteNome", "fabricantesNome", "fabricanteId"'),
+        .select('id, nome, fabricante, "fabricanteNome", "fabricantesNome"'),
         'Falha ao listar materiais.'
       ),
     ])
