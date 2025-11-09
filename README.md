@@ -121,8 +121,9 @@ A pasta [`docs/`](docs) descreve fluxos específicos (cadastros, dashboards, ter
 - [`docs/Dashboard.txt`](docs/Dashboard.txt) – indicadores e gráficos de movimentação.
 - [`docs/DashboardAcidentes.txt`](docs/DashboardAcidentes.txt) – painel de SST (Supabase x modo local).
 - [`docs/Acidentes.txt`](docs/Acidentes.txt) – formulário, filtros e histórico de acidentes.
-- [`docs/Materiais.txt`](docs/Materiais.txt) – cadastro avançado de EPIs, catálogos e histórico de preços.
-- [`docs/Pessoas.txt`](docs/Pessoas.txt) – gestão de colaboradores, filtros e auditoria.
+- [`docs/Materiais.txt`](docs/Materiais.txt) — cadastro avançado de EPIs, catálogos e histórico de preços.
+- [`docs/materiais-issues.txt`](docs/materiais-issues.txt) — registro dos erros recorrentes que impactaram o cadastro de materiais (validação de EPI, uuid nos catálogos, vínculo de cores/características e o histórico) e orientações para corrigi-los.
+- [`docs/Pessoas.txt`](docs/Pessoas.txt) — gestão de colaboradores, filtros e auditoria.
 - [`docs/Entradas.txt`](docs/Entradas.txt) e [`docs/Saidas.txt`](docs/Saidas.txt) – movimentações de estoque com filtros e paginação.
 - [`docs/TermosEpi.txt`](docs/TermosEpi.txt) e [`docs/ambiente-termos-epi.txt`](docs/ambiente-termos-epi.txt) – geração do termo e requisitos de infraestrutura.
 - [`docs/data-mode-guide.txt`](docs/data-mode-guide.txt) – alternância entre Supabase e modo local.

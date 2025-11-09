@@ -246,10 +246,14 @@ export function MateriaisPage() {
       return
     }
     const targetValue =
-      editingMaterial.materialItemNome || editingMaterial.nome || editingMaterial.nomeItemRelacionado || ''
+      editingMaterial.materialItemNome ||
+      editingMaterial.nomeId ||
+      editingMaterial.nome ||
+      editingMaterial.nomeItemRelacionado ||
+      ''
     const targetKey = normalizeSelectionKey(targetValue)
     const matchedById =
-      materialItems.find((item) => item.id && item.id === editingMaterial.nome) ?? null
+      materialItems.find((item) => item.id && item.id === (editingMaterial.nomeId || editingMaterial.nome)) ?? null
     const matchedByName =
       materialItems.find((item) => normalizeSelectionKey(item.nome) === targetKey) ?? null
     const candidate = matchedById || matchedByName
@@ -563,7 +567,7 @@ export function MateriaisPage() {
       nome: grupoMaterialDisplay,
     })
     const itemSelecionado = normalizeSelectionItem({
-      id: material.nome || material.materialItemNome || nomeEpiDisplay,
+      id: material.nomeId || material.nome || material.materialItemNome || nomeEpiDisplay,
       nome: nomeEpiDisplay,
     })
     const fabricanteSelecionado = normalizeSelectionItem({
@@ -596,7 +600,7 @@ export function MateriaisPage() {
       setFabricanteOptions((prev) => normalizeSelectionList([...prev, fabricanteSelecionado]))
     }
     setForm({
-      nome: material.nome || '',
+      nome: material.nomeId || material.nome || '',
       materialItemNome: nomeEpiDisplay,
       fabricante: fabricanteSelecionado?.id ?? '',
       fabricanteNome: fabricanteSelecionado?.nome ?? '',

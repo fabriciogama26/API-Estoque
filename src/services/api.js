@@ -1025,6 +1025,7 @@ function mapMaterialRecord(record) {
   const rawNome = trim(record.nome ?? '')
   const materialItemNome = trim(record.materialItemNome ?? nomeItemRelacionado) || rawNome
   const nome = materialItemNome || rawNome
+  const nomeId = rawNome
   const rawFabricante = trim(record.fabricante ?? '')
   const fabricanteNomeBase = trim(record.fabricanteNome ?? record.fabricante_nome ?? '')
   const fabricanteNome = fabricanteNomeBase || rawFabricante
@@ -1047,6 +1048,7 @@ function mapMaterialRecord(record) {
   return {
     id: record.id,
     nome,
+    nomeId,
     nomeItemRelacionado,
     materialItemNome,
     fabricante: rawFabricante,

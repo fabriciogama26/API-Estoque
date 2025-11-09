@@ -1,0 +1,73 @@
+Materiais: erros conhecidos e correções
+======================================
+
+1. **“O campo EPI não pode conter números” ao editar**
+   - **Arquivos:** `src/rules/MateriaisRules.js`
+   - **Problema:** a validação previa examinava `form.nome` (o UUID que vem do dropdown), rejeitando qualquer material cuja identificador continha dígitos mesmo que o usuário só tivesse selecionado um item existente. Isso bloqueava o botão “Salvar” em edições e criava o falso positivo.
+   - **Correção:** agora o trecho abaixo busca o UUID (`form.nome`) e só executa `/\d/` quando ele não contém um UUID válido:
+
+     ```js
+     const UUID_REGEX = /^[0-9a-f-]{36}$/i
+     const nomeDisplay = form.materialItemNome || ''
+     const isExistingEpi = UUID_REGEX.test(String(form.nome || ''))
+     if (!isExistingEpi && /\d/.test(nomeDisplay)) {
+       return 'O campo EPI nao pode conter numeros.'
+     }
+     ```
+
+     Dessa forma, salvar um EPI já cadastrado não ativa a validação, mas criar um novo texto com números continua bloqueado.
+
+2. **`invalid input syntax for type uuid` nas medidas**
+   - **Arquivos:** `src/services/api.js`, `src/pages/Materiais.jsx`, `src/components/Materiais/MateriaisForm.jsx`, `src/rules/MateriaisRules.js`
+   - **Problema:** os selects de “Número de calçado” / “Tamanho” retornavam apenas texto e a validação/`buildMaterialPayload` também usavam o valor do campo (ex: `'33'` ou `'G'`), mas as colunas `numeroCalcado` e `numeroVestimenta` esperam UUIDs.
+   - **Correção:** a API BOM agora expõe `{ id, nome }` de `medidas_calcado` e `medidas_vestimentas`; o formulário salva `numeroCalcado`/`numeroVestimenta` com o `id` e mantém o nome em novos campos `numeroCalcadoNome`/`numeroVestimentaNome`; `buildMaterialPayload` persiste o UUID e usa o nome para compor `numeroEspecifico`/validação.
+   - **Snippet-chave (form handler):**
+
+     ```js
+     if (name === 'numeroCalcado') {
+       const selecionado = findOptionByValue(calcadoOptions, value)
+       setForm((prev) => ({
+         ...prev,
+         numeroCalcado: selecionado?.id ?? '',
+         numeroCalcadoNome: selecionado?.nome ?? value,
+       }))
+       return
+     }
+     ```
+
+3. **Histórico exibindo UUIDs e mudanças irrelevantes**
+   - **Arquivos:** `src/services/api.js`, `src/components/Materiais/MateriaisHistoricoTimeline.jsx`
+   - **Problema:** o diff guardava os campos `nome`, `fabricante`, etc. (UUIDs), por isso qualquer atualização substituía o UUID e aparecia como mudança no histórico.
+   - **Correção:** reduziu-se `MATERIAL_HISTORY_FIELDS` para `materialItemNome`, `fabricanteNome`, `numeroCalcadoNome`, etc., e `formatChange` usa esses nomes e formata apenas quando o texto realmente difere; o histórico agora dispara somente quando o conteúdo visível mudou.
+
+4. **Falha na sincronização de relações com `material_grupo_cor` / `material_grupo_caracteristica_epi`**
+   - **Arquivo:** `src/services/api.js`
+   - **Problema:** o algoritmo percorria candidatos como `grupo_cor_id`, `caracteristica_epi`, `nome_cor`, etc., que não existem nas tabelas de join; isso produzia erros `column does not exist` antes de tentar o campo correto.
+   - **Correção:** `MATERIAL_COR_RELATION_ID_COLUMNS` e `MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS` agora referenciam apenas as colunas reais (`grupo_material_cor`, `grupo_caracteristica_epi`) e a lista de fallback textual foi esvaziada. O loop passa somente pelos nomes presentes no schema.
+
+5. **Tabela mostra UUID em vez do nome do fabricante**
+   - **Arquivo:** `src/components/Materiais/MateriaisTable.jsx`
+   - **Problema:** a coluna “Fabricante” exibia `material.fabricante` (UUID) em vez de `fabricanteNome`.
+   - **Correção:** incluiu `material.fabricanteNome` no render; o fallback para o UUID permanece apenas se o nome ainda não foi resolvido.
+   - **Sniper:** `<td>{material.fabricanteNome || material.fabricante || '-'}</td>`
+
+6. **Edição envia texto (“Apoio”) em vez do UUID**
+   - **Arquivos:** `src/services/api.js`, `src/pages/Materiais.jsx`
+   - **Problema:** o BD armazenava o UUID original, mas `MateriaisPage` preenchia `form.nome` com o texto (“Apoio”), reintroduzindo o erro `invalid input syntax for type uuid` ao atualizar o material. O dropdown sempre caía num `normalizeSelectionItem` que só via o nome e não o ID.
+   - **Correção:** `mapMaterialRecord` agora expõe `nomeId`, e o início da edição usa esse valor:
+
+     ```js
+     const itemSelecionado = normalizeSelectionItem({
+       id: material.nomeId || material.nome || material.materialItemNome,
+       nome: nomeEpiDisplay,
+     })
+     …
+     setForm({
+       nome: material.nomeId || material.nome || '',
+       …
+     })
+     ```
+
+     O efeito que sincroniza o dropdown agora compara `editingMaterial.nomeId`, garantindo que o form sempre mantenha o UUID e que salvar, seja edição ou novo cadastro, nunca insira o texto exibido no backend.
+
+Faça testes manuais criando/atualizando materiais e observe os logs do Supabase para confirmar que os UUIDs corretos são enviados e os históricos trazem apenas mudanças relevantes.
