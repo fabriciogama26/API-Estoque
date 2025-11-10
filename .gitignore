@@ -38,3 +38,6 @@ temp/
 .xlsx
 *.xls
 *.csv
+
+# Backup files
+SupabaseBackup/
