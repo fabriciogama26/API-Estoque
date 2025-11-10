@@ -2837,20 +2837,238 @@ async dashboard(params = {}) {
 
 
 
+const normalizeReferenceLookupKey = (valor) => {
+  const texto = resolveTextValue(valor)
+  if (!texto) {
+    return ''
+  }
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+const buildReferenceCacheKey = (tabela, colunaTexto, colunaId, tipo, valor) =>
+  [tabela || '', colunaTexto || '', colunaId || '', tipo || '', valor || ''].join('::')
+
+const extractReferenceInput = (valor, colunaTexto, colunaId) => {
+  if (valor === undefined || valor === null) {
+    return { id: null, nome: '' }
+  }
+
+  const registro = unwrapOptionRecord(valor)
+  if (registro && typeof registro === 'object' && !Array.isArray(registro)) {
+    const idCandidates = [colunaId, 'id', 'uuid', 'value', 'valor', 'codigo', 'code']
+    let id = null
+    for (const candidate of idCandidates) {
+      if (!candidate) {
+        continue
+      }
+      id = normalizeOptionId(registro[candidate])
+      if (id) {
+        break
+      }
+    }
+
+    const textoCandidates = [
+      registro[colunaTexto],
+      registro.nome,
+      registro.label,
+      registro.descricao,
+      registro.valor,
+      registro.value,
+    ]
+
+    let nome = ''
+    for (const candidate of textoCandidates) {
+      const texto = resolveTextValue(candidate)
+      if (texto) {
+        nome = texto
+        break
+      }
+    }
+
+    if (!nome) {
+      nome = resolveTextValue(valor)
+    }
+
+    if (id || nome) {
+      return { id: id || null, nome }
+    }
+  }
+
+  const idDireto = normalizeOptionId(valor)
+  const nomeDireto = resolveTextValue(valor)
+  return { id: idDireto || null, nome: nomeDireto }
+}
+
+const resolveReferencia = async (valorTexto, tabela, colunaTexto = 'nome', colunaId = 'id') => {
+  const tableName = trim(tabela)
+  if (!tableName) {
+    return null
+  }
+
+  const { id: inputId, nome: inputNome } = extractReferenceInput(valorTexto, colunaTexto, colunaId)
+  const normalizedText = normalizeReferenceLookupKey(inputNome)
+
+  const cache = resolveReferencia.cache || (resolveReferencia.cache = new Map())
+  const idKey = inputId
+    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'id', inputId)
+    : null
+  const textKey = normalizedText
+    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'text', normalizedText)
+    : null
+
+  const cachedKeys = [idKey, textKey].filter(Boolean)
+  for (const key of cachedKeys) {
+    if (cache.has(key)) {
+      return cache.get(key)
+    }
+  }
+
+  if (!inputId && !normalizedText) {
+    return null
+  }
+
+  const selectFields = [colunaId, colunaTexto].filter(Boolean)
+  const selectColumns = selectFields.length > 0 ? selectFields.join(', ') : '*'
+  const fallbackMessage = `Falha ao consultar ${tableName}.`
+  const pickFirst = (rows) => (Array.isArray(rows) && rows.length ? rows[0] ?? null : null)
+
+  let registro = null
+
+  if (inputId) {
+    const dataPorId = await execute(
+      supabase.from(tableName).select(selectColumns).eq(colunaId, inputId).limit(1),
+      fallbackMessage,
+    )
+    registro = pickFirst(dataPorId)
+  }
+
+  const textoBusca = trim(inputNome)
+  if (!registro && textoBusca) {
+    const dataEq = await execute(
+      supabase.from(tableName).select(selectColumns).eq(colunaTexto, textoBusca).limit(1),
+      fallbackMessage,
+    )
+    registro = pickFirst(dataEq)
+
+    if (!registro) {
+      const dataIlike = await execute(
+        supabase
+          .from(tableName)
+          .select(selectColumns)
+          .ilike(colunaTexto, textoBusca)
+          .order(colunaTexto, { ascending: true })
+          .limit(1),
+        fallbackMessage,
+      )
+      registro = pickFirst(dataIlike)
+    }
+  }
+
+  const resolvedId = normalizeOptionId(registro?.[colunaId] ?? inputId)
+  const resolvedNome = resolveTextValue(
+    registro && colunaTexto ? registro[colunaTexto] : inputNome,
+  )
+
+  const resultado = resolvedId || resolvedNome ? { id: resolvedId ?? null, nome: resolvedNome || '' } : null
+
+  const resolvedIdKey = resultado?.id
+    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'id', resultado.id)
+    : null
+  const resolvedTextKey = resultado?.nome
+    ? buildReferenceCacheKey(
+        tableName,
+        colunaTexto,
+        colunaId,
+        'text',
+        normalizeReferenceLookupKey(resultado.nome),
+      )
+    : null
+
+  const keysToStore = [idKey, textKey, resolvedIdKey, resolvedTextKey].filter(Boolean)
+  keysToStore.forEach((key) => {
+    cache.set(key, resultado)
+  })
+
+  return resultado
+}
+
+async function resolveRefs(payload, mappings = {}) {
+  if (!payload || typeof payload !== 'object' || !mappings || typeof mappings !== 'object') {
+    return {}
+  }
+
+  const entries = Object.entries(mappings)
+  if (!entries.length) {
+    return {}
+  }
+
+  const resolvedEntries = await Promise.all(
+    entries.map(async ([alias, config]) => {
+      if (!config || typeof config !== 'object') {
+        return null
+      }
+
+      const {
+        tabela,
+        colunaTexto = 'nome',
+        colunaId = 'id',
+        sourceKey,
+        from,
+        field,
+        value: explicitValue,
+      } = config
+
+      if (!tabela) {
+        return { key: alias, value: null }
+      }
+
+      const resolvedSourceKey = field ?? from ?? sourceKey ?? alias
+      const rawValue = explicitValue !== undefined ? explicitValue : payload?.[resolvedSourceKey]
+
+      if (rawValue === undefined || rawValue === null) {
+        return { key: alias, value: null }
+      }
+
+      const { id: existingId, nome: existingNome } = extractReferenceInput(
+        rawValue,
+        colunaTexto,
+        colunaId,
+      )
+      if (!existingId && !existingNome) {
+        return { key: alias, value: null }
+      }
+
+      const referencia = await resolveReferencia(rawValue, tabela, colunaTexto, colunaId)
+      return { key: alias, value: referencia ?? null }
+    }),
+  )
+
+  return resolvedEntries.reduce((acc, entry) => {
+    if (!entry) {
+      return acc
+    }
+    acc[entry.key] = entry.value
+    return acc
+  }, {})
+}
+
 async function resolveReferenceId(table, value, errorMessage) {
-  const nome = trim(value)
-  if (!nome) {
+  const { id: entradaId, nome: entradaNome } = extractReferenceInput(value, 'nome', 'id')
+  if (!entradaId && !entradaNome) {
     throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
   }
 
-  const data = await execute(
-    supabase.from(table).select('id').eq('nome', nome).limit(1),
-    'Falha ao consultar ' + table + '.'
-  )
-
-  const id = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
+  const referencia = await resolveReferencia(value, table)
+  const id = referencia?.id ?? null
   if (!id) {
-    throw new Error(errorMessage ?? ('Valor "' + nome + '" não encontrado.'))
+    const label = entradaNome || entradaId || ''
+    throw new Error(
+      errorMessage ?? (label ? `Valor "${label}" não encontrado.` : 'Valor não encontrado.'),
+    )
   }
   return id
 }
@@ -2891,6 +3109,8 @@ async function resolvePessoaReferencias(dados) {
   }
 }
 
+
+export { resolveReferencia, resolveRefs }
 
 
 
