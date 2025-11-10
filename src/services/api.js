@@ -164,15 +164,133 @@ const normalizeHistoryValue = (value) => {
     return ''
   }
   if (Array.isArray(value)) {
-    return value.map((item) => ((item ?? '').toString().trim())).filter(Boolean).join(', ')
+    return value
+      .map((item) => {
+        if (item === null || item === undefined) {
+          return ''
+        }
+        if (typeof item === 'object') {
+          try {
+            return JSON.stringify(item)
+          } catch (error) {
+            console.warn('Falha ao serializar valor de histórico.', error)
+            return ''
+          }
+        }
+        return item.toString().trim()
+      })
+      .filter(Boolean)
+      .join(', ')
   }
   if (value instanceof Date) {
     return value.toISOString()
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch (error) {
+      console.warn('Falha ao serializar valor de histórico.', error)
+      return ''
+    }
   }
   if (typeof value === 'number' && Number.isNaN(value)) {
     return ''
   }
   return value.toString().trim()
+}
+
+function selectMaterialHistoryFields(material = {}) {
+  if (!material) {
+    return {}
+  }
+
+  const caracteristicaNome =
+    material.caracteristicaNome ??
+    material.caracteristicaEpi ??
+    material.caracteristicasTexto ??
+    (Array.isArray(material.caracteristicas)
+      ? extractTextualNames(material.caracteristicas).join('; ')
+      : '')
+
+  const corNome =
+    material.corNome ??
+    material.corMaterial ??
+    material.coresTexto ??
+    (Array.isArray(material.cores)
+      ? extractTextualNames(material.cores).join('; ')
+      : '')
+
+  const grupoMaterialValue =
+    material.grupoMaterial ??
+    material.grupoMaterialNome ??
+    material.grupo_material ??
+    ''
+
+  const grupoMaterialNomeValue =
+    material.grupoMaterialNome ??
+    material.grupoMaterial ??
+    material.grupo_material_nome ??
+    ''
+
+  const numeroCalcadoValue =
+    material.numeroCalcado ??
+    material.numeroCalcadoId ??
+    material.numero_calcado ??
+    null
+
+  const numeroVestimentaValue =
+    material.numeroVestimenta ??
+    material.numeroVestimentaId ??
+    material.numero_vestimenta ??
+    null
+
+  return {
+    materialItemNome:
+      material.materialItemNome ??
+      material.nomeItemRelacionado ??
+      material.nome ??
+      '',
+    fabricanteNome: material.fabricanteNome ?? material.fabricante ?? '',
+    validadeDias: material.validadeDias ?? null,
+    ca: material.ca ?? '',
+    valorUnitario: material.valorUnitario ?? null,
+    estoqueMinimo: material.estoqueMinimo ?? null,
+    ativo: material.ativo ?? true,
+    descricao: material.descricao ?? '',
+    grupoMaterial: grupoMaterialValue,
+    grupoMaterialNome: grupoMaterialNomeValue,
+    numeroCalcado: numeroCalcadoValue,
+    numeroVestimenta: numeroVestimentaValue,
+    numeroEspecifico: material.numeroEspecifico ?? '',
+    caracteristicaNome,
+    corNome,
+  }
+}
+
+function buildHistoryChanges(prev, next) {
+  if (!prev || !next) {
+    return null
+  }
+
+  const campos = new Set([
+    ...Object.keys(prev ?? {}),
+    ...Object.keys(next ?? {}),
+  ])
+  const diff = []
+
+  campos.forEach((campo) => {
+    const valorAtual = normalizeHistoryValue(prev?.[campo])
+    const valorNovo = normalizeHistoryValue(next?.[campo])
+    if (valorAtual !== valorNovo) {
+      diff.push({
+        campo,
+        de: valorAtual,
+        para: valorNovo,
+      })
+    }
+  })
+
+  return diff.length > 0 ? diff : null
 }
 
 const normalizePessoaHistorico = (lista) => {
@@ -1419,6 +1537,29 @@ async function carregarMateriaisDetalhados() {
   return (data ?? []).map(mapMaterialRecord)
 }
 
+async function getMaterialById(id, { errorMessage = 'Falha ao obter material.' } = {}) {
+  if (!id) {
+    return null
+  }
+
+  ensureSupabase()
+  const { data, error } = await supabase
+    .from('materiais_view')
+    .select(MATERIAL_SELECT_COLUMNS)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    throw mapSupabaseError(error, errorMessage)
+  }
+
+  if (!data) {
+    return null
+  }
+
+  return mapMaterialRecord(data)
+}
+
 async function carregarPessoas() {
   const data = await execute(
     supabase
@@ -1849,26 +1990,28 @@ export const api = {
         return date.toISOString()
       }
 
-      const camposAlterados = []
-      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
-        const valorAtual =
-          campo === 'dataAdmissao'
-            ? normalizeDateValue(atual.dataAdmissao)
-            : resolveTextValue(atual[campo] ?? '')
-        const valorNovo =
-          campo === 'dataAdmissao'
-            ? normalizeDateValue(dados.dataAdmissao)
-            : resolveTextValue(dados[campo] ?? '')
-        if (valorAtual !== valorNovo) {
-          camposAlterados.push({
-            campo,
-            de: valorAtual ?? '',
-            para: valorNovo ?? '',
-          })
-        }
-      })
+      const camposAtuais = {
+        nome: resolveTextValue(atual.nome ?? ''),
+        matricula: resolveTextValue(atual.matricula ?? ''),
+        centroServico: resolveTextValue(atual.centroServico ?? ''),
+        setor: resolveTextValue(atual.setor ?? ''),
+        cargo: resolveTextValue(atual.cargo ?? ''),
+        tipoExecucao: resolveTextValue(atual.tipoExecucao ?? ''),
+        dataAdmissao: normalizeDateValue(atual.dataAdmissao),
+      }
+      const camposNovos = {
+        nome: resolveTextValue(dados.nome ?? ''),
+        matricula: resolveTextValue(dados.matricula ?? ''),
+        centroServico: resolveTextValue(dados.centroServico ?? ''),
+        setor: resolveTextValue(dados.setor ?? ''),
+        cargo: resolveTextValue(dados.cargo ?? ''),
+        tipoExecucao: resolveTextValue(dados.tipoExecucao ?? ''),
+        dataAdmissao: normalizeDateValue(dados.dataAdmissao),
+      }
 
-      if (camposAlterados.length > 0) {
+      const camposAlterados = buildHistoryChanges(camposAtuais, camposNovos)
+
+      if (camposAlterados) {
         await execute(
           supabase
             .from('pessoas_historico')
@@ -2039,16 +2182,8 @@ export const api = {
       if (!id) {
         throw new Error('Material inválido.')
       }
-      const atualLista = await execute(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', id)
-          .limit(1),
-        'Falha ao localizar material.'
-      )
-      const registroAtual = Array.isArray(atualLista) ? atualLista[0] : null
-      if (!registroAtual) {
+      const atual = await getMaterialById(id, { errorMessage: 'Falha ao localizar material.' })
+      if (!atual) {
         throw new Error('Material no encontrado.')
       }
 
@@ -2100,6 +2235,7 @@ export const api = {
             materialId: id,
             valorUnitario: dadosSanitizados.valorUnitario,
             usuarioResponsavel: usuario,
+            campos_alterados: diff,
             criadoEm: agora,
             campos_alterados: diff,
           })
@@ -2148,34 +2284,27 @@ export const api = {
         atualizadoEm: agora,
       }
 
-      await execute(
-        supabase.from('materiais').update(supabasePayload).eq('id', id),
-        'Falha ao atualizar material.'
-      )
       await syncMaterialRelations(id, {
         corIds: coresIds,
         corNames,
         caracteristicaIds,
         caracteristicaNames,
       })
-      const registro = await executeSingle(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', id),
-        'Falha ao obter material atualizado.'
-      )
-      return mapMaterialRecord(registro)
+
+      const atualizado = await getMaterialById(id, {
+        errorMessage: 'Falha ao obter material atualizado.',
+      })
+      if (!atualizado) {
+        throw new Error('Falha ao obter material atualizado.')
+      }
+      return atualizado
     },
     async get(id) {
-      const registro = await executeSingle(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', id),
-        'Falha ao obter material.'
-      )
-      return mapMaterialRecord(registro)
+      const registro = await getMaterialById(id)
+      if (!registro) {
+        throw new Error('Material no encontrado.')
+      }
+      return registro
     },
     async priceHistory(id) {
       const data = await execute(
@@ -2766,21 +2895,14 @@ export const api = {
         cat: dados.cat,
         observacao: dados.observacao,
       }
-      const camposAlterados = []
-      ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
-        const valorAtual = normalizeHistoryValue(antigo[campo])
-        const valorNovo = normalizeHistoryValue(novoComparacao[campo])
-        if (valorAtual !== valorNovo) {
-          camposAlterados.push({
-            campo,
-            de: valorAtual,
-            para: valorNovo,
-          })
-        }
-      })
+      const camposAntigos = ACIDENTE_HISTORY_FIELDS.reduce((acc, campo) => {
+        acc[campo] = antigo?.[campo]
+        return acc
+      }, {})
+      const camposAlterados = buildHistoryChanges(camposAntigos, novoComparacao)
       const agora = new Date().toISOString()
       const historicoRegistro =
-        camposAlterados.length > 0
+        Array.isArray(camposAlterados) && camposAlterados.length > 0
           ? {
               acidente_id: id,
               data_edicao: agora,
@@ -2940,20 +3062,238 @@ async dashboard(params = {}) {
 
 
 
+const normalizeReferenceLookupKey = (valor) => {
+  const texto = resolveTextValue(valor)
+  if (!texto) {
+    return ''
+  }
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+const buildReferenceCacheKey = (tabela, colunaTexto, colunaId, tipo, valor) =>
+  [tabela || '', colunaTexto || '', colunaId || '', tipo || '', valor || ''].join('::')
+
+const extractReferenceInput = (valor, colunaTexto, colunaId) => {
+  if (valor === undefined || valor === null) {
+    return { id: null, nome: '' }
+  }
+
+  const registro = unwrapOptionRecord(valor)
+  if (registro && typeof registro === 'object' && !Array.isArray(registro)) {
+    const idCandidates = [colunaId, 'id', 'uuid', 'value', 'valor', 'codigo', 'code']
+    let id = null
+    for (const candidate of idCandidates) {
+      if (!candidate) {
+        continue
+      }
+      id = normalizeOptionId(registro[candidate])
+      if (id) {
+        break
+      }
+    }
+
+    const textoCandidates = [
+      registro[colunaTexto],
+      registro.nome,
+      registro.label,
+      registro.descricao,
+      registro.valor,
+      registro.value,
+    ]
+
+    let nome = ''
+    for (const candidate of textoCandidates) {
+      const texto = resolveTextValue(candidate)
+      if (texto) {
+        nome = texto
+        break
+      }
+    }
+
+    if (!nome) {
+      nome = resolveTextValue(valor)
+    }
+
+    if (id || nome) {
+      return { id: id || null, nome }
+    }
+  }
+
+  const idDireto = normalizeOptionId(valor)
+  const nomeDireto = resolveTextValue(valor)
+  return { id: idDireto || null, nome: nomeDireto }
+}
+
+const resolveReferencia = async (valorTexto, tabela, colunaTexto = 'nome', colunaId = 'id') => {
+  const tableName = trim(tabela)
+  if (!tableName) {
+    return null
+  }
+
+  const { id: inputId, nome: inputNome } = extractReferenceInput(valorTexto, colunaTexto, colunaId)
+  const normalizedText = normalizeReferenceLookupKey(inputNome)
+
+  const cache = resolveReferencia.cache || (resolveReferencia.cache = new Map())
+  const idKey = inputId
+    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'id', inputId)
+    : null
+  const textKey = normalizedText
+    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'text', normalizedText)
+    : null
+
+  const cachedKeys = [idKey, textKey].filter(Boolean)
+  for (const key of cachedKeys) {
+    if (cache.has(key)) {
+      return cache.get(key)
+    }
+  }
+
+  if (!inputId && !normalizedText) {
+    return null
+  }
+
+  const selectFields = [colunaId, colunaTexto].filter(Boolean)
+  const selectColumns = selectFields.length > 0 ? selectFields.join(', ') : '*'
+  const fallbackMessage = `Falha ao consultar ${tableName}.`
+  const pickFirst = (rows) => (Array.isArray(rows) && rows.length ? rows[0] ?? null : null)
+
+  let registro = null
+
+  if (inputId) {
+    const dataPorId = await execute(
+      supabase.from(tableName).select(selectColumns).eq(colunaId, inputId).limit(1),
+      fallbackMessage,
+    )
+    registro = pickFirst(dataPorId)
+  }
+
+  const textoBusca = trim(inputNome)
+  if (!registro && textoBusca) {
+    const dataEq = await execute(
+      supabase.from(tableName).select(selectColumns).eq(colunaTexto, textoBusca).limit(1),
+      fallbackMessage,
+    )
+    registro = pickFirst(dataEq)
+
+    if (!registro) {
+      const dataIlike = await execute(
+        supabase
+          .from(tableName)
+          .select(selectColumns)
+          .ilike(colunaTexto, textoBusca)
+          .order(colunaTexto, { ascending: true })
+          .limit(1),
+        fallbackMessage,
+      )
+      registro = pickFirst(dataIlike)
+    }
+  }
+
+  const resolvedId = normalizeOptionId(registro?.[colunaId] ?? inputId)
+  const resolvedNome = resolveTextValue(
+    registro && colunaTexto ? registro[colunaTexto] : inputNome,
+  )
+
+  const resultado = resolvedId || resolvedNome ? { id: resolvedId ?? null, nome: resolvedNome || '' } : null
+
+  const resolvedIdKey = resultado?.id
+    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'id', resultado.id)
+    : null
+  const resolvedTextKey = resultado?.nome
+    ? buildReferenceCacheKey(
+        tableName,
+        colunaTexto,
+        colunaId,
+        'text',
+        normalizeReferenceLookupKey(resultado.nome),
+      )
+    : null
+
+  const keysToStore = [idKey, textKey, resolvedIdKey, resolvedTextKey].filter(Boolean)
+  keysToStore.forEach((key) => {
+    cache.set(key, resultado)
+  })
+
+  return resultado
+}
+
+async function resolveRefs(payload, mappings = {}) {
+  if (!payload || typeof payload !== 'object' || !mappings || typeof mappings !== 'object') {
+    return {}
+  }
+
+  const entries = Object.entries(mappings)
+  if (!entries.length) {
+    return {}
+  }
+
+  const resolvedEntries = await Promise.all(
+    entries.map(async ([alias, config]) => {
+      if (!config || typeof config !== 'object') {
+        return null
+      }
+
+      const {
+        tabela,
+        colunaTexto = 'nome',
+        colunaId = 'id',
+        sourceKey,
+        from,
+        field,
+        value: explicitValue,
+      } = config
+
+      if (!tabela) {
+        return { key: alias, value: null }
+      }
+
+      const resolvedSourceKey = field ?? from ?? sourceKey ?? alias
+      const rawValue = explicitValue !== undefined ? explicitValue : payload?.[resolvedSourceKey]
+
+      if (rawValue === undefined || rawValue === null) {
+        return { key: alias, value: null }
+      }
+
+      const { id: existingId, nome: existingNome } = extractReferenceInput(
+        rawValue,
+        colunaTexto,
+        colunaId,
+      )
+      if (!existingId && !existingNome) {
+        return { key: alias, value: null }
+      }
+
+      const referencia = await resolveReferencia(rawValue, tabela, colunaTexto, colunaId)
+      return { key: alias, value: referencia ?? null }
+    }),
+  )
+
+  return resolvedEntries.reduce((acc, entry) => {
+    if (!entry) {
+      return acc
+    }
+    acc[entry.key] = entry.value
+    return acc
+  }, {})
+}
+
 async function resolveReferenceId(table, value, errorMessage) {
-  const nome = trim(value)
-  if (!nome) {
+  const { id: entradaId, nome: entradaNome } = extractReferenceInput(value, 'nome', 'id')
+  if (!entradaId && !entradaNome) {
     throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
   }
 
-  const data = await execute(
-    supabase.from(table).select('id').eq('nome', nome).limit(1),
-    'Falha ao consultar ' + table + '.'
-  )
-
-  const id = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
+  const referencia = await resolveReferencia(value, table)
+  const id = referencia?.id ?? null
   if (!id) {
-    throw new Error(errorMessage ?? ('Valor "' + nome + '" não encontrado.'))
+    const label = entradaNome || entradaId || ''
+    throw new Error(
+      errorMessage ?? (label ? `Valor "${label}" não encontrado.` : 'Valor não encontrado.'),
+    )
   }
   return id
 }
@@ -2994,6 +3334,8 @@ async function resolvePessoaReferencias(dados) {
   }
 }
 
+
+export { resolveReferencia, resolveRefs }
 
 
 
