@@ -124,25 +124,6 @@ const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
 const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = ['grupo_caracteristica_epi']
 const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 
-
-const MATERIAL_HISTORY_FIELDS = [
-  'materialItemNome',
-  'fabricanteNome',
-  'validadeDias',
-  'ca',
-  'valorUnitario',
-  'estoqueMinimo',
-  'ativo',
-  'descricao',
-  'grupoMaterial',
-  'grupoMaterialNome',
-  'numeroCalcado',
-  'numeroVestimenta',
-  'numeroEspecifico',
-  'caracteristicaNome',
-  'corNome',
-]
-
 const MATERIAL_TABLE_SELECT_COLUMNS = `
   id,
   nome,
@@ -182,10 +163,34 @@ const normalizeHistoryValue = (value) => {
     return ''
   }
   if (Array.isArray(value)) {
-    return value.map((item) => ((item ?? '').toString().trim())).filter(Boolean).join(', ')
+    return value
+      .map((item) => {
+        if (item === null || item === undefined) {
+          return ''
+        }
+        if (typeof item === 'object') {
+          try {
+            return JSON.stringify(item)
+          } catch (error) {
+            console.warn('Falha ao serializar valor de histórico.', error)
+            return ''
+          }
+        }
+        return item.toString().trim()
+      })
+      .filter(Boolean)
+      .join(', ')
   }
   if (value instanceof Date) {
     return value.toISOString()
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch (error) {
+      console.warn('Falha ao serializar valor de histórico.', error)
+      return ''
+    }
   }
   if (typeof value === 'number' && Number.isNaN(value)) {
     return ''
@@ -261,28 +266,30 @@ function selectMaterialHistoryFields(material = {}) {
   }
 }
 
-function buildHistoryChanges(atual, novo) {
-  if (!atual || !novo) {
+function buildHistoryChanges(prev, next) {
+  if (!prev || !next) {
     return null
   }
 
-  const atualCampos = selectMaterialHistoryFields(atual)
-  const novoCampos = selectMaterialHistoryFields({ ...atual, ...novo })
-  const camposAlterados = []
+  const campos = new Set([
+    ...Object.keys(prev ?? {}),
+    ...Object.keys(next ?? {}),
+  ])
+  const diff = []
 
-  MATERIAL_HISTORY_FIELDS.forEach((campo) => {
-    const valorAtual = normalizeHistoryValue(atualCampos[campo])
-    const valorNovo = normalizeHistoryValue(novoCampos[campo])
+  campos.forEach((campo) => {
+    const valorAtual = normalizeHistoryValue(prev?.[campo])
+    const valorNovo = normalizeHistoryValue(next?.[campo])
     if (valorAtual !== valorNovo) {
-      camposAlterados.push({
+      diff.push({
         campo,
-        de: atualCampos[campo] ?? '',
-        para: novoCampos[campo] ?? '',
+        de: valorAtual,
+        para: valorNovo,
       })
     }
   })
 
-  return camposAlterados.length ? camposAlterados : null
+  return diff.length > 0 ? diff : null
 }
 
 const normalizePessoaHistorico = (lista) => {
@@ -2066,26 +2073,28 @@ export const api = {
         return date.toISOString()
       }
 
-      const camposAlterados = []
-      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
-        const valorAtual =
-          campo === 'dataAdmissao'
-            ? normalizeDateValue(atual.dataAdmissao)
-            : resolveTextValue(atual[campo] ?? '')
-        const valorNovo =
-          campo === 'dataAdmissao'
-            ? normalizeDateValue(dados.dataAdmissao)
-            : resolveTextValue(dados[campo] ?? '')
-        if (valorAtual !== valorNovo) {
-          camposAlterados.push({
-            campo,
-            de: valorAtual ?? '',
-            para: valorNovo ?? '',
-          })
-        }
-      })
+      const camposAtuais = {
+        nome: resolveTextValue(atual.nome ?? ''),
+        matricula: resolveTextValue(atual.matricula ?? ''),
+        centroServico: resolveTextValue(atual.centroServico ?? ''),
+        setor: resolveTextValue(atual.setor ?? ''),
+        cargo: resolveTextValue(atual.cargo ?? ''),
+        tipoExecucao: resolveTextValue(atual.tipoExecucao ?? ''),
+        dataAdmissao: normalizeDateValue(atual.dataAdmissao),
+      }
+      const camposNovos = {
+        nome: resolveTextValue(dados.nome ?? ''),
+        matricula: resolveTextValue(dados.matricula ?? ''),
+        centroServico: resolveTextValue(dados.centroServico ?? ''),
+        setor: resolveTextValue(dados.setor ?? ''),
+        cargo: resolveTextValue(dados.cargo ?? ''),
+        tipoExecucao: resolveTextValue(dados.tipoExecucao ?? ''),
+        dataAdmissao: normalizeDateValue(dados.dataAdmissao),
+      }
 
-      if (camposAlterados.length > 0) {
+      const camposAlterados = buildHistoryChanges(camposAtuais, camposNovos)
+
+      if (camposAlterados) {
         await execute(
           supabase
             .from('pessoas_historico')
@@ -2263,7 +2272,10 @@ export const api = {
       const novo = await sanitizeMaterialPayload(payload)
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
-      const diff = buildHistoryChanges(atual, novo)
+      const diff = buildHistoryChanges(
+        selectMaterialHistoryFields(atual),
+        selectMaterialHistoryFields({ ...atual, ...novo }),
+      )
 
       const supabasePayload = {
         nome: novo.nome ?? '',
@@ -2934,21 +2946,14 @@ export const api = {
         cat: dados.cat,
         observacao: dados.observacao,
       }
-      const camposAlterados = []
-      ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
-        const valorAtual = normalizeHistoryValue(antigo[campo])
-        const valorNovo = normalizeHistoryValue(novoComparacao[campo])
-        if (valorAtual !== valorNovo) {
-          camposAlterados.push({
-            campo,
-            de: valorAtual,
-            para: valorNovo,
-          })
-        }
-      })
+      const camposAntigos = ACIDENTE_HISTORY_FIELDS.reduce((acc, campo) => {
+        acc[campo] = antigo?.[campo]
+        return acc
+      }, {})
+      const camposAlterados = buildHistoryChanges(camposAntigos, novoComparacao)
       const agora = new Date().toISOString()
       const historicoRegistro =
-        camposAlterados.length > 0
+        Array.isArray(camposAlterados) && camposAlterados.length > 0
           ? {
               acidente_id: id,
               data_edicao: agora,
