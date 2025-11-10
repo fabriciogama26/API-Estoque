@@ -193,6 +193,98 @@ const normalizeHistoryValue = (value) => {
   return value.toString().trim()
 }
 
+function selectMaterialHistoryFields(material = {}) {
+  if (!material) {
+    return {}
+  }
+
+  const caracteristicaNome =
+    material.caracteristicaNome ??
+    material.caracteristicaEpi ??
+    material.caracteristicasTexto ??
+    (Array.isArray(material.caracteristicas)
+      ? extractTextualNames(material.caracteristicas).join('; ')
+      : '')
+
+  const corNome =
+    material.corNome ??
+    material.corMaterial ??
+    material.coresTexto ??
+    (Array.isArray(material.cores)
+      ? extractTextualNames(material.cores).join('; ')
+      : '')
+
+  const grupoMaterialValue =
+    material.grupoMaterial ??
+    material.grupoMaterialNome ??
+    material.grupo_material ??
+    ''
+
+  const grupoMaterialNomeValue =
+    material.grupoMaterialNome ??
+    material.grupoMaterial ??
+    material.grupo_material_nome ??
+    ''
+
+  const numeroCalcadoValue =
+    material.numeroCalcado ??
+    material.numeroCalcadoId ??
+    material.numero_calcado ??
+    null
+
+  const numeroVestimentaValue =
+    material.numeroVestimenta ??
+    material.numeroVestimentaId ??
+    material.numero_vestimenta ??
+    null
+
+  return {
+    materialItemNome:
+      material.materialItemNome ??
+      material.nomeItemRelacionado ??
+      material.nome ??
+      '',
+    fabricanteNome: material.fabricanteNome ?? material.fabricante ?? '',
+    validadeDias: material.validadeDias ?? null,
+    ca: material.ca ?? '',
+    valorUnitario: material.valorUnitario ?? null,
+    estoqueMinimo: material.estoqueMinimo ?? null,
+    ativo: material.ativo ?? true,
+    descricao: material.descricao ?? '',
+    grupoMaterial: grupoMaterialValue,
+    grupoMaterialNome: grupoMaterialNomeValue,
+    numeroCalcado: numeroCalcadoValue,
+    numeroVestimenta: numeroVestimentaValue,
+    numeroEspecifico: material.numeroEspecifico ?? '',
+    caracteristicaNome,
+    corNome,
+  }
+}
+
+function buildHistoryChanges(atual, novo) {
+  if (!atual || !novo) {
+    return null
+  }
+
+  const atualCampos = selectMaterialHistoryFields(atual)
+  const novoCampos = selectMaterialHistoryFields({ ...atual, ...novo })
+  const camposAlterados = []
+
+  MATERIAL_HISTORY_FIELDS.forEach((campo) => {
+    const valorAtual = normalizeHistoryValue(atualCampos[campo])
+    const valorNovo = normalizeHistoryValue(novoCampos[campo])
+    if (valorAtual !== valorNovo) {
+      camposAlterados.push({
+        campo,
+        de: atualCampos[campo] ?? '',
+        para: novoCampos[campo] ?? '',
+      })
+    }
+  })
+
+  return camposAlterados.length ? camposAlterados : null
+}
+
 const normalizePessoaHistorico = (lista) => {
   if (!Array.isArray(lista)) {
     return []
@@ -1521,6 +1613,29 @@ async function carregarMateriaisDetalhados() {
   return (data ?? []).map(mapMaterialRecord)
 }
 
+async function getMaterialById(id, { errorMessage = 'Falha ao obter material.' } = {}) {
+  if (!id) {
+    return null
+  }
+
+  ensureSupabase()
+  const { data, error } = await supabase
+    .from('materiais_view')
+    .select(MATERIAL_SELECT_COLUMNS)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    throw mapSupabaseError(error, errorMessage)
+  }
+
+  if (!data) {
+    return null
+  }
+
+  return mapMaterialRecord(data)
+}
+
 async function carregarPessoas() {
   const data = await execute(
     supabase
@@ -2140,45 +2255,48 @@ export const api = {
       if (!id) {
         throw new Error('Material inválido.')
       }
-      const atualLista = await execute(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', id)
-          .limit(1),
-        'Falha ao localizar material.'
-      )
-      const registroAtual = Array.isArray(atualLista) ? atualLista[0] : null
-      if (!registroAtual) {
+      const atual = await getMaterialById(id, { errorMessage: 'Falha ao localizar material.' })
+      if (!atual) {
         throw new Error('Material no encontrado.')
       }
 
-      const materialAtual = mapMaterialRecord(registroAtual)
-      const dadosCombinados = await sanitizeMaterialPayload({ ...materialAtual, ...payload })
+      const novo = await sanitizeMaterialPayload(payload)
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
-      const camposAlterados = []
-      MATERIAL_HISTORY_FIELDS.forEach((campo) => {
-        const valorAtual = normalizeHistoryValue(materialAtual?.[campo])
-        const valorNovo = normalizeHistoryValue(dadosCombinados?.[campo])
-        if (valorAtual !== valorNovo) {
-          camposAlterados.push({
-            campo,
-            de: materialAtual?.[campo] ?? '',
-            para: dadosCombinados?.[campo] ?? '',
-          })
-        }
-      })
-      if (camposAlterados.length > 0) {
+      const diff = buildHistoryChanges(atual, novo)
+
+      const supabasePayload = {
+        nome: novo.nome ?? '',
+        fabricante: novo.fabricante ?? '',
+        validadeDias: novo.validadeDias ?? null,
+        ca: novo.ca ?? '',
+        valorUnitario: novo.valorUnitario ?? 0,
+        estoqueMinimo: novo.estoqueMinimo ?? 0,
+        ativo: novo.ativo ?? true,
+        descricao: novo.descricao ?? '',
+        grupoMaterial: novo.grupoMaterialId ?? novo.grupoMaterial ?? '',
+        numeroCalcado: novo.numeroCalcado ?? null,
+        numeroVestimenta: novo.numeroVestimenta ?? null,
+        numeroEspecifico: novo.numeroEspecifico ?? '',
+        usuarioAtualizacao: usuario ?? '',
+        atualizadoEm: agora,
+      }
+
+      await execute(
+        supabase.from('materiais').update(supabasePayload).eq('id', id),
+        'Falha ao atualizar material.'
+      )
+
+      if (diff) {
         ensureSupabase()
         const { error: historicoErro } = await supabase
           .from('material_price_history')
           .insert({
             materialId: id,
-            valorUnitario: dadosCombinados.valorUnitario,
+            valorUnitario: novo.valorUnitario,
             usuarioResponsavel: usuario,
+            campos_alterados: diff,
             criadoEm: agora,
-            campos_alterados: camposAlterados,
           })
         if (historicoErro) {
           const mensagemErro = historicoErro.message?.toLowerCase?.() ?? ''
@@ -2197,58 +2315,35 @@ export const api = {
           }
         }
       }
-      const dados = await sanitizeMaterialPayload(payload)
-      const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
-      const caracteristicaIds = Array.isArray(dados.caracteristicasIds)
-        ? dados.caracteristicasIds
-        : []
-      const corNames = extractTextualNames(dados.cores)
-      const caracteristicaNames = extractTextualNames(dados.caracteristicas)
-      const supabasePayload = {
-        nome: dados.nome ?? '',
-        fabricante: dados.fabricante ?? '',
-        validadeDias: dados.validadeDias ?? null,
-        ca: dados.ca ?? '',
-        valorUnitario: dados.valorUnitario ?? 0,
-        estoqueMinimo: dados.estoqueMinimo ?? 0,
-        ativo: dados.ativo ?? true,
-        descricao: dados.descricao ?? '',
-        grupoMaterial: dados.grupoMaterialId ?? dados.grupoMaterial ?? '',
-        numeroCalcado: dados.numeroCalcado ?? null,
-        numeroVestimenta: dados.numeroVestimenta ?? null,
-        numeroEspecifico: dados.numeroEspecifico ?? '',
-        usuarioAtualizacao: usuario ?? '',
-        atualizadoEm: agora,
-      }
 
-      await execute(
-        supabase.from('materiais').update(supabasePayload).eq('id', id),
-        'Falha ao atualizar material.'
-      )
+      const coresIds = Array.isArray(novo.coresIds) ? novo.coresIds : []
+      const caracteristicaIds = Array.isArray(novo.caracteristicasIds)
+        ? novo.caracteristicasIds
+        : []
+      const corNames = extractTextualNames(novo.cores)
+      const caracteristicaNames = extractTextualNames(novo.caracteristicas)
+
       await syncMaterialRelations(id, {
         corIds: coresIds,
         corNames,
         caracteristicaIds,
         caracteristicaNames,
       })
-      const registro = await executeSingle(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', id),
-        'Falha ao obter material atualizado.'
-      )
-      return mapMaterialRecord(registro)
+
+      const atualizado = await getMaterialById(id, {
+        errorMessage: 'Falha ao obter material atualizado.',
+      })
+      if (!atualizado) {
+        throw new Error('Falha ao obter material atualizado.')
+      }
+      return atualizado
     },
     async get(id) {
-      const registro = await executeSingle(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', id),
-        'Falha ao obter material.'
-      )
-      return mapMaterialRecord(registro)
+      const registro = await getMaterialById(id)
+      if (!registro) {
+        throw new Error('Material no encontrado.')
+      }
+      return registro
     },
     async priceHistory(id) {
       const data = await execute(
