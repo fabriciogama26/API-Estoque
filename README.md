@@ -122,6 +122,7 @@ A pasta [`docs/`](docs) descreve fluxos específicos (cadastros, dashboards, ter
 - [`docs/DashboardAcidentes.txt`](docs/DashboardAcidentes.txt) – painel de SST (Supabase x modo local).
 - [`docs/Acidentes.txt`](docs/Acidentes.txt) – formulário, filtros e histórico de acidentes.
 - [`docs/Materiais.txt`](docs/Materiais.txt) — cadastro avançado de EPIs, catálogos e histórico de preços.
+- O backend `api.materiais` resolve referências (fabricante/grupo/medidas) antes de persistir e grava diffs JSON no `material_price_history` via `buildHistoryChanges`; o fluxo está descrito com detalhes em `docs/Materiais.txt`.
 - [`docs/duplicidade-materiais.txt`](docs/duplicidade-materiais.txt) — detalha a view `materiais_unicos_view`, o hash e os gatilhos (`evitar_duplicidade_material`, `impedir_material_duplicado`) que evitam materiais repetidos mesmo quando só mudam cores/características.
 - [`docs/materiais-issues.txt`](docs/materiais-issues.txt) — registro dos erros recorrentes que impactaram o cadastro de materiais (validação de EPI, uuid nos catálogos, vínculo de cores/características e o histórico) e orientações para corrigi-los.
 - [`docs/Pessoas.txt`](docs/Pessoas.txt) — gestão de colaboradores, filtros e auditoria.

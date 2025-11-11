@@ -44,15 +44,21 @@ const normalizeGrupo = (value) =>
 
 const isGrupo = (value, target) => normalizeGrupo(value) === normalizeGrupo(target)
 
+const normalizeLookupValue = (valor) =>
+  valor === undefined || valor === null ? '' : String(valor).trim()
+
 const findOptionByValue = (options, valor) => {
-  const alvo = typeof valor === 'string' ? valor.trim() : valor
+  const alvo = normalizeLookupValue(valor)
   if (!alvo) {
     return null
   }
 
+  const alvoKey = normalizeLookupValue(alvo).toLowerCase()
+
   return options.find((item) => {
-    const id = item?.id ?? item?.value ?? item?.valor ?? item?.nome
-    return id === alvo || item?.nome === alvo
+    const id = normalizeLookupValue(item?.id ?? item?.value ?? item?.valor ?? item?.nome ?? '')
+    const nome = normalizeLookupValue(item?.nome ?? '')
+    return (id && id.toLowerCase() === alvoKey) || (nome && nome.toLowerCase() === alvoKey)
   })
 }
 
@@ -324,7 +330,8 @@ export function MateriaisPage() {
       setForm((prev) => ({
         ...prev,
         nome: selecionado?.id ?? '',
-        materialItemNome: selecionado?.materialItemNome ?? value, // texto legível
+        materialItemNome: selecionado?.nome ?? prev.materialItemNome ?? value,
+        nomeItemRelacionado: selecionado?.nome ?? prev.nomeItemRelacionado ?? value,
       }))
       return
     }
@@ -373,24 +380,19 @@ export function MateriaisPage() {
       }
 
       const atual = normalizeSelectionList(prev.caracteristicaEpi)
+      const atualizada = normalizeSelectionList([...atual, selecionada])
 
-      if (
-        atual.some((item) => {
-          if (item.id && selecionada.id) {
-            return item.id === selecionada.id
-          }
-          return normalizeSelectionKey(item.nome) === normalizeSelectionKey(selecionada.nome)
-        })
-      ) {
+      if (atualizada.length === atual.length) {
         return prev
       }
 
-      const atualizada = [...atual, selecionada].sort((a, b) => a.nome.localeCompare(b.nome))
-
+      const ids = atualizada.map((item) => item.id).filter(Boolean)
       return {
         ...prev,
         caracteristicaEpi: atualizada,
-        caracteristicas_epi: atualizada.map((item) => item.id).filter(Boolean),
+        caracteristicas: atualizada,
+        caracteristicasIds: ids,
+        caracteristicas_epi: ids,
       }
     })
   }
@@ -401,10 +403,13 @@ export function MateriaisPage() {
         (item) => item.id !== valor && item.nome !== valor,
       )
 
+      const ids = atualizada.map((item) => item.id).filter(Boolean)
       return {
         ...prev,
         caracteristicaEpi: atualizada,
-        caracteristicas_epi: atualizada.map((item) => item.id).filter(Boolean),
+        caracteristicas: atualizada,
+        caracteristicasIds: ids,
+        caracteristicas_epi: ids,
       }
     })
   }
@@ -418,19 +423,11 @@ export function MateriaisPage() {
       }
 
       const atual = normalizeSelectionList(prev.cores)
+      const atualizada = normalizeSelectionList([...atual, selecionada])
 
-      if (
-        atual.some((item) => {
-          if (item.id && selecionada.id) {
-            return item.id === selecionada.id
-          }
-          return normalizeSelectionKey(item.nome) === normalizeSelectionKey(selecionada.nome)
-        })
-      ) {
+      if (atualizada.length === atual.length) {
         return prev
       }
-
-      const atualizada = [...atual, selecionada].sort((a, b) => a.nome.localeCompare(b.nome))
 
       return {
         ...prev,
@@ -577,6 +574,10 @@ export function MateriaisPage() {
   const startEdit = async (material) => {
     if (!material || !material.id) {
       return
+    }
+
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
     setError(null)

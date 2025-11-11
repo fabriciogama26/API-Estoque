@@ -126,7 +126,6 @@ const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 
 
 const MATERIAL_HISTORY_FIELDS = [
-  'nome',
   'materialItemNome',
   'fabricanteNome',
   'validadeDias',
@@ -140,8 +139,10 @@ const MATERIAL_HISTORY_FIELDS = [
   'numeroCalcado',
   'numeroVestimenta',
   'numeroEspecifico',
-  'caracteristicaNome',
-  'corNome',
+  'caracteristicaEpi',
+  'caracteristicasTexto',
+  'corMaterial',
+  'coresTexto',
 ]
 
 const MATERIAL_TABLE_SELECT_COLUMNS = `
@@ -409,7 +410,7 @@ const normalizeRelationIds = (lista) => {
       }
       return normalizeOptionId(item)
     })
-    .filter(Boolean)
+    .filter((id) => Boolean(id) && isUuidValue(id))
     .forEach((id) => {
       if (!vistos.has(id)) {
         vistos.add(id)
@@ -467,6 +468,63 @@ const buildRelationSelectionList = (ids, nomes) => {
     itens.push({ id: id || nome, nome })
   }
   return normalizeOptionList(itens)
+}
+
+const normalizeCatalogoNameKey = (valor) => {
+  const texto = trim(valor)
+  if (!texto) {
+    return ''
+  }
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+const normalizeNameList = (nomes) =>
+  (Array.isArray(nomes) ? nomes : [])
+    .map((nome) => trim(nome))
+    .filter(Boolean)
+
+async function resolveCatalogoIdsByNames({ table, nameColumn, nomes, errorMessage }) {
+  const lista = normalizeNameList(nomes)
+  if (!lista.length) {
+    return []
+  }
+  const registros = await execute(
+    supabase.from(table).select(`id, ${nameColumn}`),
+    errorMessage,
+  )
+  const mapa = new Map()
+  ;(registros ?? []).forEach((registro) => {
+    const nome = trim(registro?.[nameColumn])
+    const id = normalizeOptionId(registro?.id)
+    if (!nome || !id) {
+      return
+    }
+    mapa.set(normalizeCatalogoNameKey(nome), id)
+  })
+  return lista
+    .map((nome) => mapa.get(normalizeCatalogoNameKey(nome)) || null)
+    .filter(Boolean)
+}
+
+async function resolveCorIdsFromNames(nomes) {
+  return resolveCatalogoIdsByNames({
+    table: 'cor',
+    nameColumn: 'cor',
+    nomes,
+    errorMessage: 'Falha ao resolver cores por nome.',
+  })
+}
+
+async function resolveCaracteristicaIdsFromNames(nomes) {
+  return resolveCatalogoIdsByNames({
+    table: 'caracteristica_epi',
+    nameColumn: 'caracteristica_material',
+    nomes,
+    errorMessage: 'Falha ao resolver caracteristicas por nome.',
+  })
 }
 
 const normalizeCatalogoOptions = (lista) =>
@@ -1352,9 +1410,11 @@ function sanitizeMaterialPayload(payload = {}) {
     caracteristicasIds: normalizeRelationIds(
       caracteristicasSelecionadas.map((item) => item?.id)
     ),
+    caracteristicasTexto: caracteristicaEpi,
     cores: coresSelecionadas,
     coresIds: normalizeRelationIds(coresSelecionadas.map((item) => item?.id)),
     corMaterial: corMaterialTexto,
+    coresTexto: corMaterialTexto,
   }
 }
 
@@ -1960,6 +2020,12 @@ export const api = {
         : []
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
+      const corRelationIds =
+        coresIds.length > 0 ? coresIds : await resolveCorIdsFromNames(corNames)
+      const caracteristicaRelationIds =
+        caracteristicaIds.length > 0
+          ? caracteristicaIds
+          : await resolveCaracteristicaIdsFromNames(caracteristicaNames)
       const supabasePayload = buildMaterialSupabasePayload(dados, {
         usuario,
         agora,
@@ -1978,10 +2044,10 @@ export const api = {
           throw new Error('Falha ao criar material.')
         }
 
-        await insereCores(materialCriadoId, coresIds, corNames)
+        await insereCores(materialCriadoId, corRelationIds, corNames)
         await insereCaracteristicas(
           materialCriadoId,
-          caracteristicaIds,
+          caracteristicaRelationIds,
           caracteristicaNames,
         )
       } catch (error) {
@@ -2078,6 +2144,12 @@ export const api = {
         : []
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
+      const corRelationIds =
+        coresIds.length > 0 ? coresIds : await resolveCorIdsFromNames(corNames)
+      const caracteristicaRelationIds =
+        caracteristicaIds.length > 0
+          ? caracteristicaIds
+          : await resolveCaracteristicaIdsFromNames(caracteristicaNames)
       const supabasePayload = buildMaterialSupabasePayload(dados, {
         usuario,
         agora,
@@ -2088,8 +2160,8 @@ export const api = {
         supabase.from('materiais').update(supabasePayload).eq('id', id),
         'Falha ao atualizar material.'
       )
-      await insereCores(id, coresIds, corNames)
-      await insereCaracteristicas(id, caracteristicaIds, caracteristicaNames)
+      await insereCores(id, corRelationIds, corNames)
+      await insereCaracteristicas(id, caracteristicaRelationIds, caracteristicaNames)
       const registro = await executeSingle(
         supabase
           .from('materiais_view')
