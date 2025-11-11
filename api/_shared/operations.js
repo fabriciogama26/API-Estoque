@@ -82,6 +82,7 @@ async function execute(builder, fallbackMessage) {
   const { data, error } = await builder
   if (error) {
     throw mapSupabaseError(error, fallbackMessage)
+  }
   return data
 }
 
@@ -89,6 +90,7 @@ async function executeSingle(builder, fallbackMessage) {
   const { data, error } = await builder.single()
   if (error) {
     throw mapSupabaseError(error, fallbackMessage)
+  }
   return data
 }
 
@@ -96,12 +98,14 @@ async function executeMaybeSingle(builder, fallbackMessage) {
   const { data, error } = await builder.maybeSingle()
   if (error) {
     throw mapSupabaseError(error, fallbackMessage)
+  }
   return data
 }
 
 function mapSupabaseError(error, fallbackMessage = GENERIC_SUPABASE_ERROR) {
   if (!error) {
     return createHttpError(500, fallbackMessage)
+  }
   const message = error.message || fallbackMessage
   const httpError = createHttpError(error.status || 500, message)
   httpError.code = error.code
@@ -119,6 +123,7 @@ function nowIso() {
 const trim = (value) => {
   if (value === undefined || value === null) {
     return ''
+  }
   return String(value).trim()
 }
 
@@ -127,6 +132,7 @@ const normalizeSearchTerm = (value) => (value ? String(value).trim().toLowerCase
 const isAllFilter = (value) => {
   if (value === undefined || value === null) {
     return true
+  }
   return String(value).trim().toLowerCase() === 'todos'
 }
 
@@ -134,9 +140,11 @@ const toStartOfDayIso = (value) => {
   const raw = trim(value)
   if (!raw) {
     return null
+  }
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) {
     return null
+  }
   date.setHours(0, 0, 0, 0)
   return date.toISOString()
 }
@@ -145,9 +153,11 @@ const toEndOfDayIso = (value) => {
   const raw = trim(value)
   if (!raw) {
     return null
+  }
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) {
     return null
+  }
   date.setHours(23, 59, 59, 999)
   return date.toISOString()
 }
@@ -193,6 +203,7 @@ function sanitizePessoaPayload(payload = {}) {
     matricula: trim(payload.matricula),
     cargo: trim(payload.cargo),
     centroServico,
+  }
 }
 
 function validatePessoaPayload(payload) {
@@ -205,39 +216,47 @@ function validatePessoaPayload(payload) {
 function mapPessoaRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
+  }
   const centroServico = record.centroServico ?? record.local ?? ''
   return {
     ...record,
     centroServico,
     local: record.local ?? centroServico,
+  }
 }
 
 function mapEntradaRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
+  }
   return {
     ...record,
     centroCusto: record.centroCusto ?? '',
+  }
 }
 
 function mapSaidaRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
+  }
   return {
     ...record,
     centroCusto: record.centroCusto ?? '',
     centroServico: record.centroServico ?? '',
+  }
 }
 
 function mapAcidenteRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
+  }
   const centroServico = record.centroServico ?? record.setor ?? ''
   return {
     ...record,
     centroServico,
     setor: record.setor ?? centroServico,
     local: record.local ?? centroServico,
+  }
 }
 
 function mapMaterialResumo(record) {
@@ -348,12 +367,15 @@ function normalizePessoaHistorico(lista) {
 async function ensureMatriculaDisponivel(matricula, ignoreId) {
   if (!matricula) {
     return
+  }
   let query = supabaseAdmin.from('pessoas').select('id').eq('matricula', matricula).limit(1)
   if (ignoreId) {
     query = query.neq('id', ignoreId)
+  }
   const existente = await executeMaybeSingle(query, 'Falha ao validar matrÃ­cula.')
   if (existente) {
     throw createHttpError(409, 'JÃ¡ existe uma pessoa com essa matrÃ­cula.')
+  }
 }
 
 const sanitizeDigits = (value = '') => String(value).replace(/\\D/g, '')
@@ -804,14 +826,20 @@ const buildCatalogoTexto = (lista) => normalizeCatalogoLista(lista).join('; ')
 
 
 function sanitizeEntradaPayload(payload = {}) {
-  const dataEntradaRaw = trim(payload.dataEntrada);
-  let dataEntradaIso = null;
-  if (dataEntradaRaw) {
-    const data = new Date(dataEntradaRaw);
-    if (Number.isNaN(data.getTime())) {
-      throw createHttpError(400, 'Data de entrada invalida.');
-    }
-    dataEntradaIso = data.toISOString();
+  const dataEntradaRaw = trim(payload.dataEntrada)
+  let dataEntradaIso = null
+
+  if (!dataEntradaRaw) {
+    throw createHttpError(400, 'Data de entrada obrigatoria.')
+  }
+
+  const data = new Date(dataEntradaRaw)
+  if (Number.isNaN(data.getTime())) {
+    throw createHttpError(400, 'Data de entrada invalida.')
+  }
+
+  dataEntradaIso = data.toISOString()
+
   return {
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
@@ -819,23 +847,38 @@ function sanitizeEntradaPayload(payload = {}) {
     centroServico: trim(payload.centroServico),
     dataEntrada: dataEntradaIso,
     usuarioResponsavel: trim(payload.usuarioResponsavel) || null,
-  };
+  }
 }
+
 function validateEntradaPayload(payload) {
   if (!payload.materialId) throw createHttpError(400, 'Material obrigatorio para entrada.')
   if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatorio.')
   if (!payload.centroServico) throw createHttpError(400, 'Centro de servico obrigatorio.')
   if (!payload.dataEntrada) throw createHttpError(400, 'Data de entrada obrigatoria.')
 }
+
 function sanitizeSaidaPayload(payload = {}) {
-  const dataEntregaRaw = trim(payload.dataEntrega);
-  let dataEntregaIso = null;
-  if (dataEntregaRaw) {
-    const data = new Date(dataEntregaRaw);
-    if (Number.isNaN(data.getTime())) {
-      throw createHttpError(400, 'Data de entrega invalida.');
+  const dataEntregaRaw = trim(payload.dataEntrega)
+  let dataEntregaIso = null
+
+  if (!dataEntregaRaw) {
+    throw createHttpError(400, 'Data de entrega obrigatoria.')
+  }
+
+  const data = new Date(dataEntregaRaw)
+  if (Number.isNaN(data.getTime())) {
+    throw createHttpError(400, 'Data de entrega invalida.')
+  }
+
+  if (payload.validadeDias) {
+    const validade = Number(payload.validadeDias)
+    if (!Number.isNaN(validade) && validade > 0) {
+      data.setUTCDate(data.getUTCDate() + validade)
     }
-    dataEntregaIso = data.toISOString();
+  }
+
+  dataEntregaIso = data.toISOString()
+
   return {
     pessoaId: trim(payload.pessoaId),
     materialId: trim(payload.materialId),
@@ -845,8 +888,9 @@ function sanitizeSaidaPayload(payload = {}) {
     dataEntrega: dataEntregaIso,
     usuarioResponsavel: trim(payload.usuarioResponsavel) || null,
     status: trim(payload.status) || 'entregue',
-  };
+  }
 }
+
 function validateSaidaPayload(payload) {
   if (!payload.pessoaId) throw createHttpError(400, 'Pessoa obrigatoria para saida.')
   if (!payload.materialId) throw createHttpError(400, 'Material obrigatorio para saida.')
@@ -854,12 +898,7 @@ function validateSaidaPayload(payload) {
   if (!payload.centroServico) throw createHttpError(400, 'Centro de servico obrigatorio.')
   if (!payload.dataEntrega) throw createHttpError(400, 'Data de entrega obrigatoria.')
 }
-  if (!payload.pessoaId) throw createHttpError(400, 'Pessoa obrigatÃ³ria para saÃ­da.')
-  if (!payload.materialId) throw createHttpError(400, 'Material obrigatÃ³rio para saÃ­da.')
-  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatÃ³rio.')
-  if (!payload.centroServico) throw createHttpError(400, 'Centro de serviÃ§o obrigatÃ³rio.')
-    throw createHttpError(400, 'Data de entrega invÃ¡lida.')
-}
+
 
 const sanitizeOptional = (value) => {
   if (value === undefined) return undefined
@@ -872,10 +911,13 @@ function sanitizeOptionalIntegerString(value, fieldName = 'Valor') {
   const sanitized = sanitizeOptional(value)
   if (sanitized === undefined) {
     return undefined
+  }
   if (sanitized === null) {
     return null
+  }
   if (!/^[0-9]+$/.test(sanitized)) {
     throw createHttpError(400, `${fieldName} deve conter apenas numeros inteiros.`)
+  }
   return sanitized
 }
 
@@ -885,13 +927,17 @@ function sanitizeNonNegativeInteger(value, { defaultValue = 0, allowNull = false
       return null
     }
     return defaultValue
+  }
   if (!/^-?[0-9]+$/.test(String(value).trim())) {
     throw createHttpError(400, `${fieldName} deve ser um numero inteiro.`)
+  }
   const numeric = Number(value)
   if (!Number.isInteger(numeric) || Number.isNaN(numeric)) {
     throw createHttpError(400, `${fieldName} deve ser um numero inteiro.`)
+  }
   if (numeric < 0) {
     throw createHttpError(400, `${fieldName} nao pode ser negativo.`)
+  }
   return numeric
 }
 
@@ -925,6 +971,7 @@ function sanitizeAcidentePayload(payload = {}) {
     cid: sanitizeOptional(payload.cid),
     cat: cat ?? null,
     observacao: sanitizeOptional(payload.observacao),
+  }
 }
 
 function validateAcidentePayload(payload) {
@@ -938,16 +985,21 @@ function validateAcidentePayload(payload) {
   if (!payload.centroServico) throw createHttpError(400, 'Centro de servico obrigatorio')
   if (!payload.data || Number.isNaN(Date.parse(payload.data))) {
     throw createHttpError(400, 'Data do acidente obrigatoria')
+  }
   if (!Number.isInteger(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
     throw createHttpError(400, 'Dias perdidos deve ser zero ou positivo')
+  }
   if (!Number.isInteger(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
     throw createHttpError(400, 'Dias debitados deve ser zero ou positivo')
+  }
   if (payload.hht !== undefined && payload.hht !== null) {
     if (!Number.isInteger(Number(payload.hht)) || Number(payload.hht) < 0) {
       throw createHttpError(400, 'HHT deve ser zero ou positivo')
     }
+  }
   if (payload.cat && !/^[0-9]+$/.test(String(payload.cat))) {
     throw createHttpError(400, 'CAT deve conter apenas numeros inteiros')
+  }
 }
 
 async function obterPessoaPorId(id) {
@@ -960,6 +1012,7 @@ async function obterPessoaPorId(id) {
 async function obterPessoaPorMatricula(matricula) {
   if (!matricula) {
     return null
+  }
   const pessoa = await executeMaybeSingle(
     supabaseAdmin.from('pessoas').select('*').eq('matricula', matricula).limit(1),
     'Falha ao consultar pessoa por matrï¿½cula.'
@@ -970,6 +1023,7 @@ async function obterPessoaPorMatricula(matricula) {
 async function obterPessoaPorNome(nome) {
   if (!nome) {
     return null
+  }
   const pattern = `%${nome.trim().replace(/\s+/g, '%')}%`
   const registros =
     (await execute(
@@ -978,11 +1032,13 @@ async function obterPessoaPorNome(nome) {
     )) ?? []
   if (registros.length === 0) {
     return null
+  }
   if (registros.length > 1) {
     throw createHttpError(
       409,
       'Mais de um colaborador encontrado para o nome informado. Refine a busca ou informe a matr???cula.'
     )
+  }
   return mapPessoaRecord(registros[0])
 }
 
@@ -1003,12 +1059,15 @@ async function obterMaterialPorId(id) {
 function calcularDataTroca(dataEntregaIso, validadeDias) {
   if (!validadeDias) {
     return null
+  }
   const data = new Date(dataEntregaIso)
   if (Number.isNaN(data.getTime())) {
     return null
+  }
   const prazo = Number(validadeDias)
   if (Number.isNaN(prazo) || prazo <= 0) {
     return null
+  }
   data.setUTCDate(data.getUTCDate() + prazo)
   return data.toISOString()
 }
@@ -1016,6 +1075,7 @@ function calcularDataTroca(dataEntregaIso, validadeDias) {
 async function registrarHistoricoPreco(materialId, valorUnitario, usuario) {
   if (!materialId) {
     return
+  }
   await execute(
     supabaseAdmin.from('material_price_history').insert({
       id: randomId(),
@@ -1049,10 +1109,12 @@ async function carregarMovimentacoes(params) {
     const inicioIso = resolvedRange.start.toISOString()
     entradasFiltered = entradasFiltered.gte('dataEntrada', inicioIso)
     saidasFiltered = saidasFiltered.gte('dataEntrega', inicioIso)
+  }
   if (resolvedRange?.end) {
     const fimIso = resolvedRange.end.toISOString()
     entradasFiltered = entradasFiltered.lte('dataEntrada', fimIso)
     saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
+  }
 
   const [materiaisRegistros, entradas, saidas] = await Promise.all([
     execute(
@@ -1068,6 +1130,7 @@ async function carregarMovimentacoes(params) {
     entradas: (entradas ?? []).map(mapEntradaRecord),
     saidas: (saidas ?? []).map(mapSaidaRecord),
     periodo,
+  }
 }
 
 async function calcularSaldoMaterialAtual(materialId) {
@@ -1088,6 +1151,7 @@ async function calcularSaldoMaterialAtual(materialId) {
 async function obterSaidasDetalhadasPorPessoa(pessoaId) {
   if (!pessoaId) {
     return []
+  }
   const registros =
     (await execute(
       supabaseAdmin
@@ -1134,12 +1198,15 @@ async function obterSaidasDetalhadasPorPessoa(pessoaId) {
 function buildDescricaoMaterial(material) {
   if (!material) {
     return ''
+  }
   const partes = [material.nome]
   if (material.fabricante) {
     partes.push(material.fabricante)
+  }
   const numeroEspecifico = material.numeroEspecifico || material.numeroCalcado || material.numeroVestimenta
   if (numeroEspecifico) {
     partes.push(numeroEspecifico)
+  }
   return partes.filter(Boolean).join(' ')
 }
 
@@ -1195,6 +1262,7 @@ function montarContextoTermoEpi(pessoa, saidas) {
       totalItensEntregues,
       ultimaEntrega,
     },
+  }
 }
 
 export const PessoasOperations = {
@@ -1897,6 +1965,7 @@ export async function healthCheck() {
     .limit(1)
   if (error) {
     throw mapSupabaseError(error, GENERIC_SUPABASE_ERROR)
+  }
   return { status: 'ok' }
 }
 

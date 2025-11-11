@@ -199,13 +199,162 @@ const normalizeHistoryValue = (value) => {
   if (value === null || value === undefined) {
     return ''
   }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (item === null || item === undefined) {
+          return ''
+        }
+        if (typeof item === 'object') {
+          try {
+            return JSON.stringify(item)
+          } catch (error) {
+            console.warn('Falha ao serializar valor de histórico (local).', error)
+            return ''
+          }
+        }
+        return item.toString().trim()
+      })
+      .filter(Boolean)
+      .join(', ')
+  }
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch (error) {
+      console.warn('Falha ao serializar valor de histórico (local).', error)
+      return ''
+    }
+  }
   if (typeof value === 'number' && Number.isNaN(value)) {
     return ''
   }
-  if (Array.isArray(value)) {
-    return value.map((item) => (item && String(item).trim()) || '').filter(Boolean).join(', ')
+  return value.toString().trim()
+}
+
+const extractTextualNames = (lista) => {
+  if (!Array.isArray(lista)) {
+    return []
   }
-  return value
+  const seen = new Set()
+  return lista
+    .map((item) => {
+      if (!item) {
+        return ''
+      }
+      if (typeof item === 'string') {
+        return item.trim()
+      }
+      if (typeof item === 'object') {
+        const nome =
+          (typeof item.nome === 'string' && item.nome.trim()) ||
+          (typeof item.name === 'string' && item.name.trim()) ||
+          (typeof item.label === 'string' && item.label.trim()) ||
+          (typeof item.valor === 'string' && item.valor.trim()) ||
+          (typeof item.value === 'string' && item.value.trim())
+        return nome || ''
+      }
+      return String(item ?? '').trim()
+    })
+    .filter(Boolean)
+    .filter((nome) => {
+      if (seen.has(nome)) {
+        return false
+      }
+      seen.add(nome)
+      return true
+    })
+}
+
+const selectMaterialHistoryFields = (material = {}) => {
+  if (!material || typeof material !== 'object') {
+    return {}
+  }
+
+  const caracteristicaNome =
+    material.caracteristicasTexto ??
+    material.caracteristicaEpi ??
+    (Array.isArray(material.caracteristicas)
+      ? extractTextualNames(material.caracteristicas).join('; ')
+      : '')
+
+  const corNome =
+    material.coresTexto ??
+    material.corMaterial ??
+    (Array.isArray(material.cores) ? extractTextualNames(material.cores).join('; ') : '')
+
+  const grupoMaterialValue =
+    material.grupoMaterial ??
+    material.grupoMaterialNome ??
+    ''
+
+  const grupoMaterialNomeValue =
+    material.grupoMaterialNome ??
+    material.grupoMaterial ??
+    ''
+
+  const numeroCalcadoValue =
+    material.numeroCalcado ??
+    material.numeroCalcadoId ??
+    material.numeroCalcadoNome ??
+    null
+
+  const numeroVestimentaValue =
+    material.numeroVestimenta ??
+    material.numeroVestimentaId ??
+    material.numeroVestimentaNome ??
+    null
+
+  return {
+    materialItemNome:
+      material.materialItemNome ??
+      material.nomeItemRelacionado ??
+      material.nome ??
+      '',
+    fabricanteNome: material.fabricanteNome ?? material.fabricante ?? '',
+    validadeDias: material.validadeDias ?? null,
+    ca: material.ca ?? '',
+    valorUnitario: material.valorUnitario ?? null,
+    estoqueMinimo: material.estoqueMinimo ?? null,
+    ativo: material.ativo ?? true,
+    descricao: material.descricao ?? '',
+    grupoMaterial: grupoMaterialValue,
+    grupoMaterialNome: grupoMaterialNomeValue,
+    numeroCalcado: numeroCalcadoValue,
+    numeroVestimenta: numeroVestimentaValue,
+    numeroEspecifico: material.numeroEspecifico ?? '',
+    caracteristicaNome,
+    corNome,
+  }
+}
+
+const buildHistoryChanges = (prev, next) => {
+  if (!prev || !next) {
+    return null
+  }
+
+  const campos = new Set([
+    ...Object.keys(prev ?? {}),
+    ...Object.keys(next ?? {}),
+  ])
+  const diff = []
+
+  campos.forEach((campo) => {
+    const valorAtual = normalizeHistoryValue(prev?.[campo])
+    const valorNovo = normalizeHistoryValue(next?.[campo])
+    if (valorAtual !== valorNovo) {
+      diff.push({
+        campo,
+        de: valorAtual,
+        para: valorNovo,
+      })
+    }
+  })
+
+  return diff.length > 0 ? diff : null
 }
 
 const mapLocalAcidenteRecord = (acidente) => {
@@ -642,46 +791,6 @@ const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta 
   return ''
 }
 
-const buildChaveUnica = ({
-  grupoMaterial,
-  nome,
-  fabricante,
-  numeroCalcado,
-  numeroVestimenta,
-  caracteristicaEpi,
-  corMaterial,
-  ca,
-}) => {
-  const partes = [
-    normalizeKeyPart(nome),
-    normalizeKeyPart(fabricante),
-    normalizeKeyPart(grupoMaterial),
-  ]
-  const numero = normalizeKeyPart(numeroCalcado || numeroVestimenta)
-  if (numero) {
-    partes.push(numero)
-  }
-  const caracteristicas = normalizeCaracteristicaLista(caracteristicaEpi)
-  if (caracteristicas.length) {
-    partes.push(
-      caracteristicas
-        .map((item) => normalizeKeyPart(item))
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b))
-        .join('||'),
-    )
-  }
-  const cor = normalizeKeyPart(corMaterial)
-  if (cor) {
-    partes.push(cor)
-  }
-  const caNormalizado = normalizeKeyPart(String(ca || '').trim())
-  if (caNormalizado) {
-    partes.push(caNormalizado)
-  }
-  return partes.join('||')
-}
-
 const catalogoGruposMateriais = {
   Vestimentas: [
     'Camisa manga longa',
@@ -1034,7 +1143,7 @@ const catalogoAcidenteLesoes = [
   { agente: 'Agente Psicosocial', nome: 'Disturbios cognitivos', ordem: 7 },
 ];
 
-const sanitizeMaterialPayload = (payload = {}) => {
+async function sanitizeMaterialPayload(payload = {}) {
   const grupoMaterialNome = trim(payload.grupoMaterialNome || payload.grupoMaterial)
   const grupoMaterialIdBase = trim(payload.grupoMaterialId)
   const grupoMaterialId = grupoMaterialIdBase || (grupoMaterialNome ? buildOptionId('grupo', grupoMaterialNome) : '')
@@ -1522,37 +1631,29 @@ const localApi = {
         }
 
         const atual = state.pessoas[index]
-        const camposAlterados = []
-        const comparacoes = [
-          { campo: 'nome' },
-          { campo: 'matricula' },
-          { campo: 'centroServico', atualKey: 'centroServico' },
-          { campo: 'setor' },
-          { campo: 'cargo' },
-          { campo: 'dataAdmissao' },
-          { campo: 'tipoExecucao' },
-        ]
-
-        comparacoes.forEach(({ campo, atualKey }) => {
-          const valorAtual = (atualKey ? atual[atualKey] : atual[campo]) || ''
-          const valorNovo =
-            campo === 'centroServico'
-              ? dados.centroServico
-              : campo === 'setor'
-                ? dados.setor
-                : dados[campo]
-          if (valorAtual !== valorNovo) {
-            camposAlterados.push({
-              campo,
-              de: valorAtual,
-              para: valorNovo,
-            })
-          }
-        })
+        const camposAtuais = {
+          nome: atual.nome ?? '',
+          matricula: atual.matricula ?? '',
+          centroServico: atual.centroServico ?? '',
+          setor: atual.setor ?? '',
+          cargo: atual.cargo ?? '',
+          dataAdmissao: atual.dataAdmissao ?? null,
+          tipoExecucao: atual.tipoExecucao ?? '',
+        }
+        const camposNovos = {
+          nome: dados.nome ?? '',
+          matricula: dados.matricula ?? '',
+          centroServico: dados.centroServico ?? '',
+          setor: dados.setor ?? '',
+          cargo: dados.cargo ?? '',
+          dataAdmissao: dados.dataAdmissao ?? null,
+          tipoExecucao: dados.tipoExecucao ?? '',
+        }
+        const camposAlterados = buildHistoryChanges(camposAtuais, camposNovos)
 
         const historico = Array.isArray(atual.historicoEdicao) ? atual.historicoEdicao.slice() : []
         const agora = nowIso()
-        if (camposAlterados.length > 0) {
+        if (Array.isArray(camposAlterados) && camposAlterados.length > 0) {
           historico.push({
             id: randomId(),
             dataEdicao: agora,
@@ -1720,7 +1821,7 @@ const localApi = {
       return normalizeCatalogoLista(catalogoMedidasVestimenta)
     },
     async create(payload) {
-      const dados = sanitizeMaterialPayload(payload)
+      const dados = await sanitizeMaterialPayload(payload)
       validateMaterialPayload(dados)
       const usuario = trim(payload.usuarioCadastro) || 'sistema'
 
@@ -1754,55 +1855,29 @@ const localApi = {
         throw createError(400, 'ID do material obrigatorio.')
       }
 
+      const atual = readState((state) => state.materiais.find((material) => material.id === id))
+      if (!atual) {
+        throw createError(404, 'Material nao encontrado.')
+      }
+
+      const dadosCompletos = await sanitizeMaterialPayload({ ...atual, ...payload })
+      validateMaterialPayload(dadosCompletos)
+
+      const usuario = trim(payload.usuarioResponsavel) || 'sistema'
+      const agora = nowIso()
+      const camposAlterados = buildHistoryChanges(
+        selectMaterialHistoryFields(mapLocalMaterialRecord(atual)),
+        selectMaterialHistoryFields(mapLocalMaterialRecord({ ...atual, ...dadosCompletos })),
+      )
+
       return writeState((state) => {
         const index = state.materiais.findIndex((material) => material.id === id)
         if (index === -1) {
           throw createError(404, 'Material nao encontrado.')
         }
 
-        const atual = state.materiais[index]
-        const dadosCompletos = sanitizeMaterialPayload({ ...atual, ...payload })
-        validateMaterialPayload(dadosCompletos)
-        const usuario = trim(payload.usuarioResponsavel) || 'sistema'
-
-        const camposComparacao = [
-          'nome',
-          'nomeItemRelacionado',
-          'materialItemNome',
-          'fabricante',
-          'fabricanteNome',
-          'validadeDias',
-          'ca',
-          'valorUnitario',
-          'estoqueMinimo',
-          'ativo',
-          'descricao',
-          'grupoMaterial',
-          'grupoMaterialNome',
-          'grupoMaterialId',
-          'numeroCalcado',
-          'numeroVestimenta',
-          'numeroEspecifico',
-          'caracteristicaEpi',
-          'corMaterial',
-        ]
-
-        const camposAlterados = []
-        camposComparacao.forEach((campo) => {
-          const valorAtual = normalizeHistoryValue(atual[campo])
-          const valorNovo = normalizeHistoryValue(dadosCompletos[campo])
-          if (valorAtual !== valorNovo) {
-            camposAlterados.push({
-              campo,
-              de: atual[campo] ?? '',
-              para: dadosCompletos[campo] ?? '',
-            })
-          }
-        })
-
-        const agora = nowIso()
         const atualizado = {
-          ...atual,
+          ...state.materiais[index],
           ...dadosCompletos,
           usuarioAtualizacao: usuario,
           usuarioAtualizacaoNome: trim(payload.usuarioAtualizacaoNome) || usuario,
@@ -1811,7 +1886,7 @@ const localApi = {
 
         state.materiais[index] = atualizado
 
-        if (camposAlterados.length > 0) {
+        if (Array.isArray(camposAlterados) && camposAlterados.length > 0) {
           state.materialPriceHistory.push({
             id: randomId(),
             materialId: id,
@@ -2211,29 +2286,25 @@ const localApi = {
 
         validateAcidentePayload(dados)
 
-        const camposAlterados = []
-        ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
-          let valorAtual
+        const camposAntigos = ACIDENTE_HISTORY_FIELDS.reduce((acc, campo) => {
           if (campo === 'centroServico') {
-            valorAtual = normalizeHistoryValue(atual.centroServico ?? atual.setor ?? '')
+            acc[campo] = atual.centroServico ?? atual.setor ?? ''
           } else if (campo === 'local') {
-            valorAtual = normalizeHistoryValue(atual.local ?? atual.centroServico ?? '')
+            acc[campo] = atual.local ?? atual.centroServico ?? ''
           } else {
-            valorAtual = normalizeHistoryValue(atual[campo])
+            acc[campo] = atual[campo]
           }
-          const valorNovo = normalizeHistoryValue(dados[campo])
-          if (valorAtual !== valorNovo) {
-            camposAlterados.push({
-              campo,
-              de: valorAtual,
-              para: valorNovo,
-            })
-          }
-        })
+          return acc
+        }, {})
+        const camposNovos = ACIDENTE_HISTORY_FIELDS.reduce((acc, campo) => {
+          acc[campo] = dados[campo]
+          return acc
+        }, {})
+        const camposAlterados = buildHistoryChanges(camposAntigos, camposNovos)
 
         const historicoBase = Array.isArray(atual.historicoEdicao) ? atual.historicoEdicao.slice() : []
         const agora = nowIso()
-        if (camposAlterados.length > 0) {
+        if (Array.isArray(camposAlterados) && camposAlterados.length > 0) {
           historicoBase.push({
             id: randomId(),
             dataEdicao: agora,
