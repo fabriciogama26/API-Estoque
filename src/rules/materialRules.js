@@ -1,117 +1,361 @@
-const GRUPO_MATERIAL_CALCADO = 'Calçado';
-const GRUPO_MATERIAL_VESTIMENTA = 'Vestimenta';
-const GRUPO_MATERIAL_PROTECAO_MAOS = 'Proteção das Mãos';
+import { parseCurrencyToNumber, sanitizeDigits } from '../utils/MateriaisUtils.js'
+
+export const GRUPO_MATERIAL_CALCADO = 'Calcado'
+export const GRUPO_MATERIAL_VESTIMENTA = 'Vestimenta'
+export const GRUPO_MATERIAL_PROTECAO_MAOS = 'Proteção das Mãos'
+
+const CARACTERISTICA_SEPARATOR = ';'
 
 const normalizeKeyPart = (value) =>
   value
-    ? String(value)
+    ? value
         .trim()
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-    : '';
+    : ''
 
-const isGrupo = (value, target) => normalizeKeyPart(value) === normalizeKeyPart(target);
+const normalizeGrupoValor = (value) => {
+  const base = normalizeKeyPart(value)
+  return base.endsWith('s') ? base.slice(0, -1) : base
+}
 
-const sanitizeDigits = (value = '') => String(value).replace(/\D/g, '');
+const isGrupo = (value, grupoReferencia) =>
+  normalizeGrupoValor(value) === normalizeGrupoValor(grupoReferencia)
 
-const sanitizeNomeEpi = (value = '') => String(value).replace(/\d/g, '').trim();
+const sanitizeAlphanumeric = (value = '') => String(value).trim()
+
+const sanitizeMaterialNome = (value = '') => value.replace(/\d/g, '')
+
+const normalizeSelectionKey = (value) => normalizeKeyPart(value || '')
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const normalizeSelectionItem = (item) => {
+  if (item === null || item === undefined) {
+    return null
+  }
+  if (typeof item === 'string' || typeof item === 'number') {
+    const texto = sanitizeAlphanumeric(item)
+    if (!texto) {
+      return null
+    }
+    const valor = String(item).trim()
+    return { id: valor, nome: texto }
+  }
+  if (typeof item === 'object') {
+    const nomeBase = sanitizeAlphanumeric(
+      item.nome ?? item.label ?? item.valor ?? item.value ?? item.texto ?? item.text ?? '',
+    )
+    const idBase =
+      item.id ?? item.uuid ?? item.value ?? item.valor ?? item.nome ?? item.label ?? null
+    const id = sanitizeAlphanumeric(idBase ?? nomeBase)
+    const nome = nomeBase || id
+    if (!nome) {
+      return null
+    }
+    return { id, nome }
+  }
+  const texto = sanitizeAlphanumeric(String(item))
+  if (!texto) {
+    return null
+  }
+  const valor = String(item).trim()
+  return { id: valor, nome: texto }
+}
+
+const mergeSelectionLists = (...sources) => {
+  const itens = []
+  sources.forEach((source) => {
+    if (source === null || source === undefined || source === '') {
+      return
+    }
+    if (Array.isArray(source)) {
+      source.forEach((value) => {
+        itens.push(value)
+      })
+      return
+    }
+    if (typeof source === 'string') {
+      source
+        .split(/[;|,]/)
+        .map((parte) => sanitizeAlphanumeric(parte))
+        .filter(Boolean)
+        .forEach((parte) => itens.push(parte))
+      return
+    }
+    itens.push(source)
+  })
+
+  const vistos = new Set()
+  const normalizados = []
+
+  itens
+    .map((item) => normalizeSelectionItem(item))
+    .filter(Boolean)
+    .forEach((item) => {
+      const chave = item.id ? `id:${item.id}` : `nome:${normalizeSelectionKey(item.nome)}`
+      if (vistos.has(chave)) {
+        return
+      }
+      vistos.add(chave)
+      normalizados.push(item)
+    })
+
+  return normalizados.sort((a, b) => a.nome.localeCompare(b.nome))
+}
 
 const requiresTamanho = (grupo) =>
-  isGrupo(grupo, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(grupo, GRUPO_MATERIAL_PROTECAO_MAOS);
+  isGrupo(grupo, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(grupo, GRUPO_MATERIAL_PROTECAO_MAOS)
 
 const normalizeCaracteristicaLista = (value) => {
   if (Array.isArray(value)) {
     return value
-      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
-      .filter(Boolean);
+      .map((item) => {
+        if (item === null || item === undefined) {
+          return ''
+        }
+        if (typeof item === 'string') {
+          const texto = sanitizeAlphanumeric(item)
+          return texto.normalize?.('NFC') ?? texto
+        }
+        if (typeof item === 'object') {
+          const textoBase =
+            item.nome ?? item.label ?? item.valor ?? item.value ?? item.id ?? ''
+          const texto = sanitizeAlphanumeric(textoBase)
+          return texto.normalize?.('NFC') ?? texto
+        }
+        const texto = sanitizeAlphanumeric(String(item))
+        return texto.normalize?.('NFC') ?? texto
+      })
+      .filter(Boolean)
   }
-  const texto = String(value ?? '');
+  const texto = String(value ?? '')
   if (!texto.trim()) {
-    return [];
+    return []
   }
+
   return texto
     .split(/[;|,]/)
-    .map((parte) => String(parte).trim())
-    .filter(Boolean);
-};
+    .map((parte) => sanitizeAlphanumeric(parte))
+    .filter(Boolean)
+}
 
-const formatCaracteristicaTexto = (value) =>
-  Array.from(new Set(normalizeCaracteristicaLista(value)))
-    .sort((a, b) => a.localeCompare(b))
-    .join('; ');
+const ordenarCaracteristicas = (lista) =>
+  Array.from(new Set(lista.map((item) => item.trim()))).sort((a, b) => a.localeCompare(b))
 
-const buildNumeroEspecifico = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
+const buildCaracteristicaTexto = (value) =>
+  ordenarCaracteristicas(normalizeCaracteristicaLista(value)).join(`${CARACTERISTICA_SEPARATOR} `)
+
+const buildNumeroReferencia = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
   if (isGrupo(grupoMaterial, GRUPO_MATERIAL_CALCADO)) {
-    return sanitizeDigits(numeroCalcado);
+    return numeroCalcado
   }
   if (requiresTamanho(grupoMaterial)) {
-    return String(numeroVestimenta || '').trim();
+    return numeroVestimenta
   }
-  return '';
-};
+  return ''
+}
 
+export function resolveUsuarioNome(user) {
+  return user?.name || user?.username || user?.email || 'sistema'
+}
 
-function validarDadosObrigatorios({
-  nome,
-  fabricante,
-  validadeDias,
-  valorUnitario,
-  grupoMaterial,
-  numeroCalcado,
-  numeroVestimenta,
-  caracteristicaEpi,
-}) {
-  const nomeSanitizado = sanitizeNomeEpi(nome);
-  if (!nomeSanitizado) {
-    throw new Error('Nome do EPI obrigatorio e nao pode conter numeros');
+export function validateMaterialForm(form) {
+  const nomeSanitizado = sanitizeMaterialNome(form.materialItemNome || form.nome)
+  if (!nomeSanitizado.trim()) {
+    return 'Informe o nome do EPI (somente letras).'
   }
-  if (/\d/.test(String(nome || ''))) {
-    throw new Error('O campo EPI nao pode conter numeros');
+  const nomeDisplay = form.materialItemNome || ''
+  const isExistingEpi = UUID_REGEX.test(String(form.nome || ''))
+  if (!isExistingEpi && /\d/.test(nomeDisplay)) {
+    return 'O campo EPI nao pode conter numeros.'
   }
-  if (!grupoMaterial || !String(grupoMaterial).trim()) {
-    throw new Error('Grupo de material obrigatorio');
+  const grupoMaterialNome = sanitizeAlphanumeric(
+    form.grupoMaterialNome || form.grupoMaterial || '',
+  )
+  if (!form.grupoMaterialId && !grupoMaterialNome) {
+    return 'Selecione o grupo de material.'
   }
-  if (isGrupo(grupoMaterial, GRUPO_MATERIAL_CALCADO) && !sanitizeDigits(numeroCalcado)) {
-    throw new Error('Informe o numero do calcado');
+  if (!form.nome) {
+    return 'Selecione o EPI.'
   }
-  if (requiresTamanho(grupoMaterial) && !String(numeroVestimenta || '').trim()) {
-    throw new Error('Informe o tamanho');
+
+  if (isGrupo(grupoMaterialNome, GRUPO_MATERIAL_CALCADO)) {
+    const numero = form.numeroCalcadoNome?.trim() || form.numeroCalcado?.trim() || ''
+    if (!numero) {
+      return 'Informe o numero do calcado.'
+    }
   }
-  if (!fabricante || !String(fabricante).trim()) {
-    throw new Error('Fabricante obrigatorio');
+
+  if (requiresTamanho(grupoMaterialNome)) {
+    const numeroVestimentaTexto =
+      form.numeroVestimentaNome?.trim() || form.numeroVestimenta?.trim() || ''
+    if (!numeroVestimentaTexto) {
+      return 'Informe o tamanho.'
+    }
   }
-  if (Number.isNaN(Number(validadeDias)) || Number(validadeDias) <= 0) {
-    throw new Error('Validade deve ser maior que zero');
+
+  const fabricanteNome = sanitizeAlphanumeric(form.fabricante || '')
+  if (!form.fabricante && !fabricanteNome) {
+    return 'Informe o fabricante.'
   }
-  if (Number.isNaN(Number(valorUnitario)) || Number(valorUnitario) <= 0) {
-    throw new Error('Valor unitario deve ser maior que zero');
+
+  const caracteristicas = mergeSelectionLists(
+    form.caracteristicaEpi,
+    form.caracteristicas,
+    form.caracteristicas_epi,
+    form.caracteristicasIds,
+  )
+  if (!caracteristicas.length) {
+    return 'Informe ao menos uma caracteristica.'
   }
-  if (!normalizeCaracteristicaLista(caracteristicaEpi).length) {
-    throw new Error('Informe ao menos uma caracteristica');
+
+  const validade = Number(form.validadeDias)
+  if (!Number.isFinite(validade) || validade <= 0) {
+    return 'Validade deve ser maior que zero.'
+  }
+
+  const valor = parseCurrencyToNumber(form.valorUnitario)
+  if (!Number.isFinite(valor) || valor <= 0) {
+    return 'Valor unitario deve ser maior que zero.'
+  }
+
+  return null
+}
+
+const buildMaterialPayload = (form) => {
+  const grupoMaterialNome = sanitizeAlphanumeric(
+    form.grupoMaterialNome || form.grupoMaterial || '',
+  )
+  const grupoMaterialId = sanitizeAlphanumeric(form.grupoMaterialId || '')
+  const grupoMaterial = grupoMaterialNome
+  const numeroCalcadoId = form.numeroCalcado || ''
+  const numeroCalcadoNome = sanitizeAlphanumeric(form.numeroCalcadoNome || '')
+  const numeroVestimentaId = form.numeroVestimenta || ''
+  const numeroVestimentaNome = sanitizeAlphanumeric(form.numeroVestimentaNome || '')
+  const nomeTextoBruto = sanitizeAlphanumeric(
+    form.materialItemNome || form.nomeItemRelacionado || '',
+  )
+  const nomeEpi = sanitizeMaterialNome(
+    form.materialItemNome || form.nomeItemRelacionado || form.nome,
+  ).trim()
+  const nomeId = sanitizeAlphanumeric(form.nome)
+  const caracteristicasSelecionadas = mergeSelectionLists(
+    form.caracteristicaEpi,
+    form.caracteristicas,
+    form.caracteristicas_epi,
+    form.caracteristicasIds,
+  )
+  const caracteristicaTexto = buildCaracteristicaTexto(
+    caracteristicasSelecionadas.length ? caracteristicasSelecionadas : form.caracteristicaEpi,
+  )
+  const coresSelecionadas = mergeSelectionLists(form.cores, form.coresIds)
+  const corPrincipal = coresSelecionadas[0]?.nome ?? form.corMaterial
+  const fabricanteId = sanitizeAlphanumeric(form.fabricante || '')
+  const fabricanteNome = sanitizeAlphanumeric(form.fabricanteNome || form.fabricante || '')
+  const numeroEspecifico = buildNumeroReferencia({
+    grupoMaterial: grupoMaterialNome,
+    numeroCalcado: numeroCalcadoNome,
+    numeroVestimenta: numeroVestimentaNome,
+  })
+
+  return {
+    nome: nomeId,
+    nomeItemRelacionado: nomeTextoBruto || nomeEpi,
+    materialItemNome: nomeTextoBruto || nomeEpi,
+    fabricante: fabricanteId || '',
+    fabricanteNome: fabricanteNome.trim(),
+    validadeDias: Number(form.validadeDias) || 0,
+    ca: sanitizeDigits(form.ca),
+    valorUnitario: parseCurrencyToNumber(form.valorUnitario),
+    grupoMaterial,
+    grupoMaterialNome,
+    grupoMaterialId: grupoMaterialId || null,
+    numeroCalcado: isGrupo(grupoMaterialNome, GRUPO_MATERIAL_CALCADO)
+      ? numeroCalcadoId || null
+      : null,
+    numeroVestimenta: requiresTamanho(grupoMaterialNome) ? numeroVestimentaId || null : null,
+    numeroEspecifico,
+    caracteristicaEpi: caracteristicaTexto,
+    corMaterial: sanitizeAlphanumeric(corPrincipal),
+    caracteristicas: caracteristicasSelecionadas,
+    caracteristicasIds: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
+    caracteristicas_epi: caracteristicasSelecionadas.map((item) => item.id).filter(Boolean),
+    cores: coresSelecionadas,
+    coresIds: coresSelecionadas.map((item) => item.id).filter(Boolean),
+    descricao: sanitizeAlphanumeric(form.descricao),
   }
 }
 
-function validarEstoqueMinimo(estoqueMinimo) {
-  if (estoqueMinimo === undefined || estoqueMinimo === null) {
-    return;
-  }
-  if (Number.isNaN(Number(estoqueMinimo)) || Number(estoqueMinimo) < 0) {
-    throw new Error('Estoque minimo deve ser zero ou positivo');
+export function createMaterialPayload(form, usuarioCadastro) {
+  const base = buildMaterialPayload(form)
+  return {
+    ...base,
+    usuarioCadastro,
   }
 }
 
-module.exports = {
-  GRUPO_MATERIAL_CALCADO,
-  GRUPO_MATERIAL_VESTIMENTA,
-  GRUPO_MATERIAL_PROTECAO_MAOS,
-  validarDadosObrigatorios,
-  validarEstoqueMinimo,
-  sanitizeNomeEpi,
-  buildNumeroEspecifico,
-  sanitizeDigits,
-  isGrupoCalcado: (valor) => isGrupo(valor, GRUPO_MATERIAL_CALCADO),
-  isGrupoVestimenta: (valor) => isGrupo(valor, GRUPO_MATERIAL_VESTIMENTA),
-  formatCaracteristicaTexto,
-  requiresTamanho,
-};
+export function updateMaterialPayload(form, usuarioResponsavel) {
+  const base = buildMaterialPayload(form)
+  return {
+    ...base,
+    usuarioResponsavel,
+  }
+}
+
+export function filterMateriais(materiais, filters) {
+  const termo = filters.termo.trim().toLowerCase()
+
+  return materiais.filter((material) => {
+    if (filters.status === 'ativos' && material.ativo === false) {
+      return false
+    }
+
+    if (filters.status === 'inativos' && material.ativo !== false) {
+      return false
+    }
+
+    if (!termo) {
+      return true
+    }
+
+    const target = [
+      material.nome,
+      material.nomeItemRelacionado,
+      material.materialItemNome,
+      material.fabricante,
+      material.fabricanteNome,
+      material.ca,
+      material.grupoMaterial,
+      material.grupoMaterialNome,
+      material.numeroCalcado,
+      material.numeroCalcadoNome,
+      material.numeroVestimenta,
+      material.numeroVestimentaNome,
+      material.caracteristicaEpi,
+      material.caracteristicasTexto,
+      ...(Array.isArray(material.caracteristicasNomes) ? material.caracteristicasNomes : []),
+      material.corMaterial,
+      material.coresTexto,
+      ...(Array.isArray(material.coresNomes) ? material.coresNomes : []),
+      material.descricao,
+      material.usuarioCadastro,
+      material.usuarioCadastroNome,
+      material.usuarioAtualizacao,
+      material.usuarioAtualizacaoNome,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+
+    return target.includes(termo)
+  })
+}
+
+export function sortMateriaisByNome(materiais) {
+  return materiais.slice().sort((a, b) => a.nome.localeCompare(b.nome))
+}
+
+export function parseCaracteristicaEpi(value) {
+  return ordenarCaracteristicas(normalizeCaracteristicaLista(value))
+}
