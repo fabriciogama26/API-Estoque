@@ -233,7 +233,12 @@ const buildMaterialPayload = (form) => {
   const numeroCalcadoNome = sanitizeAlphanumeric(form.numeroCalcadoNome || '')
   const numeroVestimentaId = form.numeroVestimenta || ''
   const numeroVestimentaNome = sanitizeAlphanumeric(form.numeroVestimentaNome || '')
-  const nomeEpi = sanitizeMaterialNome(form.materialItemNome || form.nome).trim()
+  const nomeTextoBruto = sanitizeAlphanumeric(
+    form.materialItemNome || form.nomeItemRelacionado || '',
+  )
+  const nomeEpi = sanitizeMaterialNome(
+    form.materialItemNome || form.nomeItemRelacionado || form.nome,
+  ).trim()
   const nomeId = sanitizeAlphanumeric(form.nome)
   const caracteristicasSelecionadas = mergeSelectionLists(
     form.caracteristicaEpi,
@@ -256,8 +261,8 @@ const buildMaterialPayload = (form) => {
 
   return {
     nome: nomeId,
-    nomeItemRelacionado: nomeEpi,
-    materialItemNome: nomeEpi,
+    nomeItemRelacionado: nomeTextoBruto || nomeEpi,
+    materialItemNome: nomeTextoBruto || nomeEpi,
     fabricante: fabricanteId || '',
     fabricanteNome: fabricanteNome.trim(),
     validadeDias: Number(form.validadeDias) || 0,
