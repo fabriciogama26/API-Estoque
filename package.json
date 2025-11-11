@@ -1,7 +1,7 @@
 {
   "name": "api-estoque",
   "private": true,
-  "version": "1.12.137",
+  "version": "2.15.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -125,26 +125,6 @@ const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = ['grupo_caracteristica_epi']
 const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 
 
-const MATERIAL_HISTORY_FIELDS = [
-  'materialItemNome',
-  'fabricanteNome',
-  'validadeDias',
-  'ca',
-  'valorUnitario',
-  'estoqueMinimo',
-  'ativo',
-  'descricao',
-  'grupoMaterial',
-  'grupoMaterialNome',
-  'numeroCalcado',
-  'numeroVestimenta',
-  'numeroEspecifico',
-  'caracteristicaEpi',
-  'caracteristicasTexto',
-  'corMaterial',
-  'coresTexto',
-]
-
 const MATERIAL_TABLE_SELECT_COLUMNS = `
   id,
   nome,
@@ -528,7 +508,7 @@ const normalizeRelationIds = (lista) => {
       }
       return normalizeOptionId(item)
     })
-    .filter((id) => Boolean(id) && isUuidValue(id))
+    .filter(Boolean)
     .forEach((id) => {
       if (!vistos.has(id)) {
         vistos.add(id)
@@ -558,91 +538,6 @@ const normalizeOptionList = (lista) => {
       }
     })
   return valores
-}
-
-const ensureArrayValue = (value) => {
-  if (Array.isArray(value)) {
-    return value
-  }
-  if (value === undefined || value === null) {
-    return []
-  }
-  return [value]
-}
-
-const buildRelationSelectionList = (ids, nomes) => {
-  const idList = ensureArrayValue(ids)
-  const nameList = ensureArrayValue(nomes)
-  const limite = Math.max(idList.length, nameList.length)
-  const itens = []
-  for (let index = 0; index < limite; index += 1) {
-    const rawId = idList[index]
-    const rawNome = nameList[index]
-    const nome = trim(rawNome ?? rawId ?? '')
-    const id = trim(rawId ?? nome)
-    if (!nome && !id) {
-      continue
-    }
-    itens.push({ id: id || nome, nome })
-  }
-  return normalizeOptionList(itens)
-}
-
-const normalizeCatalogoNameKey = (valor) => {
-  const texto = trim(valor)
-  if (!texto) {
-    return ''
-  }
-  return texto
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-}
-
-const normalizeNameList = (nomes) =>
-  (Array.isArray(nomes) ? nomes : [])
-    .map((nome) => trim(nome))
-    .filter(Boolean)
-
-async function resolveCatalogoIdsByNames({ table, nameColumn, nomes, errorMessage }) {
-  const lista = normalizeNameList(nomes)
-  if (!lista.length) {
-    return []
-  }
-  const registros = await execute(
-    supabase.from(table).select(`id, ${nameColumn}`),
-    errorMessage,
-  )
-  const mapa = new Map()
-  ;(registros ?? []).forEach((registro) => {
-    const nome = trim(registro?.[nameColumn])
-    const id = normalizeOptionId(registro?.id)
-    if (!nome || !id) {
-      return
-    }
-    mapa.set(normalizeCatalogoNameKey(nome), id)
-  })
-  return lista
-    .map((nome) => mapa.get(normalizeCatalogoNameKey(nome)) || null)
-    .filter(Boolean)
-}
-
-async function resolveCorIdsFromNames(nomes) {
-  return resolveCatalogoIdsByNames({
-    table: 'cor',
-    nameColumn: 'cor',
-    nomes,
-    errorMessage: 'Falha ao resolver cores por nome.',
-  })
-}
-
-async function resolveCaracteristicaIdsFromNames(nomes) {
-  return resolveCatalogoIdsByNames({
-    table: 'caracteristica_epi',
-    nameColumn: 'caracteristica_material',
-    nomes,
-    errorMessage: 'Falha ao resolver caracteristicas por nome.',
-  })
 }
 
 const normalizeCatalogoOptions = (lista) =>
@@ -1159,11 +1054,11 @@ async function replaceMaterialCaracteristicaVinculos(
   }
 }
 
-async function insereCores(materialId, corIds, corNames) {
+async function syncMaterialRelations(
+  materialId,
+  { corIds, corNames, caracteristicaIds, caracteristicaNames },
+) {
   await replaceMaterialCorVinculos(materialId, corIds, corNames)
-}
-
-async function insereCaracteristicas(materialId, caracteristicaIds, caracteristicaNames) {
   await replaceMaterialCaracteristicaVinculos(
     materialId,
     caracteristicaIds,
@@ -1199,20 +1094,10 @@ function mapMaterialRecord(record) {
   const rawFabricante = trim(record.fabricante ?? '')
   const fabricanteNomeBase = trim(record.fabricanteNome ?? record.fabricante_nome ?? '')
   const fabricanteNome = fabricanteNomeBase || rawFabricante
-  const caracteristicasLista = buildRelationSelectionList(
-    record.caracteristicasIds ?? record.caracteristicas_ids ?? [],
-    record.caracteristicaNome ?? record.caracteristicas_nome ?? [],
+  const caracteristicasTexto = trim(
+    record.caracteristicaNome ?? record.caracteristicas_texto ?? ''
   )
-  const coresLista = buildRelationSelectionList(
-    record.coresIds ?? record.cores_ids ?? [],
-    record.corNome ?? record.cores_nome ?? [],
-  )
-  const caracteristicasNomes = caracteristicasLista.map((item) => item.nome).filter(Boolean)
-  const caracteristicasIds = caracteristicasLista.map((item) => item.id).filter(Boolean)
-  const coresNomes = coresLista.map((item) => item.nome).filter(Boolean)
-  const coresIds = coresLista.map((item) => item.id).filter(Boolean)
-  const caracteristicasTexto = caracteristicasNomes.join('; ')
-  const coresTexto = coresNomes.join('; ')
+  const coresTexto = trim(record.corNome ?? record.cores_texto ?? '')
   const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
   const usuarioCadastroNome =
     trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
@@ -1249,14 +1134,14 @@ function mapMaterialRecord(record) {
     numeroEspecifico: record.numeroEspecifico ?? record.numero_especifico ?? '',
     descricao: record.descricao ?? '',
     caracteristicaEpi: caracteristicasTexto,
-    caracteristicas: caracteristicasLista,
-    caracteristicasIds,
-    caracteristicasNomes,
+    caracteristicas: [],
+    caracteristicasIds: [],
+    caracteristicasNomes: [],
     caracteristicasTexto,
-    corMaterial: coresLista[0]?.nome || coresTexto || '',
-    cores: coresLista,
-    coresIds,
-    coresNomes,
+    corMaterial: coresTexto,
+    cores: [],
+    coresIds: [],
+    coresNomes: [],
     coresTexto,
     usuarioCadastro: usuarioCadastroId,
     usuarioCadastroNome,
@@ -1594,16 +1479,12 @@ async function sanitizeMaterialPayload(payload = {}) {
     numeroVestimenta: refs.numeroVestimenta.id ?? null,
     numeroVestimentaNome: refs.numeroVestimenta.nome,
     numeroEspecifico,
-    caracteristicaEpi,
-    caracteristicas: caracteristicasSelecionadas,
-    caracteristicasIds: normalizeRelationIds(
-      caracteristicasSelecionadas.map((item) => item?.id)
-    ),
-    caracteristicasTexto: caracteristicaEpi,
-    cores: coresSelecionadas,
-    coresIds: normalizeRelationIds(coresSelecionadas.map((item) => item?.id)),
+    caracteristicaEpi: caracteristicaTexto,
+    caracteristicas,
+    caracteristicasIds: normalizeRelationIds(caracteristicas.map((item) => item?.id)),
+    cores,
+    coresIds: normalizeRelationIds(cores.map((item) => item?.id)),
     corMaterial: corMaterialTexto,
-    coresTexto: corMaterialTexto,
   }
 }
 
@@ -2234,18 +2115,25 @@ export const api = {
         : []
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
-      const corRelationIds =
-        coresIds.length > 0 ? coresIds : await resolveCorIdsFromNames(corNames)
-      const caracteristicaRelationIds =
-        caracteristicaIds.length > 0
-          ? caracteristicaIds
-          : await resolveCaracteristicaIdsFromNames(caracteristicaNames)
-      const supabasePayload = buildMaterialSupabasePayload(dados, {
-        usuario,
-        agora,
-        includeCreateAudit: true,
-        includeUpdateAudit: true,
-      })
+      // Monta payload final com UUIDs resolvidos e auditoria de criação
+      const supabasePayload = {
+        nome: dados.nome,
+        fabricante: dados.fabricante,
+        validadeDias: dados.validadeDias ?? null,
+        ca: dados.ca ?? '',
+        valorUnitario: dados.valorUnitario ?? 0,
+        estoqueMinimo: dados.estoqueMinimo ?? 0,
+        ativo: dados.ativo ?? true,
+        descricao: dados.descricao ?? '',
+        grupoMaterial: dados.grupoMaterial ?? null,
+        numeroCalcado: dados.numeroCalcado ?? null,
+        numeroVestimenta: dados.numeroVestimenta ?? null,
+        numeroEspecifico: dados.numeroEspecifico ?? '',
+        usuarioCadastro: usuario,
+        usuarioAtualizacao: usuario,
+        dataCadastro: agora,
+        atualizadoEm: agora,
+      }
 
       let materialCriadoId
       try {
@@ -2258,12 +2146,12 @@ export const api = {
           throw new Error('Falha ao criar material.')
         }
 
-        await insereCores(materialCriadoId, corRelationIds, corNames)
-        await insereCaracteristicas(
-          materialCriadoId,
-          caracteristicaRelationIds,
+        await syncMaterialRelations(materialCriadoId, {
+          corIds: coresIds,
+          corNames,
+          caracteristicaIds,
           caracteristicaNames,
-        )
+        })
       } catch (error) {
         if (materialCriadoId) {
           try {
@@ -2372,34 +2260,44 @@ export const api = {
       const caracteristicaIds = Array.isArray(dadosSanitizados.caracteristicasIds)
         ? dadosSanitizados.caracteristicasIds
         : []
-      const corNames = extractTextualNames(dados.cores)
-      const caracteristicaNames = extractTextualNames(dados.caracteristicas)
-      const corRelationIds =
-        coresIds.length > 0 ? coresIds : await resolveCorIdsFromNames(corNames)
-      const caracteristicaRelationIds =
-        caracteristicaIds.length > 0
-          ? caracteristicaIds
-          : await resolveCaracteristicaIdsFromNames(caracteristicaNames)
-      const supabasePayload = buildMaterialSupabasePayload(dados, {
-        usuario,
-        agora,
-        includeUpdateAudit: true,
+      const corNames = extractTextualNames(dadosSanitizados.cores)
+      const caracteristicaNames = extractTextualNames(dadosSanitizados.caracteristicas)
+      // Persistimos apenas os IDs normalizados e os campos auditáveis
+      const supabasePayload = {
+        nome: dadosSanitizados.nome,
+        fabricante: dadosSanitizados.fabricante,
+        validadeDias: dadosSanitizados.validadeDias ?? null,
+        ca: dadosSanitizados.ca ?? '',
+        valorUnitario: dadosSanitizados.valorUnitario ?? 0,
+        estoqueMinimo: dadosSanitizados.estoqueMinimo ?? 0,
+        ativo: dadosSanitizados.ativo ?? true,
+        descricao: dadosSanitizados.descricao ?? '',
+        grupoMaterial:
+          dadosSanitizados.grupoMaterial ??
+          materialAtual.grupoMaterialId ??
+          materialAtual.grupoMaterial ??
+          null,
+        numeroCalcado: dadosSanitizados.numeroCalcado ?? null,
+        numeroVestimenta: dadosSanitizados.numeroVestimenta ?? null,
+        numeroEspecifico: dadosSanitizados.numeroEspecifico ?? '',
+        usuarioAtualizacao: usuario,
+        atualizadoEm: agora,
+      }
+
+      await syncMaterialRelations(id, {
+        corIds: coresIds,
+        corNames,
+        caracteristicaIds,
+        caracteristicaNames,
       })
 
-      await execute(
-        supabase.from('materiais').update(supabasePayload).eq('id', id),
-        'Falha ao atualizar material.'
-      )
-      await insereCores(id, corRelationIds, corNames)
-      await insereCaracteristicas(id, caracteristicaRelationIds, caracteristicaNames)
-      const registro = await executeSingle(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', id),
-        'Falha ao obter material atualizado.'
-      )
-      return mapMaterialRecord(registro)
+      const atualizado = await getMaterialById(id, {
+        errorMessage: 'Falha ao obter material atualizado.',
+      })
+      if (!atualizado) {
+        throw new Error('Falha ao obter material atualizado.')
+      }
+      return atualizado
     },
     async get(id) {
       const registro = await getMaterialById(id)
@@ -3162,10 +3060,26 @@ async dashboard(params = {}) {
   },
 }
 
-async function resolveReferenceId(table, value, errorMessage) {
-  const nome = trim(value)
-  if (!nome) {
-    throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
+
+
+const normalizeReferenceLookupKey = (valor) => {
+  const texto = resolveTextValue(valor)
+  if (!texto) {
+    return ''
+  }
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+const buildReferenceCacheKey = (tabela, colunaTexto, colunaId, tipo, valor) =>
+  [tabela || '', colunaTexto || '', colunaId || '', tipo || '', valor || ''].join('::')
+
+const extractReferenceInput = (valor, colunaTexto, colunaId) => {
+  if (valor === undefined || valor === null) {
+    return { id: null, nome: '' }
   }
 
   const registro = unwrapOptionRecord(valor)

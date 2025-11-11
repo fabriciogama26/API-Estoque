@@ -1,0 +1,105 @@
+Vestimentas:
+
+Camisa manga longa
+
+Camisa manga curta
+
+Calça de brim
+
+Jaleco hospitalar
+
+Avental PVC
+
+Macacão de proteção química
+
+Capote descartável
+
+Touca descartável
+
+Avental de chumbo (radiologia)
+
+Colete refletivo
+
+Capa de chuva
+
+Colete salva-vidas
+
+Calçados:
+
+Botina de segurança bico plástico
+
+Botina de segurança bico de aço
+
+Sapato hospitalar fechado
+
+Tênis antiderrapante
+
+Bota de borracha cano longo
+
+Bota de PVC
+
+Proteção das Mãos:
+
+Luva de vaqueta
+
+Luva nitrílica
+
+Luva de látex
+
+Luva térmica
+
+Luva de raspa
+
+Luva de procedimento
+
+Luva descartável
+
+Proteção da Cabeça e Face:
+
+Capacete de segurança
+
+Protetor facial
+
+Óculos de segurança incolor
+
+Óculos de segurança fumê
+
+Máscara facial
+
+Máscara cirúrgica
+
+Máscara com filtro
+
+Escudo facial
+
+Proteção Auditiva:
+
+Protetor auricular tipo plug
+
+Protetor auricular tipo concha
+
+Proteção Respiratória:
+
+Respirador semifacial
+
+Respirador purificador de ar
+
+Máscara de carvão ativado
+
+Proteção contra Quedas:
+
+Cinto de segurança tipo paraquedista
+
+Talabarte com absorvedor de energia
+
+Trava quedas
+
+Cordas de ancoragem
+
+Outros:
+
+Creme protetor solar
+
+Creme de proteção dérmica
+
+Protetor de nuca
