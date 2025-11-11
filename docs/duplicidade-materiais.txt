@@ -1,0 +1,28 @@
+Duplicidade de Materiais
+========================
+
+1. **Objetivo**
+   - Nenhum material deve ser repetido no banco com a mesma combinação de `fabricante`, `grupoMaterial`, `numeroEspecifico`, `valorUnitario`, `ca`, `cores` e `características`.
+   - O backend agora valida essa unicidade no nível do banco para não depender só do frontend.
+
+2. **View `materiais_unicos_view`**
+   - Agrega cada material com as cores e características ordenadas.
+   - Calcula `hash_unico = md5(lower(concat_ws('|', fabricante, grupoMaterial, numeroEspecifico, valorUnitario, ca, cores_string, caracteristicas_string)))`.
+   - Serve como base para comparar combinações completas.
+
+3. **Função `material_hash_completo(material_id uuid)`**
+   - Regera o mesmo hash usado pela view para um `material_id` específico (inclui cores/características e campos numéricos).
+
+4. **Função `evitar_duplicidade_material()` + trigger**
+   - Trigger `BEFORE INSERT OR UPDATE` em `public.materiais` chama a função.
+   - A função busca o hash do material em `materiais_unicos_view`; se outro `id` possuir o mesmo `hash_unico`, dispara `RAISE EXCEPTION 'Material duplicado...'`.
+   - Essa exceção aborta o insert/update antes de salvar.
+
+5. **Triggers auxiliares em `material_grupo_cor` e `material_grupo_caracteristica_epi`**
+   - Após inserir/atualizar/excluir cores ou características, reexecuta `evitar_duplicidade_material()` para o `material_id` afetado.
+   - Mantém a validação mesmo quando as relações são alteradas depois da linha principal.
+
+6. **Testes**
+   - Crie um material e outro com os mesmos campos + cores + características → o segundo insert deve falhar com `Material duplicado...`.
+   - Tente editar cores/características de um material já existente para igualar outro → o update deve ser barrado.
+   - Materiais diferentes (ex: CA ou valor/cores divergentes) continuam passando.

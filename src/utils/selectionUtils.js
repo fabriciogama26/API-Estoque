@@ -60,10 +60,15 @@ export const normalizeSelectionList = (lista) => {
     .filter(Boolean)
     .reduce((acc, item) => {
       const exists = acc.some((existente) => {
-        if (existente.id && item.id) {
-          return existente.id === item.id
-        }
-        return normalizeSelectionKey(existente.nome) === normalizeSelectionKey(item.nome)
+        const sameId =
+          existente.id &&
+          item.id &&
+          String(existente.id).trim() &&
+          String(item.id).trim() &&
+          existente.id === item.id
+        const sameName =
+          normalizeSelectionKey(existente.nome) === normalizeSelectionKey(item.nome)
+        return sameId || sameName
       })
       if (!exists) {
         acc.push({ id: item.id ?? item.nome, nome: item.nome })

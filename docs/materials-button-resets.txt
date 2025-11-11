@@ -1,0 +1,16 @@
+Materiais Buttons Reset
+=======================
+
+Status/Context:
+- `handleSubmit` (src/pages/Materiais.jsx) is now a stub that only prevents default submission, clears errors, and toggles `isSaving` without calling any backend service.
+- `startEdit` in the same file is also an empty stub so the edit button no longer pre-populates or triggers logic.
+- No “Salvar material”, “Salvar alterações” or history updates execute anywhere in the app while this reset is in place.
+- Validation helpers (`validateMaterialForm`, payload builders) remain untouched and available for when the flows are rebuilt.
+
+Touch points zeroed:
+- `src/pages/Materiais.jsx`: reset submit handler + editor stub.
+- `src/components/Materiais/MateriaisForm.jsx`: left buttons/UI intact but now no backend wiring occurs.
+- `api/services/api.js`: no changes were made here during the reset, so the insert/update service remains ready for later reactivation.
+
+Next steps:
+- Reintroduce the desired flow once the cached `nome` value is understood and we are ready to call the sanitized backend again.
