@@ -184,133 +184,15 @@ const normalizeHistoryValue = (value) => {
     return ''
   }
   if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (item === null || item === undefined) {
-          return ''
-        }
-        if (typeof item === 'object') {
-          try {
-            return JSON.stringify(item)
-          } catch (error) {
-            console.warn('Falha ao serializar valor de histórico.', error)
-            return ''
-          }
-        }
-        return item.toString().trim()
-      })
-      .filter(Boolean)
-      .join(', ')
+    return value.map((item) => ((item ?? '').toString().trim())).filter(Boolean).join(', ')
   }
   if (value instanceof Date) {
     return value.toISOString()
-  }
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value)
-    } catch (error) {
-      console.warn('Falha ao serializar valor de histórico.', error)
-      return ''
-    }
   }
   if (typeof value === 'number' && Number.isNaN(value)) {
     return ''
   }
   return value.toString().trim()
-}
-
-function selectMaterialHistoryFields(material = {}) {
-  if (!material) {
-    return {}
-  }
-
-  const caracteristicaNome =
-    material.caracteristicaNome ??
-    material.caracteristicaEpi ??
-    material.caracteristicasTexto ??
-    (Array.isArray(material.caracteristicas)
-      ? extractTextualNames(material.caracteristicas).join('; ')
-      : '')
-
-  const corNome =
-    material.corNome ??
-    material.corMaterial ??
-    material.coresTexto ??
-    (Array.isArray(material.cores)
-      ? extractTextualNames(material.cores).join('; ')
-      : '')
-
-  const grupoMaterialValue =
-    material.grupoMaterial ??
-    material.grupoMaterialNome ??
-    material.grupo_material ??
-    ''
-
-  const grupoMaterialNomeValue =
-    material.grupoMaterialNome ??
-    material.grupoMaterial ??
-    material.grupo_material_nome ??
-    ''
-
-  const numeroCalcadoValue =
-    material.numeroCalcado ??
-    material.numeroCalcadoId ??
-    material.numero_calcado ??
-    null
-
-  const numeroVestimentaValue =
-    material.numeroVestimenta ??
-    material.numeroVestimentaId ??
-    material.numero_vestimenta ??
-    null
-
-  return {
-    materialItemNome:
-      material.materialItemNome ??
-      material.nomeItemRelacionado ??
-      material.nome ??
-      '',
-    fabricanteNome: material.fabricanteNome ?? material.fabricante ?? '',
-    validadeDias: material.validadeDias ?? null,
-    ca: material.ca ?? '',
-    valorUnitario: material.valorUnitario ?? null,
-    estoqueMinimo: material.estoqueMinimo ?? null,
-    ativo: material.ativo ?? true,
-    descricao: material.descricao ?? '',
-    grupoMaterial: grupoMaterialValue,
-    grupoMaterialNome: grupoMaterialNomeValue,
-    numeroCalcado: numeroCalcadoValue,
-    numeroVestimenta: numeroVestimentaValue,
-    numeroEspecifico: material.numeroEspecifico ?? '',
-    caracteristicaNome,
-    corNome,
-  }
-}
-
-function buildHistoryChanges(prev, next) {
-  if (!prev || !next) {
-    return null
-  }
-
-  const campos = new Set([
-    ...Object.keys(prev ?? {}),
-    ...Object.keys(next ?? {}),
-  ])
-  const diff = []
-
-  campos.forEach((campo) => {
-    const valorAtual = normalizeHistoryValue(prev?.[campo])
-    const valorNovo = normalizeHistoryValue(next?.[campo])
-    if (valorAtual !== valorNovo) {
-      diff.push({
-        campo,
-        de: valorAtual,
-        para: valorNovo,
-      })
-    }
-  })
-
-  return diff.length > 0 ? diff : null
 }
 
 const normalizePessoaHistorico = (lista) => {
@@ -1171,6 +1053,38 @@ async function insereCaracteristicas(materialId, caracteristicaIds, caracteristi
   )
 }
 
+function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
+  const nomePersist = dados.nome || ''
+  const fabricantePersist = dados.fabricante || ''
+  const grupoMaterialPersist = dados.grupoMaterialId || dados.grupoMaterial || ''
+  const payload = {
+    nome: nomePersist,
+    fabricante: fabricantePersist,
+    validadeDias: dados.validadeDias ?? null,
+    ca: dados.ca ?? '',
+    valorUnitario: dados.valorUnitario ?? 0,
+    estoqueMinimo: dados.estoqueMinimo ?? 0,
+    ativo: dados.ativo ?? true,
+    descricao: dados.descricao ?? '',
+    grupoMaterial: grupoMaterialPersist,
+    numeroCalcado: dados.numeroCalcado || null,
+    numeroVestimenta: dados.numeroVestimenta || null,
+    numeroEspecifico: dados.numeroEspecifico ?? '',
+  }
+
+  if (includeCreateAudit) {
+    payload.usuarioCadastro = usuario ?? ''
+    payload.dataCadastro = agora ?? new Date().toISOString()
+  }
+
+  if (includeUpdateAudit) {
+    payload.usuarioAtualizacao = usuario ?? ''
+    payload.atualizadoEm = agora ?? new Date().toISOString()
+  }
+
+  return payload
+}
+
 async function resolveUsuarioResponsavel() {
   ensureSupabase()
   const { data } = await supabase.auth.getSession()
@@ -1423,176 +1337,73 @@ function sanitizePessoaPayload(payload = {}) {
   }
 }
 
-const RESOLVE_REF_ERROR = 'Falha ao resolver referência de material.'
-
-// Cache simples para evitar SELECTs repetidos ao resolver chaves estrangeiras
-const resolveReferenciaCache = new Map()
-
-// Consulta genericamente uma tabela de apoio pelo texto fornecido e retorna { id, nome }
-async function resolveReferencia(valorTexto, tabela, colunaTexto = 'nome', colunaId = 'id') {
-  const nome = trim(valorTexto)
-  if (!nome) {
-    return { id: null, nome: '' }
-  }
-
-  const cacheKey = [tabela, colunaTexto, colunaId, nome.toLowerCase()].join('|')
-  if (resolveReferenciaCache.has(cacheKey)) {
-    return resolveReferenciaCache.get(cacheKey)
-  }
-
-  const pattern = nome.includes('%') ? nome : `%${nome.replace(/\s+/g, '%')}%`
-  const registros = await execute(
-    supabase
-      .from(tabela)
-      .select(`${colunaId}, ${colunaTexto}`)
-      .ilike(colunaTexto, pattern)
-      .limit(1),
-    RESOLVE_REF_ERROR,
-  )
-
-  const registro = Array.isArray(registros) ? registros[0] : null
-  const resolved = registro
-    ? {
-        id: registro[colunaId] ?? null,
-        nome: trim(registro[colunaTexto] ?? nome) || nome,
-      }
-    : { id: null, nome }
-
-  resolveReferenciaCache.set(cacheKey, resolved)
-  return resolved
-}
-
-resolveReferencia.cache = resolveReferenciaCache
-
-// Resolve em lote as referências declaradas no mapeamento (campo -> tabela)
-async function resolveRefs(payload, mappings) {
-  const resolved = {}
-  const entries = Object.entries(mappings || {})
-
-  await Promise.all(
-    entries.map(async ([campo, config]) => {
-      const { tabela, colunaTexto = 'nome', colunaId = 'id' } = config || {}
-      if (!tabela) {
-        resolved[campo] = { id: null, nome: '' }
-        return
-      }
-
-      const valor = resolveTextValue(payload?.[campo] ?? '')
-      resolved[campo] = await resolveReferencia(valor, tabela, colunaTexto, colunaId)
-    }),
-  )
-
-  return resolved
-}
-
-// Gera um diff JSON com apenas os campos alterados entre dois objetos
-function buildHistoryChanges(antes = {}, depois = {}) {
-  const prev = antes ?? {}
-  const next = depois ?? {}
-  const diff = {}
-  const campos = new Set([...Object.keys(prev), ...Object.keys(next)])
-
-  for (const campo of campos) {
-    const valorAnterior = prev[campo]
-    const valorNovo = next[campo]
-    if (normalizeHistoryValue(valorAnterior) !== normalizeHistoryValue(valorNovo)) {
-      diff[campo] = {
-        de: valorAnterior ?? null,
-        para: valorNovo ?? null,
-      }
-    }
-  }
-
-  return Object.keys(diff).length ? diff : null
-}
-
-// Normaliza o payload de materiais, garantindo UUIDs válidos e rótulos legíveis
-async function sanitizeMaterialPayload(payload = {}) {
-  const caracteristicas = normalizeOptionList(
+function sanitizeMaterialPayload(payload = {}) {
+  const grupoMaterialId = trim(payload.grupoMaterialId ?? payload.grupo_material_id ?? '')
+  const grupoMaterialNome =
+    trim(
+      payload.grupoMaterialNome ??
+        payload.grupo_material_nome ??
+        payload.grupoMaterial ??
+        payload.grupo_material ??
+        '',
+    ) || ''
+  const grupoMaterial = grupoMaterialNome
+  const numeroCalcado = trim(payload.numeroCalcado ?? payload.numero_calcado ?? '')
+  const numeroVestimenta = trim(payload.numeroVestimenta ?? payload.numero_vestimenta ?? '')
+  const nomeDisplayId = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
+  const nomeEpi =
+    trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? payload.nome ?? '') || ''
+  const materialItemNome =
+    nomeEpi || trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
+  const fabricanteId = normalizeRelationId(payload.fabricante ?? payload.fabricante_id ?? '')
+  const nomeId = normalizeRelationId(nomeDisplayId)
+  const fabricanteNome =
+    trim(payload.fabricanteNome ?? payload.fabricante ?? payload.fabricante_nome ?? '') || ''
+  const caracteristicasSelecionadas = normalizeOptionList(
     payload.caracteristicas ??
       payload.caracteristicasSelecionadas ??
       payload.caracteristicasEpi ??
       payload.caracteristicaEpi ??
       payload.caracteristica_epi ??
       payload.caracteristicas_epi ??
-      [],
+      []
   )
-
-  const cores = normalizeOptionList(
+  const caracteristicaEpi = formatCaracteristicaTexto(
+    caracteristicasSelecionadas.length
+      ? caracteristicasSelecionadas.map((item) => item.nome)
+      : payload.caracteristicaEpi ?? payload.caracteristica_epi ?? '',
+  )
+  const coresSelecionadas = normalizeOptionList(
     payload.cores ??
       payload.coresSelecionadas ??
       payload.coresIds ??
       payload.corMaterial ??
       payload.cor_material ??
       payload.cor ??
-      [],
+      []
   )
-
-  const referenceInputs = {
-    nome:
-      payload.materialItemNome ??
-      payload.nomeItemRelacionado ??
-      payload.nome ??
-      payload.nomeId ??
-      '',
-    fabricante: payload.fabricanteNome ?? payload.fabricante ?? payload.fabricante_nome ?? '',
-    grupoMaterial:
-      payload.grupoMaterialNome ??
-      payload.grupo_material_nome ??
-      payload.grupoMaterial ??
-      payload.grupo_material ??
-      '',
-    numeroCalcado: payload.numeroCalcadoNome ?? payload.numeroCalcado ?? payload.numero_calcado ?? '',
-    numeroVestimenta:
-      payload.numeroVestimentaNome ?? payload.numeroVestimenta ?? payload.numero_vestimenta ?? '',
-  }
-
-  const refs = await resolveRefs(referenceInputs, {
-    nome: { tabela: 'materiais_view', colunaTexto: 'materialItemNome', colunaId: 'nome' },
-    fabricante: { tabela: 'fabricante_view' },
-    grupoMaterial: { tabela: 'grupos_material' },
-    numeroCalcado: { tabela: 'medidas_calcado', colunaTexto: 'numero_calcado' },
-    numeroVestimenta: { tabela: 'medidas_vestimenta', colunaTexto: 'numero_vestimenta' },
-  })
-
-  const validadeDias = toNullableNumber(payload.validadeDias ?? payload.validade_dias)
-  const valorUnitario = toNumber(payload.valorUnitario ?? payload.valor_unitario ?? 0)
-  const estoqueMinimo = toNumber(payload.estoqueMinimo ?? payload.estoque_minimo ?? 0)
-  const ca = trim(payload.ca ?? '').replace(/\D/g, '')
-  const numeroEspecifico = trim(payload.numeroEspecifico ?? payload.numero_especifico ?? '')
-  const descricao = trim(payload.descricao ?? '')
-
-  const caracteristicaTexto =
-    caracteristicas.length > 0
-      ? caracteristicas.map((item) => item.nome).join('; ')
-      : formatCaracteristicaTexto(payload.caracteristicaEpi ?? payload.caracteristica_epi ?? '')
-
   const corMaterialTexto =
-    cores.length > 0
-      ? cores.map((item) => item.nome).join('; ')
+    coresSelecionadas.length
+      ? coresSelecionadas.map((item) => item.nome).join('; ')
       : trim(payload.corMaterial ?? payload.cor_material ?? '')
-
+  const numeroEspecifico = trim(payload.numeroEspecifico ?? payload.numero_especifico ?? '')
   return {
-    ...payload,
-    nome: refs.nome.id ?? '',
-    nomeId: refs.nome.id ?? '',
-    nomeItemRelacionado: refs.nome.nome,
-    materialItemNome: refs.nome.nome,
-    fabricante: refs.fabricante.id ?? '',
-    fabricanteNome: refs.fabricante.nome,
-    validadeDias,
-    ca,
-    valorUnitario,
-    estoqueMinimo,
+    nome: nomeId || '',
+    nomeItemRelacionado: materialItemNome || nomeEpi,
+    materialItemNome: materialItemNome || nomeEpi,
+    fabricante: fabricanteId ?? '',
+    fabricanteNome,
+    validadeDias: toNullableNumber(payload.validadeDias ?? payload.validade_dias),
+    ca: trim(payload.ca ?? ''),
+    valorUnitario: toNumber(payload.valorUnitario ?? payload.valor_unitario ?? 0),
+    estoqueMinimo: toNumber(payload.estoqueMinimo ?? payload.estoque_minimo ?? 0),
     ativo: payload.ativo ?? true,
-    descricao,
-    grupoMaterial: refs.grupoMaterial.id ?? null,
-    grupoMaterialId: refs.grupoMaterial.id ?? null,
-    grupoMaterialNome: refs.grupoMaterial.nome,
-    numeroCalcado: refs.numeroCalcado.id ?? null,
-    numeroCalcadoNome: refs.numeroCalcado.nome,
-    numeroVestimenta: refs.numeroVestimenta.id ?? null,
-    numeroVestimentaNome: refs.numeroVestimenta.nome,
+    descricao: trim(payload.descricao ?? ''),
+    grupoMaterial,
+    grupoMaterialNome,
+    grupoMaterialId: normalizeRelationId(grupoMaterialId),
+    numeroCalcado,
+    numeroVestimenta,
     numeroEspecifico,
     caracteristicaEpi,
     caracteristicas: caracteristicasSelecionadas,
@@ -1654,29 +1465,6 @@ async function carregarMateriaisDetalhados() {
     'Falha ao listar materiais.'
   )
   return (data ?? []).map(mapMaterialRecord)
-}
-
-async function getMaterialById(id, { errorMessage = 'Falha ao obter material.' } = {}) {
-  if (!id) {
-    return null
-  }
-
-  ensureSupabase()
-  const { data, error } = await supabase
-    .from('materiais_view')
-    .select(MATERIAL_SELECT_COLUMNS)
-    .eq('id', id)
-    .maybeSingle()
-
-  if (error) {
-    throw mapSupabaseError(error, errorMessage)
-  }
-
-  if (!data) {
-    return null
-  }
-
-  return mapMaterialRecord(data)
 }
 
 async function carregarPessoas() {
@@ -2109,28 +1897,26 @@ export const api = {
         return date.toISOString()
       }
 
-      const camposAtuais = {
-        nome: resolveTextValue(atual.nome ?? ''),
-        matricula: resolveTextValue(atual.matricula ?? ''),
-        centroServico: resolveTextValue(atual.centroServico ?? ''),
-        setor: resolveTextValue(atual.setor ?? ''),
-        cargo: resolveTextValue(atual.cargo ?? ''),
-        tipoExecucao: resolveTextValue(atual.tipoExecucao ?? ''),
-        dataAdmissao: normalizeDateValue(atual.dataAdmissao),
-      }
-      const camposNovos = {
-        nome: resolveTextValue(dados.nome ?? ''),
-        matricula: resolveTextValue(dados.matricula ?? ''),
-        centroServico: resolveTextValue(dados.centroServico ?? ''),
-        setor: resolveTextValue(dados.setor ?? ''),
-        cargo: resolveTextValue(dados.cargo ?? ''),
-        tipoExecucao: resolveTextValue(dados.tipoExecucao ?? ''),
-        dataAdmissao: normalizeDateValue(dados.dataAdmissao),
-      }
+      const camposAlterados = []
+      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
+        const valorAtual =
+          campo === 'dataAdmissao'
+            ? normalizeDateValue(atual.dataAdmissao)
+            : resolveTextValue(atual[campo] ?? '')
+        const valorNovo =
+          campo === 'dataAdmissao'
+            ? normalizeDateValue(dados.dataAdmissao)
+            : resolveTextValue(dados[campo] ?? '')
+        if (valorAtual !== valorNovo) {
+          camposAlterados.push({
+            campo,
+            de: valorAtual ?? '',
+            para: valorNovo ?? '',
+          })
+        }
+      })
 
-      const camposAlterados = buildHistoryChanges(camposAtuais, camposNovos)
-
-      if (camposAlterados) {
+      if (camposAlterados.length > 0) {
         await execute(
           supabase
             .from('pessoas_historico')
@@ -2221,7 +2007,7 @@ export const api = {
       return carregarMateriaisDetalhados()
     },
     async create(payload) {
-      const dados = await sanitizeMaterialPayload(payload)
+      const dados = sanitizeMaterialPayload(payload)
       if (!dados.nome || !dados.fabricante || !dados.validadeDias || dados.validadeDias <= 0) {
         throw new Error('Preencha nome, fabricante e validade (em dias).')
       }
@@ -2235,11 +2021,11 @@ export const api = {
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const corRelationIds =
-        coresIds.length > 0 ? coresIds : await resolveCorIdsFromNames(corNames)
+        corNames.length > 0 ? await resolveCorIdsFromNames(corNames) : coresIds
       const caracteristicaRelationIds =
-        caracteristicaIds.length > 0
-          ? caracteristicaIds
-          : await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+        caracteristicaNames.length > 0
+          ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+          : caracteristicaIds
       const supabasePayload = buildMaterialSupabasePayload(dados, {
         usuario,
         agora,
@@ -2294,62 +2080,45 @@ export const api = {
       if (!id) {
         throw new Error('Material inválido.')
       }
-      const atual = await getMaterialById(id, { errorMessage: 'Falha ao localizar material.' })
-      if (!atual) {
+      const atualLista = await execute(
+        supabase
+          .from('materiais_view')
+          .select(MATERIAL_SELECT_COLUMNS)
+          .eq('id', id)
+          .limit(1),
+        'Falha ao localizar material.'
+      )
+      const registroAtual = Array.isArray(atualLista) ? atualLista[0] : null
+      if (!registroAtual) {
         throw new Error('Material no encontrado.')
       }
 
       const materialAtual = mapMaterialRecord(registroAtual)
-      const dadosSanitizados = await sanitizeMaterialPayload(payload)
+      const dadosCombinados = sanitizeMaterialPayload({ ...materialAtual, ...payload })
       const usuario = await resolveUsuarioResponsavel()
       const agora = new Date().toISOString()
-      // Calcula diferenças entre o registro atual e o payload sanitizado
-      const diff = buildHistoryChanges(
-        {
-          materialItemNome: materialAtual.materialItemNome,
-          fabricanteNome: materialAtual.fabricanteNome,
-          validadeDias: materialAtual.validadeDias,
-          ca: materialAtual.ca,
-          valorUnitario: materialAtual.valorUnitario,
-          estoqueMinimo: materialAtual.estoqueMinimo,
-          ativo: materialAtual.ativo,
-          descricao: materialAtual.descricao,
-          grupoMaterialNome: materialAtual.grupoMaterialNome,
-          numeroCalcadoNome: materialAtual.numeroCalcadoNome,
-          numeroVestimentaNome: materialAtual.numeroVestimentaNome,
-          numeroEspecifico: materialAtual.numeroEspecifico,
-          caracteristicaEpi: materialAtual.caracteristicaEpi,
-          corMaterial: materialAtual.corMaterial,
-        },
-        {
-          materialItemNome: dadosSanitizados.materialItemNome,
-          fabricanteNome: dadosSanitizados.fabricanteNome,
-          validadeDias: dadosSanitizados.validadeDias,
-          ca: dadosSanitizados.ca,
-          valorUnitario: dadosSanitizados.valorUnitario,
-          estoqueMinimo: dadosSanitizados.estoqueMinimo,
-          ativo: dadosSanitizados.ativo,
-          descricao: dadosSanitizados.descricao,
-          grupoMaterialNome: dadosSanitizados.grupoMaterialNome,
-          numeroCalcadoNome: dadosSanitizados.numeroCalcadoNome,
-          numeroVestimentaNome: dadosSanitizados.numeroVestimentaNome,
-          numeroEspecifico: dadosSanitizados.numeroEspecifico,
-          caracteristicaEpi: dadosSanitizados.caracteristicaEpi,
-          corMaterial: dadosSanitizados.corMaterial,
-        },
-      )
-
-      if (diff) {
+      const camposAlterados = []
+      MATERIAL_HISTORY_FIELDS.forEach((campo) => {
+        const valorAtual = normalizeHistoryValue(materialAtual?.[campo])
+        const valorNovo = normalizeHistoryValue(dadosCombinados?.[campo])
+        if (valorAtual !== valorNovo) {
+          camposAlterados.push({
+            campo,
+            de: materialAtual?.[campo] ?? '',
+            para: dadosCombinados?.[campo] ?? '',
+          })
+        }
+      })
+      if (camposAlterados.length > 0) {
         ensureSupabase()
         const { error: historicoErro } = await supabase
           .from('material_price_history')
           .insert({
             materialId: id,
-            valorUnitario: dadosSanitizados.valorUnitario,
+            valorUnitario: dadosCombinados.valorUnitario,
             usuarioResponsavel: usuario,
-            campos_alterados: diff,
             criadoEm: agora,
-            campos_alterados: diff,
+            campos_alterados: camposAlterados,
           })
         if (historicoErro) {
           const mensagemErro = historicoErro.message?.toLowerCase?.() ?? ''
@@ -2368,18 +2137,19 @@ export const api = {
           }
         }
       }
-      const coresIds = Array.isArray(dadosSanitizados.coresIds) ? dadosSanitizados.coresIds : []
-      const caracteristicaIds = Array.isArray(dadosSanitizados.caracteristicasIds)
-        ? dadosSanitizados.caracteristicasIds
+      const dados = sanitizeMaterialPayload(payload)
+      const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
+      const caracteristicaIds = Array.isArray(dados.caracteristicasIds)
+        ? dados.caracteristicasIds
         : []
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const corRelationIds =
-        coresIds.length > 0 ? coresIds : await resolveCorIdsFromNames(corNames)
+        corNames.length > 0 ? await resolveCorIdsFromNames(corNames) : coresIds
       const caracteristicaRelationIds =
-        caracteristicaIds.length > 0
-          ? caracteristicaIds
-          : await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+        caracteristicaNames.length > 0
+          ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+          : caracteristicaIds
       const supabasePayload = buildMaterialSupabasePayload(dados, {
         usuario,
         agora,
@@ -2402,11 +2172,14 @@ export const api = {
       return mapMaterialRecord(registro)
     },
     async get(id) {
-      const registro = await getMaterialById(id)
-      if (!registro) {
-        throw new Error('Material no encontrado.')
-      }
-      return registro
+      const registro = await executeSingle(
+        supabase
+          .from('materiais_view')
+          .select(MATERIAL_SELECT_COLUMNS)
+          .eq('id', id),
+        'Falha ao obter material.'
+      )
+      return mapMaterialRecord(registro)
     },
     async priceHistory(id) {
       const data = await execute(
@@ -2997,14 +2770,21 @@ export const api = {
         cat: dados.cat,
         observacao: dados.observacao,
       }
-      const camposAntigos = ACIDENTE_HISTORY_FIELDS.reduce((acc, campo) => {
-        acc[campo] = antigo?.[campo]
-        return acc
-      }, {})
-      const camposAlterados = buildHistoryChanges(camposAntigos, novoComparacao)
+      const camposAlterados = []
+      ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
+        const valorAtual = normalizeHistoryValue(antigo[campo])
+        const valorNovo = normalizeHistoryValue(novoComparacao[campo])
+        if (valorAtual !== valorNovo) {
+          camposAlterados.push({
+            campo,
+            de: valorAtual,
+            para: valorNovo,
+          })
+        }
+      })
       const agora = new Date().toISOString()
       const historicoRegistro =
-        Array.isArray(camposAlterados) && camposAlterados.length > 0
+        camposAlterados.length > 0
           ? {
               acidente_id: id,
               data_edicao: agora,
@@ -3168,218 +2948,14 @@ async function resolveReferenceId(table, value, errorMessage) {
     throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
   }
 
-  const registro = unwrapOptionRecord(valor)
-  if (registro && typeof registro === 'object' && !Array.isArray(registro)) {
-    const idCandidates = [colunaId, 'id', 'uuid', 'value', 'valor', 'codigo', 'code']
-    let id = null
-    for (const candidate of idCandidates) {
-      if (!candidate) {
-        continue
-      }
-      id = normalizeOptionId(registro[candidate])
-      if (id) {
-        break
-      }
-    }
-
-    const textoCandidates = [
-      registro[colunaTexto],
-      registro.nome,
-      registro.label,
-      registro.descricao,
-      registro.valor,
-      registro.value,
-    ]
-
-    let nome = ''
-    for (const candidate of textoCandidates) {
-      const texto = resolveTextValue(candidate)
-      if (texto) {
-        nome = texto
-        break
-      }
-    }
-
-    if (!nome) {
-      nome = resolveTextValue(valor)
-    }
-
-    if (id || nome) {
-      return { id: id || null, nome }
-    }
-  }
-
-  const idDireto = normalizeOptionId(valor)
-  const nomeDireto = resolveTextValue(valor)
-  return { id: idDireto || null, nome: nomeDireto }
-}
-
-const resolveReferencia = async (valorTexto, tabela, colunaTexto = 'nome', colunaId = 'id') => {
-  const tableName = trim(tabela)
-  if (!tableName) {
-    return null
-  }
-
-  const { id: inputId, nome: inputNome } = extractReferenceInput(valorTexto, colunaTexto, colunaId)
-  const normalizedText = normalizeReferenceLookupKey(inputNome)
-
-  const cache = resolveReferencia.cache || (resolveReferencia.cache = new Map())
-  const idKey = inputId
-    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'id', inputId)
-    : null
-  const textKey = normalizedText
-    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'text', normalizedText)
-    : null
-
-  const cachedKeys = [idKey, textKey].filter(Boolean)
-  for (const key of cachedKeys) {
-    if (cache.has(key)) {
-      return cache.get(key)
-    }
-  }
-
-  if (!inputId && !normalizedText) {
-    return null
-  }
-
-  const selectFields = [colunaId, colunaTexto].filter(Boolean)
-  const selectColumns = selectFields.length > 0 ? selectFields.join(', ') : '*'
-  const fallbackMessage = `Falha ao consultar ${tableName}.`
-  const pickFirst = (rows) => (Array.isArray(rows) && rows.length ? rows[0] ?? null : null)
-
-  let registro = null
-
-  if (inputId) {
-    const dataPorId = await execute(
-      supabase.from(tableName).select(selectColumns).eq(colunaId, inputId).limit(1),
-      fallbackMessage,
-    )
-    registro = pickFirst(dataPorId)
-  }
-
-  const textoBusca = trim(inputNome)
-  if (!registro && textoBusca) {
-    const dataEq = await execute(
-      supabase.from(tableName).select(selectColumns).eq(colunaTexto, textoBusca).limit(1),
-      fallbackMessage,
-    )
-    registro = pickFirst(dataEq)
-
-    if (!registro) {
-      const dataIlike = await execute(
-        supabase
-          .from(tableName)
-          .select(selectColumns)
-          .ilike(colunaTexto, textoBusca)
-          .order(colunaTexto, { ascending: true })
-          .limit(1),
-        fallbackMessage,
-      )
-      registro = pickFirst(dataIlike)
-    }
-  }
-
-  const resolvedId = normalizeOptionId(registro?.[colunaId] ?? inputId)
-  const resolvedNome = resolveTextValue(
-    registro && colunaTexto ? registro[colunaTexto] : inputNome,
+  const data = await execute(
+    supabase.from(table).select('id').eq('nome', nome).limit(1),
+    'Falha ao consultar ' + table + '.'
   )
 
-  const resultado = resolvedId || resolvedNome ? { id: resolvedId ?? null, nome: resolvedNome || '' } : null
-
-  const resolvedIdKey = resultado?.id
-    ? buildReferenceCacheKey(tableName, colunaTexto, colunaId, 'id', resultado.id)
-    : null
-  const resolvedTextKey = resultado?.nome
-    ? buildReferenceCacheKey(
-        tableName,
-        colunaTexto,
-        colunaId,
-        'text',
-        normalizeReferenceLookupKey(resultado.nome),
-      )
-    : null
-
-  const keysToStore = [idKey, textKey, resolvedIdKey, resolvedTextKey].filter(Boolean)
-  keysToStore.forEach((key) => {
-    cache.set(key, resultado)
-  })
-
-  return resultado
-}
-
-async function resolveRefs(payload, mappings = {}) {
-  if (!payload || typeof payload !== 'object' || !mappings || typeof mappings !== 'object') {
-    return {}
-  }
-
-  const entries = Object.entries(mappings)
-  if (!entries.length) {
-    return {}
-  }
-
-  const resolvedEntries = await Promise.all(
-    entries.map(async ([alias, config]) => {
-      if (!config || typeof config !== 'object') {
-        return null
-      }
-
-      const {
-        tabela,
-        colunaTexto = 'nome',
-        colunaId = 'id',
-        sourceKey,
-        from,
-        field,
-        value: explicitValue,
-      } = config
-
-      if (!tabela) {
-        return { key: alias, value: null }
-      }
-
-      const resolvedSourceKey = field ?? from ?? sourceKey ?? alias
-      const rawValue = explicitValue !== undefined ? explicitValue : payload?.[resolvedSourceKey]
-
-      if (rawValue === undefined || rawValue === null) {
-        return { key: alias, value: null }
-      }
-
-      const { id: existingId, nome: existingNome } = extractReferenceInput(
-        rawValue,
-        colunaTexto,
-        colunaId,
-      )
-      if (!existingId && !existingNome) {
-        return { key: alias, value: null }
-      }
-
-      const referencia = await resolveReferencia(rawValue, tabela, colunaTexto, colunaId)
-      return { key: alias, value: referencia ?? null }
-    }),
-  )
-
-  return resolvedEntries.reduce((acc, entry) => {
-    if (!entry) {
-      return acc
-    }
-    acc[entry.key] = entry.value
-    return acc
-  }, {})
-}
-
-async function resolveReferenceId(table, value, errorMessage) {
-  const { id: entradaId, nome: entradaNome } = extractReferenceInput(value, 'nome', 'id')
-  if (!entradaId && !entradaNome) {
-    throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
-  }
-
-  const referencia = await resolveReferencia(value, table)
-  const id = referencia?.id ?? null
+  const id = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
   if (!id) {
-    const label = entradaNome || entradaId || ''
-    throw new Error(
-      errorMessage ?? (label ? `Valor "${label}" não encontrado.` : 'Valor não encontrado.'),
-    )
+    throw new Error(errorMessage ?? ('Valor "' + nome + '" não encontrado.'))
   }
   return id
 }
@@ -3419,13 +2995,3 @@ async function resolvePessoaReferencias(dados) {
     tipoExecucaoId,
   }
 }
-
-
-export { resolveReferencia, resolveRefs }
-
-
-
-
-
-
-
