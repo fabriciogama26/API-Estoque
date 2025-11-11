@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { EntryIcon } from '../components/icons.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
@@ -19,6 +19,121 @@ const filterInitial = {
   centroCusto: '',
   dataInicio: '',
   dataFim: '',
+}
+
+const MATERIAL_SEARCH_MIN_CHARS = 2
+const MATERIAL_SEARCH_MAX_RESULTS = 10
+const MATERIAL_SEARCH_DEBOUNCE_MS = 250
+
+const normalizeSearchValue = (value) => {
+  if (value === undefined || value === null) {
+    return ''
+  }
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+const materialMatchesTerm = (material, termoNormalizado) => {
+  if (!termoNormalizado) {
+    return true
+  }
+  const campos = [
+    material?.nome,
+    material?.nomeItemRelacionado,
+    material?.materialItemNome,
+    material?.grupoMaterial,
+    material?.grupoMaterialNome,
+    material?.numeroCalcado,
+    material?.numeroVestimenta,
+    material?.numeroEspecifico,
+    material?.fabricante,
+    material?.fabricanteNome,
+    material?.corMaterial,
+    material?.coresTexto,
+    material?.ca,
+    material?.id,
+  ]
+  return campos
+    .map((campo) => normalizeSearchValue(campo))
+    .some((campo) => campo.includes(termoNormalizado))
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const isLikelyUuid = (value) => UUID_PATTERN.test(String(value || '').trim())
+
+const formatMaterialSummary = (material) => {
+  if (!material) {
+    return ''
+  }
+  const nome =
+    [material.materialItemNome, material.nome, material.nomeId, material.id].find(
+      (valor) => valor && !isLikelyUuid(valor),
+    ) || ''
+  const grupo = material.grupoMaterialNome || material.grupoMaterial || ''
+  const detalheCandidates = [
+    material.numeroCalcadoNome,
+    material.numeroCalcado,
+    material.numeroVestimentaNome,
+    material.numeroVestimenta,
+    material.numeroEspecifico,
+    material.ca,
+    material.corMaterial,
+    Array.isArray(material.coresNomes) ? material.coresNomes[0] : '',
+  ]
+  const detalhe = detalheCandidates.find(
+    (valor) => valor && !isLikelyUuid(valor),
+  ) || ''
+  const corDescricao =
+    material.coresTexto ||
+    material.corMaterial ||
+    (Array.isArray(material.coresNomes) ? material.coresNomes.join(', ') : '')
+  const caracteristicaDescricao =
+    material.caracteristicasTexto ||
+    (Array.isArray(material.caracteristicasNomes)
+      ? material.caracteristicasNomes.join(', ')
+      : '')
+  const fabricante =
+    material.fabricanteNome ||
+    (material.fabricante && !isLikelyUuid(material.fabricante) ? material.fabricante : '') ||
+    ''
+  const resumo = [nome, grupo, detalhe, corDescricao, caracteristicaDescricao, fabricante]
+  const vistos = new Set()
+  const partes = resumo.filter((parte) => {
+    const texto = (parte || '').toString().trim()
+    if (!texto) {
+      return false
+    }
+    if (vistos.has(texto.toLowerCase())) {
+      return false
+    }
+    vistos.add(texto.toLowerCase())
+    return true
+  })
+  return partes.join(' | ')
+}
+
+const normalizeCentroCustoOptions = (lista) => {
+  const mapa = new Map()
+  ;(Array.isArray(lista) ? lista : []).forEach((item, index) => {
+    const rawNome = typeof item === 'string' ? item : item?.nome
+    const displayName = (rawNome ?? '').toString().trim()
+    if (!displayName) {
+      return
+    }
+    const id = item?.id ?? displayName
+    const chave = item?.id ?? normalizeSearchValue(displayName)
+    if (!mapa.has(chave)) {
+      mapa.set(chave, {
+        id: id || `centro-${index}`,
+        nome: displayName,
+      })
+    }
+  })
+  return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 }
 
 const buildEntradasQuery = (filters) => {
@@ -55,26 +170,56 @@ export function EntradasPage() {
   const { user } = useAuth()
   const [materiais, setMateriais] = useState([])
   const [entradas, setEntradas] = useState([])
+  const [centrosCusto, setCentrosCusto] = useState([])
   const [form, setForm] = useState(initialForm)
   const [filters, setFilters] = useState(filterInitial)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [materialSearchValue, setMaterialSearchValue] = useState('')
+  const [materialSuggestions, setMaterialSuggestions] = useState([])
+  const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false)
+  const [isSearchingMaterials, setIsSearchingMaterials] = useState(false)
+  const [materialSearchError, setMaterialSearchError] = useState(null)
+  const materialSearchTimeoutRef = useRef(null)
+  const materialBlurTimeoutRef = useRef(null)
 
-  const load = async (params = filters, { resetPage = false } = {}) => {
+  const load = async (params = filters, { resetPage = false, refreshCatalogs = false } = {}) => {
     if (resetPage) {
       setCurrentPage(1)
     }
     setIsLoading(true)
     setError(null)
     try {
-      const [materiaisData, entradasData] = await Promise.all([
-        api.materiais.list(),
+      const shouldReloadMateriais = refreshCatalogs || materiais.length === 0
+      const shouldReloadCentros = refreshCatalogs || centrosCusto.length === 0
+      const [materiaisData, centrosData, entradasData] = await Promise.all([
+        shouldReloadMateriais ? api.materiais.list() : Promise.resolve(null),
+        shouldReloadCentros && api?.centrosCusto && typeof api.centrosCusto.list === 'function'
+          ? api.centrosCusto.list()
+          : Promise.resolve(null),
         api.entradas.list(buildEntradasQuery(params)),
       ])
-      setMateriais(materiaisData ?? [])
+      if (materiaisData) {
+        setMateriais(materiaisData ?? [])
+      }
+      if (centrosData) {
+        setCentrosCusto(normalizeCentroCustoOptions(centrosData ?? []))
+      }
       setEntradas(entradasData ?? [])
+      if (!centrosData) {
+        const derivados = normalizeCentroCustoOptions([
+          ...centrosCusto,
+          ...(entradasData ?? []).map((entrada) => ({
+            id: entrada.centroCustoId || entrada.centroCusto,
+            nome: entrada.centroCusto || entrada.centroCustoId || '',
+          })),
+        ])
+        if (derivados.length > 0) {
+          setCentrosCusto(derivados)
+        }
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -83,7 +228,7 @@ export function EntradasPage() {
   }
 
   useEffect(() => {
-    load(filterInitial, { resetPage: true })
+    load(filterInitial, { resetPage: true, refreshCatalogs: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -94,6 +239,10 @@ export function EntradasPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (!form.materialId) {
+      setError('Selecione um material valido.')
+      return
+    }
     if (!form.dataEntrada) {
       setError('Informe a data da entrada.')
       return
@@ -110,7 +259,11 @@ export function EntradasPage() {
       }
       await api.entradas.create(payload)
       setForm(initialForm)
-      await load(filters, { resetPage: true })
+      setMaterialSearchValue('')
+      setMaterialSuggestions([])
+      setMaterialDropdownOpen(false)
+      setMaterialSearchError(null)
+      await load(filters, { resetPage: true, refreshCatalogs: true })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -133,6 +286,59 @@ export function EntradasPage() {
     load(filterInitial, { resetPage: true })
   }
 
+  const handleMaterialInputChange = (event) => {
+    const { value } = event.target
+    if (materialBlurTimeoutRef.current) {
+      clearTimeout(materialBlurTimeoutRef.current)
+      materialBlurTimeoutRef.current = null
+    }
+    setMaterialSearchValue(value)
+    setForm((prev) => ({ ...prev, materialId: '' }))
+    setMaterialSearchError(null)
+    if (value.trim().length >= MATERIAL_SEARCH_MIN_CHARS) {
+      setMaterialDropdownOpen(true)
+    } else {
+      setMaterialDropdownOpen(false)
+      setMaterialSuggestions([])
+      setMaterialSearchError(null)
+    }
+  }
+
+  const handleMaterialSelect = (material) => {
+    if (!material) {
+      return
+    }
+    setForm((prev) => ({ ...prev, materialId: material.id }))
+    setMaterialSearchValue(formatMaterialSummary(material))
+    setMaterialSuggestions([])
+    setMaterialDropdownOpen(false)
+    setMaterialSearchError(null)
+  }
+
+  const handleMaterialFocus = () => {
+    if (materialBlurTimeoutRef.current) {
+      clearTimeout(materialBlurTimeoutRef.current)
+      materialBlurTimeoutRef.current = null
+    }
+    if (!form.materialId && materialSearchValue.trim().length >= MATERIAL_SEARCH_MIN_CHARS) {
+      setMaterialDropdownOpen(true)
+    }
+  }
+
+  const handleMaterialBlur = () => {
+    materialBlurTimeoutRef.current = setTimeout(() => {
+      setMaterialDropdownOpen(false)
+    }, 120)
+  }
+
+  const handleMaterialClear = () => {
+    setForm((prev) => ({ ...prev, materialId: '' }))
+    setMaterialSearchValue('')
+    setMaterialSuggestions([])
+    setMaterialDropdownOpen(false)
+    setMaterialSearchError(null)
+  }
+
   const materiaisMap = useMemo(() => {
     const map = new Map()
     materiais.forEach((item) => {
@@ -140,6 +346,96 @@ export function EntradasPage() {
     })
     return map
   }, [materiais])
+
+  const centrosCustoMap = useMemo(() => {
+    const map = new Map()
+    centrosCusto.forEach((item) => {
+      if (!item?.nome) {
+        return
+      }
+      const key = item.id ?? item.nome
+      map.set(key, item.nome)
+      if (!item.id) {
+        map.set(normalizeSearchValue(item.nome), item.nome)
+      }
+    })
+    return map
+  }, [centrosCusto])
+
+  const fallbackMaterialSearch = useCallback(
+    (term) => {
+      const normalized = normalizeSearchValue(term)
+      if (!normalized) {
+        return []
+      }
+      return materiais
+        .filter((material) => materialMatchesTerm(material, normalized))
+        .slice(0, MATERIAL_SEARCH_MAX_RESULTS)
+    },
+    [materiais]
+  )
+
+  useEffect(() => {
+    if (!form.materialId) {
+      return
+    }
+    const selecionado = materiaisMap.get(form.materialId)
+    if (selecionado) {
+      setMaterialSearchValue(formatMaterialSummary(selecionado))
+    }
+  }, [form.materialId, materiaisMap])
+
+  useEffect(() => {
+    if (materialSearchTimeoutRef.current) {
+      clearTimeout(materialSearchTimeoutRef.current)
+      materialSearchTimeoutRef.current = null
+    }
+    const termo = materialSearchValue.trim()
+    if (form.materialId || termo.length < MATERIAL_SEARCH_MIN_CHARS) {
+      setMaterialSuggestions([])
+      setIsSearchingMaterials(false)
+      setMaterialSearchError(null)
+      setMaterialDropdownOpen(false)
+      return
+    }
+    let cancelled = false
+    setIsSearchingMaterials(true)
+    materialSearchTimeoutRef.current = setTimeout(async () => {
+      setMaterialSearchError(null)
+      try {
+        let resultados = []
+        if (api?.materiais?.search) {
+          resultados = await api.materiais.search({
+            termo,
+            limit: MATERIAL_SEARCH_MAX_RESULTS,
+          })
+        } else {
+          resultados = fallbackMaterialSearch(termo)
+        }
+        if (!cancelled) {
+          setMaterialSuggestions(resultados ?? [])
+          setMaterialDropdownOpen(true)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setMaterialSearchError(err.message || 'Falha ao buscar materiais.')
+          setMaterialSuggestions([])
+          setMaterialDropdownOpen(true)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSearchingMaterials(false)
+        }
+      }
+    }, MATERIAL_SEARCH_DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      if (materialSearchTimeoutRef.current) {
+        clearTimeout(materialSearchTimeoutRef.current)
+        materialSearchTimeoutRef.current = null
+      }
+    }
+  }, [materialSearchValue, form.materialId, fallbackMaterialSearch])
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(entradas.length / TABLE_PAGE_SIZE))
@@ -154,10 +450,22 @@ export function EntradasPage() {
     })
   }, [entradas.length])
 
+  useEffect(() => {
+    return () => {
+      if (materialBlurTimeoutRef.current) {
+        clearTimeout(materialBlurTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const paginatedEntradas = useMemo(() => {
     const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE
     return entradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
   }, [entradas, currentPage])
+
+  const shouldShowMaterialDropdown = materialDropdownOpen && !form.materialId
+
+  const hasCentrosCusto = centrosCusto.length > 0
 
   return (
     <div className="stack">
@@ -169,16 +477,59 @@ export function EntradasPage() {
 
       <form className="form" onSubmit={handleSubmit}>
         <div className="form__grid">
-          <label className="field">
+          <label className="field field--autocomplete">
             <span>Material*</span>
-            <select name="materialId" value={form.materialId} onChange={handleChange} required>
-              <option value="">Selecione um material</option>
-              {materiais.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.nome} - {item.fabricante}
-                </option>
-              ))}
-            </select>
+            <div className="autocomplete">
+              <input
+                type="text"
+                className="autocomplete__input"
+                value={materialSearchValue}
+                onChange={handleMaterialInputChange}
+                onFocus={handleMaterialFocus}
+                onBlur={handleMaterialBlur}
+                placeholder="Busque por nome, grupo, tamanho ou fabricante"
+                aria-autocomplete="list"
+                aria-expanded={shouldShowMaterialDropdown}
+                autoComplete="off"
+                spellCheck="false"
+              />
+              <input type="hidden" name="materialId" value={form.materialId} />
+              {form.materialId ? (
+                <button
+                  type="button"
+                  className="autocomplete__clear"
+                  onClick={handleMaterialClear}
+                  aria-label="Limpar material selecionado"
+                >
+                  x
+                </button>
+              ) : null}
+              {shouldShowMaterialDropdown ? (
+                <div className="autocomplete__dropdown" role="listbox">
+                  {isSearchingMaterials ? (
+                    <p className="autocomplete__feedback">Buscando materiais...</p>
+                  ) : null}
+                  {!isSearchingMaterials && materialSearchError ? (
+                    <p className="autocomplete__feedback autocomplete__feedback--error">{materialSearchError}</p>
+                  ) : null}
+                  {!isSearchingMaterials && !materialSearchError && materialSuggestions.length === 0 ? (
+                    <p className="autocomplete__feedback">Nenhum material encontrado.</p>
+                  ) : null}
+                  {materialSuggestions.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className="autocomplete__item"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleMaterialSelect(item)}
+                    >
+                      <span className="autocomplete__primary">{formatMaterialSummary(item)}</span>
+                      <span className="autocomplete__secondary">ID: {item.nomeId || item.id}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </label>
           <label className="field">
             <span>Quantidade*</span>
@@ -186,13 +537,24 @@ export function EntradasPage() {
           </label>
           <label className="field">
             <span>Centro de custo*</span>
-            <input
-              name="centroCusto"
-              value={form.centroCusto}
-              onChange={handleChange}
-              required
-              placeholder="Ex: CC-OPER"
-            />
+            {hasCentrosCusto ? (
+              <select name="centroCusto" value={form.centroCusto} onChange={handleChange} required>
+                <option value="">Selecione um centro</option>
+                {centrosCusto.map((item) => (
+                  <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                    {item.nome}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                name="centroCusto"
+                value={form.centroCusto}
+                onChange={handleChange}
+                required
+                placeholder="Informe o centro de custo"
+              />
+            )}
           </label>
         <label className="field">
           <span>Data da entrada*</span>
@@ -223,14 +585,30 @@ export function EntradasPage() {
             <option value="">Todos</option>
             {materiais.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.nome} - {item.fabricante}
+                {formatMaterialSummary(item)}
               </option>
             ))}
           </select>
         </label>
         <label className="field">
           <span>Centro de custo</span>
-          <input name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange} placeholder="Ex: CC-OPER" />
+          {hasCentrosCusto ? (
+            <select name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              {centrosCusto.map((item) => (
+                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              name="centroCusto"
+              value={filters.centroCusto}
+              onChange={handleFilterChange}
+              placeholder="Informe o centro de custo"
+            />
+          )}
         </label>
         <label className="field">
           <span>Data inicial</span>
@@ -249,7 +627,12 @@ export function EntradasPage() {
       <section className="card">
         <header className="card__header">
           <h2>Historico de entradas</h2>
-          <button type="button" className="button button--ghost" onClick={() => load(filters)} disabled={isLoading}>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => load(filters, { refreshCatalogs: true })}
+            disabled={isLoading}
+          >
             Atualizar
           </button>
         </header>
@@ -261,6 +644,7 @@ export function EntradasPage() {
               <thead>
                 <tr>
                   <th>Material</th>
+                  <th>Descrição</th>
                   <th>Quantidade</th>
                   <th>Centro de custo</th>
                   <th>Valor total</th>
@@ -273,17 +657,27 @@ export function EntradasPage() {
                   const material = materiaisMap.get(entrada.materialId)
                   const valorUnitario = Number(material?.valorUnitario ?? 0)
                   const total = valorUnitario * Number(entrada.quantidade ?? 0)
+                  const centroCustoKey = entrada.centroCustoId || entrada.centroCusto
+                  const centroCustoLabel =
+                    centrosCustoMap.get(centroCustoKey) ||
+                    entrada.centroCusto ||
+                    entrada.centroCustoId ||
+                    '-'
+                  const materialResumo = material ? formatMaterialSummary(material) : 'Material removido'
+                  const materialIdLabel = material?.id || entrada.materialId || 'Nao informado'
+                  const descricaoMaterial = material?.descricao || 'Nao informado'
                   return (
                     <tr key={entrada.id}>
                       <td>
-                        <strong>{material?.nome || 'Material removido'}</strong>
-                        <p className="data-table__muted">{material?.fabricante || 'Nao informado'}</p>
+                        <strong>{materialResumo}</strong>
+                        <p className="data-table__muted">ID: {materialIdLabel}</p>
                       </td>
+                      <td>{descricaoMaterial}</td>
                       <td>{entrada.quantidade}</td>
-                      <td>{entrada.centroCusto || '-'}</td>
+                      <td>{centroCustoLabel}</td>
                       <td>{formatCurrency(total)}</td>
                       <td>{entrada.dataEntrada ? new Date(entrada.dataEntrada).toLocaleString('pt-BR') : 'Nao informado'}</td>
-                      <td>{entrada.usuarioResponsavel || 'Nao informado'}</td>
+                      <td>{entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Nao informado'}</td>
                     </tr>
                   )
                 })}

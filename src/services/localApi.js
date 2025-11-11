@@ -134,6 +134,12 @@ const mapLocalEntradaRecord = (entrada) => {
     ...entrada,
     centroCusto: entrada.centroCusto ?? '',
     centroServico: entrada.centroServico ?? '',
+    usuarioResponsavel: entrada.usuarioResponsavel ?? '',
+    usuarioResponsavelId:
+      typeof entrada.usuarioResponsavel === 'string' && UUID_REGEX.test(entrada.usuarioResponsavel.trim())
+        ? entrada.usuarioResponsavel.trim()
+        : null,
+    usuarioResponsavelNome: entrada.usuarioResponsavel ?? '',
   }
 }
 
@@ -1401,6 +1407,57 @@ const calcularDataTroca = (dataEntregaIso, validadeDias) => {
 
 const normalizeSearchTerm = (value) => (value ? String(value).trim().toLowerCase() : '')
 
+const MATERIAL_SEARCH_MAX_RESULTS = 10
+
+const localMaterialMatchesSearch = (material, termo) => {
+  const alvo = normalizeSearchTerm(termo)
+  if (!alvo) {
+    return true
+  }
+  if (!material || typeof material !== 'object') {
+    return false
+  }
+  const campos = [
+    material.nome,
+    material.nomeItemRelacionado,
+    material.materialItemNome,
+    material.grupoMaterial,
+    material.grupoMaterialNome,
+    material.numeroCalcado,
+    material.numeroVestimenta,
+    material.numeroEspecifico,
+    material.fabricante,
+    material.fabricanteNome,
+    material.corMaterial,
+    material.coresTexto,
+    material.ca,
+  ]
+  return campos.some((campo) => normalizeSearchTerm(campo).includes(alvo))
+}
+
+const collectCentrosCustoOptions = (state) => {
+  const nomes = new Set()
+  const adicionar = (valor) => {
+    const nome = trim(valor)
+    if (nome) {
+      nomes.add(nome)
+    }
+  }
+  ;(state.pessoas || []).forEach((pessoa) => {
+    adicionar(pessoa.centroCusto)
+    adicionar(pessoa.centroServico)
+    adicionar(pessoa.local)
+  })
+  ;(state.entradas || []).forEach((entrada) => adicionar(entrada.centroCusto))
+  ;(state.saidas || []).forEach((saida) => adicionar(saida.centroCusto))
+  return Array.from(nomes)
+    .sort((a, b) => a.localeCompare(b))
+    .map((nome) => ({
+      id: nome,
+      nome,
+    }))
+}
+
 const toStartOfDay = (value) => {
   const raw = value ? String(value).trim() : ''
   if (!raw) {
@@ -1703,6 +1760,22 @@ const localApi = {
     },
     async listDetalhado() {
       return readState((state) => state.materiais.map((material) => mapLocalMaterialRecord(material)))
+    },
+    async search(params = {}) {
+      const termo = params?.termo ?? params?.q ?? params?.query ?? ''
+      const limiteSolicitado = Number(params?.limit)
+      const limite =
+        Number.isFinite(limiteSolicitado) && limiteSolicitado > 0
+          ? Math.min(limiteSolicitado, 50)
+          : MATERIAL_SEARCH_MAX_RESULTS
+      const alvo = normalizeSearchTerm(termo)
+      if (!alvo) {
+        return []
+      }
+      return readState((state) => {
+        const registros = state.materiais.map((material) => mapLocalMaterialRecord(material))
+        return registros.filter((material) => localMaterialMatchesSearch(material, alvo)).slice(0, limite)
+      })
     },
     async groups() {
       return readState((state) => {
@@ -2357,6 +2430,11 @@ const localApi = {
   documentos: {
     async termoEpiContext(params = {}) {
       return obterContextoTermoEpiLocal(params)
+    },
+  },
+  centrosCusto: {
+    async list() {
+      return readState((state) => collectCentrosCustoOptions(state))
     },
   },
 }

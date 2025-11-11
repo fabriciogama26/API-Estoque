@@ -8,6 +8,7 @@ import {
   SaidasOperations,
   EstoqueOperations,
   DocumentosOperations,
+  CentrosCustoOperations,
   healthCheck,
 } from './_shared/operations.js'
 
@@ -55,6 +56,9 @@ export default withAuth(async (req, res, user) => {
     }
     if (path === '/api/materiais/medidas-vestimenta' && method === 'GET') {
       return sendJson(res, 200, await MateriaisOperations.medidasVestimenta())
+    }
+    if (path === '/api/materiais/search' && method === 'GET') {
+      return sendJson(res, 200, await MateriaisOperations.search(query))
     }
     if (path === '/api/materiais') {
       if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
@@ -125,6 +129,10 @@ export default withAuth(async (req, res, user) => {
 
       const contexto = await DocumentosOperations.termoEpiContext(query)
       return sendJson(res, 200, contexto)
+    }
+
+    if (path === '/api/centros-custo' && method === 'GET') {
+      return sendJson(res, 200, await CentrosCustoOperations.list())
     }
 
     // Health check
