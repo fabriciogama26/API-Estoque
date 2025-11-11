@@ -162,6 +162,29 @@ const toEndOfDayIso = (value) => {
   return date.toISOString()
 }
 
+const toDateOnlyUtcIso = (value) => {
+  const raw = trim(value)
+  if (!raw) {
+    return null
+  }
+  const datePart = raw.split('T')[0]
+  const [year, month, day] = datePart.split('-').map(Number)
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null
+  }
+  const utc = Date.UTC(year, month - 1, day)
+  const date = new Date(utc)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
 function matchesEntradaSearch(entrada, termo, materiaisMap) {
   const material = materiaisMap.get(entrada.materialId)
   const alvo = [
@@ -243,12 +266,14 @@ function mapEntradaRecord(record) {
     typeof usuarioRaw === 'string' && UUID_REGEX.test(usuarioRaw.trim())
       ? usuarioRaw.trim()
       : null
+  const usuarioTexto = trim(usuarioRaw)
   return {
     ...record,
     centroCustoId: centroCustoId ?? null,
     centroCusto: centroCustoNome || centroCustoRaw || '',
     usuarioResponsavelId: usuarioId,
-    usuarioResponsavel: usuarioRaw,
+    usuarioResponsavel: usuarioId ? usuarioId : usuarioTexto,
+    usuarioResponsavelNome: usuarioId ? '' : usuarioTexto,
   }
 }
 
@@ -389,9 +414,9 @@ async function ensureMatriculaDisponivel(matricula, ignoreId) {
   if (ignoreId) {
     query = query.neq('id', ignoreId)
   }
-  const existente = await executeMaybeSingle(query, 'Falha ao validar matrÃ­cula.')
+  const existente = await executeMaybeSingle(query, 'Falha ao validar matrícula.')
   if (existente) {
-    throw createHttpError(409, 'JÃ¡ existe uma pessoa com essa matrÃ­cula.')
+    throw createHttpError(409, 'Já existe uma pessoa com essa matrícula.')
   }
 }
 
@@ -414,10 +439,10 @@ const normalizeGrupoMaterial = (value) => {
 const isGrupo = (value, target) => normalizeGrupoMaterial(value) === normalizeGrupoMaterial(target)
 
 const requiresTamanho = (grupoMaterial) =>
-  isGrupo(grupoMaterial, 'Vestimenta') || isGrupo(grupoMaterial, 'Proteção das Mãos')
+  isGrupo(grupoMaterial, 'Vestimenta') || isGrupo(grupoMaterial, 'Prote��o das M�os')
 
 const buildNumeroReferenciaMaterial = ({ grupoMaterial, numeroCalcado, numeroVestimenta }) => {
-  if (isGrupo(grupoMaterial, 'Calçado')) {
+  if (isGrupo(grupoMaterial, 'Cal�ado')) {
     return sanitizeDigits(numeroCalcado)
   }
   if (requiresTamanho(grupoMaterial)) {
@@ -433,7 +458,7 @@ async function sanitizeMaterialPayload(payload = {}) {
   const grupoMaterialId = trim(payload.grupoMaterialId)
   const numeroCalcadoRaw = sanitizeDigits(payload.numeroCalcado)
   const numeroVestimentaRaw = trim(payload.numeroVestimenta)
-  const numeroCalcado = isGrupo(grupoMaterialNome, 'Calçado') ? numeroCalcadoRaw : ''
+  const numeroCalcado = isGrupo(grupoMaterialNome, 'Cal�ado') ? numeroCalcadoRaw : ''
   const numeroVestimenta = requiresTamanho(grupoMaterialNome) ? numeroVestimentaRaw : ''
   const descricao = trim(payload.descricao)
   const ca = sanitizeDigits(payload.ca)
@@ -446,7 +471,7 @@ async function sanitizeMaterialPayload(payload = {}) {
   const caracteristicaIds = collectUuidListFromPayload(
     payload,
     CARACTERISTICA_ID_KEYS,
-    'características de EPI',
+    'caracter�sticas de EPI',
   )
   const corIds = collectUuidListFromPayload(payload, COR_ID_KEYS, 'cores')
 
@@ -504,7 +529,7 @@ function validateMaterialPayload(payload) {
     throw createHttpError(400, 'Valor unitario deve ser maior que zero.')
   }
   const grupoNome = payload.grupoMaterialNome || payload.grupoMaterial || ''
-  if (isGrupo(grupoNome, 'Calçado') && !payload.numeroCalcado) {
+  if (isGrupo(grupoNome, 'Cal�ado') && !payload.numeroCalcado) {
     throw createHttpError(400, 'Informe o numero do calcado.')
   }
   if (requiresTamanho(grupoNome) && !payload.numeroVestimenta) {
@@ -578,6 +603,142 @@ const normalizeDomainOptions = (lista) =>
     })
     .filter(Boolean)
 
+async function resolveCentroCustoNome(valor) {
+  const raw = trim(valor)
+  if (!raw) {
+    return ''
+  }
+  if (!UUID_REGEX.test(raw)) {
+    return raw
+  }
+  try {
+    const registro = await executeMaybeSingle(
+      supabaseAdmin.from('centros_custo').select('nome').eq('id', raw),
+      'Falha ao consultar centro de custo.'
+    )
+    return trim(registro?.nome ?? '') || raw
+  } catch (error) {
+    console.warn('Nao foi possivel resolver o centro de custo.', error)
+    return raw
+  }
+}
+
+async function registrarHistoricoEntrada(entrada, material, usuarioNome, entradaAnterior = null) {
+  if (!entrada || !entrada.id) {
+    return
+  }
+  try {
+    const snapshotAtual = await buildEntradaHistoricoSnapshot(entrada, material, usuarioNome)
+    const snapshotAnterior = entradaAnterior ? await buildEntradaHistoricoSnapshot(entradaAnterior, null, usuarioNome) : null
+    const payload =
+      snapshotAnterior && Object.keys(snapshotAnterior).length > 0
+        ? { atual: snapshotAtual, anterior: snapshotAnterior }
+        : { atual: snapshotAtual }
+    await execute(
+      supabaseAdmin.from('entrada_historico').insert({
+        id: randomId(),
+        entrada_id: entrada.id,
+        material_id: snapshotAtual.materialId,
+        material_ent: payload,
+        usuarioResponsavel: entrada.usuarioResponsavelId || null,
+      }),
+      'Falha ao registrar historico de entrada.'
+    )
+  } catch (error) {
+    console.warn('Nao foi possivel registrar historico de entrada.', error)
+  }
+}
+
+async function buildEntradaHistoricoSnapshot(entrada, materialCache = null, usuarioNomePadrao = '') {
+  if (!entrada) {
+    return null
+  }
+  const material =
+    materialCache && materialCache.id === entrada.materialId
+      ? materialCache
+      : await obterMaterialPorId(entrada.materialId)
+  const centroNome = await resolveCentroCustoNome(entrada.centroCustoId || entrada.centroCusto)
+  return {
+    entradaId: entrada.id,
+    materialId: entrada.materialId,
+    materialResumo: buildMaterialResumo(material),
+    descricao: material?.descricao ?? '',
+    quantidade: entrada.quantidade,
+    centroCusto: centroNome || entrada.centroCusto || '',
+    centroCustoId: entrada.centroCustoId || '',
+    dataEntrada: entrada.dataEntrada,
+    usuarioResponsavel: entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || usuarioNomePadrao || '',
+    usuarioResponsavelNome: entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || usuarioNomePadrao || '',
+    valorUnitario: material?.valorUnitario ?? null,
+  }
+}
+
+const buildMaterialResumo = (material) => {
+  if (!material || typeof material !== 'object') {
+    return ''
+  }
+  const nome =
+    material.materialItemNome ||
+    material.nome ||
+    material.nomeId ||
+    material.id ||
+    ''
+  const grupo = material.grupoMaterialNome || material.grupoMaterial || ''
+  const detalhes = [
+    material.numeroCalcadoNome,
+    material.numeroCalcado,
+    material.numeroVestimentaNome,
+    material.numeroVestimenta,
+    material.numeroEspecifico,
+    material.ca,
+    material.corMaterial,
+    Array.isArray(material.coresNomes) ? material.coresNomes.join(', ') : '',
+  ].filter(Boolean)
+  const caracteristicas =
+    material.caracteristicasTexto ||
+    (Array.isArray(material.caracteristicasNomes)
+      ? material.caracteristicasNomes.join(', ')
+      : '')
+  const fabricante = material.fabricanteNome || material.fabricante || ''
+  const partes = [nome, grupo, ...detalhes, caracteristicas, fabricante]
+  const vistos = new Set()
+  const resumo = partes
+    .map((parte) => (parte || '').toString().trim())
+    .filter((parte) => {
+      if (!parte) {
+        return false
+      }
+      const key = parte.toLowerCase()
+      if (vistos.has(key)) {
+        return false
+      }
+      vistos.add(key)
+      return true
+    })
+  return resumo.join(' | ')
+}
+
+function mapEntradaHistoricoRecord(record) {
+  const snapshot = record.material_ent ?? record.materialEnt ?? {}
+  const usuarioNome =
+    trim(
+      record.usuario?.display_name ??
+        record.usuario?.username ??
+        record.usuario?.email ??
+        snapshot.usuarioResponsavelNome ??
+        snapshot.usuarioResponsavel ??
+        ''
+    ) || ''
+  return {
+    id: record.id,
+    entradaId: record.entrada_id ?? snapshot.entradaId ?? null,
+    materialId: record.material_id ?? snapshot.materialId ?? null,
+    criadoEm: record.created_at ?? record.createdAt ?? null,
+    usuarioResponsavel: usuarioNome,
+    snapshot,
+  }
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const MATERIAL_RELATION_ID_KEYS = [
@@ -650,7 +811,7 @@ function collectUuidListFromSources(sources, { label }) {
   })
 
   if (invalid.size > 0) {
-    throw createHttpError(400, `Alguns identificadores de ${label} são inválidos.`)
+    throw createHttpError(400, `Alguns identificadores de ${label} s�o inv�lidos.`)
   }
 
   return Array.from(ids)
@@ -688,7 +849,7 @@ async function fetchCatalogRecordsByIds({
   const encontrados = new Set((registros ?? []).map((item) => item.id))
   const faltantes = ids.filter((id) => !encontrados.has(id))
   if (faltantes.length > 0) {
-    throw createHttpError(400, `${errorLabel} informadas não foram encontradas.`)
+    throw createHttpError(400, `${errorLabel} informadas n�o foram encontradas.`)
   }
 
   return registros.map((registro) => ({
@@ -705,8 +866,8 @@ async function resolveCaracteristicasByIds(ids) {
     table: 'caracteristica_epi',
     ids,
     nameColumn: 'caracteristica_material',
-    errorLabel: 'Características de EPI',
-    errorMessage: 'Falha ao consultar características de EPI.',
+    errorLabel: 'Caracter�sticas de EPI',
+    errorMessage: 'Falha ao consultar caracter�sticas de EPI.',
   })
 }
 
@@ -786,7 +947,7 @@ async function replaceMaterialCorVinculos(materialId, corIds) {
     materialId,
     columnCandidates: ['grupo_cor_id', 'grupo_material_cor'],
     values: corIds,
-    deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+    deleteMessage: 'Falha ao limpar v�nculos de cores do material.',
     insertMessage: 'Falha ao vincular cores ao material.',
   })
 }
@@ -801,8 +962,8 @@ async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaI
       'grupo_caracteristica_epi',
     ],
     values: caracteristicaIds,
-    deleteMessage: 'Falha ao limpar vínculos de características do material.',
-    insertMessage: 'Falha ao vincular características ao material.',
+    deleteMessage: 'Falha ao limpar v�nculos de caracter�sticas do material.',
+    insertMessage: 'Falha ao vincular caracter�sticas ao material.',
   })
 }
 
@@ -864,18 +1025,15 @@ function sanitizeEntradaPayload(payload = {}) {
     throw createHttpError(400, 'Data de entrada obrigatoria.')
   }
 
-  const data = new Date(dataEntradaRaw)
-  if (Number.isNaN(data.getTime())) {
+  dataEntradaIso = toDateOnlyUtcIso(dataEntradaRaw)
+  if (!dataEntradaIso) {
     throw createHttpError(400, 'Data de entrada invalida.')
   }
-
-  dataEntradaIso = data.toISOString()
 
   return {
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
     centroCusto: trim(payload.centroCusto),
-    centroServico: trim(payload.centroServico),
     dataEntrada: dataEntradaIso,
     usuarioResponsavel: trim(payload.usuarioResponsavel) || null,
   }
@@ -884,7 +1042,6 @@ function sanitizeEntradaPayload(payload = {}) {
 function validateEntradaPayload(payload) {
   if (!payload.materialId) throw createHttpError(400, 'Material obrigatorio para entrada.')
   if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatorio.')
-  if (!payload.centroServico) throw createHttpError(400, 'Centro de servico obrigatorio.')
   if (!payload.dataEntrada) throw createHttpError(400, 'Data de entrada obrigatoria.')
 }
 
@@ -1046,7 +1203,7 @@ async function obterPessoaPorMatricula(matricula) {
   }
   const pessoa = await executeMaybeSingle(
     supabaseAdmin.from('pessoas').select('*').eq('matricula', matricula).limit(1),
-    'Falha ao consultar pessoa por matrï¿½cula.'
+    'Falha ao consultar pessoa por matr�cula.'
   )
   return mapPessoaRecord(pessoa)
 }
@@ -1151,7 +1308,7 @@ async function registrarHistoricoPreco(materialId, valorUnitario, usuario) {
       usuarioResponsavel: usuario || 'sistema',
       criadoEm: nowIso(),
     }),
-    'Falha ao registrar histÃ³rico de preÃ§o.'
+    'Falha ao registrar histórico de preço.'
   )
 }
 
@@ -1189,7 +1346,7 @@ async function carregarMovimentacoes(params) {
       'Falha ao listar materiais.',
     ),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
-    execute(saidasFiltered, 'Falha ao listar saídas.'),
+    execute(saidasFiltered, 'Falha ao listar sa�das.'),
   ])
 
   return {
@@ -1208,7 +1365,7 @@ async function calcularSaldoMaterialAtual(materialId) {
     ),
     execute(
       supabaseAdmin.from('saidas').select('materialId, quantidade, dataEntrega').eq('materialId', materialId),
-      'Falha ao consultar saÃ­das do material.'
+      'Falha ao consultar saídas do material.'
     ),
   ])
 
@@ -1395,73 +1552,37 @@ export const PessoasOperations = {
     return mapPessoaRecord(pessoa)
   },
   async update(id, payload, user) {
-    const atual = await executeMaybeSingle(
-      supabaseAdmin.from('pessoas').select('*').eq('id', id),
-      'Falha ao obter pessoa.'
-    )
-    if (!atual) {
-      throw createHttpError(404, 'Pessoa nÃ£o encontrada.')
+    if (!id) {
+      throw createHttpError(400, 'Entrada invalida.')
     }
-
-    const dados = sanitizePessoaPayload(payload)
-    validatePessoaPayload(dados)
-    await ensureMatriculaDisponivel(dados.matricula, id)
-
+    const dados = sanitizeEntradaPayload(payload)
+    validateEntradaPayload(dados)
+    const material = await obterMaterialPorId(dados.materialId)
+    if (!material) {
+      throw createHttpError(404, 'Material nao encontrado.')
+    }
     const usuario = resolveUsuarioNome(user)
-    const agora = nowIso()
-
-    const camposAlterados = []
-    const comparacoes = [
-      { campo: 'nome' },
-      { campo: 'matricula' },
-      { campo: 'centroServico', atualKey: 'local' },
-      { campo: 'cargo' },
-    ]
-
-    comparacoes.forEach(({ campo, atualKey }) => {
-      const valorAtual = atual[atualKey ?? campo] || ''
-      const valorNovo = campo === 'centroServico' ? dados.centroServico : dados[campo]
-      if (valorAtual !== valorNovo) {
-        camposAlterados.push({
-          campo,
-          de: valorAtual,
-          para: valorNovo,
-        })
-      }
-    })
-
-    if (camposAlterados.length > 0) {
-      await execute(
-        supabaseAdmin
-          .from('pessoas_historico')
-          .insert({
-            pessoa_id: id,
-            data_edicao: agora,
-            usuario_responsavel: usuario,
-            campos_alterados: camposAlterados,
-          }),
-        'Falha ao registrar histórico de edição.',
-      )
-    }
-
-    const pessoaAtualizada = await executeSingle(
+    const entradaAtualizada = await executeSingle(
       supabaseAdmin
-        .from('pessoas')
+        .from('entradas')
         .update({
-          nome: dados.nome,
-          matricula: dados.matricula,
-          local: dados.centroServico,
-          cargo: dados.cargo,
-          atualizadoEm: agora,
-          usuarioEdicao: usuario,
+          materialId: dados.materialId,
+          quantidade: dados.quantidade,
+          centroCusto: dados.centroCusto,
+          dataEntrada: dados.dataEntrada,
+          usuarioResponsavel: usuario,
         })
         .eq('id', id)
         .select(),
-      'Falha ao atualizar pessoa.'
+      'Falha ao atualizar entrada.'
     )
-
-    return mapPessoaRecord(pessoaAtualizada)
+    const normalizada = (
+      await preencherUsuariosResponsaveis([mapEntradaRecord(entradaAtualizada)])
+    )[0]
+    await registrarHistoricoEntrada(normalizada, material, usuario)
+    return normalizada
   },
+
   async get(id) {
     const pessoa = await executeMaybeSingle(
       supabaseAdmin.from('pessoas').select('*').eq('id', id),
@@ -1548,7 +1669,7 @@ export const MateriaisOperations = {
         .from('medidas_calcado')
         .select('numero_calcado')
         .order('numero_calcado'),
-      'Falha ao listar medidas de calçado.',
+      'Falha ao listar medidas de cal�ado.',
     )
     return normalizeCatalogoLista(registros)
   },
@@ -1605,7 +1726,7 @@ export const MateriaisOperations = {
   async update(id, payload, user) {
     const atual = await obterMaterialPorId(id)
     if (!atual) {
-      throw createHttpError(404, 'Material nÃ£o encontrado.')
+      throw createHttpError(404, 'Material não encontrado.')
     }
 
     const dados = await sanitizeMaterialPayload({
@@ -1663,7 +1784,7 @@ export const MateriaisOperations = {
           .select('*')
           .eq('materialId', id)
           .order('criadoEm', { ascending: false }),
-        'Falha ao listar histÃ³rico de preÃ§os.'
+        'Falha ao listar histórico de preços.'
       )) ?? []
     )
   },
@@ -1686,6 +1807,12 @@ export const EntradasOperations = {
       query = UUID_REGEX.test(centroCusto)
         ? query.eq('centro_custo', centroCusto)
         : query.ilike('centro_custo', `%${centroCusto}%`)
+    }
+    const registradoPor = trim(params.registradoPor)
+    if (registradoPor) {
+      query = UUID_REGEX.test(registradoPor)
+        ? query.eq('usuarioResponsavel', registradoPor)
+        : query.ilike('usuarioResponsavel', `%${registradoPor}%`)
     }
 
     const dataInicio = toStartOfDayIso(params.dataInicio)
@@ -1724,7 +1851,7 @@ export const EntradasOperations = {
 
     const material = await obterMaterialPorId(dados.materialId)
     if (!material) {
-      throw createHttpError(404, 'Material nÃ£o encontrado.')
+      throw createHttpError(404, 'Material não encontrado.')
     }
 
     const usuario = resolveUsuarioNome(user)
@@ -1744,7 +1871,95 @@ export const EntradasOperations = {
       'Falha ao registrar entrada.'
     )
 
-    return mapEntradaRecord(entrada)
+    const normalizada = (
+      await preencherUsuariosResponsaveis([mapEntradaRecord(entrada)])
+    )[0]
+    await registrarHistoricoEntrada(normalizada, material, usuario)
+    return normalizada
+  },
+  async update(id, payload, user) {
+    if (!id) {
+      throw createHttpError(400, 'Entrada invalida.')
+    }
+    const registroAtual = await executeMaybeSingle(
+      supabaseAdmin.from('entradas').select('*').eq('id', id),
+      'Falha ao obter entrada.'
+    )
+    const entradaAnterior = registroAtual ? mapEntradaRecord(registroAtual) : null
+    const dados = sanitizeEntradaPayload(payload)
+    validateEntradaPayload(dados)
+    const material = await obterMaterialPorId(dados.materialId)
+    if (!material) {
+      throw createHttpError(404, 'Material nao encontrado.')
+    }
+    const usuario = resolveUsuarioNome(user)
+    const entradaAtualizada = await executeSingle(
+      supabaseAdmin
+        .from('entradas')
+        .update({
+          materialId: dados.materialId,
+          quantidade: dados.quantidade,
+          centroCusto: dados.centroCusto,
+          dataEntrada: dados.dataEntrada,
+          usuarioResponsavel: usuario,
+        })
+        .eq('id', id)
+        .select(),
+      'Falha ao atualizar entrada.'
+    )
+    const normalizada = (
+      await preencherUsuariosResponsaveis([mapEntradaRecord(entradaAtualizada)])
+    )[0]
+    await registrarHistoricoEntrada(normalizada, material, usuario, entradaAnterior)
+    return normalizada
+  },
+  async history(id) {
+    if (!id) {
+      throw createHttpError(400, 'Entrada invalida.')
+    }
+    const registros = await execute(
+      supabaseAdmin
+        .from('entrada_historico')
+        .select(
+          `
+            id,
+            entrada_id,
+            material_id,
+            material_ent,
+            created_at,
+            usuarioResponsavel,
+            usuario:usuarioResponsavel ( id, display_name, username, email )
+          `
+        )
+        .eq('entrada_id', id)
+        .order('created_at', { ascending: false }),
+      'Falha ao obter historico da entrada.'
+    )
+    return (registros ?? []).map(mapEntradaHistoricoRecord)
+  },
+  async history(id) {
+    if (!id) {
+      throw createHttpError(400, 'Entrada invalida.')
+    }
+    const registros = await execute(
+      supabaseAdmin
+        .from('entrada_historico')
+        .select(
+          `
+            id,
+            entrada_id,
+            material_id,
+            material_ent,
+            created_at,
+            usuarioResponsavel,
+            usuario:usuarioResponsavel ( id, display_name, username, email )
+          `
+        )
+        .eq('entrada_id', id)
+        .order('created_at', { ascending: false }),
+      'Falha ao obter historico de entrada.'
+    )
+    return (registros ?? []).map(mapEntradaHistoricoRecord)
   },
 }
 
@@ -1839,7 +2054,7 @@ export const SaidasOperations = {
     }
 
     let saidas =
-      (await execute(query, 'Falha ao listar saídas.')) ?? []
+      (await execute(query, 'Falha ao listar sa�das.')) ?? []
     saidas = saidas.map(mapSaidaRecord)
 
     const termo = normalizeSearchTerm(params.termo)
@@ -1873,15 +2088,15 @@ export const SaidasOperations = {
     ])
 
     if (!pessoa) {
-      throw createHttpError(404, 'Pessoa nÃ£o encontrada.')
+      throw createHttpError(404, 'Pessoa não encontrada.')
     }
     if (!material) {
-      throw createHttpError(404, 'Material nÃ£o encontrado.')
+      throw createHttpError(404, 'Material não encontrado.')
     }
 
     const estoqueDisponivel = await calcularSaldoMaterialAtual(material.id)
     if (Number(dados.quantidade) > estoqueDisponivel) {
-      throw createHttpError(400, 'Quantidade informada maior que estoque disponÃ­vel.')
+      throw createHttpError(400, 'Quantidade informada maior que estoque disponível.')
     }
 
     const centroServico = dados.centroServico || pessoa.centroServico || pessoa.local || ''
@@ -1903,7 +2118,7 @@ export const SaidasOperations = {
           dataTroca,
         })
         .select(),
-      'Falha ao registrar saÃ­da.'
+      'Falha ao registrar saída.'
     )
 
     return {
@@ -1981,7 +2196,7 @@ export const AcidentesOperations = {
 
     const pessoa = await obterPessoaPorMatricula(dados.matricula)
     if (!pessoa) {
-      throw createHttpError(404, 'Pessoa nï¿½o encontrada para a matrï¿½cula informada.')
+      throw createHttpError(404, 'Pessoa n�o encontrada para a matr�cula informada.')
     }
 
     const centroServicoBase = dados.centroServico || pessoa.centroServico || pessoa.setor || pessoa.local || ''
@@ -2020,66 +2235,7 @@ export const AcidentesOperations = {
 
     return mapAcidenteRecord(acidente)
   },
-  async update(id, payload, user) {
-    const atual = await executeMaybeSingle(
-      supabaseAdmin.from('acidentes').select('*').eq('id', id),
-      'Falha ao obter acidente.'
-    )
-    if (!atual) {
-      throw createHttpError(404, 'Acidente nï¿½o encontrado.')
-    }
 
-    let pessoa = null
-    if (payload.matricula !== undefined && trim(payload.matricula)) {
-      pessoa = await obterPessoaPorMatricula(trim(payload.matricula))
-      if (!pessoa) {
-        throw createHttpError(404, 'Pessoa nï¿½o encontrada para a matrï¿½cula informada.')
-      }
-    }
-
-    const dados = sanitizeAcidentePayload({ ...atual, ...payload })
-    validateAcidentePayload(dados)
-
-    const centroServicoPessoa = pessoa?.centroServico || pessoa?.setor || pessoa?.local || ''
-    const localPessoa = pessoa?.local || pessoa?.centroServico || ''
-    const centroServicoFinal = dados.centroServico || centroServicoPessoa || atual.setor || ''
-    const localFinal = dados.local || localPessoa || atual.local || centroServicoFinal
-    const agora = nowIso()
-    const usuario = resolveUsuarioNome(user)
-
-    dados.centroServico = centroServicoFinal
-    dados.local = localFinal
-
-    const acidenteAtualizado = await executeSingle(
-      supabaseAdmin
-        .from('acidentes')
-        .update({
-          matricula: dados.matricula,
-          nome: dados.nome,
-          cargo: dados.cargo,
-          data: dados.data,
-          tipo: dados.tipo,
-          agente: dados.agente,
-          lesao: dados.lesao,
-          parteLesionada: dados.parteLesionada,
-          setor: centroServicoFinal,
-          local: localFinal,
-          diasPerdidos: dados.diasPerdidos,
-          diasDebitados: dados.diasDebitados,
-          hht: dados.hht,
-          cid: dados.cid,
-          cat: dados.cat,
-          observacao: dados.observacao,
-          atualizadoEm: agora,
-          atualizadoPor: usuario,
-        })
-        .eq('id', id)
-        .select(),
-      'Falha ao atualizar acidente.'
-    )
-
-    return mapAcidenteRecord(acidenteAtualizado)
-  },
 }
 
 export async function healthCheck() {
@@ -2102,6 +2258,9 @@ export const CentrosCustoOperations = {
     return normalizeDomainOptions(registros)
   },
 }
+
+
+
 
 
 

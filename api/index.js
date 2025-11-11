@@ -102,6 +102,17 @@ export default withAuth(async (req, res, user) => {
         return sendJson(res, 201, await EntradasOperations.create(body, user))
       }
     }
+    if (path.startsWith('/api/entradas/') && method === 'PUT') {
+      const id = path.split('/')[3]
+      if (!id) return sendJson(res, 400, { error: 'ID da entrada nao informado.' })
+      const body = await readJson(req)
+      return sendJson(res, 200, await EntradasOperations.update(id, body, user))
+    }
+    if (path.startsWith('/api/entradas/history/') && method === 'GET') {
+      const id = path.split('/')[4]
+      if (!id) return sendJson(res, 400, { error: 'ID da entrada nao informado para historico.' })
+      return sendJson(res, 200, await EntradasOperations.history(id))
+    }
 
     // Saídas
     if (path === '/api/saidas') {

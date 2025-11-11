@@ -31,6 +31,8 @@ const trim = (value) => {
   return String(value).trim()
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const splitMultiValue = (value) => {
   if (Array.isArray(value)) {
     return value.map((item) => trim(item)).filter(Boolean)
@@ -56,6 +58,28 @@ const toIsoOrNull = (value, defaultNow = false) => {
     return defaultNow ? nowIso() : null
   }
   return date.toISOString()
+}
+
+const toDateOnlyIso = (value) => {
+  const raw = trim(value)
+  if (!raw) {
+    return null
+  }
+  const datePart = raw.split('T')[0]
+  const [year, month, day] = datePart.split('-').map(Number)
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null
+  }
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 const toLocalDateIso = (value) => {
@@ -1253,7 +1277,7 @@ const validateMaterialPayload = (payload) => {
 }
 
 const sanitizeEntradaPayload = (payload = {}) => {
-  const dataEntrada = toIsoOrNull(payload.dataEntrada, false)
+  const dataEntrada = toDateOnlyIso(payload.dataEntrada)
   return {
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
@@ -2011,7 +2035,61 @@ const localApi = {
           ...dados,
         }
         state.entradas.push(entrada)
-        return mapLocalEntradaRecord(entrada)
+        const snapshot = mapLocalEntradaRecord(entrada)
+        state.entradaHistorico = Array.isArray(state.entradaHistorico) ? state.entradaHistorico : []
+        state.entradaHistorico.push({
+          id: randomId(),
+          entradaId: entrada.id,
+          materialId: entrada.materialId,
+          criadoEm: snapshot.dataEntrada || nowIso(),
+          usuario: snapshot.usuarioResponsavel || 'sistema',
+          snapshot: { atual: snapshot },
+        })
+        return snapshot
+      })
+    },
+    async update(id, payload) {
+      if (!id) {
+        throw createError(400, 'ID da entrada obrigatorio.')
+      }
+      const dados = sanitizeEntradaPayload(payload)
+      validateEntradaPayload(dados)
+
+      return writeState((state) => {
+        const index = state.entradas.findIndex((entrada) => entrada.id === id)
+        if (index === -1) {
+          throw createError(404, 'Entrada nao encontrada.')
+        }
+        const material = state.materiais.find((item) => item.id === dados.materialId)
+        if (!material) {
+          throw createError(404, 'Material nao encontrado.')
+        }
+        const anterior = mapLocalEntradaRecord(state.entradas[index])
+        const atualizada = {
+          ...state.entradas[index],
+          ...dados,
+        }
+        state.entradas[index] = atualizada
+        const snapshotAtual = mapLocalEntradaRecord(atualizada)
+        state.entradaHistorico = Array.isArray(state.entradaHistorico) ? state.entradaHistorico : []
+        state.entradaHistorico.push({
+          id: randomId(),
+          entradaId: atualizada.id,
+          materialId: atualizada.materialId,
+          criadoEm: nowIso(),
+          usuario: snapshotAtual.usuarioResponsavel || 'sistema',
+          snapshot: { atual: snapshotAtual, anterior },
+        })
+        return snapshotAtual
+      })
+    },
+    async history(id) {
+      if (!id) {
+        throw createError(400, 'ID da entrada obrigatorio.')
+      }
+      return readState((state) => {
+        const historico = (state.entradaHistorico || []).filter((item) => item.entradaId === id)
+        return sortByDateDesc(historico, 'criadoEm')
       })
     },
   },

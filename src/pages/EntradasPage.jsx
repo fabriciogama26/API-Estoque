@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { EntryIcon } from '../components/icons.jsx'
+import { EntryIcon, EditIcon, HistoryIcon } from '../components/icons.jsx'
+import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModal.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { dataClient as api } from '../services/dataClient.js'
@@ -15,7 +16,7 @@ const initialForm = {
 
 const filterInitial = {
   termo: '',
-  materialId: '',
+  registradoPor: '',
   centroCusto: '',
   dataInicio: '',
   dataFim: '',
@@ -24,6 +25,36 @@ const filterInitial = {
 const MATERIAL_SEARCH_MIN_CHARS = 2
 const MATERIAL_SEARCH_MAX_RESULTS = 10
 const MATERIAL_SEARCH_DEBOUNCE_MS = 250
+
+const formatDateToInput = (value) => {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  return date.toISOString().slice(0, 10)
+}
+
+const formatDisplayDate = (value) => {
+  if (!value) {
+    return 'Nao informado'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Nao informado'
+  }
+  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+}
+
+const HISTORY_INITIAL = {
+  open: false,
+  entrada: null,
+  registros: [],
+  isLoading: false,
+  error: null,
+}
 
 const normalizeSearchValue = (value) => {
   if (value === undefined || value === null) {
@@ -138,12 +169,13 @@ const normalizeCentroCustoOptions = (lista) => {
 
 const buildEntradasQuery = (filters) => {
   const query = {}
-  if (filters.materialId) {
-    query.materialId = filters.materialId
-  }
   const centroCusto = filters.centroCusto?.trim()
   if (centroCusto) {
     query.centroCusto = centroCusto
+  }
+  const registradoPor = filters.registradoPor?.trim()
+  if (registradoPor) {
+    query.registradoPor = registradoPor
   }
   if (filters.dataInicio) {
     query.dataInicio = filters.dataInicio
@@ -170,20 +202,22 @@ export function EntradasPage() {
   const { user } = useAuth()
   const [materiais, setMateriais] = useState([])
   const [entradas, setEntradas] = useState([])
-  const [centrosCusto, setCentrosCusto] = useState([])
-  const [form, setForm] = useState(initialForm)
-  const [filters, setFilters] = useState(filterInitial)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [currentPage, setCurrentPage] = useState(1)
+const [centrosCusto, setCentrosCusto] = useState([])
+const [editingEntrada, setEditingEntrada] = useState(null)
+const [form, setForm] = useState(initialForm)
+const [filters, setFilters] = useState(filterInitial)
+const [isSaving, setIsSaving] = useState(false)
+const [isLoading, setIsLoading] = useState(false)
+const [error, setError] = useState(null)
+const [currentPage, setCurrentPage] = useState(1)
   const [materialSearchValue, setMaterialSearchValue] = useState('')
   const [materialSuggestions, setMaterialSuggestions] = useState([])
   const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false)
   const [isSearchingMaterials, setIsSearchingMaterials] = useState(false)
-  const [materialSearchError, setMaterialSearchError] = useState(null)
-  const materialSearchTimeoutRef = useRef(null)
-  const materialBlurTimeoutRef = useRef(null)
+const [materialSearchError, setMaterialSearchError] = useState(null)
+const materialSearchTimeoutRef = useRef(null)
+const materialBlurTimeoutRef = useRef(null)
+const [historyState, setHistoryState] = useState({ ...HISTORY_INITIAL })
 
   const load = async (params = filters, { resetPage = false, refreshCatalogs = false } = {}) => {
     if (resetPage) {
@@ -239,31 +273,30 @@ export function EntradasPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!form.materialId) {
-      setError('Selecione um material valido.')
-      return
-    }
-    if (!form.dataEntrada) {
-      setError('Informe a data da entrada.')
-      return
-    }
+    const isEditMode = Boolean(editingEntrada)
     setIsSaving(true)
     setError(null)
     try {
       const payload = {
         materialId: form.materialId,
-        quantidade: Number(form.quantidade),
+        quantidade: form.quantidade,
         centroCusto: form.centroCusto.trim(),
         dataEntrada: form.dataEntrada,
         usuarioResponsavel: user?.name || user?.username || 'sistema',
       }
-      await api.entradas.create(payload)
-      setForm(initialForm)
-      setMaterialSearchValue('')
-      setMaterialSuggestions([])
-      setMaterialDropdownOpen(false)
-      setMaterialSearchError(null)
-      await load(filters, { resetPage: true, refreshCatalogs: true })
+      if (!payload.materialId) {
+        throw new Error('Selecione um material valido.')
+      }
+      if (!payload.dataEntrada) {
+        throw new Error('Informe a data da entrada.')
+      }
+      if (isEditMode) {
+        await api.entradas.update(editingEntrada.id, payload)
+      } else {
+        await api.entradas.create(payload)
+      }
+      cancelEdit()
+      await load(filters, { resetPage: !isEditMode, refreshCatalogs: true })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -337,6 +370,65 @@ export function EntradasPage() {
     setMaterialSuggestions([])
     setMaterialDropdownOpen(false)
     setMaterialSearchError(null)
+    setEditingEntrada(null)
+  }
+
+  const startEditEntrada = (entrada) => {
+    if (!entrada) {
+      return
+    }
+    const material = materiaisMap.get(entrada.materialId)
+    setEditingEntrada(entrada)
+    setForm({
+      materialId: entrada.materialId,
+      quantidade: String(entrada.quantidade ?? ''),
+      centroCusto: entrada.centroCustoId || entrada.centroCusto || '',
+      dataEntrada: formatDateToInput(entrada.dataEntrada),
+    })
+    setMaterialSearchValue(
+      material ? formatMaterialSummary(material) : entrada.materialId || ''
+    )
+    setMaterialSuggestions([])
+    setMaterialDropdownOpen(false)
+    setMaterialSearchError(null)
+    setError(null)
+  }
+
+  const cancelEdit = () => {
+    setEditingEntrada(null)
+    setForm({ ...initialForm })
+    setMaterialSearchValue('')
+    setMaterialSuggestions([])
+    setMaterialDropdownOpen(false)
+    setMaterialSearchError(null)
+  }
+
+  const openHistory = async (entrada) => {
+    if (!entrada?.id) {
+      return
+    }
+    setHistoryState({ ...HISTORY_INITIAL, open: true, entrada, isLoading: true })
+    try {
+      const registros = await api.entradas.history(entrada.id)
+      setHistoryState({
+        open: true,
+        entrada,
+        isLoading: false,
+        registros: registros ?? [],
+        error: null,
+      })
+    } catch (err) {
+      setHistoryState({
+        ...HISTORY_INITIAL,
+        open: true,
+        entrada,
+        error: err.message || 'Nao foi possivel carregar o historico.',
+      })
+    }
+  }
+
+  const closeHistory = () => {
+    setHistoryState({ ...HISTORY_INITIAL })
   }
 
   const materiaisMap = useMemo(() => {
@@ -350,17 +442,81 @@ export function EntradasPage() {
   const centrosCustoMap = useMemo(() => {
     const map = new Map()
     centrosCusto.forEach((item) => {
-      if (!item?.nome) {
+      const nome = (item?.nome ?? '').toString().trim()
+      if (!nome) {
         return
       }
-      const key = item.id ?? item.nome
-      map.set(key, item.nome)
-      if (!item.id) {
-        map.set(normalizeSearchValue(item.nome), item.nome)
+      if (item.id) {
+        map.set(item.id, nome)
       }
+      map.set(nome, nome)
+      map.set(normalizeSearchValue(nome), nome)
     })
     return map
   }, [centrosCusto])
+
+  const resolveCentroCustoLabel = useCallback(
+    (entrada) => {
+      if (!entrada) {
+        return ''
+      }
+      const candidatos = [entrada.centroCustoId, entrada.centroCusto]
+      for (const raw of candidatos) {
+        if (!raw) {
+          continue
+        }
+        const texto = raw.toString().trim()
+        if (!texto) {
+          continue
+        }
+        const label =
+          centrosCustoMap.get(raw) ||
+          centrosCustoMap.get(texto) ||
+          centrosCustoMap.get(normalizeSearchValue(texto))
+        if (label) {
+          return label
+        }
+        if (!isLikelyUuid(texto)) {
+          return texto
+        }
+      }
+      return entrada.centroCustoId || entrada.centroCusto || ''
+    },
+    [centrosCustoMap]
+  )
+
+  const registeredOptions = useMemo(() => {
+    const mapa = new Map()
+    entradas.forEach((entrada) => {
+      const nome = entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Nao informado'
+      const id = entrada.usuarioResponsavelId || nome
+      if (!nome) {
+        return
+      }
+      if (!mapa.has(id)) {
+        mapa.set(id, { id, nome })
+      }
+    })
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [entradas])
+
+  const centroCustoFilterOptions = useMemo(() => {
+    const mapa = new Map()
+    entradas.forEach((entrada) => {
+      const nome = resolveCentroCustoLabel(entrada)
+      if (!nome) {
+        return
+      }
+      const chave = normalizeSearchValue(nome)
+      if (!mapa.has(chave)) {
+        mapa.set(chave, {
+          id: entrada.centroCustoId || entrada.centroCusto || nome,
+          nome,
+        })
+      }
+    })
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [entradas, resolveCentroCustoLabel])
 
   const fallbackMaterialSearch = useCallback(
     (term) => {
@@ -458,14 +614,78 @@ export function EntradasPage() {
     }
   }, [])
 
+const normalizedSearchTerm = normalizeSearchValue(filters.termo)
+const startTimestamp = filters.dataInicio ? Date.parse(`${filters.dataInicio}T00:00:00Z`) : null
+const endTimestamp = filters.dataFim ? Date.parse(`${filters.dataFim}T23:59:59Z`) : null
+
+const filteredEntradas = useMemo(() => {
+  return entradas.filter((entrada) => {
+      const dataEntrada = entrada.dataEntrada ? Date.parse(entrada.dataEntrada) : null
+      if (startTimestamp && (dataEntrada === null || dataEntrada < startTimestamp)) {
+        return false
+      }
+      if (endTimestamp && (dataEntrada === null || dataEntrada > endTimestamp)) {
+        return false
+      }
+      if (filters.registradoPor) {
+        const candidatos = [
+          entrada.usuarioResponsavelId,
+          entrada.usuarioResponsavel,
+          entrada.usuarioResponsavelNome,
+        ]
+          .map((valor) => (valor ? String(valor).trim() : ''))
+        if (!candidatos.includes(filters.registradoPor)) {
+          return false
+        }
+      }
+      if (filters.centroCusto) {
+        const entradaLabel = resolveCentroCustoLabel(entrada)
+        const normalizedFilter = normalizeSearchValue(filters.centroCusto)
+        const filterLabel =
+          centrosCustoMap.get(filters.centroCusto) ||
+          centrosCustoMap.get(normalizedFilter) ||
+          (!isLikelyUuid(filters.centroCusto) ? filters.centroCusto : '')
+        const matchesById = Boolean(entrada.centroCustoId) && entrada.centroCustoId === filters.centroCusto
+        const matchesByLabel =
+          Boolean(filterLabel) &&
+          normalizeSearchValue(entradaLabel || entrada.centroCusto || '') === normalizeSearchValue(filterLabel)
+        if (!matchesById && !matchesByLabel) {
+          return false
+        }
+      }
+      if (normalizedSearchTerm) {
+        const material = materiaisMap.get(entrada.materialId)
+        const resumo = normalizeSearchValue(material ? formatMaterialSummary(material) : '')
+        if (!resumo.includes(normalizedSearchTerm)) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [
+    entradas,
+    filters.registradoPor,
+    filters.centroCusto,
+    normalizedSearchTerm,
+    materiaisMap,
+    startTimestamp,
+    endTimestamp,
+    resolveCentroCustoLabel,
+    centrosCustoMap,
+  ])
+
   const paginatedEntradas = useMemo(() => {
     const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE
-    return entradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
-  }, [entradas, currentPage])
+    return filteredEntradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
+  }, [filteredEntradas, currentPage])
 
-  const shouldShowMaterialDropdown = materialDropdownOpen && !form.materialId
+  const shouldShowMaterialDropdown =
+    materialDropdownOpen &&
+    !form.materialId &&
+    (isSearchingMaterials || materialSearchError || materialSuggestions.length > 0)
 
   const hasCentrosCusto = centrosCusto.length > 0
+  const isEditing = Boolean(editingEntrada)
 
   return (
     <div className="stack">
@@ -476,6 +696,14 @@ export function EntradasPage() {
       />
 
       <form className="form" onSubmit={handleSubmit}>
+        {isEditing ? (
+          <div className="form__notice">
+            <span>Editando entrada #{editingEntrada?.id?.slice(0, 8) || ''}</span>
+            <button type="button" className="button button--ghost" onClick={cancelEdit} disabled={isSaving}>
+              Cancelar edição
+            </button>
+          </div>
+        ) : null}
         <div className="form__grid">
           <label className="field field--autocomplete">
             <span>Material*</span>
@@ -564,7 +792,7 @@ export function EntradasPage() {
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
           <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? 'Registrando...' : 'Registrar entrada'}
+            {isSaving ? (isEditing ? 'Salvando...' : 'Registrando...') : isEditing ? 'Salvar alterações' : 'Registrar entrada'}
           </button>
         </div>
       </form>
@@ -576,39 +804,30 @@ export function EntradasPage() {
             name="termo"
             value={filters.termo}
             onChange={handleFilterChange}
-            placeholder="Material, fabricante ou usuario"
+            placeholder="Buscar por material"
           />
         </label>
         <label className="field">
-          <span>Material</span>
-          <select name="materialId" value={filters.materialId} onChange={handleFilterChange}>
+          <span>Registrado por</span>
+          <select name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange}>
             <option value="">Todos</option>
-            {materiais.map((item) => (
+            {registeredOptions.map((item) => (
               <option key={item.id} value={item.id}>
-                {formatMaterialSummary(item)}
+                {item.nome}
               </option>
             ))}
           </select>
         </label>
         <label className="field">
           <span>Centro de custo</span>
-          {hasCentrosCusto ? (
-            <select name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange}>
-              <option value="">Todos</option>
-              {centrosCusto.map((item) => (
-                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
-                  {item.nome}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              name="centroCusto"
-              value={filters.centroCusto}
-              onChange={handleFilterChange}
-              placeholder="Informe o centro de custo"
-            />
-          )}
+          <select name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange}>
+            <option value="">Todos</option>
+            {centroCustoFilterOptions.map((item) => (
+              <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                {item.nome}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Data inicial</span>
@@ -650,6 +869,7 @@ export function EntradasPage() {
                   <th>Valor total</th>
                   <th>Data</th>
                   <th>Registrado por</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -657,12 +877,7 @@ export function EntradasPage() {
                   const material = materiaisMap.get(entrada.materialId)
                   const valorUnitario = Number(material?.valorUnitario ?? 0)
                   const total = valorUnitario * Number(entrada.quantidade ?? 0)
-                  const centroCustoKey = entrada.centroCustoId || entrada.centroCusto
-                  const centroCustoLabel =
-                    centrosCustoMap.get(centroCustoKey) ||
-                    entrada.centroCusto ||
-                    entrada.centroCustoId ||
-                    '-'
+                  const centroCustoLabel = resolveCentroCustoLabel(entrada) || '-'
                   const materialResumo = material ? formatMaterialSummary(material) : 'Material removido'
                   const materialIdLabel = material?.id || entrada.materialId || 'Nao informado'
                   const descricaoMaterial = material?.descricao || 'Nao informado'
@@ -676,8 +891,30 @@ export function EntradasPage() {
                       <td>{entrada.quantidade}</td>
                       <td>{centroCustoLabel}</td>
                       <td>{formatCurrency(total)}</td>
-                      <td>{entrada.dataEntrada ? new Date(entrada.dataEntrada).toLocaleString('pt-BR') : 'Nao informado'}</td>
+                      <td>{formatDisplayDate(entrada.dataEntrada)}</td>
                       <td>{entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Nao informado'}</td>
+                      <td>
+                        <div className="table-actions">
+                          <button
+                            type="button"
+                            className="button button--ghost button--icon"
+                            onClick={() => startEditEntrada(entrada)}
+                            aria-label={`Editar entrada ${entrada.id}`}
+                            title="Editar entrada"
+                          >
+                            <EditIcon size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="button button--ghost button--icon"
+                            onClick={() => openHistory(entrada)}
+                            aria-label={`Historico da entrada ${entrada.id}`}
+                            title="Historico da entrada"
+                          >
+                            <HistoryIcon size={16} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
@@ -686,12 +923,13 @@ export function EntradasPage() {
           </div>
         ) : null}
         <TablePagination
-          totalItems={entradas.length}
+          totalItems={filteredEntradas.length}
           pageSize={TABLE_PAGE_SIZE}
           currentPage={currentPage}
           onPageChange={setCurrentPage}
         />
       </section>
+      <EntradasHistoryModal state={historyState} onClose={closeHistory} />
     </div>
   )
 }
