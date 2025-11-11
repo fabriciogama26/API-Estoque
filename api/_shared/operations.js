@@ -168,6 +168,7 @@ function matchesEntradaSearch(entrada, termo, materiaisMap) {
     material?.nome || '',
     material?.fabricante || '',
     entrada.centroCusto || '',
+    entrada.centroCustoId || '',
     entrada.usuarioResponsavel || '',
   ]
     .join(' ')
@@ -229,9 +230,25 @@ function mapEntradaRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
   }
+  const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
+  const centroCustoId =
+    typeof centroCustoRaw === 'string' && UUID_REGEX.test(centroCustoRaw.trim())
+      ? centroCustoRaw.trim()
+      : null
+  const centroCustoNome =
+    trim(record.centroCustoNome ?? record.centro_custo_nome ?? '') ||
+    (centroCustoId ? '' : trim(centroCustoRaw))
+  const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
+  const usuarioId =
+    typeof usuarioRaw === 'string' && UUID_REGEX.test(usuarioRaw.trim())
+      ? usuarioRaw.trim()
+      : null
   return {
     ...record,
-    centroCusto: record.centroCusto ?? '',
+    centroCustoId: centroCustoId ?? null,
+    centroCusto: centroCustoNome || centroCustoRaw || '',
+    usuarioResponsavelId: usuarioId,
+    usuarioResponsavel: usuarioRaw,
   }
 }
 
@@ -546,6 +563,20 @@ const normalizeCatalogoLista = (lista) => {
   })
   return Array.from(valores).sort((a, b) => a.localeCompare(b))
 }
+
+const normalizeDomainOptions = (lista) =>
+  (Array.isArray(lista) ? lista : [])
+    .map((item) => {
+      const nome = trim(item?.nome ?? item?.descricao ?? item ?? '')
+      if (!nome) {
+        return null
+      }
+      return {
+        id: item?.id ?? null,
+        nome,
+      }
+    })
+    .filter(Boolean)
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -1056,6 +1087,42 @@ async function obterMaterialPorId(id) {
   return mapMaterialRecord(registro)
 }
 
+async function buscarMateriaisPorTermo(termo, limit = 10) {
+  const termoNormalizado = trim(termo)
+  if (!termoNormalizado) {
+    return []
+  }
+  const limiteSeguro = Number.isFinite(Number(limit))
+    ? Math.max(1, Math.min(Number(limit), 50))
+    : 10
+  const like = `%${termoNormalizado.replace(/\s+/g, '%')}%`
+  const filtros = [
+    `materialItemNome.ilike.${like}`,
+    `fabricanteNome.ilike.${like}`,
+    `grupoMaterialNome.ilike.${like}`,
+    `numeroCalcadoNome.ilike.${like}`,
+    `numeroVestimentaNome.ilike.${like}`,
+    `numeroEspecifico.ilike.${like}`,
+    `ca.ilike.${like}`,
+    `descricao.ilike.${like}`,
+    `usuarioCadastroNome.ilike.${like}`,
+    `usuarioAtualizacaoNome.ilike.${like}`,
+    `coresTexto.ilike.${like}`,
+    `caracteristicasTexto.ilike.${like}`,
+  ]
+  const registros = await execute(
+    supabaseAdmin
+      .from(MATERIAIS_VIEW)
+      .select('*')
+      .or(filtros.join(','))
+      .order('nome', { ascending: true })
+      .order('fabricante', { ascending: true, nullsFirst: false })
+      .limit(limiteSeguro),
+    'Falha ao buscar materiais.',
+  )
+  return (registros ?? []).map(mapMaterialRecord)
+}
+
 function calcularDataTroca(dataEntregaIso, validadeDias) {
   if (!validadeDias) {
     return null
@@ -1425,6 +1492,11 @@ export const MateriaisOperations = {
       )) ?? []
     return registros.map(mapMaterialRecord)
   },
+  async search(params = {}) {
+    const termo = params?.termo ?? params?.q ?? params?.query ?? ''
+    const limit = params?.limit ?? 10
+    return buscarMateriaisPorTermo(termo, limit)
+  },
   async groups() {
     const registros =
       (await execute(
@@ -1611,7 +1683,9 @@ export const EntradasOperations = {
 
     const centroCusto = trim(params.centroCusto)
     if (centroCusto) {
-      query = query.ilike('centroCusto', centroCusto)
+      query = UUID_REGEX.test(centroCusto)
+        ? query.eq('centro_custo', centroCusto)
+        : query.ilike('centro_custo', `%${centroCusto}%`)
     }
 
     const dataInicio = toStartOfDayIso(params.dataInicio)
@@ -1626,7 +1700,9 @@ export const EntradasOperations = {
 
     let entradas =
       (await execute(query, 'Falha ao listar entradas.')) ?? []
-    entradas = entradas.map(mapEntradaRecord)
+    entradas = await preencherUsuariosResponsaveis(
+      entradas.map(mapEntradaRecord)
+    )
 
     const termo = normalizeSearchTerm(params.termo)
     if (termo) {
@@ -1670,6 +1746,54 @@ export const EntradasOperations = {
 
     return mapEntradaRecord(entrada)
   },
+}
+
+async function preencherUsuariosResponsaveis(registros) {
+  const ids = Array.from(
+    new Set(
+      (registros ?? [])
+        .map((entrada) => entrada.usuarioResponsavelId)
+        .filter(Boolean)
+    )
+  )
+  if (!ids.length) {
+    return registros.map((entrada) => ({
+      ...entrada,
+      usuarioResponsavel:
+        entrada.usuarioResponsavel && !UUID_REGEX.test(entrada.usuarioResponsavel)
+          ? entrada.usuarioResponsavel
+          : entrada.usuarioResponsavel || '',
+      usuarioResponsavelNome:
+        entrada.usuarioResponsavel && !UUID_REGEX.test(entrada.usuarioResponsavel)
+          ? entrada.usuarioResponsavel
+          : '',
+    }))
+  }
+  const usuarios = await execute(
+    supabaseAdmin
+      .from('app_users')
+      .select('id, display_name, username, email')
+      .in('id', ids),
+    'Falha ao consultar usuarios.'
+  )
+  const mapa = new Map(
+    (usuarios ?? []).map((usuario) => [
+      usuario.id,
+      trim(usuario.display_name ?? usuario.username ?? usuario.email ?? ''),
+    ])
+  )
+
+  return registros.map((entrada) => {
+    const nome =
+      entrada.usuarioResponsavelId && mapa.has(entrada.usuarioResponsavelId)
+        ? mapa.get(entrada.usuarioResponsavelId)
+        : entrada.usuarioResponsavel
+    return {
+      ...entrada,
+      usuarioResponsavel: nome || entrada.usuarioResponsavel || '',
+      usuarioResponsavelNome: nome || entrada.usuarioResponsavel || '',
+    }
+  })
 }
 
 export const SaidasOperations = {
@@ -1967,6 +2091,16 @@ export async function healthCheck() {
     throw mapSupabaseError(error, GENERIC_SUPABASE_ERROR)
   }
   return { status: 'ok' }
+}
+
+export const CentrosCustoOperations = {
+  async list() {
+    const registros = await execute(
+      supabaseAdmin.from('centros_custo').select('id, nome').order('nome'),
+      'Falha ao listar centros de custo.'
+    )
+    return normalizeDomainOptions(registros)
+  },
 }
 
 

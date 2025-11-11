@@ -1239,13 +1239,22 @@ function mapEntradaRecord(record) {
   if (!record) {
     return null
   }
+  const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
+  const centroCustoId = normalizeUuid(centroCustoRaw)
+  const centroCustoNome =
+    resolveTextValue(record.centroCustoNome ?? record.centro_custo_nome ?? '') ||
+    (centroCustoId ? '' : resolveTextValue(centroCustoRaw))
+  const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
+  const usuarioId = isUuidValue(usuarioRaw) ? usuarioRaw : null
   return {
     id: record.id,
     materialId: record.materialId ?? record.material_id ?? null,
     quantidade: toNumber(record.quantidade),
-    centroCusto: resolveTextValue(record.centroCusto ?? record.centro_custo ?? ''),
+    centroCustoId: centroCustoId ?? null,
+    centroCusto: centroCustoNome || centroCustoRaw || '',
     dataEntrada: record.dataEntrada ?? record.data_entrada ?? null,
-    usuarioResponsavel: record.usuarioResponsavel ?? record.usuario_responsavel ?? '',
+    usuarioResponsavelId: usuarioId,
+    usuarioResponsavel: resolveTextValue(usuarioRaw),
   }
 }
 
@@ -1467,6 +1476,50 @@ async function carregarMateriaisDetalhados() {
   return (data ?? []).map(mapMaterialRecord)
 }
 
+async function buscarMateriaisPorTermo(termo, limit = 10) {
+  const termoNormalizado = trim(termo)
+  if (!termoNormalizado) {
+    return []
+  }
+  const limiteSeguro = Number.isFinite(Number(limit))
+    ? Math.max(1, Math.min(Number(limit), 50))
+    : 10
+  const like = `%${termoNormalizado.replace(/\s+/g, '%')}%`
+  const filtros = [
+    `materialItemNome.ilike.${like}`,
+    `fabricanteNome.ilike.${like}`,
+    `grupoMaterialNome.ilike.${like}`,
+    `numeroCalcadoNome.ilike.${like}`,
+    `numeroVestimentaNome.ilike.${like}`,
+    `numeroEspecifico.ilike.${like}`,
+    `ca.ilike.${like}`,
+    `descricao.ilike.${like}`,
+    `usuarioCadastroNome.ilike.${like}`,
+    `usuarioAtualizacaoNome.ilike.${like}`,
+    `coresTexto.ilike.${like}`,
+    `caracteristicasTexto.ilike.${like}`,
+  ]
+  const data = await execute(
+    supabase
+      .from('materiais_view')
+      .select(MATERIAL_SELECT_COLUMNS)
+      .or(filtros.join(','))
+      .order('nome', { ascending: true })
+      .order('fabricante', { ascending: true, nullsFirst: false })
+      .limit(limiteSeguro),
+    'Falha ao buscar materiais.'
+  )
+  return (data ?? []).map(mapMaterialRecord)
+}
+
+async function carregarCentrosCusto() {
+  const data = await execute(
+    supabase.from('centros_custo').select('id, nome').order('nome', { ascending: true }),
+    'Falha ao listar centros de custo.'
+  )
+  return normalizeDomainOptions(data)
+}
+
 async function carregarPessoas() {
   const data = await execute(
     supabase
@@ -1503,8 +1556,11 @@ async function carregarEntradas(params = {}) {
   if (params.materialId) {
     query = query.eq('materialId', params.materialId)
   }
-  if (params.centroCusto) {
-    query = query.ilike('centro_custo', `%${trim(params.centroCusto)}%`)
+  const centroFiltro = trim(params.centroCusto)
+  if (centroFiltro) {
+    query = isUuidValue(centroFiltro)
+      ? query.eq('centro_custo', centroFiltro)
+      : query.ilike('centro_custo', `%${centroFiltro}%`)
   }
 
   const periodo = resolvePeriodoRange(parsePeriodo(params))
@@ -1514,12 +1570,14 @@ async function carregarEntradas(params = {}) {
 
   const data = await execute(query, 'Falha ao listar entradas.')
   let registros = (data ?? []).map(mapEntradaRecord)
+  registros = await preencherUsuariosResponsaveis(registros)
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
     registros = registros.filter((entrada) => {
       const alvo = [
         entrada.centroCusto,
+        entrada.centroCustoId,
         entrada.usuarioResponsavel,
       ]
         .join(' ')
@@ -1529,6 +1587,50 @@ async function carregarEntradas(params = {}) {
   }
 
   return registros
+}
+
+async function preencherUsuariosResponsaveis(registros) {
+  const ids = Array.from(
+    new Set(registros.map((entrada) => entrada.usuarioResponsavelId).filter(Boolean))
+  )
+  if (!ids.length) {
+    return registros.map((entrada) => ({
+      ...entrada,
+      usuarioResponsavelNome: entrada.usuarioResponsavel,
+    }))
+  }
+  try {
+    const usuarios = await execute(
+      supabase
+        .from('app_users')
+        .select('id, display_name, username, email')
+        .in('id', ids),
+      'Falha ao consultar usuarios.'
+    )
+    const mapa = new Map(
+      (usuarios ?? []).map((usuario) => [
+        usuario.id,
+        resolveTextValue(usuario.display_name ?? usuario.username ?? usuario.email ?? ''),
+      ])
+    )
+    return registros.map((entrada) => {
+      const nome =
+        entrada.usuarioResponsavelId && mapa.has(entrada.usuarioResponsavelId)
+          ? mapa.get(entrada.usuarioResponsavelId)
+          : entrada.usuarioResponsavel
+      return {
+        ...entrada,
+        usuarioResponsavelNome: nome || '',
+        usuarioResponsavel: nome || entrada.usuarioResponsavel,
+      }
+    })
+  } catch (error) {
+    console.warn('Falha ao resolver usuarios responsaveis.', error)
+    return registros.map((entrada) => ({
+      ...entrada,
+      usuarioResponsavelNome: entrada.usuarioResponsavel,
+    }))
+  }
 }
 
 async function carregarSaidas(params = {}) {
@@ -2005,6 +2107,11 @@ export const api = {
     },
     async listDetalhado() {
       return carregarMateriaisDetalhados()
+    },
+    async search(params = {}) {
+      const termo = params?.termo ?? params?.q ?? params?.query ?? ''
+      const limit = params?.limit ?? 10
+      return buscarMateriaisPorTermo(termo, limit)
     },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)
@@ -2876,6 +2983,11 @@ async dashboard(params = {}) {
         cargos: normalizeDomainOptions(cargos),
         tiposExecucao: normalizeDomainOptions(tipos),
       }
+    },
+  },
+  centrosCusto: {
+    async list() {
+      return carregarCentrosCusto()
     },
   },
   documentos: {
