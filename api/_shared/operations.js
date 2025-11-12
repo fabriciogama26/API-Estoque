@@ -18,6 +18,7 @@ const DEFAULT_MATERIAIS_VIEW = 'vw_materiais_vinculos'
 const MATERIAIS_VIEW = process.env.MATERIAIS_VIEW || DEFAULT_MATERIAIS_VIEW
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
+const CENTRO_ESTOQUE_TABLE = 'centro_estoque'
 
 const CARACTERISTICA_ID_KEYS = [
   'caracteristicasIds',
@@ -253,14 +254,20 @@ function mapEntradaRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
   }
+  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
   const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
   const centroCustoId =
-    typeof centroCustoRaw === 'string' && UUID_REGEX.test(centroCustoRaw.trim())
-      ? centroCustoRaw.trim()
+    typeof (centroEstoqueValor ?? centroCustoRaw) === 'string' &&
+    UUID_REGEX.test(String(centroEstoqueValor ?? centroCustoRaw).trim())
+      ? String(centroEstoqueValor ?? centroCustoRaw).trim()
       : null
   const centroCustoNome =
-    trim(record.centroCustoNome ?? record.centro_custo_nome ?? '') ||
-    (centroCustoId ? '' : trim(centroCustoRaw))
+    trim(
+      record.centroCustoNome ??
+        record.centro_custo_nome ??
+        record.centro_estoque_nome ??
+        '',
+    ) || (centroCustoId ? '' : trim(centroCustoRaw))
   const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
   const usuarioId =
     typeof usuarioRaw === 'string' && UUID_REGEX.test(usuarioRaw.trim())
@@ -613,12 +620,12 @@ async function resolveCentroCustoNome(valor) {
   }
   try {
     const registro = await executeMaybeSingle(
-      supabaseAdmin.from('centros_custo').select('nome').eq('id', raw),
-      'Falha ao consultar centro de custo.'
+      supabaseAdmin.from(CENTRO_ESTOQUE_TABLE).select('almox').eq('id', raw),
+      'Falha ao consultar centro de estoque.'
     )
-    return trim(registro?.nome ?? '') || raw
+    return trim(registro?.almox ?? '') || raw
   } catch (error) {
-    console.warn('Nao foi possivel resolver o centro de custo.', error)
+    console.warn('Nao foi possivel resolver o centro de estoque.', error)
     return raw
   }
 }
@@ -1804,9 +1811,11 @@ export const EntradasOperations = {
 
     const centroCusto = trim(params.centroCusto)
     if (centroCusto) {
-      query = UUID_REGEX.test(centroCusto)
-        ? query.eq('centro_custo', centroCusto)
-        : query.ilike('centro_custo', `%${centroCusto}%`)
+      if (UUID_REGEX.test(centroCusto)) {
+        query = query.or(`centro_estoque.eq.${centroCusto},centro_custo.eq.${centroCusto}`)
+      } else {
+        query = query.ilike('centro_custo', `%${centroCusto}%`)
+      }
     }
     const registradoPor = trim(params.registradoPor)
     if (registradoPor) {
@@ -1830,6 +1839,7 @@ export const EntradasOperations = {
     entradas = await preencherUsuariosResponsaveis(
       entradas.map(mapEntradaRecord)
     )
+    entradas = await preencherCentrosEstoque(entradas)
 
     const termo = normalizeSearchTerm(params.termo)
     if (termo) {
@@ -1863,6 +1873,7 @@ export const EntradasOperations = {
             id: randomId(),
             materialId: dados.materialId,
             quantidade: dados.quantidade,
+            centro_estoque: dados.centroCusto,
             centroCusto: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
@@ -1872,7 +1883,9 @@ export const EntradasOperations = {
     )
 
     const normalizada = (
-      await preencherUsuariosResponsaveis([mapEntradaRecord(entrada)])
+      await preencherCentrosEstoque(
+        await preencherUsuariosResponsaveis([mapEntradaRecord(entrada)])
+      )
     )[0]
     await registrarHistoricoEntrada(normalizada, material, usuario)
     return normalizada
@@ -1899,6 +1912,7 @@ export const EntradasOperations = {
         .update({
           materialId: dados.materialId,
           quantidade: dados.quantidade,
+          centro_estoque: dados.centroCusto,
           centroCusto: dados.centroCusto,
           dataEntrada: dados.dataEntrada,
           usuarioResponsavel: usuario,
@@ -1908,7 +1922,9 @@ export const EntradasOperations = {
       'Falha ao atualizar entrada.'
     )
     const normalizada = (
-      await preencherUsuariosResponsaveis([mapEntradaRecord(entradaAtualizada)])
+      await preencherCentrosEstoque(
+        await preencherUsuariosResponsaveis([mapEntradaRecord(entradaAtualizada)])
+      )
     )[0]
     await registrarHistoricoEntrada(normalizada, material, usuario, entradaAnterior)
     return normalizada
@@ -2009,6 +2025,69 @@ async function preencherUsuariosResponsaveis(registros) {
       usuarioResponsavelNome: nome || entrada.usuarioResponsavel || '',
     }
   })
+}
+
+async function preencherCentrosEstoque(registros = []) {
+  const ids = Array.from(
+    new Set(
+      (registros ?? [])
+        .map((entrada) => entrada.centroCustoId)
+        .filter((valor) => Boolean(valor) && UUID_REGEX.test(String(valor)))
+    )
+  )
+  if (!ids.length) {
+    return registros
+  }
+  try {
+    const [porId, porCentro] = await Promise.all([
+      execute(
+        supabaseAdmin
+          .from(CENTRO_ESTOQUE_TABLE)
+          .select('id, almox')
+          .in('id', ids),
+        'Falha ao consultar centros de estoque.'
+      ),
+      execute(
+        supabaseAdmin
+          .from(CENTRO_ESTOQUE_TABLE)
+          .select('id, almox, centro_custo')
+          .in('centro_custo', ids),
+        'Falha ao consultar centros de estoque.'
+      ),
+    ])
+    const mapaPorId = new Map(
+      (porId ?? [])
+        .map((centro) => [centro.id, trim(centro.almox ?? '')])
+        .filter(([, nome]) => Boolean(nome))
+    )
+    const mapaPorCentro = new Map(
+      (porCentro ?? [])
+        .map((centro) => [centro.centro_custo, trim(centro.almox ?? '')])
+        .filter(([, nome]) => Boolean(nome))
+    )
+    if (!mapaPorId.size && !mapaPorCentro.size) {
+      return registros
+    }
+    return registros.map((entrada) => {
+      if (!entrada.centroCustoId) {
+        return entrada
+      }
+      const nome =
+        mapaPorId.get(entrada.centroCustoId) ||
+        mapaPorCentro.get(entrada.centroCustoId)
+      if (!nome) {
+        return entrada
+      }
+      return {
+        ...entrada,
+        centroCusto: nome,
+        centroCustoNome: nome,
+      }
+    })
+  } catch (error) {
+    console.warn('Falha ao resolver centros de estoque.', error)
+    return registros
+  }
 }
 
 export const SaidasOperations = {
@@ -2252,10 +2331,16 @@ export async function healthCheck() {
 export const CentrosCustoOperations = {
   async list() {
     const registros = await execute(
-      supabaseAdmin.from('centros_custo').select('id, nome').order('nome'),
-      'Falha ao listar centros de custo.'
+      supabaseAdmin.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox'),
+      'Falha ao listar centros de estoque.'
     )
-    return normalizeDomainOptions(registros)
+    const normalizados = (registros ?? [])
+      .map((item) => ({
+        id: item?.id ?? null,
+        nome: trim(item?.almox ?? ''),
+      }))
+      .filter((item) => item.nome)
+    return normalizeDomainOptions(normalizados)
   },
 }
 

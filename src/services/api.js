@@ -124,6 +124,8 @@ const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
 const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = ['grupo_caracteristica_epi']
 const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 
+const CENTRO_ESTOQUE_TABLE = 'centros_estoque'
+
 
 const MATERIAL_HISTORY_FIELDS = [
   'materialItemNome',
@@ -685,12 +687,12 @@ async function resolveCentroCustoNome(valor) {
   }
   try {
     const registro = await executeMaybeSingle(
-      supabase.from('centros_custo').select('nome').eq('id', raw),
-      'Falha ao consultar centro de custo.'
+      supabase.from(CENTRO_ESTOQUE_TABLE).select('almox').eq('id', raw),
+      'Falha ao consultar centro de estoque.'
     )
-    return resolveTextValue(registro?.nome ?? '') || raw
+    return resolveTextValue(registro?.almox ?? '') || raw
   } catch (error) {
-    console.warn('Nao foi possivel resolver centro de custo.', error)
+    console.warn('Nao foi possivel resolver centro de estoque.', error)
     return raw
   }
 }
@@ -1438,10 +1440,13 @@ function mapEntradaRecord(record) {
   if (!record) {
     return null
   }
+  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
   const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
-  const centroCustoId = normalizeUuid(centroCustoRaw)
+  const centroCustoId = normalizeUuid(centroEstoqueValor ?? centroCustoRaw)
   const centroCustoNome =
-    resolveTextValue(record.centroCustoNome ?? record.centro_custo_nome ?? '') ||
+    resolveTextValue(
+      record.centroCustoNome ?? record.centro_custo_nome ?? record.centro_estoque_nome ?? '',
+    ) ||
     (centroCustoId ? '' : resolveTextValue(centroCustoRaw))
   const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
   const usuarioId = isUuidValue(usuarioRaw) ? usuarioRaw : null
@@ -1743,10 +1748,16 @@ async function buscarMateriaisPorTermo(termo, limit = 10) {
 
 async function carregarCentrosCusto() {
   const data = await execute(
-    supabase.from('centros_custo').select('id, nome').order('nome', { ascending: true }),
-    'Falha ao listar centros de custo.'
+    supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox', { ascending: true }),
+    'Falha ao listar centros de estoque.'
   )
-  return normalizeDomainOptions(data)
+  const normalizados = (data ?? [])
+    .map((item) => ({
+      id: item?.id ?? null,
+      nome: resolveTextValue(item?.almox ?? ''),
+    }))
+    .filter((item) => item.nome)
+  return normalizeDomainOptions(normalizados)
 }
 
 async function carregarPessoas() {
@@ -1787,9 +1798,11 @@ async function carregarEntradas(params = {}) {
   }
   const centroFiltro = trim(params.centroCusto)
   if (centroFiltro) {
-    query = isUuidValue(centroFiltro)
-      ? query.eq('centro_custo', centroFiltro)
-      : query.ilike('centro_custo', `%${centroFiltro}%`)
+    if (isUuidValue(centroFiltro)) {
+      query = query.or(`centro_estoque.eq.${centroFiltro},centro_custo.eq.${centroFiltro}`)
+    } else {
+      query = query.ilike('centro_custo', `%${centroFiltro}%`)
+    }
   }
   const registradoPor = trim(params.registradoPor)
   if (registradoPor) {
@@ -1812,6 +1825,7 @@ async function carregarEntradas(params = {}) {
   const data = await execute(query, 'Falha ao listar entradas.')
   let registros = (data ?? []).map(mapEntradaRecord)
   registros = await preencherUsuariosResponsaveis(registros)
+  registros = await preencherCentrosEstoque(registros)
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
@@ -1880,6 +1894,69 @@ async function preencherUsuariosResponsaveis(registros) {
       ...entrada,
       usuarioResponsavelNome: entrada.usuarioResponsavel,
     }))
+  }
+}
+
+async function preencherCentrosEstoque(registros = []) {
+  const ids = Array.from(
+    new Set(
+      (registros ?? [])
+        .map((entrada) => entrada.centroCustoId)
+        .filter((valor) => Boolean(valor) && isUuidValue(valor))
+    )
+  )
+  if (!ids.length) {
+    return registros
+  }
+  try {
+    const [porId, porCentroLegado] = await Promise.all([
+      execute(
+        supabase
+          .from(CENTRO_ESTOQUE_TABLE)
+          .select('id, almox')
+          .in('id', ids),
+        'Falha ao consultar centros de estoque.'
+      ),
+      execute(
+        supabase
+          .from(CENTRO_ESTOQUE_TABLE)
+          .select('id, almox, centro_custo')
+          .in('centro_custo', ids),
+        'Falha ao consultar centros de estoque.'
+      ),
+    ])
+    const mapaPorId = new Map(
+      (porId ?? [])
+        .map((centro) => [centro.id, resolveTextValue(centro.almox ?? '')])
+        .filter(([, nome]) => Boolean(nome))
+    )
+    const mapaPorCentro = new Map(
+      (porCentroLegado ?? [])
+        .map((centro) => [centro.centro_custo, resolveTextValue(centro.almox ?? '')])
+        .filter(([, nome]) => Boolean(nome))
+    )
+    if (!mapaPorId.size && !mapaPorCentro.size) {
+      return registros
+    }
+    return registros.map((entrada) => {
+      if (!entrada.centroCustoId) {
+        return entrada
+      }
+      const nome =
+        mapaPorId.get(entrada.centroCustoId) ||
+        mapaPorCentro.get(entrada.centroCustoId)
+      if (!nome) {
+        return entrada
+      }
+      return {
+        ...entrada,
+        centroCustoNome: nome,
+        centroCusto: nome,
+      }
+    })
+  } catch (error) {
+    console.warn('Falha ao resolver centros de estoque.', error)
+    return registros
   }
 }
 
@@ -2690,6 +2767,7 @@ export const api = {
           .insert({
             materialId: dados.materialId,
             quantidade: dados.quantidade,
+            centro_estoque: dados.centroCusto,
             centro_custo: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
@@ -2718,6 +2796,7 @@ export const api = {
           .update({
             materialId: dados.materialId,
             quantidade: dados.quantidade,
+            centro_estoque: dados.centroCusto,
             centro_custo: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,

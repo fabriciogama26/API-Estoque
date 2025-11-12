@@ -6,6 +6,7 @@ import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import '../styles/MateriaisPage.css'
 
 const initialForm = {
   materialId: '',
@@ -764,10 +765,10 @@ const filteredEntradas = useMemo(() => {
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
           </label>
           <label className="field">
-            <span>Centro de custo*</span>
+            <span>Centro de estoque*</span>
             {hasCentrosCusto ? (
               <select name="centroCusto" value={form.centroCusto} onChange={handleChange} required>
-                <option value="">Selecione um centro</option>
+                <option value="">Selecione um centro de estoque</option>
                 {centrosCusto.map((item) => (
                   <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
                     {item.nome}
@@ -780,7 +781,7 @@ const filteredEntradas = useMemo(() => {
                 value={form.centroCusto}
                 onChange={handleChange}
                 required
-                placeholder="Informe o centro de custo"
+                placeholder="Informe o centro de estoque"
               />
             )}
           </label>
@@ -819,7 +820,7 @@ const filteredEntradas = useMemo(() => {
           </select>
         </label>
         <label className="field">
-          <span>Centro de custo</span>
+          <span>Centro de estoque</span>
           <select name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange}>
             <option value="">Todos</option>
             {centroCustoFilterOptions.map((item) => (
@@ -865,7 +866,7 @@ const filteredEntradas = useMemo(() => {
                   <th>Material</th>
                   <th>Descrição</th>
                   <th>Quantidade</th>
-                  <th>Centro de custo</th>
+                  <th>Centro de estoque</th>
                   <th>Valor total</th>
                   <th>Data</th>
                   <th>Registrado por</th>
@@ -894,10 +895,10 @@ const filteredEntradas = useMemo(() => {
                       <td>{formatDisplayDate(entrada.dataEntrada)}</td>
                       <td>{entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Nao informado'}</td>
                       <td>
-                        <div className="table-actions">
+                        <div className="table-actions materiais-data-table__actions">
                           <button
                             type="button"
-                            className="button button--ghost button--icon"
+                            className="materiais-table-action-button"
                             onClick={() => startEditEntrada(entrada)}
                             aria-label={`Editar entrada ${entrada.id}`}
                             title="Editar entrada"
@@ -906,7 +907,7 @@ const filteredEntradas = useMemo(() => {
                           </button>
                           <button
                             type="button"
-                            className="button button--ghost button--icon"
+                            className="materiais-table-action-button"
                             onClick={() => openHistory(entrada)}
                             aria-label={`Historico da entrada ${entrada.id}`}
                             title="Historico da entrada"

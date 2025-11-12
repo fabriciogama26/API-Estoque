@@ -29,7 +29,7 @@ const buildChanges = (currentSnapshot, previousSnapshot) => {
     { key: 'materialResumo', label: 'Material' },
     { key: 'descricao', label: 'Descricao' },
     { key: 'quantidade', label: 'Quantidade' },
-    { key: 'centroCusto', label: 'Centro de custo' },
+    { key: 'centroCusto', label: 'Centro de estoque' },
     { key: 'dataEntrada', label: 'Data da entrada' },
   ]
   const prev = previousSnapshot || {}
