@@ -1431,6 +1431,32 @@ const calcularDataTroca = (dataEntregaIso, validadeDias) => {
 
 const normalizeSearchTerm = (value) => (value ? String(value).trim().toLowerCase() : '')
 
+const materialMatchesLocalTerm = (material, termoNormalizado) => {
+  if (!termoNormalizado) {
+    return true
+  }
+  const campos = [
+    material?.nome,
+    material?.materialItemNome,
+    material?.nomeItemRelacionado,
+    material?.grupoMaterial,
+    material?.grupoMaterialNome,
+    material?.numeroCalcado,
+    material?.numeroCalcadoNome,
+    material?.numeroVestimenta,
+    material?.numeroVestimentaNome,
+    material?.numeroEspecifico,
+    material?.fabricante,
+    material?.fabricanteNome,
+    material?.coresTexto,
+    material?.caracteristicasTexto,
+    material?.id,
+  ]
+  return campos
+    .map((campo) => normalizeSearchTerm(campo))
+    .some((campo) => campo && campo.includes(termoNormalizado))
+}
+
 const MATERIAL_SEARCH_MAX_RESULTS = 10
 
 const localMaterialMatchesSearch = (material, termo) => {
@@ -1480,6 +1506,26 @@ const collectCentrosCustoOptions = (state) => {
       id: nome,
       nome,
     }))
+}
+
+const collectCentrosServicoOptions = (state) => {
+  const nomes = new Set()
+  const adicionar = (valor) => {
+    const nome = trim(valor)
+    if (nome) {
+      nomes.add(nome)
+    }
+  }
+  ;(state.pessoas || []).forEach((pessoa) => {
+    adicionar(pessoa.centroServico)
+    adicionar(pessoa.setor)
+    adicionar(pessoa.local)
+  })
+  ;(state.saidas || []).forEach((saida) => adicionar(saida.centroServico))
+  return Array.from(nomes)
+    .sort((a, b) => a.localeCompare(b))
+    .map((nome, index) => mapDomainOption(nome, index))
+    .filter(Boolean)
 }
 
 const toStartOfDay = (value) => {
@@ -2012,14 +2058,57 @@ const localApi = {
       )
     },
   },
-    entradas: {
-      async list(params = {}) {
-        return readState((state) => {
-          const mapped = state.entradas.map(mapLocalEntradaRecord)
-          const filtradas = filterLocalEntradas(mapped, params, state)
-          return sortByDateDesc(filtradas, 'dataEntrada')
+  entradas: {
+    async list(params = {}) {
+      return readState((state) => {
+        const mapped = state.entradas.map(mapLocalEntradaRecord)
+        const filtradas = filterLocalEntradas(mapped, params, state)
+        return sortByDateDesc(filtradas, 'dataEntrada')
+      })
+    },
+    async materialOptions() {
+      return readState((state) => {
+        const ids = new Set(
+          (state.entradas || [])
+            .map((entrada) => entrada.materialId)
+            .filter((id) => Boolean(id))
+        )
+        if (ids.size === 0) {
+          return []
+        }
+        const materiais = state.materiais
+          .filter((material) => ids.has(material.id))
+          .map((material) => mapLocalMaterialRecord(material))
+        return materiais.sort((a, b) => {
+          const nomeA = normalizeSearchTerm(a.materialItemNome || a.nome || a.nomeId || '')
+          const nomeB = normalizeSearchTerm(b.materialItemNome || b.nome || b.nomeId || '')
+          return nomeA.localeCompare(nomeB, 'pt-BR')
         })
-      },
+      })
+    },
+    async searchMateriais(params = {}) {
+      const termo = normalizeSearchTerm(params.termo || params.q || params.query)
+      const limiteSeguro = Number.isFinite(Number(params.limit))
+        ? Math.max(1, Math.min(Number(params.limit), 50))
+        : 10
+      return readState((state) => {
+        const ids = new Set(
+          (state.entradas || [])
+            .map((entrada) => entrada.materialId)
+            .filter((id) => Boolean(id))
+        )
+        if (ids.size === 0) {
+          return []
+        }
+        const materiais = state.materiais
+          .filter((material) => ids.has(material.id))
+          .map((material) => mapLocalMaterialRecord(material))
+        const candidatos = termo
+          ? materiais.filter((material) => materialMatchesLocalTerm(material, termo))
+          : materiais
+        return candidatos.slice(0, limiteSeguro)
+      })
+    },
     async create(payload) {
       const dados = sanitizeEntradaPayload(payload)
       validateEntradaPayload(dados)
@@ -2513,6 +2602,11 @@ const localApi = {
   centrosCusto: {
     async list() {
       return readState((state) => collectCentrosCustoOptions(state))
+    },
+  },
+  centrosServico: {
+    async list() {
+      return readState((state) => collectCentrosServicoOptions(state))
     },
   },
 }

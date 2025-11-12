@@ -125,6 +125,8 @@ const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = ['grupo_caracteristica_epi']
 const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 
 const CENTRO_ESTOQUE_TABLE = 'centros_estoque'
+const CENTROS_CUSTO_TABLE = 'centros_custo'
+const ENTRADAS_MATERIAIS_VIEW = 'entradas_material_view'
 
 
 const MATERIAL_HISTORY_FIELDS = [
@@ -291,9 +293,7 @@ const resolveCatalogoNome = (record) => {
   return ''
 }
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const normalizeUuid = (value) => {
   const texto = trim(value)
   if (!texto) {
@@ -1392,20 +1392,27 @@ function mapPessoaRecord(record) {
   const centroCustoRel = record.centros_custo ?? record.centro_custo_rel
   const tipoExecucaoRel = record.tipo_execucao ?? record.tipo_execucao_rel
 
-  const centroServico = resolveTextValue(
-    record.centroServico ??
-      record.centro_servico ??
-      centroServicoRel ??
-      record.setor ??
-      record.local ??
-      '',
+  const resolveCampo = (...valores) => {
+    for (const valor of valores) {
+      const texto = resolveTextValue(valor)
+      if (texto) {
+        return texto
+      }
+    }
+    return ''
+  }
+
+  const centroServico = resolveCampo(
+    record.centroServico,
+    record.centro_servico,
+    centroServicoRel,
+    record.setor,
+    record.local
   )
-  const setor = resolveTextValue(record.setor ?? setorRel ?? centroServico)
-  const cargo = resolveTextValue(record.cargo ?? cargoRel ?? '')
-  const tipoExecucao = resolveTextValue(
-    record.tipoExecucao ?? record.tipo_execucao ?? tipoExecucaoRel ?? '',
-  )
-  const centroCusto = resolveTextValue(centroCustoRel ?? record.centro_custo ?? centroServico)
+  const setor = resolveCampo(record.setor, setorRel, centroServico)
+  const cargo = resolveCampo(record.cargo, cargoRel)
+  const tipoExecucao = resolveCampo(record.tipoExecucao, record.tipo_execucao, tipoExecucaoRel)
+  const centroCusto = resolveCampo(centroCustoRel, record.centro_custo, record.centroServico, centroServico)
 
   const historicoRaw =
     record.historicoEdicao ??
@@ -1496,17 +1503,26 @@ function mapSaidaRecord(record) {
   if (!record) {
     return null
   }
+  const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
+  const usuarioId = isUuidValue(usuarioRaw) ? usuarioRaw : null
+  const usuarioTexto = resolveTextValue(usuarioRaw)
   return {
     id: record.id,
     materialId: record.materialId ?? record.material_id ?? null,
     pessoaId: record.pessoaId ?? record.pessoa_id ?? null,
     quantidade: toNumber(record.quantidade),
-    centroCusto: resolveTextValue(record.centroCusto ?? record.centro_custo ?? ''),
-    centroServico: resolveTextValue(record.centroServico ?? record.centro_servico ?? ''),
+    centroCustoId: record.centroCustoId ?? record.centro_custo ?? null,
+    centroCusto: resolveTextValue(record.centroCustoNome ?? record.centroCusto ?? record.centro_custo ?? ''),
+    centroServicoId: record.centroServicoId ?? record.centro_servico ?? null,
+    centroServico: resolveTextValue(
+      record.centroServicoNome ?? record.centroServico ?? record.centro_servico ?? ''
+    ),
     dataEntrega: record.dataEntrega ?? record.data_entrega ?? null,
     dataTroca: record.dataTroca ?? record.data_troca ?? null,
     status: record.status ?? '',
-    usuarioResponsavel: record.usuarioResponsavel ?? record.usuario_responsavel ?? '',
+    usuarioResponsavel: usuarioId ? usuarioId : usuarioTexto,
+    usuarioResponsavelId: usuarioId,
+    usuarioResponsavelNome: usuarioId ? '' : usuarioTexto,
   }
 }
 
@@ -1710,7 +1726,19 @@ async function carregarMateriaisDetalhados() {
   return (data ?? []).map(mapMaterialRecord)
 }
 
-async function buscarMateriaisPorTermo(termo, limit = 10) {
+async function carregarMateriaisDeEntradas() {
+  const data = await execute(
+    supabase
+      .from(ENTRADAS_MATERIAIS_VIEW)
+      .select(MATERIAL_SELECT_COLUMNS)
+      .order('materialItemNome', { ascending: true })
+      .order('nome', { ascending: true }),
+    'Falha ao listar materiais provenientes de entradas.'
+  )
+  return (data ?? []).map(mapMaterialRecord)
+}
+
+async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
   const termoNormalizado = trim(termo)
   if (!termoNormalizado) {
     return []
@@ -1718,6 +1746,7 @@ async function buscarMateriaisPorTermo(termo, limit = 10) {
   const limiteSeguro = Number.isFinite(Number(limit))
     ? Math.max(1, Math.min(Number(limit), 50))
     : 10
+  const sourceTable = options.source || 'materiais_view'
   const like = `%${termoNormalizado.replace(/\s+/g, '%')}%`
   const filtros = [
     `materialItemNome.ilike.${like}`,
@@ -1735,7 +1764,7 @@ async function buscarMateriaisPorTermo(termo, limit = 10) {
   ]
   const data = await execute(
     supabase
-      .from('materiais_view')
+      .from(sourceTable)
       .select(MATERIAL_SELECT_COLUMNS)
       .or(filtros.join(','))
       .order('nome', { ascending: true })
@@ -1748,16 +1777,18 @@ async function buscarMateriaisPorTermo(termo, limit = 10) {
 
 async function carregarCentrosCusto() {
   const data = await execute(
-    supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox', { ascending: true }),
-    'Falha ao listar centros de estoque.'
+    supabase.from(CENTROS_CUSTO_TABLE).select('id, nome').order('nome', { ascending: true }),
+    'Falha ao listar centros de custo.'
   )
-  const normalizados = (data ?? [])
-    .map((item) => ({
-      id: item?.id ?? null,
-      nome: resolveTextValue(item?.almox ?? ''),
-    }))
-    .filter((item) => item.nome)
-  return normalizeDomainOptions(normalizados)
+  return normalizeDomainOptions(data ?? [])
+}
+
+async function carregarCentrosServico() {
+  const data = await execute(
+    supabase.from('centros_servico').select('id, nome').order('nome'),
+    'Falha ao listar centros de serviço.'
+  )
+  return normalizeDomainOptions(data ?? [])
 }
 
 async function carregarPessoas() {
@@ -1787,7 +1818,57 @@ async function carregarPessoas() {
       .order('nome', { ascending: true }),
     'Falha ao listar pessoas.'
   )
-  return (data ?? []).map(mapPessoaRecord)
+  const pessoas = (data ?? []).map(mapPessoaRecord)
+  return aplicarCargoFallback(pessoas)
+}
+
+function normalizeMatriculaKey(value) {
+  const texto = trim(value)
+  return texto ? texto.toUpperCase() : ''
+}
+
+async function carregarCargoFallbackPorMatricula() {
+  try {
+    const registros = await execute(
+      supabase.from('pessoas_view').select('matricula, cargo'),
+      'Falha ao consultar pessoas_view.'
+    )
+    const mapa = new Map()
+    ;(registros ?? []).forEach((registro) => {
+      const matriculaKey = normalizeMatriculaKey(registro?.matricula)
+      const cargoTexto = resolveTextValue(registro?.cargo ?? '')
+      if (matriculaKey && cargoTexto) {
+        mapa.set(matriculaKey, cargoTexto)
+      }
+    })
+    return mapa
+  } catch (error) {
+    console.warn('Nao foi possivel usar pessoas_view como fallback de cargo.', error)
+    return null
+  }
+}
+
+async function aplicarCargoFallback(pessoas) {
+  if (!Array.isArray(pessoas) || pessoas.length === 0) {
+    return pessoas ?? []
+  }
+  const faltantes = pessoas.filter(
+    (pessoa) => pessoa && !pessoa.cargo && normalizeMatriculaKey(pessoa.matricula)
+  )
+  if (faltantes.length === 0) {
+    return pessoas
+  }
+  const cargoMap = await carregarCargoFallbackPorMatricula()
+  if (!cargoMap || cargoMap.size === 0) {
+    return pessoas
+  }
+  faltantes.forEach((pessoa) => {
+    const cargoFallback = cargoMap.get(normalizeMatriculaKey(pessoa.matricula))
+    if (cargoFallback) {
+      pessoa.cargo = cargoFallback
+    }
+  })
+  return pessoas
 }
 
 async function carregarEntradas(params = {}) {
@@ -1909,42 +1990,23 @@ async function preencherCentrosEstoque(registros = []) {
     return registros
   }
   try {
-    const [porId, porCentroLegado] = await Promise.all([
-      execute(
-        supabase
-          .from(CENTRO_ESTOQUE_TABLE)
-          .select('id, almox')
-          .in('id', ids),
-        'Falha ao consultar centros de estoque.'
-      ),
-      execute(
-        supabase
-          .from(CENTRO_ESTOQUE_TABLE)
-          .select('id, almox, centro_custo')
-          .in('centro_custo', ids),
-        'Falha ao consultar centros de estoque.'
-      ),
-    ])
-    const mapaPorId = new Map(
-      (porId ?? [])
-        .map((centro) => [centro.id, resolveTextValue(centro.almox ?? '')])
+    const centros = await execute(
+      supabase.from(CENTROS_CUSTO_TABLE).select('id, nome').in('id', ids),
+      'Falha ao consultar centros de custo.'
+    )
+    const mapa = new Map(
+      (centros ?? [])
+        .map((centro) => [centro.id, resolveTextValue(centro.nome ?? '')])
         .filter(([, nome]) => Boolean(nome))
     )
-    const mapaPorCentro = new Map(
-      (porCentroLegado ?? [])
-        .map((centro) => [centro.centro_custo, resolveTextValue(centro.almox ?? '')])
-        .filter(([, nome]) => Boolean(nome))
-    )
-    if (!mapaPorId.size && !mapaPorCentro.size) {
+    if (!mapa.size) {
       return registros
     }
     return registros.map((entrada) => {
       if (!entrada.centroCustoId) {
         return entrada
       }
-      const nome =
-        mapaPorId.get(entrada.centroCustoId) ||
-        mapaPorCentro.get(entrada.centroCustoId)
+      const nome = mapa.get(entrada.centroCustoId)
       if (!nome) {
         return entrada
       }
@@ -1955,7 +2017,7 @@ async function preencherCentrosEstoque(registros = []) {
       }
     })
   } catch (error) {
-    console.warn('Falha ao resolver centros de estoque.', error)
+    console.warn('Falha ao resolver centros de custo.', error)
     return registros
   }
 }
@@ -1986,11 +2048,32 @@ async function carregarSaidas(params = {}) {
 
   const data = await execute(query, 'Falha ao listar saidas.')
   let registros = (data ?? []).map(mapSaidaRecord)
+  registros = await preencherUsuariosResponsaveis(registros)
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
     const [pessoasRaw, materiaisRaw] = await Promise.all([
-      execute(supabase.from('pessoas').select('id, nome, centro_servico'), 'Falha ao listar pessoas.'),
+      execute(
+        supabase
+          .from('pessoas')
+          .select(
+            `
+              id,
+              nome,
+              centro_servico_id,
+              centros_servico ( id, nome ),
+              setor_id,
+              setores ( id, nome ),
+              cargo_id,
+              cargos ( id, nome ),
+              centro_custo_id,
+              centros_custo ( id, nome ),
+              tipo_execucao_id,
+              tipo_execucao ( id, nome )
+            `
+          ),
+        'Falha ao listar pessoas.'
+      ),
       execute(
         supabase
           .from('materiais_view')
@@ -2209,7 +2292,8 @@ export const api = {
           query = applyPessoaSearchFilters(query, like)
         }
         const data = await execute(query, 'Falha ao listar pessoas.')
-        return (data ?? []).map(mapPessoaRecord)
+        const registros = (data ?? []).map(mapPessoaRecord)
+        return aplicarCargoFallback(registros)
       } catch (error) {
         if (!termo) {
           throw error
@@ -2219,7 +2303,7 @@ export const api = {
           error
         )
         const fallbackData = await execute(buildQuery(), 'Falha ao listar pessoas.')
-        const registros = (fallbackData ?? []).map(mapPessoaRecord)
+        const registros = await aplicarCargoFallback((fallbackData ?? []).map(mapPessoaRecord))
         return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
       }
     },
@@ -2758,6 +2842,12 @@ export const api = {
   },
   entradas: {
     list: carregarEntradas,
+    materialOptions: carregarMateriaisDeEntradas,
+    async searchMateriais(params = {}) {
+      const termo = params?.termo ?? params?.q ?? params?.query ?? ''
+      const limit = Number.isFinite(Number(params?.limit)) ? Number(params.limit) : 10
+      return buscarMateriaisPorTermo(termo, limit, { source: ENTRADAS_MATERIAIS_VIEW })
+    },
     async create(payload) {
       const usuario = await resolveUsuarioResponsavel()
       const dados = normalizeEntradaInput(payload)
@@ -2840,16 +2930,13 @@ export const api = {
       const pessoaId = trim(payload.pessoaId)
       const materialId = trim(payload.materialId)
       const quantidade = toNumber(payload.quantidade, null)
-      const centroCusto = trim(payload.centroCusto)
-      const centroServicoInput = trim(payload.centroServico ?? payload.centro_servico ?? '')
+      const centroCustoIdInput = trim(payload.centroCustoId)
+      const centroServicoIdInput = trim(payload.centroServicoId)
       const dataEntregaRaw = trim(payload.dataEntrega)
       const status = trim(payload.status) || 'entregue'
 
       if (!pessoaId || !materialId || !quantidade || quantidade <= 0) {
         throw new Error('Preencha pessoa, material e quantidade (>0).')
-      }
-      if (!centroCusto) {
-        throw new Error('Informe o centro de custo.')
       }
       if (!dataEntregaRaw) {
         throw new Error('Informe a data de entrega.')
@@ -2860,11 +2947,18 @@ export const api = {
       }
 
       const pessoa = await executeSingle(
-        supabase.from('pessoas').select('centro_servico').eq('id', pessoaId),
+        supabase.from('pessoas').select('centro_servico_id, centro_custo_id').eq('id', pessoaId),
         'Falha ao obter pessoa.'
       )
 
-      const centroServico = centroServicoInput || pessoa?.centro_servico || ''
+      const centroCustoIdFinal = centroCustoIdInput || pessoa?.centro_custo_id || null
+      const centroServicoIdFinal = centroServicoIdInput || pessoa?.centro_servico_id || null
+      if (!centroCustoIdFinal) {
+        throw new Error('Centro de custo inválido.')
+      }
+      if (!centroServicoIdFinal) {
+        throw new Error('Centro de serviço inválido.')
+      }
 
       const material = await executeSingle(
         supabase.from('materiais').select('id, validadeDias').eq('id', materialId),
@@ -2888,8 +2982,8 @@ export const api = {
             pessoaId,
             materialId,
             quantidade,
-            centro_custo: centroCusto,
-            centro_servico: centroServico,
+            centro_custo: centroCustoIdFinal,
+            centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
             dataTroca,
             status,
@@ -3351,6 +3445,11 @@ async dashboard(params = {}) {
       return carregarCentrosCusto()
     },
   },
+  centrosServico: {
+    async list() {
+      return carregarCentrosServico()
+    },
+  },
   documentos: {
     async termoEpiContext(params = {}) {
       const matricula = trim(params.matricula)
@@ -3466,5 +3565,57 @@ async function resolvePessoaReferencias(dados) {
     cargoId,
     centroCustoId,
     tipoExecucaoId,
+  }
+}
+
+async function carregarPessoasViewDetalhes(ids) {
+  const selecionados = Array.from(new Set((ids || []).filter(Boolean)))
+  if (selecionados.length === 0) {
+    return new Map()
+  }
+  try {
+    const registros = await execute(
+      supabase
+        .from('pessoas_view')
+        .select(
+          `
+            id,
+            centro_servico_id,
+            centro_servico,
+            setor_id,
+            setor,
+            cargo_id,
+            cargo,
+            centro_custo_id,
+            centro_custo,
+            tipo_execucao_id,
+            tipo_execucao
+          `
+        )
+        .in('id', selecionados),
+      'Falha ao consultar pessoas_view.'
+    )
+    const mapa = new Map()
+    ;(registros ?? []).forEach((registro) => {
+      if (!registro?.id) {
+        return
+      }
+      mapa.set(registro.id, {
+        centroServicoId: registro.centro_servico_id ?? null,
+        centroServico: resolveTextValue(registro.centro_servico ?? ''),
+        setorId: registro.setor_id ?? null,
+        setor: resolveTextValue(registro.setor ?? ''),
+        cargoId: registro.cargo_id ?? null,
+        cargo: resolveTextValue(registro.cargo ?? ''),
+        centroCustoId: registro.centro_custo_id ?? null,
+        centroCusto: resolveTextValue(registro.centro_custo ?? ''),
+        tipoExecucaoId: registro.tipo_execucao_id ?? null,
+        tipoExecucao: resolveTextValue(registro.tipo_execucao ?? ''),
+      })
+    })
+    return mapa
+  } catch (error) {
+    console.warn('Nao foi possivel usar pessoas_view como fallback.', error)
+    return new Map()
   }
 }
