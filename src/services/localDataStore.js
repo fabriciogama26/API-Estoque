@@ -135,6 +135,7 @@ function getDefaultState() {
     saidas: [],
     acidentes: [],
     materialPriceHistory: [],
+    entradaHistorico: [],
   }
 }
 
@@ -183,7 +184,6 @@ function normalizeState(state) {
       coresLista.length > 0
         ? coresLista.map((item) => item.nome).join('; ')
         : String(material.corMaterial || '').trim()
-    const ca = material.ca ?? ''
     const numeroEspecifico =
       material.numeroEspecifico ??
       buildNumeroEspecificoLocal({
@@ -256,6 +256,7 @@ function normalizeState(state) {
     }
   })
   sanitized.materialPriceHistory = normalizeArray(sanitized.materialPriceHistory)
+  sanitized.entradaHistorico = normalizeArray(sanitized.entradaHistorico)
   return sanitized
 }
 
@@ -285,7 +286,7 @@ function readFromStorage() {
 function applySeed(base) {
   const seeded = { ...base }
   if (seedData && typeof seedData === 'object') {
-    const keys = ['pessoas', 'materiais', 'entradas', 'saidas', 'acidentes', 'materialPriceHistory']
+    const keys = ['pessoas', 'materiais', 'entradas', 'saidas', 'acidentes', 'materialPriceHistory', 'entradaHistorico']
     keys.forEach((key) => {
       if (Array.isArray(seedData[key]) && seedData[key].length > 0) {
         seeded[key] = normalizeArray(seedData[key])

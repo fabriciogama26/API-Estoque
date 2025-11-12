@@ -6,9 +6,11 @@ import {
   Boxes,
   CircleDollarSign,
   ClipboardList,
+  History,
   LayoutDashboard,
   LogIn,
   LogOut,
+  PenSquare,
   PieChart,
   Shield,
   ShoppingCart,
@@ -39,3 +41,5 @@ export const PieIcon = (props) => <PieChart {...withDefaultProps(props)} />
 export const BarsIcon = (props) => <BarChart3 {...withDefaultProps(props)} />
 export const ChevronIcon = (props) => <ChevronDown {...withDefaultProps(props)} />
 export const SaveIcon = (props) => <Save {...withDefaultProps(props)} />
+export const EditIcon = (props) => <PenSquare {...withDefaultProps(props)} />
+export const HistoryIcon = (props) => <History {...withDefaultProps(props)} />

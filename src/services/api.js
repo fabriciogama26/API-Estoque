@@ -124,6 +124,8 @@ const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
 const MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS = ['grupo_caracteristica_epi']
 const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 
+const CENTRO_ESTOQUE_TABLE = 'centros_estoque'
+
 
 const MATERIAL_HISTORY_FIELDS = [
   'materialItemNome',
@@ -533,9 +535,6 @@ const normalizeCatalogoOptions = (lista) =>
     nome: item.nome,
   }))
 
-const normalizeCatalogoLista = (lista) =>
-  normalizeCatalogoOptions(lista).map((item) => item.nome)
-
 const normalizeCaracteristicaLista = (value) => {
   if (Array.isArray(value)) {
     return value
@@ -570,6 +569,200 @@ const normalizeDomainOptions = (lista) =>
       }
     })
     .filter(Boolean)
+
+const normalizeEntradaInput = (payload = {}) => {
+  const materialId = trim(payload.materialId)
+  if (!materialId) {
+    throw new Error('Selecione um material.')
+  }
+  const quantidade = toNumber(payload.quantidade, null)
+  if (!quantidade || quantidade <= 0) {
+    throw new Error('Informe a quantidade (maior que zero).')
+  }
+  const centroCusto = trim(payload.centroCusto)
+  if (!centroCusto) {
+    throw new Error('Selecione o centro de custo.')
+  }
+  const dataEntradaRaw = trim(payload.dataEntrada)
+  if (!dataEntradaRaw) {
+    throw new Error('Informe a data da entrada.')
+  }
+  const dataEntradaIso = toDateOnlyIso(dataEntradaRaw)
+  if (!dataEntradaIso) {
+    throw new Error('Data da entrada invalida.')
+  }
+  return {
+    materialId,
+    quantidade,
+    centroCusto,
+    dataEntrada: dataEntradaIso,
+  }
+}
+
+const toDateOnlyIso = (valor) => {
+  const raw = trim(valor)
+  if (!raw) {
+    return null
+  }
+  const dataPart = raw.split('T')[0]
+  const [year, month, day] = dataPart.split('-').map(Number)
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null
+  }
+  const utc = Date.UTC(year, month - 1, day)
+  const date = new Date(utc)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+const toStartOfDayUtcIso = (value) => toDateOnlyIso(value)
+
+const toEndOfDayUtcIso = (value) => {
+  const startIso = toDateOnlyIso(value)
+  if (!startIso) {
+    return null
+  }
+  const date = new Date(startIso)
+  date.setUTCHours(23, 59, 59, 999)
+  return date.toISOString()
+}
+
+const buildMaterialResumo = (material) => {
+  if (!material || typeof material !== 'object') {
+    return ''
+  }
+  const nome =
+    material.materialItemNome ||
+    material.nome ||
+    material.nomeId ||
+    material.id ||
+    ''
+  const grupo = material.grupoMaterialNome || material.grupoMaterial || ''
+  const detalhes = [
+    material.numeroCalcadoNome,
+    material.numeroCalcado,
+    material.numeroVestimentaNome,
+    material.numeroVestimenta,
+    material.numeroEspecifico,
+    material.ca,
+    material.corMaterial,
+    material.coresTexto,
+  ]
+    .map((parte) => (parte || '').toString().trim())
+    .filter(Boolean)
+  const caracteristicas = (material.caracteristicasTexto || '').trim()
+  const fabricante = material.fabricanteNome || material.fabricante || ''
+  const partes = [nome, grupo, ...detalhes, caracteristicas, fabricante]
+  const vistos = new Set()
+  return partes
+    .map((parte) => (parte || '').toString().trim())
+    .filter((parte) => {
+      if (!parte) {
+        return false
+      }
+      const key = parte.toLowerCase()
+      if (vistos.has(key)) {
+        return false
+      }
+      vistos.add(key)
+      return true
+    })
+    .join(' | ')
+}
+
+async function resolveCentroCustoNome(valor) {
+  const raw = trim(valor)
+  if (!raw) {
+    return ''
+  }
+  if (!UUID_REGEX.test(raw)) {
+    return raw
+  }
+  try {
+    const registro = await executeMaybeSingle(
+      supabase.from(CENTRO_ESTOQUE_TABLE).select('almox').eq('id', raw),
+      'Falha ao consultar centro de estoque.'
+    )
+    return resolveTextValue(registro?.almox ?? '') || raw
+  } catch (error) {
+    console.warn('Nao foi possivel resolver centro de estoque.', error)
+    return raw
+  }
+}
+
+async function fetchMaterialSnapshot(materialId) {
+  if (!materialId) {
+    return null
+  }
+  try {
+    const registro = await executeMaybeSingle(
+      supabase.from('materiais_view').select(MATERIAL_SELECT_COLUMNS).eq('id', materialId),
+      'Falha ao obter material.'
+    )
+    return registro ? mapMaterialRecord(registro) : null
+  } catch (error) {
+    console.warn('Nao foi possivel resolver material.', error)
+    return null
+  }
+}
+
+async function buildEntradaSnapshot(entrada) {
+  if (!entrada) {
+    return null
+  }
+  const [material, centroNome] = await Promise.all([
+    fetchMaterialSnapshot(entrada.materialId),
+    resolveCentroCustoNome(entrada.centroCustoId || entrada.centroCusto),
+  ])
+  return {
+    entradaId: entrada.id,
+    materialId: entrada.materialId,
+    materialResumo: material ? buildMaterialResumo(material) : entrada.materialId,
+    descricao: material?.descricao ?? '',
+    quantidade: entrada.quantidade,
+    centroCusto: centroNome || entrada.centroCusto || '',
+    centroCustoId: entrada.centroCustoId || '',
+    dataEntrada: entrada.dataEntrada,
+    usuarioResponsavel: entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || '',
+    usuarioResponsavelNome: entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || '',
+    valorUnitario: material?.valorUnitario ?? null,
+  }
+}
+
+async function registrarEntradaHistoricoSupabase(entradaAtual, entradaAnterior = null) {
+  if (!entradaAtual || !entradaAtual.id) {
+    return
+  }
+  try {
+    const [snapshotAtual, snapshotAnterior] = await Promise.all([
+      buildEntradaSnapshot(entradaAtual),
+      entradaAnterior ? buildEntradaSnapshot(entradaAnterior) : Promise.resolve(null),
+    ])
+    const payload =
+      snapshotAnterior && Object.keys(snapshotAnterior).length > 0
+        ? { atual: snapshotAtual, anterior: snapshotAnterior }
+        : { atual: snapshotAtual }
+    await execute(
+      supabase.from('entrada_historico').insert({
+        id: randomId(),
+        entrada_id: entradaAtual.id,
+        material_id: entradaAtual.materialId,
+        material_ent: payload,
+        usuarioResponsavel: entradaAtual.usuarioResponsavelId || null,
+      }),
+      'Falha ao registrar historico da entrada.'
+    )
+  } catch (error) {
+    console.warn('Nao foi possivel registrar historico da entrada.', error)
+  }
+}
 
 async function ensureAcidentePartes(nomes) {
   const lista = normalizeStringArray(nomes)
@@ -860,6 +1053,15 @@ async function executeSingle(builder, fallbackMessage) {
   return data
 }
 
+async function executeMaybeSingle(builder, fallbackMessage) {
+  ensureSupabase()
+  const { data, error } = await builder.maybeSingle()
+  if (error) {
+    throw mapSupabaseError(error, fallbackMessage)
+  }
+  return data
+}
+
 const isUuidValue = (value) => typeof value === 'string' && UUID_REGEX.test(value)
 
 const extractTextualNames = (lista) => {
@@ -1092,7 +1294,6 @@ async function resolveUsuarioResponsavel() {
   if (!user) {
     return 'anônimo'
   }
-  const metadata = user.user_metadata ?? {}
   return user.id || 'anônimo'
 }
 
@@ -1239,13 +1440,17 @@ function mapEntradaRecord(record) {
   if (!record) {
     return null
   }
+  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
   const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
-  const centroCustoId = normalizeUuid(centroCustoRaw)
+  const centroCustoId = normalizeUuid(centroEstoqueValor ?? centroCustoRaw)
   const centroCustoNome =
-    resolveTextValue(record.centroCustoNome ?? record.centro_custo_nome ?? '') ||
+    resolveTextValue(
+      record.centroCustoNome ?? record.centro_custo_nome ?? record.centro_estoque_nome ?? '',
+    ) ||
     (centroCustoId ? '' : resolveTextValue(centroCustoRaw))
   const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
   const usuarioId = isUuidValue(usuarioRaw) ? usuarioRaw : null
+  const usuarioTexto = resolveTextValue(usuarioRaw)
   return {
     id: record.id,
     materialId: record.materialId ?? record.material_id ?? null,
@@ -1254,7 +1459,36 @@ function mapEntradaRecord(record) {
     centroCusto: centroCustoNome || centroCustoRaw || '',
     dataEntrada: record.dataEntrada ?? record.data_entrada ?? null,
     usuarioResponsavelId: usuarioId,
-    usuarioResponsavel: resolveTextValue(usuarioRaw),
+    usuarioResponsavel: usuarioId ? usuarioId : usuarioTexto,
+    usuarioResponsavelNome: usuarioId ? '' : usuarioTexto,
+  }
+}
+
+function mapEntradaHistoryRecord(record) {
+  if (!record) {
+    return null
+  }
+  const rawSnapshot = record.material_ent ?? record.materialEnt ?? {}
+  const atual = rawSnapshot.atual ?? rawSnapshot
+  const anterior = rawSnapshot.anterior ?? null
+  const usuarioNome = resolveTextValue(
+    record.usuario?.display_name ??
+      record.usuario?.username ??
+      record.usuario?.email ??
+      atual.usuarioResponsavelNome ??
+      atual.usuarioResponsavel ??
+      ''
+  )
+  return {
+    id: record.id,
+    entradaId: record.entrada_id ?? atual.entradaId ?? null,
+    materialId: record.material_id ?? atual.materialId ?? null,
+    criadoEm: record.created_at ?? record.createdAt ?? null,
+    usuario: usuarioNome,
+    snapshot: {
+      atual,
+      anterior,
+    },
   }
 }
 
@@ -1514,10 +1748,16 @@ async function buscarMateriaisPorTermo(termo, limit = 10) {
 
 async function carregarCentrosCusto() {
   const data = await execute(
-    supabase.from('centros_custo').select('id, nome').order('nome', { ascending: true }),
-    'Falha ao listar centros de custo.'
+    supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox', { ascending: true }),
+    'Falha ao listar centros de estoque.'
   )
-  return normalizeDomainOptions(data)
+  const normalizados = (data ?? [])
+    .map((item) => ({
+      id: item?.id ?? null,
+      nome: resolveTextValue(item?.almox ?? ''),
+    }))
+    .filter((item) => item.nome)
+  return normalizeDomainOptions(normalizados)
 }
 
 async function carregarPessoas() {
@@ -1558,24 +1798,48 @@ async function carregarEntradas(params = {}) {
   }
   const centroFiltro = trim(params.centroCusto)
   if (centroFiltro) {
-    query = isUuidValue(centroFiltro)
-      ? query.eq('centro_custo', centroFiltro)
-      : query.ilike('centro_custo', `%${centroFiltro}%`)
+    if (isUuidValue(centroFiltro)) {
+      query = query.or(`centro_estoque.eq.${centroFiltro},centro_custo.eq.${centroFiltro}`)
+    } else {
+      query = query.ilike('centro_custo', `%${centroFiltro}%`)
+    }
+  }
+  const registradoPor = trim(params.registradoPor)
+  if (registradoPor) {
+    query = isUuidValue(registradoPor)
+      ? query.eq('usuarioResponsavel', registradoPor)
+      : query.ilike('usuarioResponsavel', `%${registradoPor}%`)
   }
 
-  const periodo = resolvePeriodoRange(parsePeriodo(params))
-  if (periodo?.start || periodo?.end) {
-    query = buildDateFilters(query, 'dataEntrada', periodo?.start?.toISOString(), periodo?.end?.toISOString())
+  const dataInicioIso = toStartOfDayUtcIso(params.dataInicio)
+  const dataFimIso = toEndOfDayUtcIso(params.dataFim)
+  if (dataInicioIso || dataFimIso) {
+    query = buildDateFilters(query, 'dataEntrada', dataInicioIso, dataFimIso)
+  } else {
+    const periodo = resolvePeriodoRange(parsePeriodo(params))
+    if (periodo?.start || periodo?.end) {
+      query = buildDateFilters(query, 'dataEntrada', periodo?.start?.toISOString(), periodo?.end?.toISOString())
+    }
   }
 
   const data = await execute(query, 'Falha ao listar entradas.')
   let registros = (data ?? []).map(mapEntradaRecord)
   registros = await preencherUsuariosResponsaveis(registros)
+  registros = await preencherCentrosEstoque(registros)
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
+    const materiais = await execute(
+      supabase.from('materiais_view').select('id, nome, materialItemNome, fabricante'),
+      'Falha ao listar materiais.'
+    )
+    const materiaisMap = new Map((materiais ?? []).map((material) => [material.id, material]))
     registros = registros.filter((entrada) => {
+      const material = materiaisMap.get(entrada.materialId)
       const alvo = [
+        material?.nome,
+        material?.materialItemNome,
+        material?.fabricante,
         entrada.centroCusto,
         entrada.centroCustoId,
         entrada.usuarioResponsavel,
@@ -1630,6 +1894,69 @@ async function preencherUsuariosResponsaveis(registros) {
       ...entrada,
       usuarioResponsavelNome: entrada.usuarioResponsavel,
     }))
+  }
+}
+
+async function preencherCentrosEstoque(registros = []) {
+  const ids = Array.from(
+    new Set(
+      (registros ?? [])
+        .map((entrada) => entrada.centroCustoId)
+        .filter((valor) => Boolean(valor) && isUuidValue(valor))
+    )
+  )
+  if (!ids.length) {
+    return registros
+  }
+  try {
+    const [porId, porCentroLegado] = await Promise.all([
+      execute(
+        supabase
+          .from(CENTRO_ESTOQUE_TABLE)
+          .select('id, almox')
+          .in('id', ids),
+        'Falha ao consultar centros de estoque.'
+      ),
+      execute(
+        supabase
+          .from(CENTRO_ESTOQUE_TABLE)
+          .select('id, almox, centro_custo')
+          .in('centro_custo', ids),
+        'Falha ao consultar centros de estoque.'
+      ),
+    ])
+    const mapaPorId = new Map(
+      (porId ?? [])
+        .map((centro) => [centro.id, resolveTextValue(centro.almox ?? '')])
+        .filter(([, nome]) => Boolean(nome))
+    )
+    const mapaPorCentro = new Map(
+      (porCentroLegado ?? [])
+        .map((centro) => [centro.centro_custo, resolveTextValue(centro.almox ?? '')])
+        .filter(([, nome]) => Boolean(nome))
+    )
+    if (!mapaPorId.size && !mapaPorCentro.size) {
+      return registros
+    }
+    return registros.map((entrada) => {
+      if (!entrada.centroCustoId) {
+        return entrada
+      }
+      const nome =
+        mapaPorId.get(entrada.centroCustoId) ||
+        mapaPorCentro.get(entrada.centroCustoId)
+      if (!nome) {
+        return entrada
+      }
+      return {
+        ...entrada,
+        centroCustoNome: nome,
+        centroCusto: nome,
+      }
+    })
+  } catch (error) {
+    console.warn('Falha ao resolver centros de estoque.', error)
+    return registros
   }
 }
 
@@ -2431,45 +2758,79 @@ export const api = {
   },
   entradas: {
     list: carregarEntradas,
-      async create(payload) {
-        const usuario = await resolveUsuarioResponsavel()
-        const materialId = trim(payload.materialId)
-        const quantidade = toNumber(payload.quantidade, null)
-        const centroCusto = trim(payload.centroCusto)
-        const dataEntradaRaw = trim(payload.dataEntrada)
-
-        if (!materialId || !quantidade || quantidade <= 0 || !centroCusto) {
-          throw new Error('Preencha material, quantidade (>0) e centro de custo.')
-        }
-        if (!dataEntradaRaw) {
-          throw new Error('Informe a data de entrada.')
-        }
-        const dataEntradaDate = new Date(dataEntradaRaw)
-        if (Number.isNaN(dataEntradaDate.getTime())) {
-          throw new Error('Data de entrada invalida.')
-        }
-
-        const dados = {
-          materialId,
-          quantidade,
-          centroCusto,
-          dataEntrada: dataEntradaDate.toISOString(),
-          usuarioResponsavel: usuario,
-        }
-        const registro = await executeSingle(
-          supabase
-            .from('entradas')
-            .insert({
+    async create(payload) {
+      const usuario = await resolveUsuarioResponsavel()
+      const dados = normalizeEntradaInput(payload)
+      const registro = await executeSingle(
+        supabase
+          .from('entradas')
+          .insert({
             materialId: dados.materialId,
             quantidade: dados.quantidade,
+            centro_estoque: dados.centroCusto,
             centro_custo: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
-            usuarioResponsavel: dados.usuarioResponsavel,
+            usuarioResponsavel: usuario,
           })
           .select(),
         'Falha ao registrar entrada.'
       )
-      return mapEntradaRecord(registro)
+      const entradaNormalizada = mapEntradaRecord(registro)
+      await registrarEntradaHistoricoSupabase(entradaNormalizada)
+      return entradaNormalizada
+    },
+    async update(id, payload) {
+      if (!id) {
+        throw new Error('Entrada invalida.')
+      }
+      const entradaAtual = await executeMaybeSingle(
+        supabase.from('entradas').select('*').eq('id', id),
+        'Falha ao obter entrada.'
+      )
+      const entradaAnterior = entradaAtual ? mapEntradaRecord(entradaAtual) : null
+      const usuario = await resolveUsuarioResponsavel()
+      const dados = normalizeEntradaInput(payload)
+      const registro = await executeSingle(
+        supabase
+          .from('entradas')
+          .update({
+            materialId: dados.materialId,
+            quantidade: dados.quantidade,
+            centro_estoque: dados.centroCusto,
+            centro_custo: dados.centroCusto,
+            dataEntrada: dados.dataEntrada,
+            usuarioResponsavel: usuario,
+          })
+          .eq('id', id)
+          .select(),
+        'Falha ao atualizar entrada.'
+      )
+      const entradaNormalizada = mapEntradaRecord(registro)
+      await registrarEntradaHistoricoSupabase(entradaNormalizada, entradaAnterior)
+      return entradaNormalizada
+    },
+    async history(id) {
+      if (!id) {
+        throw new Error('Entrada invalida.')
+      }
+      const registros = await execute(
+        supabase
+          .from('entrada_historico')
+          .select(
+            `
+              id,
+              entrada_id,
+              material_id,
+              material_ent,
+              created_at,
+              usuario:usuarioResponsavel ( id, display_name, username, email )
+            `
+          )
+          .eq('entrada_id', id)
+          .order('created_at', { ascending: false }),
+        'Falha ao listar historico de entrada.'
+      )
+      return (registros ?? []).map(mapEntradaHistoryRecord)
     },
   },
   saidas: {
