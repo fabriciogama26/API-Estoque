@@ -118,6 +118,31 @@ const ACIDENTE_HISTORY_FIELDS = [
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
 
+const PESSOAS_VIEW_SELECT = `
+  id,
+  nome,
+  matricula,
+  "dataAdmissao",
+  "usuarioCadastro",
+  "usuarioCadastroNome",
+  "usuarioEdicao",
+  "usuarioEdicaoNome",
+  "criadoEm",
+  "atualizadoEm",
+  centro_servico_id,
+  setor_id,
+  cargo_id,
+  centro_custo_id,
+  tipo_execucao_id,
+  centro_servico,
+  setor,
+  cargo,
+  centro_custo,
+  tipo_execucao
+`
+
+const buildPessoasViewQuery = () => supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT)
+
 const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_material_cor']
 const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
 
@@ -903,28 +928,20 @@ const pessoaMatchesSearch = (pessoa, termo) => {
 }
 
 const applyPessoaSearchFilters = (builder, like) => {
-  const baseFilters = [
+  const filtros = [
     `nome.ilike.${like}`,
     `matricula.ilike.${like}`,
     `usuarioCadastro.ilike.${like}`,
+    `usuarioCadastroNome.ilike.${like}`,
     `usuarioEdicao.ilike.${like}`,
+    `usuarioEdicaoNome.ilike.${like}`,
+    `centro_servico.ilike.${like}`,
+    `setor.ilike.${like}`,
+    `cargo.ilike.${like}`,
+    `centro_custo.ilike.${like}`,
+    `tipo_execucao.ilike.${like}`,
   ]
-
-  let query = builder.or(baseFilters.join(','))
-
-  const relatedTables = [
-    'centros_servico',
-    'setores',
-    'cargos',
-    'centros_custo',
-    'tipo_execucao',
-  ]
-
-  relatedTables.forEach((table) => {
-    query = query.or(`nome.ilike.${like}`, { foreignTable: table })
-  })
-
-  return query
+  return builder.or(filtros.join(','))
 }
 
 let agenteCatalogCache = null
@@ -1486,8 +1503,20 @@ function mapPessoaRecord(record) {
     tipoExecucao,
     tipoExecucaoId: record.tipo_execucao_id ?? tipoExecucaoRel?.id ?? null,
     dataAdmissao: record.dataAdmissao ?? record.data_admissao ?? null,
-    usuarioCadastro: resolveTextValue(record.usuarioCadastro ?? record.usuario_cadastro ?? ''),
-    usuarioEdicao: resolveTextValue(record.usuarioEdicao ?? record.usuario_edicao ?? ''),
+    usuarioCadastro: resolveTextValue(
+      record.usuarioCadastroNome ??
+        record.usuario_cadastro_nome ??
+        record.usuarioCadastro ??
+        record.usuario_cadastro ??
+        ''
+    ),
+    usuarioEdicao: resolveTextValue(
+      record.usuarioEdicaoNome ??
+        record.usuario_edicao_nome ??
+        record.usuarioEdicao ??
+        record.usuario_edicao ??
+        ''
+    ),
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
     historicoEdicao: normalizePessoaHistorico(historicoRaw),
@@ -1971,82 +2000,16 @@ async function carregarCentrosServico() {
 
 async function carregarPessoas() {
   const data = await execute(
-    supabase
-      .from('pessoas')
-      .select(`
-        id,
-        nome,
-        matricula,
-        "dataAdmissao",
-        "usuarioCadastro",
-        "usuarioEdicao",
-        "criadoEm",
-        "atualizadoEm",
-        centro_servico_id,
-        setor_id,
-        cargo_id,
-        centro_custo_id,
-        tipo_execucao_id,
-        centros_servico ( id, nome ),
-        setores ( id, nome ),
-        cargos ( id, nome ),
-        centros_custo ( id, nome ),
-        tipo_execucao ( id, nome )
-      `)
-      .order('nome', { ascending: true }),
+    buildPessoasViewQuery().order('nome', { ascending: true }),
     'Falha ao listar pessoas.'
   )
   const pessoas = (data ?? []).map(mapPessoaRecord)
-  return aplicarCargoFallback(pessoas)
+  return pessoas
 }
 
 function normalizeMatriculaKey(value) {
   const texto = trim(value)
   return texto ? texto.toUpperCase() : ''
-}
-
-async function carregarCargoFallbackPorMatricula() {
-  try {
-    const registros = await execute(
-      supabase.from('pessoas_view').select('matricula, cargo'),
-      'Falha ao consultar pessoas_view.'
-    )
-    const mapa = new Map()
-    ;(registros ?? []).forEach((registro) => {
-      const matriculaKey = normalizeMatriculaKey(registro?.matricula)
-      const cargoTexto = resolveTextValue(registro?.cargo ?? '')
-      if (matriculaKey && cargoTexto) {
-        mapa.set(matriculaKey, cargoTexto)
-      }
-    })
-    return mapa
-  } catch (error) {
-    console.warn('Nao foi possivel usar pessoas_view como fallback de cargo.', error)
-    return null
-  }
-}
-
-async function aplicarCargoFallback(pessoas) {
-  if (!Array.isArray(pessoas) || pessoas.length === 0) {
-    return pessoas ?? []
-  }
-  const faltantes = pessoas.filter(
-    (pessoa) => pessoa && !pessoa.cargo && normalizeMatriculaKey(pessoa.matricula)
-  )
-  if (faltantes.length === 0) {
-    return pessoas
-  }
-  const cargoMap = await carregarCargoFallbackPorMatricula()
-  if (!cargoMap || cargoMap.size === 0) {
-    return pessoas
-  }
-  faltantes.forEach((pessoa) => {
-    const cargoFallback = cargoMap.get(normalizeMatriculaKey(pessoa.matricula))
-    if (cargoFallback) {
-      pessoa.cargo = cargoFallback
-    }
-  })
-  return pessoas
 }
 
 async function carregarEntradas(params = {}) {
@@ -2627,29 +2590,7 @@ export const api = {
       const termo = trim(params.termo)
 
       const buildQuery = () => {
-        let builder = supabase
-          .from('pessoas')
-          .select(`
-            id,
-            nome,
-            matricula,
-            "dataAdmissao",
-            "usuarioCadastro",
-            "usuarioEdicao",
-            "criadoEm",
-            "atualizadoEm",
-            centro_servico_id,
-            setor_id,
-            cargo_id,
-            centro_custo_id,
-            tipo_execucao_id,
-            centros_servico ( id, nome ),
-            setores ( id, nome ),
-            cargos ( id, nome ),
-            centros_custo ( id, nome ),
-            tipo_execucao ( id, nome )
-          `)
-          .order('nome', { ascending: true })
+        let builder = buildPessoasViewQuery().order('nome', { ascending: true })
 
         if (filtros.centroServicoId) {
           builder = builder.eq('centro_servico_id', filtros.centroServicoId)
@@ -2674,7 +2615,7 @@ export const api = {
         }
         const data = await execute(query, 'Falha ao listar pessoas.')
         const registros = (data ?? []).map(mapPessoaRecord)
-        return aplicarCargoFallback(registros)
+        return registros
       } catch (error) {
         if (!termo) {
           throw error
@@ -2684,7 +2625,7 @@ export const api = {
           error
         )
         const fallbackData = await execute(buildQuery(), 'Falha ao listar pessoas.')
-        const registros = await aplicarCargoFallback((fallbackData ?? []).map(mapPessoaRecord))
+        const registros = (fallbackData ?? []).map(mapPessoaRecord)
         return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
       }
     },
