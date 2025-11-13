@@ -259,6 +259,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     return {
       materialId: material.id,
       nome: material.nome,
+      resumo: formatMaterialResumo(material),
       fabricante: material.fabricante,
       validadeDias: material.validadeDias,
       ca: material.ca,
@@ -282,6 +283,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     .map((item) => ({
       materialId: item.materialId,
       nome: item.nome,
+      resumo: item.resumo,
       fabricante: item.fabricante,
       estoqueAtual: item.estoqueAtual,
       estoqueMinimo: item.estoqueMinimo,
@@ -361,6 +363,27 @@ function somaValores(lista, materiaisMap) {
 
 function somaQuantidade(lista) {
   return lista.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+}
+
+function formatMaterialResumo(material) {
+  if (!material) {
+    return ''
+  }
+  const partes = [
+    material.materialItemNome || material.nome,
+    material.grupoMaterialNome || material.grupoMaterial,
+    material.numeroVestimentaNome ||
+      material.numeroCalcadoNome ||
+      material.numeroVestimenta ||
+      material.numeroCalcado ||
+      material.numeroEspecifico,
+    material.caracteristicasTexto,
+    material.fabricanteNome || material.fabricante,
+  ]
+  return partes
+    .map((parte) => (parte ? String(parte).trim() : ''))
+    .filter(Boolean)
+    .join(' | ')
 }
 
 export function montarDashboard({ materiais = [], entradas = [], saidas = [], pessoas = [] }, periodo = null) {
