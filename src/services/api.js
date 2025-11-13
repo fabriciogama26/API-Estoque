@@ -707,6 +707,9 @@ const buildMaterialResumo = (material) => {
       if (!parte) {
         return false
       }
+      if (isUuidValue(parte)) {
+        return false
+      }
       const key = parte.toLowerCase()
       if (vistos.has(key)) {
         return false
@@ -757,6 +760,25 @@ async function fetchMaterialSnapshot(materialId) {
   } catch (error) {
     console.warn('Nao foi possivel resolver material.', error)
     return null
+  }
+}
+
+async function carregarMateriaisPorIds(ids = []) {
+  const selecionados = Array.from(new Set((ids || []).filter(Boolean)))
+  if (!selecionados.length) {
+    return new Map()
+  }
+  try {
+    const registros = await execute(
+      supabase.from('materiais_view').select(MATERIAL_SELECT_COLUMNS).in('id', selecionados),
+      'Falha ao listar materiais.'
+    )
+    return new Map(
+      (registros ?? []).map((material) => [material.id, mapMaterialRecord(material)]).filter(([id]) => Boolean(id))
+    )
+  } catch (error) {
+    console.warn('Nao foi possivel carregar materiais por ids.', error)
+    return new Map()
   }
 }
 
@@ -2504,12 +2526,12 @@ function montarContextoTermoEpi(pessoa, saidasDetalhadas) {
     id: saida.id,
     dataEntrega: saida.dataEntrega ?? null,
     quantidade: Number(saida.quantidade ?? 0),
-    descricao: saida.material?.nome ?? '',
+    descricao: saida.material ? buildMaterialResumo(saida.material) : '',
     numeroCa: saida.material?.ca ?? '',
     centroCusto: saida.centroCusto ?? '',
     centroServico: saida.centroServico ?? '',
     status: saida.status ?? '',
-    usuarioResponsavel: saida.usuarioResponsavel ?? '',
+    usuarioResponsavel: saida.usuarioResponsavelNome || saida.usuarioResponsavel || '',
     dataTroca: saida.dataTroca ?? null,
   }))
 
@@ -3954,14 +3976,14 @@ async dashboard(params = {}) {
       let pessoa = null
       if (matricula) {
         pessoa = await executeSingle(
-          supabase.from('pessoas').select('*').eq('matricula', matricula),
+          buildPessoasViewQuery().eq('matricula', matricula),
           'Falha ao consultar colaborador.'
         )
       }
       if (!pessoa && nome) {
         const like = `%${nome.replace(/\s+/g, '%')}%`
         const resultados = await execute(
-          supabase.from('pessoas').select('*').ilike('nome', like).order('nome').limit(1),
+          buildPessoasViewQuery().ilike('nome', like).order('nome').limit(1),
           'Falha ao consultar colaborador.'
         )
         pessoa = resultados?.[0] ?? null
@@ -3986,10 +4008,22 @@ async dashboard(params = {}) {
         throw new Error('Nenhuma saida registrada para o colaborador informado.')
       }
 
-      const saidasDetalhadas = (saidas ?? []).map((registro) => ({
-        ...mapSaidaRecord(registro),
-        material: mapMaterialRecord(registro.material),
-      }))
+      const saidasOriginais = saidas ?? []
+      const saidasBasicas = saidasOriginais.map((registro) => mapSaidaRecord(registro))
+      const saidasComUsuarios = await preencherUsuariosResponsaveis(saidasBasicas)
+      const saidasComCentros = await preencherCentrosCustoSaidas(saidasComUsuarios)
+      const materiaisMap = await carregarMateriaisPorIds(
+        saidasComCentros.map((saida) => saida.materialId).filter(Boolean)
+      )
+
+      const saidasDetalhadas = saidasComCentros.map((saida, index) => {
+        const detalhado = materiaisMap.get(saida.materialId)
+        const fallbackMaterial = mapMaterialRecord(saidasOriginais[index]?.material)
+        return {
+          ...saida,
+          material: detalhado ?? fallbackMaterial ?? null,
+        }
+      })
 
       const contexto = montarContextoTermoEpi(mapPessoaRecord(pessoa), saidasDetalhadas)
       return {
