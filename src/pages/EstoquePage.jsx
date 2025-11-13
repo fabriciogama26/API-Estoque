@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { InventoryIcon, SaveIcon } from '../components/icons.jsx'
+import { TablePagination } from '../components/TablePagination.jsx'
 import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import '../styles/EstoquePage.css'
@@ -11,6 +12,8 @@ const initialFilters = {
   termo: '',
   centroCusto: '',
 }
+
+const ALERTAS_PAGE_SIZE = 6
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', {
@@ -69,6 +72,7 @@ export function EstoquePage() {
   const [minStockDrafts, setMinStockDrafts] = useState({})
   const [savingMinStock, setSavingMinStock] = useState({})
   const [minStockErrors, setMinStockErrors] = useState({})
+  const [alertasPage, setAlertasPage] = useState(1)
 
   const load = async (params = filters) => {
     setIsLoading(true)
@@ -227,6 +231,27 @@ export function EstoquePage() {
     [itensFiltrados],
   )
 
+  const totalAlertasPages =
+    alertasFiltrados.length > 0 ? Math.max(1, Math.ceil(alertasFiltrados.length / ALERTAS_PAGE_SIZE)) : 1
+
+  const alertasPaginados = useMemo(() => {
+    const start = (alertasPage - 1) * ALERTAS_PAGE_SIZE
+    return alertasFiltrados.slice(start, start + ALERTAS_PAGE_SIZE)
+  }, [alertasFiltrados, alertasPage])
+
+  useEffect(() => {
+    setAlertasPage(1)
+  }, [alertasFiltrados.length])
+
+  useEffect(() => {
+    setAlertasPage((prev) => {
+      if (prev > totalAlertasPages) {
+        return totalAlertasPages
+      }
+      return prev
+    })
+  }, [totalAlertasPages])
+
   const totalValor = itensFiltrados.reduce((acc, item) => acc + Number(item.valorTotal ?? 0), 0)
 
   const resumoFiltrado = useMemo(() => {
@@ -286,7 +311,7 @@ export function EstoquePage() {
           />
         </label>
         <label className="field">
-          <span>Centro de custo</span>
+          <span>Centro de estoque</span>
           <select name="centroCusto" value={filters.centroCusto} onChange={handleChange}>
             <option value="">Todos</option>
             {centrosCustoDisponiveis.map((centro) => (
@@ -313,30 +338,50 @@ export function EstoquePage() {
           <h2>Alertas de estoque</h2>
         </header>
         {alertasFiltrados.length ? (
-          <ul className="estoque-alert-list">
-            {alertasFiltrados.map((alerta) => {
-              const deficit = Number(alerta.deficitQuantidade ?? 0)
-              const centrosLabel = (alerta.centrosCusto && alerta.centrosCusto.length)
-                ? alerta.centrosCusto.join(', ')
-                : 'Sem centro de custo'
-              return (
-                <li key={alerta.materialId} className="estoque-alert-list__item">
-                  <span className="estoque-badge estoque-badge--alert">{alerta.nome?.split(' ')[0] || 'Material'}</span>
-                  <span>
-                    Estoque atual: <strong>{alerta.estoqueAtual}</strong>
-                    {' '}| Minimo: <strong>{alerta.estoqueMinimo}</strong>
+          <>
+            <div className="estoque-alert-grid">
+              {alertasPaginados.map((alerta, index) => {
+                const deficit = Number(alerta.deficitQuantidade ?? 0)
+                const centrosLabel =
+                  alerta.centrosCusto && alerta.centrosCusto.length
+                    ? alerta.centrosCusto.join(', ')
+                    : 'Sem centro de estoque'
+                const resumo =
+                  alerta.resumo || alerta.nome || alerta.fabricante || 'Material sem descrição'
+                const idLabel = alerta.materialId || '---'
+                const cardKey = `${alerta.materialId || 'alerta'}-${index}`
+                return (
+                  <article key={cardKey} className="estoque-alert-card">
+                    <div className="estoque-alert-card__header">
+                      <span className="estoque-alert-card__badge">Alerta</span>
+                      <span className="estoque-alert-card__id">ID: {idLabel}</span>
+                    </div>
+                    <p className="estoque-alert-card__estoque">
+                      Estoque atual: <strong>{alerta.estoqueAtual}</strong> | Minimo:{' '}
+                      <strong>{alerta.estoqueMinimo}</strong>
+                    </p>
+                    <p className="estoque-alert-card__descricao">{resumo}</p>
+                    <p className="estoque-alert-card__centro">Centro de estoque: {centrosLabel}</p>
                     {deficit > 0 ? (
-                      <span className="estoque-alert-list__deficit">
-                        {' '}Faltam {deficit} ({formatCurrency(alerta.valorReposicao)})
-                      </span>
+                      <p className="estoque-alert-card__deficit">
+                        Faltam {deficit} ({formatCurrency(alerta.valorReposicao)})
+                      </p>
                     ) : null}
-                  </span>
-                  <span className="estoque-alert-list__material">{alerta.nome} - {alerta.fabricante}</span>
-                  <span className="estoque-alert-list__centro">Centro de custo: {centrosLabel}</span>
-                </li>
-              )
-            })}
-          </ul>
+                  </article>
+                )
+              })}
+            </div>
+            {alertasFiltrados.length > ALERTAS_PAGE_SIZE ? (
+              <div className="estoque-alerts-pagination">
+                <TablePagination
+                  currentPage={alertasPage}
+                  totalItems={alertasFiltrados.length}
+                  pageSize={ALERTAS_PAGE_SIZE}
+                  onPageChange={setAlertasPage}
+                />
+              </div>
+            ) : null}
+          </>
         ) : (
           <p className="feedback">Nenhum alerta no periodo.</p>
         )}
@@ -372,7 +417,7 @@ export function EstoquePage() {
 
       <section className="card">
         <header className="card__header">
-          <h2>Itens</h2>
+          <h2>Estoque materiais</h2>
         </header>
         {itensFiltrados.length === 0 ? <p className="feedback">Sem materiais cadastrados ou filtrados.</p> : null}
         <div className="estoque-list">
@@ -382,55 +427,66 @@ export function EstoquePage() {
             const fieldError = minStockErrors[item.materialId]
             const centrosCustoLabel = (item.centrosCusto && item.centrosCusto.length)
               ? item.centrosCusto.join(', ')
-              : 'Sem centro de custo'
+              : 'Sem centro de estoque'
             const ultimaAtualizacaoItem = formatDateTimeValue(item.ultimaAtualizacao)
             const deficitQuantidade = Number(item.deficitQuantidade ?? 0)
             return (
               <article key={item.materialId} className={`estoque-list__item${item.alerta ? ' estoque-list__item--alert' : ''}`}>
                 <header className="estoque-list__item-header">
-                  <div>
+                  <div className="estoque-list__item-title">
                     <h3>{item.nome}</h3>
-                    <p>{item.fabricante}</p>
+                    <p>{item.resumo || item.fabricante || 'Sem descrição'}</p>
+                    <p className="estoque-list__item-centro">Centro de estoque: {centrosCustoLabel}</p>
+                    <p className="estoque-list__item-atualizacao">Ultima atualizacao: {ultimaAtualizacaoItem}</p>
                   </div>
-                  <div className="estoque-list__item-meta">
-                    <span>Quantidade: {item.quantidade}</span>
-                    <span>Valor unitario: {formatCurrency(item.valorUnitario)}</span>
-                    <span>Valor total: {formatCurrency(item.valorTotal)}</span>
-                    {deficitQuantidade > 0 ? (
-                      <span className="estoque-list__item-deficit">
-                        Necessario repor {deficitQuantidade} ({formatCurrency(item.valorReposicao)})
-                      </span>
-                    ) : null}
-                    <div className="estoque-list__item-min-stock">
-                      <label>
-                        <span>Estoque minimo</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={draftValue}
-                          onChange={(event) => handleMinStockChange(item.materialId, event.target.value)}
-                          disabled={isSavingMin}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="estoque-list__item-save"
-                        onClick={() => handleMinStockSave(item)}
-                        disabled={isSavingMin}
-                        aria-label={isSavingMin ? 'Salvando' : 'Salvar'}
-                        title={isSavingMin ? 'Salvando' : 'Salvar'}
-                      >
-                        <SaveIcon size={16} strokeWidth={1.8} aria-hidden="true" />
-                      </button>
+                  <div className="estoque-list__item-metrics">
+                    <div className="estoque-list__metric">
+                      <span className="estoque-list__label">Quantidade</span>
+                      <strong className="estoque-list__value">{item.quantidade}</strong>
                     </div>
-                    {fieldError ? <span className="estoque-list__item-error">{fieldError}</span> : null}
+                    <div className="estoque-list__metric">
+                      <span className="estoque-list__label">Valor unitario</span>
+                      <strong className="estoque-list__value">{formatCurrency(item.valorUnitario)}</strong>
+                    </div>
+                    <div className="estoque-list__metric">
+                      <span className="estoque-list__label">Valor total</span>
+                      <strong className="estoque-list__value">{formatCurrency(item.valorTotal)}</strong>
+                    </div>
                   </div>
                 </header>
                 <div className="estoque-list__item-body">
-                  <span>Validade (dias): {item.validadeDias}</span>
-                  <span>CA: {item.ca}</span>
-                  <span>Centros de custo: {centrosCustoLabel}</span>
-                  <span>Ultima atualizacao: {ultimaAtualizacaoItem}</span>
+                  {deficitQuantidade > 0 ? (
+                    <span className="estoque-list__item-deficit">
+                      Necessario repor {deficitQuantidade} ({formatCurrency(item.valorReposicao)})
+                    </span>
+                  ) : null}
+                  <div className="estoque-list__item-min-stock">
+                    <label>
+                      <span>Estoque minimo</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={draftValue}
+                        onChange={(event) => handleMinStockChange(item.materialId, event.target.value)}
+                        disabled={isSavingMin}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="estoque-list__item-save"
+                      onClick={() => handleMinStockSave(item)}
+                      disabled={isSavingMin}
+                      aria-label={isSavingMin ? 'Salvando' : 'Salvar'}
+                      title={isSavingMin ? 'Salvando' : 'Salvar'}
+                    >
+                      <SaveIcon size={16} strokeWidth={1.8} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="estoque-list__item-extra">
+                    <span>Validade (dias): {item.validadeDias ?? '-'}</span>
+                    <span>CA: {item.ca || '-'}</span>
+                  </div>
+                  {fieldError ? <span className="estoque-list__item-error">{fieldError}</span> : null}
                 </div>
               </article>
             )
