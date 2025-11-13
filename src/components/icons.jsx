@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Users,
   Save,
+  XCircle,
 } from 'lucide-react'
 
 const defaultSize = 18
@@ -43,3 +44,4 @@ export const ChevronIcon = (props) => <ChevronDown {...withDefaultProps(props)} 
 export const SaveIcon = (props) => <Save {...withDefaultProps(props)} />
 export const EditIcon = (props) => <PenSquare {...withDefaultProps(props)} />
 export const HistoryIcon = (props) => <History {...withDefaultProps(props)} />
+export const CancelIcon = (props) => <XCircle {...withDefaultProps(props)} />

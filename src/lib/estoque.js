@@ -190,6 +190,10 @@ export function calcularSaldoMaterial(materialId, entradas, saidas, periodo) {
   const saidasFiltradas = saidas
     .filter((saida) => saida.materialId === materialId)
     .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
+    .filter((saida) => {
+      const statusTexto = typeof saida?.status === 'string' ? saida.status.trim().toLowerCase() : ''
+      return statusTexto !== 'cancelado'
+    })
 
   const totalEntradas = entradasFiltradas.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
   const totalSaidas = saidasFiltradas.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)

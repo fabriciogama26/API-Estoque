@@ -32,6 +32,7 @@ const trim = (value) => {
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const STATUS_CANCELADO_NOME = 'CANCELADO'
 
 const splitMultiValue = (value) => {
   if (Array.isArray(value)) {
@@ -175,6 +176,36 @@ const mapLocalSaidaRecord = (saida) => {
     ...saida,
     centroCusto: saida.centroCusto ?? '',
     centroServico: saida.centroServico ?? '',
+    status: saida.status ?? 'entregue',
+    statusId: saida.statusId ?? saida.status ?? '',
+  }
+}
+
+const buildLocalSaidaSnapshot = (saida, state) => {
+  if (!saida) {
+    return null
+  }
+  const pessoas = Array.isArray(state?.pessoas) ? state.pessoas : []
+  const materiais = Array.isArray(state?.materiais) ? state.materiais : []
+  const pessoa = pessoas.find((item) => item.id === saida.pessoaId)
+  const material = materiais.find((item) => item.id === saida.materialId)
+  return {
+    saidaId: saida.id,
+    pessoaId: saida.pessoaId,
+    pessoaNome: pessoa?.nome ?? '',
+    pessoaMatricula: pessoa?.matricula ?? '',
+    pessoaCargo: pessoa?.cargo ?? '',
+    materialResumo: material?.nome ?? saida.materialId,
+    quantidade: saida.quantidade,
+    centroCusto: saida.centroCusto ?? '',
+    centroCustoId: saida.centroCustoId ?? '',
+    centroServico: saida.centroServico ?? '',
+    centroServicoId: saida.centroServicoId ?? '',
+    status: saida.status ?? '',
+    statusId: saida.statusId ?? '',
+    dataEntrega: saida.dataEntrega,
+    dataTroca: saida.dataTroca,
+    usuarioResponsavel: saida.usuarioResponsavel ?? '',
   }
 }
 
@@ -1431,6 +1462,32 @@ const calcularDataTroca = (dataEntregaIso, validadeDias) => {
 
 const normalizeSearchTerm = (value) => (value ? String(value).trim().toLowerCase() : '')
 
+const materialMatchesLocalTerm = (material, termoNormalizado) => {
+  if (!termoNormalizado) {
+    return true
+  }
+  const campos = [
+    material?.nome,
+    material?.materialItemNome,
+    material?.nomeItemRelacionado,
+    material?.grupoMaterial,
+    material?.grupoMaterialNome,
+    material?.numeroCalcado,
+    material?.numeroCalcadoNome,
+    material?.numeroVestimenta,
+    material?.numeroVestimentaNome,
+    material?.numeroEspecifico,
+    material?.fabricante,
+    material?.fabricanteNome,
+    material?.coresTexto,
+    material?.caracteristicasTexto,
+    material?.id,
+  ]
+  return campos
+    .map((campo) => normalizeSearchTerm(campo))
+    .some((campo) => campo && campo.includes(termoNormalizado))
+}
+
 const MATERIAL_SEARCH_MAX_RESULTS = 10
 
 const localMaterialMatchesSearch = (material, termo) => {
@@ -1480,6 +1537,26 @@ const collectCentrosCustoOptions = (state) => {
       id: nome,
       nome,
     }))
+}
+
+const collectCentrosServicoOptions = (state) => {
+  const nomes = new Set()
+  const adicionar = (valor) => {
+    const nome = trim(valor)
+    if (nome) {
+      nomes.add(nome)
+    }
+  }
+  ;(state.pessoas || []).forEach((pessoa) => {
+    adicionar(pessoa.centroServico)
+    adicionar(pessoa.setor)
+    adicionar(pessoa.local)
+  })
+  ;(state.saidas || []).forEach((saida) => adicionar(saida.centroServico))
+  return Array.from(nomes)
+    .sort((a, b) => a.localeCompare(b))
+    .map((nome, index) => mapDomainOption(nome, index))
+    .filter(Boolean)
 }
 
 const toStartOfDay = (value) => {
@@ -2012,14 +2089,57 @@ const localApi = {
       )
     },
   },
-    entradas: {
-      async list(params = {}) {
-        return readState((state) => {
-          const mapped = state.entradas.map(mapLocalEntradaRecord)
-          const filtradas = filterLocalEntradas(mapped, params, state)
-          return sortByDateDesc(filtradas, 'dataEntrada')
+  entradas: {
+    async list(params = {}) {
+      return readState((state) => {
+        const mapped = state.entradas.map(mapLocalEntradaRecord)
+        const filtradas = filterLocalEntradas(mapped, params, state)
+        return sortByDateDesc(filtradas, 'dataEntrada')
+      })
+    },
+    async materialOptions() {
+      return readState((state) => {
+        const ids = new Set(
+          (state.entradas || [])
+            .map((entrada) => entrada.materialId)
+            .filter((id) => Boolean(id))
+        )
+        if (ids.size === 0) {
+          return []
+        }
+        const materiais = state.materiais
+          .filter((material) => ids.has(material.id))
+          .map((material) => mapLocalMaterialRecord(material))
+        return materiais.sort((a, b) => {
+          const nomeA = normalizeSearchTerm(a.materialItemNome || a.nome || a.nomeId || '')
+          const nomeB = normalizeSearchTerm(b.materialItemNome || b.nome || b.nomeId || '')
+          return nomeA.localeCompare(nomeB, 'pt-BR')
         })
-      },
+      })
+    },
+    async searchMateriais(params = {}) {
+      const termo = normalizeSearchTerm(params.termo || params.q || params.query)
+      const limiteSeguro = Number.isFinite(Number(params.limit))
+        ? Math.max(1, Math.min(Number(params.limit), 50))
+        : 10
+      return readState((state) => {
+        const ids = new Set(
+          (state.entradas || [])
+            .map((entrada) => entrada.materialId)
+            .filter((id) => Boolean(id))
+        )
+        if (ids.size === 0) {
+          return []
+        }
+        const materiais = state.materiais
+          .filter((material) => ids.has(material.id))
+          .map((material) => mapLocalMaterialRecord(material))
+        const candidatos = termo
+          ? materiais.filter((material) => materialMatchesLocalTerm(material, termo))
+          : materiais
+        return candidatos.slice(0, limiteSeguro)
+      })
+    },
     async create(payload) {
       const dados = sanitizeEntradaPayload(payload)
       validateEntradaPayload(dados)
@@ -2132,6 +2252,14 @@ const localApi = {
         }
 
         state.saidas.push(saida)
+        state.saidaHistorico = Array.isArray(state.saidaHistorico) ? state.saidaHistorico : []
+        state.saidaHistorico.push({
+          id: randomId(),
+          saidaId: saida.id,
+          criadoEm: nowIso(),
+          usuario: saida.usuarioResponsavel || 'sistema',
+          snapshot: { atual: buildLocalSaidaSnapshot(saida, state) },
+        })
         const saidaNormalizada = mapLocalSaidaRecord(saida)
         return {
           ...saidaNormalizada,
@@ -2139,11 +2267,118 @@ const localApi = {
         }
       })
     },
+    async update(id, payload) {
+      if (!id) {
+        throw createError(400, 'ID da saída obrigatorio.')
+      }
+      const dados = sanitizeSaidaPayload(payload)
+      validateSaidaPayload(dados)
+
+      return writeState((state) => {
+        const index = state.saidas.findIndex((item) => item.id === id)
+        if (index === -1) {
+          throw createError(404, 'Saída nao encontrada.')
+        }
+        const atual = state.saidas[index]
+        const pessoa = state.pessoas.find((item) => item.id === dados.pessoaId)
+        if (!pessoa) {
+          throw createError(404, 'Pessoa nao encontrada.')
+        }
+        const material = state.materiais.find((item) => item.id === dados.materialId)
+        if (!material) {
+          throw createError(404, 'Material nao encontrado.')
+        }
+
+        const estoqueAtual = calcularSaldoMaterial(material.id, state.entradas, state.saidas, null)
+        const quantidadeAnterior = Number(atual.quantidade ?? 0)
+        const estoqueConsiderado =
+          material.id === atual.materialId ? estoqueAtual + quantidadeAnterior : estoqueAtual
+        if (Number(dados.quantidade) > estoqueConsiderado) {
+          throw createError(400, 'Quantidade informada maior que estoque disponivel.')
+        }
+
+        const centroServico = dados.centroServico || pessoa.centroServico || pessoa.local || ''
+        const dataTroca = calcularDataTroca(dados.dataEntrega, material.validadeDias)
+
+        const snapshotAnterior = buildLocalSaidaSnapshot(atual, state)
+        const atualizado = {
+          ...atual,
+          ...dados,
+          centroServico,
+          dataTroca,
+        }
+        state.saidas[index] = atualizado
+        state.saidaHistorico = Array.isArray(state.saidaHistorico) ? state.saidaHistorico : []
+        state.saidaHistorico.push({
+          id: randomId(),
+          saidaId: atualizado.id,
+          criadoEm: nowIso(),
+          usuario: atualizado.usuarioResponsavel || 'sistema',
+          snapshot: {
+            atual: buildLocalSaidaSnapshot(atualizado, state),
+            anterior: snapshotAnterior,
+          },
+        })
+        return mapLocalSaidaRecord(atualizado)
+      })
+    },
+    async cancel(id, payload = {}) {
+      if (!id) {
+        throw createError(400, 'ID da saída obrigatorio.')
+      }
+      const motivo = trim(payload.motivo ?? '')
+      return writeState((state) => {
+        const index = state.saidas.findIndex((item) => item.id === id)
+        if (index === -1) {
+          throw createError(404, 'Saída nao encontrada.')
+        }
+        const atual = state.saidas[index]
+        if ((atual.status || '').toString().toLowerCase() === 'cancelado') {
+          throw createError(400, 'Saída já cancelada.')
+        }
+        const atualizado = {
+          ...atual,
+          status: STATUS_CANCELADO_NOME,
+          statusId: STATUS_CANCELADO_NOME,
+        }
+        state.saidas[index] = atualizado
+        state.saidaHistorico = Array.isArray(state.saidaHistorico) ? state.saidaHistorico : []
+        state.saidaHistorico.push({
+          id: randomId(),
+          saidaId: atualizado.id,
+          criadoEm: nowIso(),
+          usuario: atualizado.usuarioResponsavel || 'sistema',
+          snapshot: {
+            atual: { ...buildLocalSaidaSnapshot(atualizado, state), motivoCancelamento: motivo },
+            anterior: buildLocalSaidaSnapshot(atual, state),
+          },
+        })
+        return mapLocalSaidaRecord(atualizado)
+      })
+    },
+    async history(id) {
+      if (!id) {
+        throw createError(400, 'ID da saida obrigatorio.')
+      }
+      return readState((state) => {
+        const historico = (state.saidaHistorico || []).filter((item) => item.saidaId === id)
+        return sortByDateDesc(historico, 'criadoEm')
+      })
+    },
   },
   estoque: {
     async current(params = {}) {
       const periodo = parsePeriodo(params)
       return readState((state) => montarEstoqueAtual(state.materiais, state.entradas, state.saidas, periodo))
+    },
+    async saldo(materialId) {
+      if (!materialId) {
+        throw createError(400, 'Material obrigatorio.')
+      }
+      return readState((state) => ({
+        materialId,
+        saldo: calcularSaldoMaterial(materialId, state.entradas, state.saidas, null),
+      }))
     },
     async dashboard(params = {}) {
       const periodo = parsePeriodo(params)
@@ -2513,6 +2748,16 @@ const localApi = {
   centrosCusto: {
     async list() {
       return readState((state) => collectCentrosCustoOptions(state))
+    },
+  },
+  centrosEstoque: {
+    async list() {
+      return readState((state) => collectCentrosCustoOptions(state))
+    },
+  },
+  centrosServico: {
+    async list() {
+      return readState((state) => collectCentrosServicoOptions(state))
     },
   },
 }

@@ -227,3 +227,90 @@
     white-space: normal;
   }
 }
+
+.status-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background-color: #edf2ff;
+  color: #2d3a8c;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.status-chip--cancelado {
+  background-color: #ffe8e8;
+  color: #b91c1c;
+  border: 1px solid #f5bebe;
+}
+
+.data-table__row--cancelado td {
+  opacity: 0.75;
+}
+
+.data-table__row--cancelado strong {
+  text-decoration: line-through;
+}
+
+.button--danger {
+  background-color: #c62828;
+  color: #fff;
+}
+
+.button--danger:hover:not(:disabled) {
+  background-color: #ab1f1f;
+}
+
+.button--danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-modal__textarea {
+  width: 100%;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  padding: 0.5rem;
+  resize: vertical;
+  font-size: 0.95rem;
+}
+
+.cancel-modal__feedback {
+  margin-top: 0.5rem;
+}
+
+.entradas-history__note {
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+  color: #b91c1c;
+}
+
+.cancel-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin: 1.5rem 0 0.5rem;
+  margin-right: 1.5rem;
+  padding: 0.5rem 0;
+}
+
+.materiais-table-action-button--danger {
+  color: #c62828;
+  border-color: #f5bebe;
+}
+
+.materiais-table-action-button--danger:hover {
+  background-color: #ffe8e8;
+  color: #b91c1c;
+}
+
+.field__hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.field__hint--error {
+  color: #b91c1c;
+}

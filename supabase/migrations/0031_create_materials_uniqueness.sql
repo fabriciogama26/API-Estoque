@@ -1,6 +1,7 @@
--- 0030_create_materials_uniqueness.sql
 -- 1. VIEW agregando campos obrigatórios + cores/características ordenadas + hash
-CREATE OR REPLACE VIEW public.materiais_unicos_view AS
+DROP VIEW IF EXISTS public.materiais_unicos_view;
+
+CREATE VIEW public.materiais_unicos_view AS
 WITH cores_agg AS (
   SELECT
     mgc.material_id,

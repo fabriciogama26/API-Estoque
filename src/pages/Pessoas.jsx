@@ -84,21 +84,30 @@ export function PessoasPage() {
     cargos: [],
     tiposExecucao: [],
   })
+  const referenciasRef = useRef(referencias)
+
+  useEffect(() => {
+    referenciasRef.current = referencias
+  }, [referencias])
 
   const refreshReferencias = useCallback(async () => {
     if (!api.references || typeof api.references.pessoas !== 'function') {
-      return
+      return referenciasRef.current
     }
     try {
       const data = await api.references.pessoas()
-      setReferencias({
+      const normalizado = {
         centrosServico: data?.centrosServico ?? [],
         setores: data?.setores ?? [],
         cargos: data?.cargos ?? [],
         tiposExecucao: data?.tiposExecucao ?? [],
-      })
+      }
+      referenciasRef.current = normalizado
+      setReferencias(normalizado)
+      return normalizado
     } catch (err) {
       console.warn('Falha ao carregar referencias de pessoas.', err)
+      return referenciasRef.current
     }
   }, [api])
 
@@ -115,12 +124,23 @@ export function PessoasPage() {
         ])
 
         const baseOptions = optionsData ?? pessoasOptionsRef.current
+        let referenciasAtuais = referenciasRef.current
         if (optionsData) {
           const nextOptions = optionsData ?? []
           pessoasOptionsRef.current = nextOptions
           setPessoasOptions(nextOptions)
-          await refreshReferencias()
+          referenciasAtuais = await refreshReferencias()
         }
+        const mapFromOptions = (lista = []) =>
+          new Map(
+            lista
+              .filter((item) => item?.id)
+              .map((item) => [item.id, item.nome ?? item.label ?? ''])
+          )
+        const centrosMap = mapFromOptions(referenciasAtuais?.centrosServico)
+        const setoresMap = mapFromOptions(referenciasAtuais?.setores)
+        const cargosMap = mapFromOptions(referenciasAtuais?.cargos)
+        const tiposExecucaoMap = mapFromOptions(referenciasAtuais?.tiposExecucao)
 
         const enrichedPessoas = (filteredData ?? []).map((pessoa) => {
           if (!pessoa || typeof pessoa !== 'object') {
@@ -128,19 +148,41 @@ export function PessoasPage() {
           }
 
           const fallback = baseOptions.find((item) => item?.id === pessoa.id) || {}
+          const centroServicoIdAtual = pessoa.centroServicoId ?? fallback.centroServicoId ?? null
           const centroServicoAtual =
-            pessoa.centroServico ?? pessoa.local ?? fallback.centroServico ?? fallback.local ?? ''
+            pessoa.centroServico ??
+            pessoa.local ??
+            fallback.centroServico ??
+            fallback.local ??
+            (centroServicoIdAtual ? centrosMap.get(centroServicoIdAtual) ?? '' : '')
           const localAtual =
-            pessoa.local ?? pessoa.centroServico ?? fallback.local ?? fallback.centroServico ?? ''
+            pessoa.local ??
+            pessoa.centroServico ??
+            fallback.local ??
+            fallback.centroServico ??
+            (centroServicoIdAtual ? centrosMap.get(centroServicoIdAtual) ?? '' : '')
+
+          const setorIdAtual = pessoa.setorId ?? fallback.setorId ?? null
+          const setorAtual = pessoa.setor ?? fallback.setor ?? (setorIdAtual ? setoresMap.get(setorIdAtual) ?? '' : '')
+
+          const cargoIdAtual = pessoa.cargoId ?? fallback.cargoId ?? null
+          const cargoTextoAtual =
+            pessoa.cargo ?? fallback.cargo ?? (cargoIdAtual ? cargosMap.get(cargoIdAtual) ?? '' : '')
+
+          const tipoExecucaoIdAtual = pessoa.tipoExecucaoId ?? fallback.tipoExecucaoId ?? null
+          const tipoExecucaoAtual =
+            pessoa.tipoExecucao ??
+            fallback.tipoExecucao ??
+            (tipoExecucaoIdAtual ? tiposExecucaoMap.get(tipoExecucaoIdAtual) ?? '' : '')
 
           return {
             ...fallback,
             ...pessoa,
             centroServico: centroServicoAtual,
             local: localAtual,
-            setor: pessoa.setor ?? fallback.setor ?? '',
-            cargo: pessoa.cargo ?? fallback.cargo ?? '',
-            tipoExecucao: pessoa.tipoExecucao ?? fallback.tipoExecucao ?? '',
+            setor: setorAtual,
+            cargo: cargoTextoAtual,
+            tipoExecucao: tipoExecucaoAtual,
           }
         })
 

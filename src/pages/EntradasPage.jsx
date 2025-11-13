@@ -231,7 +231,9 @@ const [historyState, setHistoryState] = useState({ ...HISTORY_INITIAL })
       const shouldReloadCentros = refreshCatalogs || centrosCusto.length === 0
       const [materiaisData, centrosData, entradasData] = await Promise.all([
         shouldReloadMateriais ? api.materiais.list() : Promise.resolve(null),
-        shouldReloadCentros && api?.centrosCusto && typeof api.centrosCusto.list === 'function'
+        shouldReloadCentros && api?.centrosEstoque && typeof api.centrosEstoque.list === 'function'
+          ? api.centrosEstoque.list()
+          : shouldReloadCentros && api?.centrosCusto && typeof api.centrosCusto.list === 'function'
           ? api.centrosCusto.list()
           : Promise.resolve(null),
         api.entradas.list(buildEntradasQuery(params)),
