@@ -127,7 +127,8 @@ const MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS = []
 const CENTRO_ESTOQUE_TABLE = 'centros_estoque'
 const CENTROS_CUSTO_TABLE = 'centros_custo'
 const ENTRADAS_MATERIAIS_VIEW = 'entradas_material_view'
-
+const STATUS_ENTREGUE_ID = '0f7a592f-d57d-479e-b004-883cb6794ef6'
+const STATUS_CANCELADO_NOME = 'CANCELADO'
 
 const MATERIAL_HISTORY_FIELDS = [
   'materialItemNome',
@@ -634,6 +635,20 @@ const toEndOfDayUtcIso = (value) => {
   return date.toISOString()
 }
 
+const buildDateWithCurrentTime = (valor) => {
+  const raw = trim(valor)
+  if (!raw) {
+    return null
+  }
+  const base = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(base.getTime())) {
+    return null
+  }
+  const agora = new Date()
+  base.setHours(agora.getHours(), agora.getMinutes(), agora.getSeconds(), agora.getMilliseconds())
+  return base
+}
+
 const buildMaterialResumo = (material) => {
   if (!material || typeof material !== 'object') {
     return ''
@@ -677,7 +692,7 @@ const buildMaterialResumo = (material) => {
     .join(' | ')
 }
 
-async function resolveCentroCustoNome(valor) {
+async function resolveCentroCustoNome(valor, { tipo = 'estoque' } = {}) {
   const raw = trim(valor)
   if (!raw) {
     return ''
@@ -686,6 +701,13 @@ async function resolveCentroCustoNome(valor) {
     return raw
   }
   try {
+    if (tipo === 'custo') {
+      const registro = await executeMaybeSingle(
+        supabase.from(CENTROS_CUSTO_TABLE).select('nome').eq('id', raw),
+        'Falha ao consultar centro de custo.'
+      )
+      return resolveTextValue(registro?.nome ?? '') || raw
+    }
     const registro = await executeMaybeSingle(
       supabase.from(CENTRO_ESTOQUE_TABLE).select('almox').eq('id', raw),
       'Falha ao consultar centro de estoque.'
@@ -709,6 +731,35 @@ async function fetchMaterialSnapshot(materialId) {
     return registro ? mapMaterialRecord(registro) : null
   } catch (error) {
     console.warn('Nao foi possivel resolver material.', error)
+    return null
+  }
+}
+
+async function fetchPessoaSnapshot(pessoaId) {
+  if (!pessoaId) {
+    return null
+  }
+  try {
+    const registro = await executeMaybeSingle(
+      supabase
+        .from('pessoas_view')
+        .select('id, nome, matricula, cargo, centro_servico, centro_custo')
+        .eq('id', pessoaId),
+      'Falha ao obter pessoa.'
+    )
+    if (!registro) {
+      return null
+    }
+    return {
+      id: registro.id,
+      nome: resolveTextValue(registro.nome ?? ''),
+      matricula: resolveTextValue(registro.matricula ?? ''),
+      cargo: resolveTextValue(registro.cargo ?? ''),
+      centroServico: resolveTextValue(registro.centro_servico ?? ''),
+      centroCusto: resolveTextValue(registro.centro_custo ?? ''),
+    }
+  } catch (error) {
+    console.warn('Nao foi possivel resolver pessoa.', error)
     return null
   }
 }
@@ -1452,7 +1503,11 @@ function mapEntradaRecord(record) {
   const centroCustoId = normalizeUuid(centroEstoqueValor ?? centroCustoRaw)
   const centroCustoNome =
     resolveTextValue(
-      record.centroCustoNome ?? record.centro_custo_nome ?? record.centro_estoque_nome ?? '',
+      record.centroEstoqueNome ??
+        record.centroEstoqueNome ??
+        record.centro_custo_nome ??
+        record.centro_estoque_nome ??
+        '',
     ) ||
     (centroCustoId ? '' : resolveTextValue(centroCustoRaw))
   const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
@@ -1503,6 +1558,17 @@ function mapSaidaRecord(record) {
   if (!record) {
     return null
   }
+  const statusRel = record.status_rel ?? record.status_rel_default ?? record.status_saida ?? null
+  const statusRaw = record.status ?? ''
+  const statusRelNome = resolveTextValue(statusRel?.status ?? record.statusNome ?? '')
+  const statusId =
+    record.statusId ??
+    statusRel?.id ??
+    (isUuidValue(statusRaw) ? statusRaw : null)
+  const statusTexto =
+    statusRelNome ||
+    (statusId ? '' : resolveTextValue(statusRaw)) ||
+    statusRaw
   const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
   const usuarioId = isUuidValue(usuarioRaw) ? usuarioRaw : null
   const usuarioTexto = resolveTextValue(usuarioRaw)
@@ -1519,10 +1585,108 @@ function mapSaidaRecord(record) {
     ),
     dataEntrega: record.dataEntrega ?? record.data_entrega ?? null,
     dataTroca: record.dataTroca ?? record.data_troca ?? null,
-    status: record.status ?? '',
+    statusId,
+    status: statusTexto || statusRaw,
+    statusNome: statusRelNome || statusTexto || statusRaw,
     usuarioResponsavel: usuarioId ? usuarioId : usuarioTexto,
     usuarioResponsavelId: usuarioId,
     usuarioResponsavelNome: usuarioId ? '' : usuarioTexto,
+  }
+}
+
+function mapSaidaHistoryRecord(record) {
+  if (!record) {
+    return null
+  }
+  const usuarioNome = resolveTextValue(
+    record.usuario?.display_name ??
+      record.usuario?.username ??
+      record.usuario?.email ??
+      record.usuario_responsavel_nome ??
+      record.usuarioResponsavel ??
+      ''
+  )
+  const snapshot =
+    record.material_saida ??
+    record.saida_snapshot ??
+    record.snapshot ??
+    record.saida_ent ??
+    record.saida ??
+    record.dados ??
+    {}
+  if (snapshot && snapshot.status && isUuidValue(snapshot.status)) {
+    const cache = statusSaidaCache && statusSaidaCache.byId ? statusSaidaCache.byId : null
+    if (cache && cache.has(snapshot.status)) {
+      snapshot.statusNome = cache.get(snapshot.status)
+      snapshot.status = cache.get(snapshot.status)
+    }
+  }
+  return {
+    id: record.id,
+    saidaId: record.saida_id ?? record.saidaId ?? record.saida ?? null,
+    materialId: record.material_id ?? null,
+    criadoEm: record.created_at ?? record.criado_em ?? record.criadoEm ?? null,
+    usuario: usuarioNome || 'Nao informado',
+    snapshot,
+  }
+}
+
+async function buildSaidaSnapshot(saida) {
+  if (!saida) {
+    return null
+  }
+  const [material, pessoa, centroCustoNome] = await Promise.all([
+    fetchMaterialSnapshot(saida.materialId),
+    fetchPessoaSnapshot(saida.pessoaId),
+    resolveCentroCustoNome(saida.centroCustoId || saida.centroCusto, { tipo: 'custo' }),
+  ])
+  return {
+    saidaId: saida.id,
+    pessoaId: saida.pessoaId,
+    pessoaNome: pessoa?.nome ?? '',
+    pessoaMatricula: pessoa?.matricula ?? '',
+    pessoaCargo: pessoa?.cargo ?? '',
+    materialResumo: material ? buildMaterialResumo(material) : saida.materialId,
+    descricao: material?.descricao ?? '',
+    quantidade: saida.quantidade,
+    centroCusto: centroCustoNome || saida.centroCusto || '',
+    centroCustoId: saida.centroCustoId || '',
+    centroServico: saida.centroServico || pessoa?.centroServico || '',
+    centroServicoId: saida.centroServicoId || '',
+    status: saida.status,
+    statusId: saida.statusId || '',
+    dataEntrega: saida.dataEntrega,
+    dataTroca: saida.dataTroca,
+    usuarioResponsavel: saida.usuarioResponsavelNome || saida.usuarioResponsavel || '',
+  }
+}
+
+async function registrarSaidaHistoricoSupabase(saidaAtual, saidaAnterior = null, extras = {}) {
+  if (!saidaAtual || !saidaAtual.id) {
+    return
+  }
+  try {
+    const [snapshotAtualBase, snapshotAnterior] = await Promise.all([
+      buildSaidaSnapshot(saidaAtual),
+      saidaAnterior ? buildSaidaSnapshot(saidaAnterior) : Promise.resolve(null),
+    ])
+    const snapshotAtual = { ...snapshotAtualBase, ...extras }
+    const payload =
+      snapshotAnterior && Object.keys(snapshotAnterior).length > 0
+        ? { atual: snapshotAtual, anterior: snapshotAnterior }
+        : { atual: snapshotAtual }
+    await execute(
+      supabase.from('saidas_historico').insert({
+        id: randomId(),
+        saida_id: saidaAtual.id,
+        material_id: saidaAtual.materialId,
+        material_saida: payload,
+        usuarioResponsavel: saidaAtual.usuarioResponsavelId || null,
+      }),
+      'Falha ao registrar historico da saida.'
+    )
+  } catch (error) {
+    console.warn('Nao foi possivel registrar historico da saida.', error)
   }
 }
 
@@ -1739,7 +1903,8 @@ async function carregarMateriaisDeEntradas() {
 }
 
 async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
-  const termoNormalizado = trim(termo)
+  const termoLimpo = trim(termo).replace(/\|/g, ' ')
+  const termoNormalizado = termoLimpo.trim()
   if (!termoNormalizado) {
     return []
   }
@@ -1781,6 +1946,19 @@ async function carregarCentrosCusto() {
     'Falha ao listar centros de custo.'
   )
   return normalizeDomainOptions(data ?? [])
+}
+
+async function carregarCentrosEstoqueCatalogo() {
+  const data = await execute(
+    supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox', { ascending: true }),
+    'Falha ao listar centros de estoque.'
+  )
+  return normalizeDomainOptions(
+    (data ?? []).map((item) => ({
+      id: item?.id ?? null,
+      nome: resolveTextValue(item?.almox ?? ''),
+    }))
+  )
 }
 
 async function carregarCentrosServico() {
@@ -1933,6 +2111,35 @@ async function carregarEntradas(params = {}) {
 
   return registros
 }
+async function carregarStatusSaidaMap() {
+  const agora = Date.now()
+  if (statusSaidaCache && agora - statusSaidaCacheTimestamp < STATUS_SAIDA_CACHE_TTL) {
+    return statusSaidaCache
+  }
+  const registros = await execute(
+    supabase.from('status_saida').select('id, status'),
+    'Falha ao consultar status de saida.'
+  )
+  const mapaId = new Map()
+  const mapaNome = new Map()
+  ;(registros ?? []).forEach((registro) => {
+    if (!registro?.id) {
+      return
+    }
+    const nome = resolveTextValue(registro.status ?? '')
+    mapaId.set(registro.id, nome)
+    const chave = normalizeStatusKey(nome)
+    if (chave) {
+      mapaNome.set(chave, registro.id)
+      if (chave === normalizeStatusKey(STATUS_CANCELADO_NOME)) {
+        statusCanceladoIds.add(registro.id)
+      }
+    }
+  })
+  statusSaidaCache = { byId: mapaId, byName: mapaNome }
+  statusSaidaCacheTimestamp = agora
+  return statusSaidaCache
+}
 
 async function preencherUsuariosResponsaveis(registros) {
   const ids = Array.from(
@@ -1978,11 +2185,141 @@ async function preencherUsuariosResponsaveis(registros) {
   }
 }
 
+const STATUS_SAIDA_CACHE_TTL = 5 * 60 * 1000
+let statusSaidaCache = null
+let statusSaidaCacheTimestamp = 0
+const statusCanceladoIds = new Set()
+
+const normalizeStatusKey = (nome) => (nome ? nome.toString().trim().toUpperCase() : '')
+
+async function preencherStatusSaida(registros = []) {
+  if (!Array.isArray(registros) || registros.length === 0) {
+    return registros ?? []
+  }
+  const precisaResolver = registros.some((saida) => {
+    if (saida?.statusId && isUuidValue(saida.statusId)) {
+      return true
+    }
+    return saida?.status && isUuidValue(saida.status)
+  })
+  if (!precisaResolver) {
+    return registros
+  }
+  try {
+    const cache = await carregarStatusSaidaMap()
+    const mapa = cache?.byId
+    if (!mapa || mapa.size === 0) {
+      return registros
+    }
+    return registros.map((saida) => {
+      if (!saida) {
+        return saida
+      }
+      const lookupId =
+        (saida.statusId && isUuidValue(saida.statusId) ? saida.statusId : null) ||
+        (saida.status && isUuidValue(saida.status) ? saida.status : null)
+      if (!lookupId) {
+        return saida
+      }
+      const label = mapa.get(lookupId) || saida.status
+      if (!label) {
+        return saida
+      }
+      return {
+        ...saida,
+        statusId: lookupId,
+        statusNome: label,
+        status: label,
+      }
+    })
+  } catch (error) {
+    console.warn('Falha ao resolver status das saidas.', error)
+    return registros
+  }
+}
+
+async function resolveStatusSaidaIdByName(nome) {
+  const chave = normalizeStatusKey(nome)
+  if (!chave) {
+    return null
+  }
+  const cache = await carregarStatusSaidaMap()
+  return cache?.byName?.get(chave) ?? null
+}
+
+async function ensureStatusCanceladoIdLoaded() {
+  if (statusCanceladoIds.size > 0) {
+    return
+  }
+  const cancelId = await resolveStatusSaidaIdByName(STATUS_CANCELADO_NOME)
+  if (cancelId) {
+    statusCanceladoIds.add(cancelId)
+  }
+}
+
+const normalizeStatusValue = (value) => (value ? value.toString().trim().toLowerCase() : '')
+
+function isSaidaCanceladaSync(saida) {
+  const texto = normalizeStatusValue(saida?.status)
+  if (texto === 'cancelado') {
+    return true
+  }
+  const statusId = (saida?.statusId ?? '').toString()
+  if (statusId && statusCanceladoIds.has(statusId)) {
+    return true
+  }
+  return false
+}
+
 async function preencherCentrosEstoque(registros = []) {
   const ids = Array.from(
     new Set(
       (registros ?? [])
         .map((entrada) => entrada.centroCustoId)
+        .filter((valor) => Boolean(valor) && isUuidValue(valor))
+    )
+  )
+  if (!ids.length) {
+    return registros
+  }
+  try {
+    const centros = await execute(
+      supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').in('id', ids),
+      'Falha ao consultar centros de estoque.'
+    )
+    const mapa = new Map(
+      (centros ?? [])
+        .map((centro) => [centro.id, resolveTextValue(centro.almox ?? '')])
+        .filter(([, nome]) => Boolean(nome))
+    )
+    if (!mapa.size) {
+      return registros
+    }
+    return registros.map((entrada) => {
+      if (!entrada.centroCustoId) {
+        return entrada
+      }
+        const nome = mapa.get(entrada.centroCustoId)
+        if (!nome) {
+          return entrada
+        }
+        return {
+          ...entrada,
+          centroCustoNome: nome,
+          centroCusto: nome,
+        }
+    })
+  } catch (error) {
+    console.warn('Falha ao resolver centros de estoque.', error)
+    return registros
+  }
+}
+
+async function preencherCentrosCustoSaidas(registros = []) {
+  const ids = Array.from(
+    new Set(
+      (registros ?? [])
+        .map((saida) => saida.centroCustoId)
         .filter((valor) => Boolean(valor) && isUuidValue(valor))
     )
   )
@@ -2002,16 +2339,16 @@ async function preencherCentrosEstoque(registros = []) {
     if (!mapa.size) {
       return registros
     }
-    return registros.map((entrada) => {
-      if (!entrada.centroCustoId) {
-        return entrada
+    return registros.map((saida) => {
+      if (!saida.centroCustoId) {
+        return saida
       }
-      const nome = mapa.get(entrada.centroCustoId)
+      const nome = mapa.get(saida.centroCustoId)
       if (!nome) {
-        return entrada
+        return saida
       }
       return {
-        ...entrada,
+        ...saida,
         centroCustoNome: nome,
         centroCusto: nome,
       }
@@ -2023,7 +2360,10 @@ async function preencherCentrosEstoque(registros = []) {
 }
 
 async function carregarSaidas(params = {}) {
-  let query = supabase.from('saidas').select('*').order('dataEntrega', { ascending: false })
+  let query = supabase
+    .from('saidas')
+    .select('*, status_rel:status_saida ( id, status )')
+    .order('dataEntrega', { ascending: false })
 
   if (params.materialId) {
     query = query.eq('materialId', params.materialId)
@@ -2031,24 +2371,52 @@ async function carregarSaidas(params = {}) {
   if (params.pessoaId) {
     query = query.eq('pessoaId', params.pessoaId)
   }
-  if (params.status) {
-    query = query.eq('status', params.status)
-  }
-  if (params.centroCusto) {
-    query = query.ilike('centro_custo', `%${trim(params.centroCusto)}%`)
-  }
-  if (params.centroServico) {
-    query = query.ilike('centro_servico', `%${trim(params.centroServico)}%`)
+  const statusFiltro = trim(params.status)
+  if (statusFiltro) {
+    if (isUuidValue(statusFiltro)) {
+      query = query.eq('status', statusFiltro)
+    } else {
+      query = query.eq('status', statusFiltro)
+    }
   }
 
-  const periodo = resolvePeriodoRange(parsePeriodo(params))
-  if (periodo?.start || periodo?.end) {
-    query = buildDateFilters(query, 'dataEntrega', periodo?.start?.toISOString(), periodo?.end?.toISOString())
+  const registradoPor = trim(params.registradoPor)
+  if (registradoPor) {
+    query = isUuidValue(registradoPor)
+      ? query.eq('usuarioResponsavel', registradoPor)
+      : query.ilike('usuarioResponsavel', `%${registradoPor}%`)
+  }
+
+  const centroCustoFiltro = trim(params.centroCusto)
+  if (centroCustoFiltro) {
+    query = isUuidValue(centroCustoFiltro)
+      ? query.eq('centro_custo', centroCustoFiltro)
+      : query.ilike('centro_custo', `%${centroCustoFiltro}%`)
+  }
+
+  const centroServicoFiltro = trim(params.centroServico)
+  if (centroServicoFiltro) {
+    query = isUuidValue(centroServicoFiltro)
+      ? query.eq('centro_servico', centroServicoFiltro)
+      : query.ilike('centro_servico', `%${centroServicoFiltro}%`)
+  }
+
+  const dataInicioIso = toStartOfDayUtcIso(params.dataInicio)
+  const dataFimIso = toEndOfDayUtcIso(params.dataFim)
+  if (dataInicioIso || dataFimIso) {
+    query = buildDateFilters(query, 'dataEntrega', dataInicioIso, dataFimIso)
+  } else {
+    const periodo = resolvePeriodoRange(parsePeriodo(params))
+    if (periodo?.start || periodo?.end) {
+      query = buildDateFilters(query, 'dataEntrega', periodo?.start?.toISOString(), periodo?.end?.toISOString())
+    }
   }
 
   const data = await execute(query, 'Falha ao listar saidas.')
   let registros = (data ?? []).map(mapSaidaRecord)
   registros = await preencherUsuariosResponsaveis(registros)
+  registros = await preencherStatusSaida(registros)
+  registros = await preencherCentrosCustoSaidas(registros)
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
@@ -2086,15 +2454,13 @@ async function carregarSaidas(params = {}) {
     registros = registros.filter((saida) => {
       const pessoa = pessoasMap.get(saida.pessoaId)
       const material = materiaisMap.get(saida.materialId)
+      const materialResumo = material ? buildMaterialResumo(material) : ''
       const alvo = [
+        materialResumo,
         material?.nome ?? '',
-        material?.fabricante ?? '',
+        material?.materialItemNome ?? '',
         pessoa?.nome ?? '',
-        pessoa?.centroServico ?? '',
-        saida.centroServico ?? '',
-        saida.centroCusto ?? '',
-        saida.usuarioResponsavel ?? '',
-        saida.status ?? '',
+        pessoa?.cargo ?? '',
       ]
         .join(' ')
         .toLowerCase()
@@ -2114,20 +2480,34 @@ async function carregarAcidentes() {
 }
 
 async function calcularSaldoMaterialAtual(materialId) {
+  await ensureStatusCanceladoIdLoaded()
   const [entradas, saidas] = await Promise.all([
     execute(
       supabase.from('entradas').select('materialId, quantidade, dataEntrada').eq('materialId', materialId),
       'Falha ao consultar entradas.'
     ),
     execute(
-      supabase.from('saidas').select('materialId, quantidade, dataEntrega').eq('materialId', materialId),
+      supabase
+        .from('saidas')
+        .select('materialId, quantidade, dataEntrega, status, status_rel:status_saida ( id, status )')
+        .eq('materialId', materialId),
       'Falha ao consultar saidas.'
     ),
   ])
 
   const entradasNormalizadas = (entradas ?? []).map(mapEntradaRecord)
-  const saidasNormalizadas = (saidas ?? []).map(mapSaidaRecord)
+  const saidasNormalizadas = (saidas ?? [])
+    .map(mapSaidaRecord)
+    .filter((saida) => !isSaidaCanceladaSync(saida))
   return calcularSaldoMaterial(materialId, entradasNormalizadas, saidasNormalizadas, null)
+}
+
+async function obterSaldoMaterial(materialId) {
+  if (!materialId) {
+    throw new Error('Material invalido.')
+  }
+  const saldo = await calcularSaldoMaterialAtual(materialId)
+  return { materialId, saldo }
 }
 
 function calcularDataTroca(dataEntregaIso, validadeDias) {
@@ -2143,6 +2523,7 @@ function calcularDataTroca(dataEntregaIso, validadeDias) {
     return null
   }
   data.setUTCDate(data.getUTCDate() + prazo)
+  data.setUTCHours(0, 0, 0, 0)
   return data.toISOString()
 }
 
@@ -2933,7 +3314,7 @@ export const api = {
       const centroCustoIdInput = trim(payload.centroCustoId)
       const centroServicoIdInput = trim(payload.centroServicoId)
       const dataEntregaRaw = trim(payload.dataEntrega)
-      const status = trim(payload.status) || 'entregue'
+      const status = trim(payload.status) || STATUS_ENTREGUE_ID
 
       if (!pessoaId || !materialId || !quantidade || quantidade <= 0) {
         throw new Error('Preencha pessoa, material e quantidade (>0).')
@@ -2941,8 +3322,8 @@ export const api = {
       if (!dataEntregaRaw) {
         throw new Error('Informe a data de entrega.')
       }
-      const dataEntregaDate = new Date(dataEntregaRaw)
-      if (Number.isNaN(dataEntregaDate.getTime())) {
+      const dataEntregaDate = buildDateWithCurrentTime(dataEntregaRaw)
+      if (!dataEntregaDate) {
         throw new Error('Data de entrega invalida.')
       }
 
@@ -2993,7 +3374,170 @@ export const api = {
         'Falha ao registrar saida.'
       )
 
-      return mapSaidaRecord(registro)
+      const saidaNormalizada = mapSaidaRecord(registro)
+      await registrarSaidaHistoricoSupabase(saidaNormalizada)
+      return saidaNormalizada
+    },
+    async update(id, payload = {}) {
+      if (!id) {
+        throw new Error('Saida invalida.')
+      }
+      const atualRegistro = await executeSingle(
+        supabase.from('saidas').select('*').eq('id', id),
+        'Falha ao obter saida.'
+      )
+      if (!atualRegistro) {
+        throw new Error('Saida nao encontrada.')
+      }
+      const saidaAtual = mapSaidaRecord(atualRegistro)
+      const usuario = await resolveUsuarioResponsavel()
+      const pessoaId = trim(payload.pessoaId ?? saidaAtual.pessoaId)
+      const materialId = trim(payload.materialId ?? saidaAtual.materialId)
+      const quantidade = toNumber(payload.quantidade, null)
+      const dataEntregaEntrada = trim(payload.dataEntrega ?? '')
+      if (!pessoaId || !materialId || !quantidade || quantidade <= 0) {
+        throw new Error('Preencha pessoa, material e quantidade (>0).')
+      }
+      if (!dataEntregaEntrada && !saidaAtual.dataEntrega) {
+        throw new Error('Informe a data de entrega.')
+      }
+      const dataEntregaDate = dataEntregaEntrada
+        ? buildDateWithCurrentTime(dataEntregaEntrada)
+        : saidaAtual.dataEntrega
+        ? new Date(saidaAtual.dataEntrega)
+        : null
+      if (!dataEntregaDate || Number.isNaN(dataEntregaDate.getTime())) {
+        throw new Error('Data de entrega invalida.')
+      }
+
+      let centroCustoIdFinal = trim(payload.centroCustoId ?? '') || saidaAtual.centroCustoId || null
+      let centroServicoIdFinal = trim(payload.centroServicoId ?? '') || saidaAtual.centroServicoId || null
+      if (!centroCustoIdFinal || !centroServicoIdFinal || pessoaId !== saidaAtual.pessoaId) {
+        const pessoa = await executeSingle(
+          supabase.from('pessoas').select('centro_servico_id, centro_custo_id').eq('id', pessoaId),
+          'Falha ao obter pessoa.'
+        )
+        centroCustoIdFinal = centroCustoIdFinal || pessoa?.centro_custo_id || null
+        centroServicoIdFinal = centroServicoIdFinal || pessoa?.centro_servico_id || null
+      }
+      if (!centroCustoIdFinal) {
+        throw new Error('Centro de custo inválido.')
+      }
+      if (!centroServicoIdFinal) {
+        throw new Error('Centro de serviço inválido.')
+      }
+
+      const material = await executeSingle(
+        supabase.from('materiais').select('id, validadeDias').eq('id', materialId),
+        'Falha ao obter material.'
+      )
+
+      const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId)
+      const quantidadeAnterior = toNumber(saidaAtual.quantidade, 0)
+      const estoqueConsiderado =
+        materialId === saidaAtual.materialId ? estoqueDisponivel + quantidadeAnterior : estoqueDisponivel
+      if (quantidade > estoqueConsiderado) {
+        const error = new Error('Quantidade informada maior que o estoque disponível.')
+        error.status = 400
+        throw error
+      }
+
+      const dataEntregaIso = dataEntregaDate.toISOString()
+      const dataTroca = calcularDataTroca(dataEntregaIso, material?.validadeDias)
+      const statusValor =
+        trim(payload.statusId ?? payload.status ?? '') ||
+        saidaAtual.statusId ||
+        saidaAtual.status ||
+        STATUS_ENTREGUE_ID
+
+      const registro = await executeSingle(
+        supabase
+          .from('saidas')
+          .update({
+            pessoaId,
+            materialId,
+            quantidade,
+            centro_custo: centroCustoIdFinal,
+            centro_servico: centroServicoIdFinal,
+            dataEntrega: dataEntregaIso,
+            dataTroca,
+            status: statusValor,
+            usuarioResponsavel: usuario,
+          })
+          .eq('id', id)
+          .select(),
+        'Falha ao atualizar saida.'
+      )
+
+      const saidaAtualizada = mapSaidaRecord(registro)
+      await registrarSaidaHistoricoSupabase(saidaAtualizada, saidaAtual)
+      return saidaAtualizada
+    },
+    async cancel(id, payload = {}) {
+      if (!id) {
+        throw new Error('Saida invalida.')
+      }
+      const motivo = trim(payload.motivo ?? payload.motivoCancelamento ?? '')
+      const atualRegistro = await executeSingle(
+        supabase.from('saidas').select('*').eq('id', id),
+        'Falha ao obter saida.'
+      )
+      if (!atualRegistro) {
+        throw new Error('Saida nao encontrada.')
+      }
+      await ensureStatusCanceladoIdLoaded()
+      const saidaAtual = mapSaidaRecord(atualRegistro)
+      if (isSaidaCanceladaSync(saidaAtual)) {
+        throw new Error('Saida ja cancelada.')
+      }
+      const usuario = await resolveUsuarioResponsavel()
+      let statusCanceladoId = await resolveStatusSaidaIdByName(STATUS_CANCELADO_NOME)
+      if (!statusCanceladoId) {
+        throw new Error('Status CANCELADO nao encontrado.')
+      }
+      const registro = await executeSingle(
+        supabase
+          .from('saidas')
+          .update({
+            status: statusCanceladoId,
+            usuarioResponsavel: usuario,
+          })
+          .eq('id', id)
+          .select(),
+        'Falha ao cancelar saida.'
+      )
+      let saidaAtualizada = mapSaidaRecord(registro)
+      saidaAtualizada.status = STATUS_CANCELADO_NOME
+      saidaAtualizada = (await preencherStatusSaida([saidaAtualizada]))[0] ?? saidaAtualizada
+      saidaAtualizada.statusMotivo = motivo
+      await registrarSaidaHistoricoSupabase(saidaAtualizada, saidaAtual, {
+        status: STATUS_CANCELADO_NOME,
+        motivoCancelamento: motivo,
+      })
+      return saidaAtualizada
+    },
+    async history(id) {
+      if (!id) {
+        throw new Error('Saida invalida.')
+      }
+      const registros = await execute(
+        supabase
+          .from('saidas_historico')
+          .select(
+            `
+              id,
+              saida_id,
+              material_id,
+              material_saida,
+              created_at,
+              usuario:usuarioResponsavel ( id, display_name, username, email )
+            `
+          )
+          .eq('saida_id', id)
+          .order('created_at', { ascending: false }),
+        'Falha ao listar historico de saida.'
+      )
+      return (registros ?? []).map(mapSaidaHistoryRecord)
     },
   },
   estoque: {
@@ -3004,6 +3548,9 @@ export const api = {
         carregarSaidas(params),
       ])
       return montarEstoqueAtual(materiais, entradas, saidas, parsePeriodo(params))
+    },
+    async saldo(materialId) {
+      return obterSaldoMaterial(materialId)
     },
     async dashboard(params = {}) {
       const periodo = parsePeriodo(params)
@@ -3438,6 +3985,11 @@ async dashboard(params = {}) {
         cargos: normalizeDomainOptions(cargos),
         tiposExecucao: normalizeDomainOptions(tipos),
       }
+    },
+  },
+  centrosEstoque: {
+    async list() {
+      return carregarCentrosEstoqueCatalogo()
     },
   },
   centrosCusto: {

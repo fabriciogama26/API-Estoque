@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { ExitIcon } from '../components/icons.jsx'
+import { ExitIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { SaidasHistoryModal } from '../components/Saidas/SaidasHistoryModal.jsx'
 import '../styles/MateriaisPage.css'
 
 const initialForm = {
@@ -26,6 +27,22 @@ const filterInitial = {
   status: '',
   dataInicio: '',
   dataFim: '',
+}
+
+const HISTORY_INITIAL = {
+  open: false,
+  saida: null,
+  registros: [],
+  isLoading: false,
+  error: null,
+}
+
+const CANCEL_INITIAL = {
+  open: false,
+  saida: null,
+  motivo: '',
+  isSubmitting: false,
+  error: null,
 }
 
 const MATERIAL_SEARCH_MIN_CHARS = 2
@@ -174,6 +191,10 @@ const buildSaidasQuery = (filters) => {
   if (centroServico) {
     query.centroServico = centroServico
   }
+  const registradoPor = filters.registradoPor?.trim()
+  if (registradoPor) {
+    query.registradoPor = registradoPor
+  }
   const status = filters.status?.trim()
   if (status) {
     query.status = status
@@ -216,6 +237,29 @@ const formatDisplayDateTime = (value) => {
   })
 }
 
+const formatDisplayDate = (value) => {
+  if (!value) {
+    return 'Nao informado'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Nao informado'
+  }
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return date.toLocaleDateString('pt-BR', { timeZone })
+}
+
+const formatDateToInput = (value) => {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  return date.toISOString().slice(0, 10)
+}
+
 export function SaidasPage() {
   const { user } = useAuth()
   const [Nomes, setNomes] = useState([])
@@ -225,11 +269,17 @@ export function SaidasPage() {
   const [centrosServicoOptions, setCentrosServicoOptions] = useState([])
   const [form, setForm] = useState(initialForm)
   const [filters, setFilters] = useState(filterInitial)
+  const [editingSaida, setEditingSaida] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [historyState, setHistoryState] = useState(HISTORY_INITIAL)
+  const [cancelState, setCancelState] = useState(CANCEL_INITIAL)
   const [materialSearchValue, setMaterialSearchValue] = useState('')
+  const [materialEstoque, setMaterialEstoque] = useState(null)
+  const [materialEstoqueLoading, setMaterialEstoqueLoading] = useState(false)
+  const [materialEstoqueError, setMaterialEstoqueError] = useState(null)
   const [materialSuggestions, setMaterialSuggestions] = useState([])
   const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false)
   const [isSearchingMaterials, setIsSearchingMaterials] = useState(false)
@@ -243,6 +293,11 @@ export function SaidasPage() {
   const [pessoaSearchError, setPessoaSearchError] = useState(null)
   const pessoaSearchTimeoutRef = useRef(null)
   const pessoaBlurTimeoutRef = useRef(null)
+
+  const isSaidaCancelada = useCallback((saida) => {
+    const texto = (saida?.status || '').toString().trim().toLowerCase()
+    return texto === 'cancelado'
+  }, [])
 
   const load = async (params = filters, { resetPage = false } = {}) => {
     if (resetPage) {
@@ -292,6 +347,27 @@ export function SaidasPage() {
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
+  const resetFormState = useCallback(() => {
+    setForm({ ...initialForm })
+    setPessoaSearchValue('')
+    setPessoaSuggestions([])
+    setPessoaDropdownOpen(false)
+    setPessoaSearchError(null)
+    setMaterialSearchValue('')
+    setMaterialSuggestions([])
+    setMaterialDropdownOpen(false)
+    setMaterialSearchError(null)
+    setMaterialEstoque(null)
+    setMaterialEstoqueError(null)
+    setMaterialEstoqueLoading(false)
+  }, [])
+
+  const cancelEditSaida = useCallback(() => {
+    setEditingSaida(null)
+    resetFormState()
+    setError(null)
+  }, [resetFormState])
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (!form.pessoaId) {
@@ -306,6 +382,7 @@ export function SaidasPage() {
       setError('Informe a data de entrega.')
       return
     }
+    const isEditMode = Boolean(editingSaida)
     setIsSaving(true)
     setError(null)
     try {
@@ -320,17 +397,14 @@ export function SaidasPage() {
         dataEntrega: form.dataEntrega,
         usuarioResponsavel: user?.name || user?.username || 'sistema',
       }
-      await api.saidas.create(payload)
-      setForm({ ...initialForm })
-      setPessoaSearchValue('')
-      setPessoaSuggestions([])
-      setPessoaDropdownOpen(false)
-      setPessoaSearchError(null)
-      setMaterialSearchValue('')
-      setMaterialSuggestions([])
-      setMaterialDropdownOpen(false)
-      setMaterialSearchError(null)
-      await load(filters, { resetPage: true })
+      if (isEditMode) {
+        await api.saidas.update(editingSaida.id, payload)
+      } else {
+        await api.saidas.create(payload)
+      }
+      setEditingSaida(null)
+      resetFormState()
+      await load(filters, { resetPage: !isEditMode })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -353,6 +427,91 @@ export function SaidasPage() {
     load(filterInitial, { resetPage: true })
   }
 
+  const openHistorySaida = useCallback(async (saida) => {
+    if (!saida?.id) {
+      return
+    }
+    setHistoryState({
+      ...HISTORY_INITIAL,
+      open: true,
+      saida,
+      isLoading: true,
+    })
+    try {
+      const registros = await api.saidas.history(saida.id)
+      setHistoryState({
+        open: true,
+        saida,
+        registros: registros ?? [],
+        isLoading: false,
+        error: null,
+      })
+    } catch (err) {
+      setHistoryState({
+        open: true,
+        saida,
+        registros: [],
+        isLoading: false,
+        error: err.message || 'Nao foi possivel carregar o historico.',
+      })
+    }
+  }, [])
+
+  const closeHistorySaida = useCallback(() => {
+    setHistoryState({ ...HISTORY_INITIAL })
+  }, [])
+
+  const openCancelSaida = useCallback(
+    (saida) => {
+      if (!saida || isSaidaCancelada(saida)) {
+        return
+      }
+      setCancelState({
+        ...CANCEL_INITIAL,
+        open: true,
+        saida,
+      })
+    },
+    [isSaidaCancelada]
+  )
+
+  const closeCancelSaida = useCallback(() => {
+    setCancelState({ ...CANCEL_INITIAL })
+  }, [])
+
+  const handleCancelMotivoChange = (event) => {
+    const { value } = event.target
+    setCancelState((prev) => ({ ...prev, motivo: value }))
+  }
+
+  const confirmCancelSaida = useCallback(async () => {
+    if (!cancelState.saida?.id) {
+      return
+    }
+    const motivoTrimmed = cancelState.motivo.trim()
+    if (!motivoTrimmed) {
+      setCancelState((prev) => ({
+        ...prev,
+        error: 'Informe o motivo do cancelamento.',
+      }))
+      return
+    }
+    setCancelState((prev) => ({ ...prev, isSubmitting: true, error: null }))
+    try {
+      await api.saidas.cancel(cancelState.saida.id, { motivo: motivoTrimmed })
+      setCancelState({ ...CANCEL_INITIAL })
+      setEditingSaida(null)
+      resetFormState()
+      await load(filters, { resetPage: false })
+    } catch (err) {
+      setCancelState((prev) => ({
+        ...prev,
+        isSubmitting: false,
+        error: err.message || 'Falha ao cancelar saida.',
+      }))
+    }
+  }, [cancelState.saida, cancelState.motivo, filters, load, resetFormState])
+
   const handleMaterialInputChange = (event) => {
     const { value } = event.target
     if (materialBlurTimeoutRef.current) {
@@ -362,6 +521,8 @@ export function SaidasPage() {
     setMaterialSearchValue(value)
     setForm((prev) => ({ ...prev, materialId: '' }))
     setMaterialSearchError(null)
+    setMaterialEstoque(null)
+    setMaterialEstoqueError(null)
     if (value.trim().length >= MATERIAL_SEARCH_MIN_CHARS) {
       setMaterialDropdownOpen(true)
     } else {
@@ -380,6 +541,8 @@ export function SaidasPage() {
     setMaterialSuggestions([])
     setMaterialDropdownOpen(false)
     setMaterialSearchError(null)
+    setMaterialEstoque(null)
+    setMaterialEstoqueError(null)
   }
 
   const handleMaterialFocus = () => {
@@ -404,6 +567,9 @@ export function SaidasPage() {
     setMaterialSuggestions([])
     setMaterialDropdownOpen(false)
     setMaterialSearchError(null)
+    setMaterialEstoque(null)
+    setMaterialEstoqueError(null)
+    setMaterialEstoqueLoading(false)
   }
 
   const handlePessoaInputChange = (event) => {
@@ -487,15 +653,86 @@ export function SaidasPage() {
     return map
   }, [materiais])
 
+  const startEditSaida = useCallback(
+    (saida) => {
+      if (!saida) {
+        return
+      }
+      if (isSaidaCancelada(saida)) {
+        setError('Saídas canceladas não podem ser editadas.')
+        return
+      }
+      const pessoa = NomesMap.get(saida.pessoaId)
+      const material = materiaisMap.get(saida.materialId)
+      setEditingSaida(saida)
+      setForm({
+        pessoaId: saida.pessoaId || '',
+        materialId: saida.materialId || '',
+        quantidade:
+          saida.quantidade !== undefined && saida.quantidade !== null ? String(saida.quantidade) : '',
+        centroCusto: saida.centroCusto || '',
+        centroCustoId: saida.centroCustoId || '',
+        centroServico: saida.centroServico || '',
+        centroServicoId: saida.centroServicoId || '',
+        dataEntrega: formatDateToInput(saida.dataEntrega),
+      })
+      setPessoaSearchValue(formatPessoaSummary(pessoa) || saida.pessoaId || '')
+      setPessoaSuggestions([])
+      setPessoaDropdownOpen(false)
+      setPessoaSearchError(null)
+      setMaterialSearchValue(material ? formatMaterialSummary(material) : saida.materialId || '')
+      setMaterialSuggestions([])
+      setMaterialDropdownOpen(false)
+      setMaterialSearchError(null)
+      setError(null)
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    },
+    [NomesMap, materiaisMap, isSaidaCancelada]
+  )
+
   const statusOptions = useMemo(() => {
-    const values = new Set()
+    const mapa = new Map()
     saidas.forEach((item) => {
-      if (item?.status) {
-        values.add(item.status)
+      if (!item) {
+        return
+      }
+      const id = item.statusId || (isLikelyUuid(item.status) ? item.status : null)
+      const nome = item.statusNome || item.status || ''
+      if (!id || !nome) {
+        return
+      }
+      if (!mapa.has(id)) {
+        mapa.set(id, { id, nome })
       }
     })
-    return Array.from(values).sort()
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   }, [saidas])
+
+  const statusLabelMap = useMemo(() => {
+    const map = new Map()
+    statusOptions.forEach((item) => {
+      map.set(item.id, item.nome)
+    })
+    return map
+  }, [statusOptions])
+
+  const renderStatusChip = useCallback(
+    (saida) => {
+      const rawStatus = saida?.status || ''
+      const texto =
+        saida?.statusNome ||
+        statusLabelMap.get(saida?.statusId) ||
+        statusLabelMap.get(rawStatus) ||
+        (isLikelyUuid(rawStatus) ? 'Status indefinido' : rawStatus) ||
+        '-'
+      const cancelada = isSaidaCancelada(saida)
+      const className = cancelada ? 'status-chip status-chip--cancelado' : 'status-chip'
+      return <span className={className}>{texto || '-'}</span>
+    },
+    [isSaidaCancelada, statusLabelMap]
+  )
 
   const registradoOptions = useMemo(() => {
     const mapa = new Map()
@@ -660,8 +897,15 @@ export function SaidasPage() {
       if (!normalized) {
         return []
       }
+      const partes = normalized.split('|').map((parte) => parte.trim()).filter(Boolean)
       return materiais
-        .filter((material) => materialMatchesTerm(material, normalized))
+        .filter((material) => {
+          if (!partes.length) {
+            return materialMatchesTerm(material, normalized)
+          }
+          const textoResumo = normalizeSearchValue(formatMaterialSummary(material))
+          return partes.every((parte) => textoResumo.includes(parte))
+        })
         .slice(0, MATERIAL_SEARCH_MAX_RESULTS)
     },
     [materiais],
@@ -698,6 +942,42 @@ export function SaidasPage() {
       setMaterialSearchValue(formatMaterialSummary(selecionado))
     }
   }, [form.materialId, materiaisMap])
+
+  useEffect(() => {
+    if (!form.materialId) {
+      setMaterialEstoque(null)
+      setMaterialEstoqueError(null)
+      setMaterialEstoqueLoading(false)
+      return
+    }
+    let cancelled = false
+    setMaterialEstoqueLoading(true)
+    setMaterialEstoqueError(null)
+    ;(async () => {
+      try {
+        if (api?.estoque?.saldo) {
+          const resultado = await api.estoque.saldo(form.materialId)
+          if (!cancelled) {
+            setMaterialEstoque(Number(resultado?.saldo ?? 0))
+          }
+        } else {
+          setMaterialEstoque(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setMaterialEstoqueError(err.message || 'Falha ao consultar estoque.')
+          setMaterialEstoque(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setMaterialEstoqueLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [form.materialId, api])
 
   useEffect(() => {
     if (pessoaSearchTimeoutRef.current) {
@@ -788,8 +1068,30 @@ export function SaidasPage() {
         } else {
           resultados = fallbackMaterialSearch(termo)
         }
+        if (!Array.isArray(resultados)) {
+          resultados = []
+        }
+        if (
+          resultados.length < MATERIAL_SEARCH_MAX_RESULTS &&
+          typeof fallbackMaterialSearch === 'function'
+        ) {
+          const fallbackResultados = fallbackMaterialSearch(termo) ?? []
+          if (fallbackResultados.length) {
+            const vistos = new Set(
+              resultados.map((item) => (item?.id ? String(item.id) : formatMaterialSummary(item))),
+            )
+            fallbackResultados.some((material) => {
+              const chave = material?.id ? String(material.id) : formatMaterialSummary(material)
+              if (!vistos.has(chave)) {
+                resultados.push(material)
+                vistos.add(chave)
+              }
+              return resultados.length >= MATERIAL_SEARCH_MAX_RESULTS
+            })
+          }
+        }
         if (!cancelled) {
-          setMaterialSuggestions(resultados ?? [])
+          setMaterialSuggestions(resultados.slice(0, MATERIAL_SEARCH_MAX_RESULTS))
           setMaterialDropdownOpen(true)
         }
       } catch (err) {
@@ -850,8 +1152,18 @@ export function SaidasPage() {
         return false
       }
       if (filters.status) {
-        const statusAtual = (saida.status || '').trim()
-        if (statusAtual !== filters.status) {
+        const candidatos = [
+          saida.statusId,
+          saida.status,
+          normalizeSearchValue(saida.status),
+        ]
+          .map((valor) => (valor ? String(valor).trim() : ''))
+          .filter(Boolean)
+        const alvoNormalizado = normalizeSearchValue(filters.status)
+        const inclui =
+          candidatos.includes(filters.status) ||
+          candidatos.includes(alvoNormalizado)
+        if (!inclui) {
           return false
         }
       }
@@ -867,14 +1179,32 @@ export function SaidasPage() {
         }
       }
       if (filters.centroCusto) {
-        const saidaId = (saida.centroCustoId || '').toString().trim()
-        if (!saidaId || saidaId !== filters.centroCusto) {
+        const saidaLabel = resolveCentroCustoLabel(saida)
+        const normalizedFilter = normalizeSearchValue(filters.centroCusto)
+        const filterLabel =
+          centrosCustoMap.get(filters.centroCusto) ||
+          centrosCustoMap.get(normalizedFilter) ||
+          (!isLikelyUuid(filters.centroCusto) ? filters.centroCusto : '')
+        const matchesById = Boolean(saida.centroCustoId) && saida.centroCustoId === filters.centroCusto
+        const matchesByLabel =
+          Boolean(filterLabel) &&
+          normalizeSearchValue(saidaLabel || saida.centroCusto || '') === normalizeSearchValue(filterLabel)
+        if (!matchesById && !matchesByLabel) {
           return false
         }
       }
       if (filters.centroServico) {
-        const saidaId = (saida.centroServicoId || '').toString().trim()
-        if (!saidaId || saidaId !== filters.centroServico) {
+        const saidaLabel = resolveCentroServicoLabel(saida)
+        const normalizedFilter = normalizeSearchValue(filters.centroServico)
+        const filterLabel =
+          centrosServicoMap.get(filters.centroServico) ||
+          centrosServicoMap.get(normalizedFilter) ||
+          (!isLikelyUuid(filters.centroServico) ? filters.centroServico : '')
+        const matchesById = Boolean(saida.centroServicoId) && saida.centroServicoId === filters.centroServico
+        const matchesByLabel =
+          Boolean(filterLabel) &&
+          normalizeSearchValue(saidaLabel || saida.centroServico || '') === normalizeSearchValue(filterLabel)
+        if (!matchesById && !matchesByLabel) {
           return false
         }
       }
@@ -882,17 +1212,10 @@ export function SaidasPage() {
         const pessoa = NomesMap.get(saida.pessoaId)
         const material = materiaisMap.get(saida.materialId)
         const campos = [
+          material ? formatMaterialSummary(material) : '',
           pessoa?.nome,
           pessoa?.matricula,
-          pessoa?.centroServico,
-          pessoa?.setor,
-          material ? formatMaterialSummary(material) : '',
-          material?.descricao,
-          saida.usuarioResponsavel,
-          saida.usuarioResponsavelNome,
-          saida.status,
-          resolveCentroCustoLabel(saida),
-          resolveCentroServicoLabel(saida),
+          pessoa?.cargo,
         ]
         const inclui = campos
           .map((campo) => normalizeSearchValue(campo))
@@ -948,6 +1271,9 @@ export function SaidasPage() {
     !form.materialId &&
     (isSearchingMaterials || materialSearchError || materialSuggestions.length > 0)
 
+  const isEditing = Boolean(editingSaida)
+  const canConfirmCancel = cancelState.motivo.trim().length > 0 && !cancelState.isSubmitting
+
   return (
     <div className="stack">
       <PageHeader
@@ -957,6 +1283,19 @@ export function SaidasPage() {
       />
 
       <form className="form" onSubmit={handleSubmit}>
+        {isEditing ? (
+          <div className="form__notice">
+            <span>Editando saída #{editingSaida?.id?.slice(0, 8) || ''}</span>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={cancelEditSaida}
+              disabled={isSaving}
+            >
+              Cancelar edição
+            </button>
+          </div>
+        ) : null}
         <div className="form__grid form__grid--two">
           <label className="field field--autocomplete">
             <span>Nome*</span>
@@ -1069,6 +1408,25 @@ export function SaidasPage() {
             </div>
           </label>
           <label className="field">
+            <span>Em estoque</span>
+            <input
+              type="text"
+              value={
+                materialEstoqueLoading
+                  ? 'Calculando...'
+                  : materialEstoqueError
+                    ? 'Erro ao consultar'
+                    : materialEstoque !== null && materialEstoque !== undefined
+                      ? String(materialEstoque)
+                      : '-'
+              }
+              readOnly
+            />
+            {materialEstoqueError ? (
+              <small className="field__hint field__hint--error">{materialEstoqueError}</small>
+            ) : null}
+          </label>
+          <label className="field">
             <span>Quantidade*</span>
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
           </label>
@@ -1104,7 +1462,7 @@ export function SaidasPage() {
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
           <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? 'Registrando...' : 'Registrar saida'}
+            {isSaving ? (isEditing ? 'Salvando...' : 'Registrando...') : isEditing ? 'Salvar alterações' : 'Registrar saida'}
           </button>
         </div>
       </form>
@@ -1157,8 +1515,8 @@ export function SaidasPage() {
           <select name="status" value={filters.status} onChange={handleFilterChange}>
             <option value="">Todos</option>
             {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
+              <option key={status.id} value={status.id}>
+                {status.nome}
               </option>
             ))}
           </select>
@@ -1203,6 +1561,7 @@ export function SaidasPage() {
                   <th>Data troca</th>
                   <th>Valor total</th>
                   <th>Registrado por</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -1216,9 +1575,10 @@ export function SaidasPage() {
                   const materialIdLabel = material?.id || saida.materialId || 'Nao informado'
                   const pessoaCargo = Nome?.cargo || 'Cargo nao informado'
                   const registradoPor = saida.usuarioResponsavelNome || saida.usuarioResponsavel || 'Nao informado'
+                  const rowClass = isSaidaCancelada(saida) ? 'data-table__row data-table__row--cancelado' : ''
 
                   return (
-                    <tr key={saida.id}>
+                    <tr key={saida.id} className={rowClass || undefined}>
                       <td>
                         <strong>{materialResumo}</strong>
                         <p className="data-table__muted">ID: {materialIdLabel}</p>
@@ -1230,13 +1590,44 @@ export function SaidasPage() {
                       <td>{saida.quantidade}</td>
                       <td>{centroCustoLabel}</td>
                       <td>{centroServicoLabel}</td>
-                      <td>{saida.status || '-'}</td>
+                      <td>{renderStatusChip(saida)}</td>
                       <td>{formatDisplayDateTime(saida.dataEntrega)}</td>
-                      <td>
-                        {saida.dataTroca ? formatDisplayDateTime(saida.dataTroca) : 'Nao informado'}
-                      </td>
+                      <td>{saida.dataTroca ? formatDisplayDate(saida.dataTroca) : 'Nao informado'}</td>
                       <td>{formatCurrency(total)}</td>
                       <td>{registradoPor}</td>
+                      <td>
+                        <div className="table-actions materiais-data-table__actions">
+                          <button
+                            type="button"
+                            className="materiais-table-action-button"
+                            onClick={() => startEditSaida(saida)}
+                            aria-label={`Editar saída ${saida.id}`}
+                            title="Editar saída"
+                            disabled={isSaidaCancelada(saida)}
+                          >
+                            <EditIcon size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="materiais-table-action-button"
+                            onClick={() => openHistorySaida(saida)}
+                            aria-label={`Histórico da saída ${saida.id}`}
+                            title="Histórico da saída"
+                          >
+                            <HistoryIcon size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="materiais-table-action-button materiais-table-action-button--danger"
+                            onClick={() => openCancelSaida(saida)}
+                            aria-label={`Cancelar saída ${saida.id}`}
+                            title="Cancelar saída"
+                            disabled={isSaidaCancelada(saida)}
+                          >
+                            <CancelIcon size={16} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
@@ -1251,11 +1642,57 @@ export function SaidasPage() {
           onPageChange={setCurrentPage}
         />
       </section>
+      <SaidasHistoryModal state={historyState} onClose={closeHistorySaida} />
+      {cancelState.open ? (
+        <div className="entradas-history__overlay" role="dialog" aria-modal="true" onClick={closeCancelSaida}>
+          <div className="entradas-history__modal" onClick={(event) => event.stopPropagation()}>
+            <header className="entradas-history__header">
+              <div>
+                <h3>Cancelar saída</h3>
+                <p className="entradas-history__subtitle">{cancelState.saida?.id || ''}</p>
+              </div>
+              <button
+                type="button"
+                className="entradas-history__close"
+                onClick={closeCancelSaida}
+                aria-label="Fechar modal de cancelamento"
+              >
+                x
+              </button>
+            </header>
+            <div className="entradas-history__body">
+              <p>Informe o motivo do cancelamento. A quantidade será devolvida ao estoque.</p>
+              <textarea
+                className="cancel-modal__textarea"
+                value={cancelState.motivo}
+                onChange={handleCancelMotivoChange}
+                placeholder="Motivo do cancelamento"
+                rows={4}
+                required
+              />
+              {cancelState.error ? (
+                <p className="feedback feedback--error cancel-modal__feedback">{cancelState.error}</p>
+              ) : null}
+            </div>
+            <div className="cancel-modal__actions">
+              <button type="button" className="button button--ghost" onClick={closeCancelSaida} disabled={cancelState.isSubmitting}>
+                Voltar
+              </button>
+              <button
+                type="button"
+                className="button button--danger"
+                onClick={confirmCancelSaida}
+                disabled={!canConfirmCancel}
+              >
+                {cancelState.isSubmitting ? 'Cancelando...' : 'Confirmar cancelamento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
-
-
 
 
 
