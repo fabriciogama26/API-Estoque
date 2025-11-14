@@ -11,7 +11,12 @@ const formatDate = (value) => {
   if (Number.isNaN(date.getTime())) {
     return value
   }
-  return new Intl.DateTimeFormat('pt-BR').format(date)
+  const hasTime = typeof value === 'string' && value.includes('T')
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    ...(hasTime ? { timeStyle: 'short' } : {}),
+  })
+  return formatter.format(date)
 }
 
 const formatNumber = (value) => {
@@ -23,6 +28,23 @@ const formatNumber = (value) => {
     return '-'
   }
   return numeric
+}
+
+const formatDateOnly = (value) => {
+  if (!value) {
+    return null
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date.toLocaleDateString('pt-BR')
+}
+
+const formatStatusWithDate = (flag, date) => {
+  const status = flag ? 'Sim' : 'Nao'
+  const dateText = formatDateOnly(date)
+  return dateText ? `${status} - ${dateText}` : status
 }
 
 export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSaving, historyState }) {
@@ -59,6 +81,8 @@ export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSavi
               <th>Nome</th>
               <th>Matricula</th>
               <th>Data</th>
+              <th>eSOCIAL</th>
+              <th>SESMT</th>
               <th>Dias perdidos</th>
               <th>Dias debitados</th>
               <th>Agente</th>
@@ -107,6 +131,8 @@ export function AcidentesTable({ acidentes, onEdit, onHistory, editingId, isSavi
                   </td>
                   <td>{acidente.matricula || '-'}</td>
                   <td>{formatDate(acidente.data)}</td>
+                  <td>{formatStatusWithDate(Boolean(acidente.dataEsocial), acidente.dataEsocial)}</td>
+                  <td>{formatStatusWithDate(Boolean(acidente.sesmt), acidente.dataSesmt)}</td>
                   <td>{formatNumber(acidente.diasPerdidos)}</td>
                   <td>{formatNumber(acidente.diasDebitados)}</td>
                   <td>{agentesSelecionados.length ? agentesSelecionados.join(', ') : '-'}</td>

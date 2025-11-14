@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 
 export function AcidentesForm({
   form,
@@ -59,6 +59,47 @@ export function AcidentesForm({
   useEffect(() => {
     setTipoSelecionado('')
   }, [form.agente])
+
+  const formatDateTimeLabel = (value) => {
+    if (!value) {
+      return ''
+    }
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return ''
+    }
+    return date.toLocaleString('pt-BR')
+  }
+
+  const handleEsocialChange = (event) => {
+    const checked = event.target.checked
+    const nextValue = checked ? new Date().toISOString() : ''
+    onChange({
+      target: {
+        name: 'dataEsocial',
+        value: nextValue,
+      },
+    })
+  }
+
+  const handleSesmtChange = (event) => {
+    const checked = event.target.checked
+    onChange({
+      target: {
+        name: 'sesmt',
+        value: checked,
+      },
+    })
+    onChange({
+      target: {
+        name: 'dataSesmt',
+        value: checked ? form.dataSesmt || new Date().toISOString() : '',
+      },
+    })
+  }
+
+  const dataEsocialLabel = form.dataEsocial ? formatDateTimeLabel(form.dataEsocial) : ''
+  const dataSesmtLabel = form.dataSesmt ? formatDateTimeLabel(form.dataSesmt) : ''
 
 
   const pessoaOptions = (() => {
@@ -431,7 +472,33 @@ export function AcidentesForm({
         </label>
         <label className="field">
           <span>Data <span className="asterisco">*</span></span>
-          <input type="date" name="data" value={form.data} onChange={onChange} required />
+          <input
+            type="datetime-local"
+            name="data"
+            value={form.data}
+            onChange={onChange}
+            required
+            step="60"
+          />
+        </label>
+        <label className="field field--checkbox">
+          <input
+            type="checkbox"
+            name="dataEsocial"
+            checked={Boolean(form.dataEsocial)}
+            onChange={handleEsocialChange}
+          />
+          <span>Lancado eSOCIAL</span>
+          {dataEsocialLabel ? (
+            <small className="field__hint">Registrado em {dataEsocialLabel}</small>
+          ) : null}
+        </label>
+        <label className="field field--checkbox">
+          <input type="checkbox" name="sesmt" checked={Boolean(form.sesmt)} onChange={handleSesmtChange} />
+          <span>Lancado SESMT</span>
+          {dataSesmtLabel ? (
+            <small className="field__hint">Registrado em {dataSesmtLabel}</small>
+          ) : null}
         </label>
         <label className="field">
           <span>Dias Perdidos <span className="asterisco">*</span></span>
@@ -748,3 +815,4 @@ export function AcidentesForm({
     </form>
   )
 }
+

@@ -99,6 +99,9 @@ const ACIDENTE_HISTORY_FIELDS = [
   'nome',
   'cargo',
   'data',
+  'dataEsocial',
+  'sesmt',
+  'dataSesmt',
   'tipo',
   'agente',
   'lesao',
@@ -1791,6 +1794,9 @@ function mapAcidenteRecord(record) {
     local: resolveTextValue(record.local ?? centroServico),
     cat: record.cat ?? null,
     observacao: record.observacao ?? '',
+    dataEsocial: record.dataEsocial ?? record.data_esocial ?? null,
+    sesmt: Boolean(record.sesmt ?? record.sesmt_flag ?? false),
+    dataSesmt: record.dataSesmt ?? record.data_sesmt ?? null,
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
     registradoPor: record.registradoPor ?? record.registrado_por ?? '',
@@ -3714,6 +3720,9 @@ export const api = {
         observacao: trim(payload.observacao),
         partesLesionadas: partes,
         partePrincipal,
+        dataEsocial: payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null,
+        sesmt: Boolean(payload.sesmt),
+        dataSesmt: payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null,
       }
       if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
         throw new Error('Preencha os campos obrigatorios do acidente.')
@@ -3728,6 +3737,9 @@ export const api = {
         partePrincipal: _partePrincipal,
         agentePrincipal: _agentePrincipal,
         tipoPrincipal: _tipoPrincipal,
+        dataEsocial,
+        sesmt,
+        dataSesmt,
         ...resto
       } = dados
       const registro = await executeSingle(
@@ -3737,6 +3749,9 @@ export const api = {
             ...resto,
             centro_servico: centroServicoDb,
             partes_lesionadas: partesPayload,
+            data_esocial: dataEsocial,
+            sesmt,
+            data_sesmt: dataSesmt,
             registradoPor: usuario,
           })
           .select(),
@@ -3811,6 +3826,18 @@ export const api = {
         cat: trim(payload.cat ?? atual.cat ?? ''),
         observacao: trim(payload.observacao ?? atual.observacao ?? ''),
         partePrincipal,
+        dataEsocial:
+          payload.dataEsocial !== undefined && payload.dataEsocial !== null
+            ? (payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null)
+            : atual.data_esocial ?? atual.dataEsocial ?? null,
+        sesmt:
+          payload.sesmt !== undefined
+            ? Boolean(payload.sesmt)
+            : Boolean(atual.sesmt),
+        dataSesmt:
+          payload.dataSesmt !== undefined && payload.dataSesmt !== null
+            ? (payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null)
+            : atual.data_sesmt ?? atual.dataSesmt ?? null,
       }
 
       if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
@@ -3841,6 +3868,9 @@ export const api = {
         cid: dados.cid,
         cat: dados.cat,
         observacao: dados.observacao,
+        dataEsocial: dados.dataEsocial,
+        sesmt: dados.sesmt,
+        dataSesmt: dados.dataSesmt,
       }
       const camposAlterados = []
       ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
@@ -3870,6 +3900,11 @@ export const api = {
         partesLesionadas: partesPayload,
         lesao: _lesaoPrincipal,
         partePrincipal: _partePrincipal,
+        agentePrincipal: _agentePrincipal,
+        tipoPrincipal: _tipoPrincipal,
+        dataEsocial,
+        sesmt,
+        dataSesmt,
         ...resto
       } = dados
       const registro = await executeSingle(
@@ -3879,6 +3914,9 @@ export const api = {
             ...resto,
             centro_servico: centroServicoDb,
             partes_lesionadas: partesPayload,
+            data_esocial: dataEsocial,
+            sesmt,
+            data_sesmt: dataSesmt,
             atualizadoPor: usuario,
             atualizadoEm: agora,
           })
@@ -3897,7 +3935,7 @@ export const api = {
     },
     async history(id) {
       if (!id) {
-        throw new Error('ID obrigatório.')
+        throw new Error('ID obrigatorio.')
       }
       const data = await execute(
         supabase
@@ -3905,16 +3943,50 @@ export const api = {
           .select('id, data_edicao, usuario_responsavel, campos_alterados')
           .eq('acidente_id', id)
           .order('data_edicao', { ascending: false }),
-        'Falha ao obter histórico do acidente.'
+        'Falha ao obter historico do acidente.'
       )
-      return (data ?? []).map((item) => ({
-        id: item.id,
-        dataEdicao: item.data_edicao ?? item.dataEdicao ?? null,
-        usuarioResponsavel: item.usuario_responsavel ?? item.usuarioResponsavel ?? '',
-        camposAlterados: Array.isArray(item.campos_alterados ?? item.camposAlterados)
-          ? item.campos_alterados ?? item.camposAlterados
-          : [],
-      }))
+      const registros = data ?? []
+      const responsaveisIds = Array.from(
+        new Set(
+          registros
+            .map((item) => (item.usuario_responsavel ?? item.usuarioResponsavel ?? '').trim())
+            .filter(Boolean)
+        )
+      )
+      let usuarioNomeMap = new Map()
+      if (responsaveisIds.length > 0) {
+        try {
+          const usuarios = await execute(
+            supabase.from('app_users').select('id, display_name, username, email').in('id', responsaveisIds),
+            'Falha ao consultar usuarios do historico de acidentes.'
+          )
+          usuarioNomeMap = new Map(
+            (usuarios ?? [])
+              .filter((usuario) => usuario?.id)
+              .map((usuario) => [
+                usuario.id,
+                resolveTextValue(usuario.display_name ?? usuario.username ?? usuario.email ?? usuario.id),
+              ])
+          )
+        } catch (usuarioError) {
+          console.warn('Nao foi possivel resolver nomes dos usuarios do historico de acidentes.', usuarioError)
+        }
+      }
+      return registros.map((item) => {
+        const usuarioId = (item.usuario_responsavel ?? item.usuarioResponsavel ?? '').trim()
+        const usuarioNome = usuarioId
+          ? usuarioNomeMap.get(usuarioId) ?? usuarioId
+          : 'Responsavel nao informado'
+        return {
+          id: item.id,
+          dataEdicao: item.data_edicao ?? item.dataEdicao ?? null,
+          usuarioResponsavel: usuarioNome,
+          usuarioResponsavelId: usuarioId || null,
+          camposAlterados: Array.isArray(item.campos_alterados ?? item.camposAlterados)
+            ? item.campos_alterados ?? item.camposAlterados
+            : [],
+        }
+      })
     },
 
 async dashboard(params = {}) {

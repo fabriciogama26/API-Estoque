@@ -25,12 +25,9 @@ import {
 
 import '../styles/AcidentesPage.css'
 
-const toInputDate = (value) => {
+const toInputDateTime = (value) => {
   if (!value) {
     return ''
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -39,7 +36,9 @@ const toInputDate = (value) => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
 const parseList = (value) => {
@@ -393,7 +392,11 @@ export function AcidentesPage() {
   )
 
   const handleFormChange = (event) => {
-    const { name, value } = event.target
+    const { name, type } = event.target
+    const value =
+      type === 'checkbox' && typeof event.target.checked === 'boolean'
+        ? event.target.checked
+        : event.target.value
     if (name === 'matricula') {
       setForm((prev) => {
         const next = { ...prev, matricula: value }
@@ -520,7 +523,11 @@ export function AcidentesPage() {
   }
 
   const handleFilterChange = (event) => {
-    const { name, value } = event.target
+    const { name, type } = event.target
+    const value =
+      type === 'checkbox' && typeof event.target.checked === 'boolean'
+        ? event.target.checked
+        : event.target.value
     if (name === "centroServico") {
       setFilters((prev) => ({ ...prev, centroServico: value, setor: value }))
       return
@@ -591,7 +598,7 @@ export function AcidentesPage() {
       matricula: acidente.matricula || '',
       nome: acidente.nome || '',
       cargo: acidente.cargo || '',
-      data: toInputDate(acidente.data),
+      data: toInputDateTime(acidente.data),
       diasPerdidos: acidente.diasPerdidos !== null && acidente.diasPerdidos !== undefined ? String(acidente.diasPerdidos) : '',
       diasDebitados:
         acidente.diasDebitados !== null && acidente.diasDebitados !== undefined ? String(acidente.diasDebitados) : '',
@@ -616,6 +623,9 @@ export function AcidentesPage() {
             : [],
       cat: acidente.cat || '',
       observacao: acidente.observacao || '',
+      dataEsocial: acidente.dataEsocial || '',
+      sesmt: Boolean(acidente.sesmt),
+      dataSesmt: acidente.dataSesmt || '',
     })
     setTipoOpcoes([])
     setTiposError(null)

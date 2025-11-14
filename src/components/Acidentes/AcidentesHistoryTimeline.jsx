@@ -17,6 +17,9 @@ const FIELD_LABELS = {
   cid: 'CID',
   cat: 'CAT',
   observacao: 'Observacao',
+  dataEsocial: 'Data eSOCIAL',
+  sesmt: 'SESMT',
+  dataSesmt: 'Data SESMT',
 }
 
 const formatDate = (value) => {
@@ -43,27 +46,35 @@ const formatDateTime = (value) => {
 
 const formatValue = (campo, valor) => {
   if (valor === null || valor === undefined || valor === '') {
-    return '-'
-  }
-  if (campo === 'data') {
-    return formatDate(valor)
+    return 'Nao informado'
   }
   if (Array.isArray(valor)) {
-    return valor.length ? valor.join(', ') : '-'
+    return valor.length ? valor.join(', ') : 'Nao informado'
   }
-  return valor
+  if (campo === 'data' || campo === 'dataEsocial' || campo === 'dataSesmt') {
+    return formatDate(valor)
+  }
+  if (campo === 'sesmt') {
+    return valor ? 'Sim' : 'Nao'
+  }
+  return String(valor)
 }
 
-const formatChange = (registro) => {
+const buildChanges = (registro) => {
   if (!Array.isArray(registro?.camposAlterados) || registro.camposAlterados.length === 0) {
-    return 'Sem alteracoes registradas'
+    return []
   }
   return registro.camposAlterados
     .map(({ campo, de, para }) => {
       const label = FIELD_LABELS[campo] ?? campo
-      return `${label}: "${formatValue(campo, de)}" -> "${formatValue(campo, para)}"`
+      const before = formatValue(campo, de)
+      const after = formatValue(campo, para)
+      if (before === after) {
+        return null
+      }
+      return { campo, label, before, after }
     })
-    .join('; ')
+    .filter(Boolean)
 }
 
 export function AcidentesHistoryTimeline({ registros }) {
@@ -72,17 +83,34 @@ export function AcidentesHistoryTimeline({ registros }) {
   }
 
   return (
-    <ul className="acidentes-history-list">
+    <ul className="entradas-history__list">
       {registros
         .slice()
         .sort((a, b) => new Date(b.dataEdicao) - new Date(a.dataEdicao))
-        .map((registro) => (
-          <li key={registro.id}>
-            <span>{formatDateTime(registro.dataEdicao)}</span>
-            <span>{registro.usuarioResponsavel || '-'}</span>
-            <span>{formatChange(registro)}</span>
-          </li>
-        ))}
+        .map((registro) => {
+          const changes = buildChanges(registro)
+          return (
+            <li key={registro.id} className="entradas-history__item">
+              <div className="entradas-history__item-header">
+                <div>
+                  <strong>{formatDateTime(registro.dataEdicao)}</strong>
+                  <p>{registro.usuarioResponsavel || 'Responsavel nao informado'}</p>
+                </div>
+              </div>
+              <div className="entradas-history__item-body">
+                {changes.length === 0 ? (
+                  <p className="feedback">Sem alteracoes registradas.</p>
+                ) : (
+                  changes.map((change) => (
+                    <p key={`${registro.id}-${change.campo}`}>
+                      <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
+                    </p>
+                  ))
+                )}
+              </div>
+            </li>
+          )
+        })}
     </ul>
   )
 }
