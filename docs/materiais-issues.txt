@@ -82,3 +82,9 @@ Faça testes manuais criando/atualizando materiais e observe os logs do Supabase
    - **Problema:** materiais legados armazenavam apenas o texto das caracteristicas e cores. Ao editar, o formulario enviava strings no lugar dos UUIDs, `api.materiais.update` entendia que ja havia IDs e nao recriava os vinculos em `material_grupo_cor`/`material_grupo_caracteristica_epi`. Alem disso o historico comparava o campo `nome` (UUID), exibindo valores como `83cdffdf-...` mesmo sem alterar o texto do EPI.
    - **Correcao:** o backend reconstruiu as selecoes diretamente da view, resolveu UUIDs por nome quando necessario e passou a usar `insereCores`/`insereCaracteristicas` apos limpar os vinculos. No front, `normalizeSelectionList`/`findOptionByValue` deduplicam por nome, os handlers mantem `caracteristicas*` e `cores*` sincronizados e `buildMaterialPayload` envia sempre o texto visivel (`materialItemNome`). O historico agora monitora apenas campos legiveis e `formatSelectionValue` garante que listas aparecam como texto.
    - **Resultado:** editar/remover caracteristicas ou cores reflete imediatamente no Supabase e o modal de historico mostra apenas textos legiveis, sem UUIDs ou mudancas falsas.
+
+
+Atualizacao 2025-11
+--------------------
+- Registrei problemas comuns relacionados a fabricantes com UUID e como isso afeta os novos graficos que exibem texto legivel.
+- Detalhei procedimento para normalizar `fabricanteNome` e `centroServico` antes de abrir chamados, garantindo que os filtros clicaveis respondam corretamente.

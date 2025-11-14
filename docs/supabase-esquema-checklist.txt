@@ -45,3 +45,9 @@ Links úteis
 - [`supabase/README.md`](../supabase/README.md)
 - [`docs/stateless-supabase-notes.txt`](stateless-supabase-notes.txt)
 - [`docs/rls-policies-guide.txt`](rls-policies-guide.txt)
+
+
+Atualizacao 2025-11
+--------------------
+- Acrescentei itens para verificar a presenca de `fabricante_nome` e `centro_servico` legiveis nas views utilizadas pelo dashboard.
+- Recomendei revisar indices nas colunas usadas pelos filtros clicaveis para manter as agregacoes responsivas.

@@ -14,3 +14,9 @@ Touch points zeroed:
 
 Next steps:
 - Reintroduce the desired flow once the cached `nome` value is understood and we are ready to call the sanitized backend again.
+
+
+Atualizacao 2025-11
+--------------------
+- Acrescentei que, ao resetar formularios, tambem devemos limpar `chartFilter` quando o contexto for dashboard/relatorios para manter o indicador coerente.
+- Descrevi rapidamente como o novo badge de filtro consome o mesmo estado de reset, evitando estados inconsistentes ao navegar entre telas.

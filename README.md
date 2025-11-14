@@ -9,6 +9,12 @@ Aplicação completa para controle de EPIs, construída com React (Vite) e integ
 - **Documentos:** geração do termo de EPI com visualização imediata e download em PDF renderizado no cliente.
 - **Modos de dados:** alternância entre Supabase (remoto) e armazenamento local (`localStorage`) com o mesmo conjunto de páginas.
 
+## Novidades 2025-11
+
+- **Gráficos interativos:** cada widget do dashboard ganhou botão de expandir (`ExpandIcon`) e modal fullscreen com clique fora/`Esc` para fechar.
+- **Filtros contextuais:** cliques nos gráficos de material, categoria, fabricante e centro de serviços preenchem automaticamente o campo de busca (`chartFilter` + badge visual), afetando todas as demais telas.
+- **Legibilidade aprimorada:** labels utilizam `formatEstoqueMaterialLabel`, tooltips exibem a descrição completa e a tipografia dos eixos Y foi reduzida para evitar sobreposição.
+
 ## Arquitetura
 
 | Camada | Descrição |

@@ -38,3 +38,9 @@ Boas práticas
 - Carregue a tela após configurar catálogos de domínio no banco (agentes, tipos, lesões, partes) para evitar placeholders vazios.
 - Prefira usar a matrícula como chave primária durante importações em massa — o componente atualiza nome/cargo automaticamente com base nessa referência.
 - Utilize o modal de histórico para auditar ajustes manuais ou sincronizações feitas via Supabase Studio.
+
+
+Atualizacao 2025-11
+--------------------
+- Reforce que os graficos do painel de acidentes podem reutilizar o mesmo padrao de modal fullscreen e botoes de expandir adotados no dashboard de estoque. Basta copiar a estrutura `chart-modal__overlay` e as classes de acao.
+- Caso futuramente sejam criados filtros clicaveis semelhantes, a documentacao deve apontar para o `chartFilter` em `DashboardPage.jsx`, garantindo comportamento consistente entre indicadores de SST.

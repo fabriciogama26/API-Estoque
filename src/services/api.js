@@ -2501,23 +2501,6 @@ async function obterSaldoMaterial(materialId) {
   return { materialId, saldo }
 }
 
-function calcularDataTroca(dataEntregaIso, validadeDias) {
-  if (!validadeDias) {
-    return null
-  }
-  const data = new Date(dataEntregaIso)
-  if (Number.isNaN(data.getTime())) {
-    return null
-  }
-  const prazo = Number(validadeDias)
-  if (Number.isNaN(prazo) || prazo <= 0) {
-    return null
-  }
-  data.setUTCDate(data.getUTCDate() + prazo)
-  data.setUTCHours(0, 0, 0, 0)
-  return data.toISOString()
-}
-
 function montarContextoTermoEpi(pessoa, saidasDetalhadas) {
   const entregasOrdenadas = saidasDetalhadas
     .slice()
@@ -3323,7 +3306,6 @@ export const api = {
       }
 
       const dataEntregaIso = dataEntregaDate.toISOString()
-      const dataTroca = calcularDataTroca(dataEntregaIso, material?.validadeDias)
 
       const registro = await executeSingle(
         supabase
@@ -3335,7 +3317,6 @@ export const api = {
             centro_custo: centroCustoIdFinal,
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
-            dataTroca,
             status,
             usuarioResponsavel: usuario,
           })
@@ -3412,7 +3393,6 @@ export const api = {
       }
 
       const dataEntregaIso = dataEntregaDate.toISOString()
-      const dataTroca = calcularDataTroca(dataEntregaIso, material?.validadeDias)
       const statusValor =
         trim(payload.statusId ?? payload.status ?? '') ||
         saidaAtual.statusId ||
@@ -3429,7 +3409,6 @@ export const api = {
             centro_custo: centroCustoIdFinal,
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
-            dataTroca,
             status: statusValor,
             usuarioResponsavel: usuario,
           })

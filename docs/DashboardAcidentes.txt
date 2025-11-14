@@ -29,3 +29,9 @@ Erros e pré-requisitos
 - Quando `VITE_SUPABASE_URL` ou `VITE_SUPABASE_ANON_KEY` não estão configuradas e o modo não é local, a tela mostra erro orientando a configurar Supabase antes de prosseguir.【F:src/pages/DashboardAcidentes.jsx†L60-L96】
 - Certifique-se de criar/atualizar a view `vw_indicadores_acidentes` durante as migrations — o dashboard espera colunas agregadas compatíveis (ver `supabase/migrations/0023_*.sql` em diante).
 - Seeds locais devem incluir exemplos em `localApi.acidentes.dashboard` para manter os gráficos populados durante desenvolvimento offline.
+
+
+Atualizacao 2025-11
+--------------------
+- Indiquei que o dashboard de acidentes pode herdar o mesmo mecanismo de modal fullscreen adotado no modulo de estoque caso novos graficos avancados sejam adicionados.
+- Mencionei que o pattern de filtros clicaveis esta isolado em `DashboardPage.jsx` e pode ser replicado parcialmente aqui caso gestores queiram segmentar dados por centro de servico.

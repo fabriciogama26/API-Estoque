@@ -23,3 +23,9 @@ Boas práticas
 - Garanta que materiais possuam `valorUnitario` e pessoas tenham centro de serviço/cargo atualizados para exibição correta.
 - Utilize o campo `status` para processos de devolução/troca; atualizações posteriores devem manter o mesmo ID de saída para preservar o histórico.
 - Seeds do modo local devem espelhar as estruturas (incluindo `dataTroca`, `status`, `usuarioResponsavel`) para evitar colunas vazias.
+
+
+Atualizacao 2025-11
+--------------------
+- Reforcei a obrigatoriedade de informar `centroServico`, explicando que o novo grafico "Top centro de serviços" soma exatamente esse campo.
+- Acrescentei guia rapido de como os filtros disparados pelos graficos retornam para esta tela via campo `termo`, facilitando investigações.

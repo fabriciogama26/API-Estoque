@@ -28,3 +28,9 @@ Boas práticas
 - Garanta que migrations que criam tabelas de referência (centros_servico, cargos, setores, tipos_execucao) estejam aplicadas antes de popular a tela.
 - Utilize o histórico para auditar atualizações feitas via importação ou scripts externos.
 - Ao operar offline, mantenha os seeds em `src/data/local-seed.json` atualizados para refletir o schema atual.
+
+
+Atualizacao 2025-11
+--------------------
+- Documentei a importancia de preencher `centroServico` e `setor` nas fichas de pessoas para que o grafico "Top centro de serviços" consiga somar saídas corretamente.
+- Acrescentei lembrete para manter textos humanamente legiveis (sem IDs), pois os novos grafos exibem exatamente o valor cadastrado.

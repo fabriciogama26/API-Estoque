@@ -22,3 +22,9 @@ Boas práticas
 - Configure SSL/Custom Domain no Supabase antes de habilitar recuperação de senha em produção (link enviado precisa apontar para domínio válido).
 - Personalize `logo2.png` em `public/` para refletir a identidade visual da empresa.
 - Evite usar usuários com `service_role` no frontend; restrinja ao perfil `anon` com políticas RLS adequadas.
+
+
+Atualizacao 2025-11
+--------------------
+- Mencionei que o indicador de filtro derivado dos graficos e limpo automaticamente quando o usuario sai da sessao, evitando reutilizar termos antigos no proximo login.
+- Adicionei nota reforçando que o botao de expandir graficos so aparece para usuarios autenticados, seguindo as mesmas verificacoes descritas aqui.

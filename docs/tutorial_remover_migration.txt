@@ -84,3 +84,9 @@ supabase db push
 ```
 
 Os comandos mantêm o histórico alinhado e reaplicam o SQL atualizado.【F:supabase/README.md†L57-L102】
+
+
+Atualizacao 2025-11
+--------------------
+- Acrescentei exemplo mencionando que, caso a migracao introduza campos como `fabricante_nome`, revoga-la exige rodar novamente os scripts usados pelos graficos.
+- Tambem registrei a necessidade de revisar seeds apos remover migracoes que impactem os filtros clicaveis.

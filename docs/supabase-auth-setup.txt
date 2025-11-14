@@ -37,3 +37,9 @@ Observações importantes
 - O SDK já envia `Authorization: Bearer <access_token>` automaticamente; evite duplicar cabeçalhos.
 - Funções serverless que usam `service_role` devem validar o cabeçalho `apikey` para impedir uso indevido (ver exemplo em `supabase/functions/termo-epi`).【F:supabase/functions/termo-epi/index.ts†L1-L160】
 - Após alterar políticas ou provedores, teste login/logout no frontend e execute `supabase db status` para garantir que não existem migrations pendentes.
+
+
+Atualizacao 2025-11
+--------------------
+- Reforcei a necessidade de propagar `user` no contexto, pois o dashboard so renderiza os novos botoes de expandir quando ha sessao valida.
+- Inclui orientacao para validar que refresh tokens continuam disponiveis ao abrir e fechar as modais de grafico, evitando erros silenciosos.

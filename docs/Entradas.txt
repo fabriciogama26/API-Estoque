@@ -23,3 +23,9 @@ Boas práticas
 - Mantenha o catálogo de materiais completo (incluindo fabricante e valor unitário) para que o histórico apresente informações consistentes.
 - Ao operar no modo local, garanta que `localApi.entradas.list` replique os mesmos campos (`materialId`, `dataEntrada`, `quantidade`, `centroCusto`, `usuarioResponsavel`).
 - Use os filtros de data para recortes específicos antes de exportar relatórios externos.
+
+
+Atualizacao 2025-11
+--------------------
+- Acrescentei observacao de que os filtros disparados pelos graficos preenchem automaticamente o campo `termo` desta tela, portanto mantenha o handler de `onChange` limpando `chartFilter` como feito no dashboard.
+- Detalhei o impacto da agregacao por fabricante/centro nas consultas de entradas, incentivando a registrar `centroServico` sempre que disponivel para alimentar os novos indicadores.

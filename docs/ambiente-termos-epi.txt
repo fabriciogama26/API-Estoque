@@ -31,3 +31,9 @@ Checklist de validação
 - [ ] Download gera PDF com imagens/estilos corretos (verificar logotipos e caracteres acentuados).
 - [ ] Função serverless responde em < 10s e registra logs de erro adequados para troubleshooting.
 - [ ] Variáveis de ambiente estão configuradas tanto no frontend quanto na função (Supabase/Vercel) antes do deploy.
+
+
+Atualizacao 2025-11
+--------------------
+- Acrescentei nota sobre a necessidade de popular fabricantes e centros de servico reais no seed do ambiente, pois agora esses campos sao usados diretamente como rotulos nos graficos clicaveis do dashboard.
+- Tambem detalhei que, ao testar Termos de EPI, vale reaproveitar o novo botao de expandir graficos para validar a responsividade dos componentes em resolucoes menores.
