@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
+  Maximize2,
   PenSquare,
   PieChart,
   Shield,
@@ -45,3 +46,4 @@ export const SaveIcon = (props) => <Save {...withDefaultProps(props)} />
 export const EditIcon = (props) => <PenSquare {...withDefaultProps(props)} />
 export const HistoryIcon = (props) => <History {...withDefaultProps(props)} />
 export const CancelIcon = (props) => <XCircle {...withDefaultProps(props)} />
+export const ExpandIcon = (props) => <Maximize2 {...withDefaultProps(props)} />

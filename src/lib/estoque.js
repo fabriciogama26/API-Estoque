@@ -261,6 +261,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       nome: material.nome,
       resumo: formatMaterialResumo(material),
       fabricante: material.fabricante,
+      fabricanteNome: material.fabricanteNome || material.fabricante || '',
       validadeDias: material.validadeDias,
       ca: material.ca,
       valorUnitario: material.valorUnitario,
@@ -285,6 +286,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       nome: item.nome,
       resumo: item.resumo,
       fabricante: item.fabricante,
+      fabricanteNome: item.fabricanteNome,
       estoqueAtual: item.estoqueAtual,
       estoqueMinimo: item.estoqueMinimo,
       deficitQuantidade: item.deficitQuantidade,
@@ -415,10 +417,12 @@ export function montarDashboard({ materiais = [], entradas = [], saidas = [], pe
     const saidasMaterial = saidasFiltradas.filter((item) => item.materialId === material.id)
     const totalQuantidade = entradasMaterial.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
       + saidasMaterial.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+    const fabricanteNome = material.fabricanteNome || material.fabricante || ''
     return {
       materialId: material.id,
       nome: material.nome,
       fabricante: material.fabricante,
+      fabricanteNome,
       totalQuantidade,
     }
   })
