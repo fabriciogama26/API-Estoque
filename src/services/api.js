@@ -144,7 +144,7 @@ const PESSOAS_VIEW_SELECT = `
   tipo_execucao
 `
 
-const buildPessoasViewQuery = () => supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT)
+const buildPessoasViewQuery = () => supabase.rpc('rpc_pessoas_completa')
 
 const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_material_cor']
 const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
@@ -610,7 +610,10 @@ const normalizeEntradaInput = (payload = {}) => {
   }
   const centroCusto = trim(payload.centroCusto)
   if (!centroCusto) {
-    throw new Error('Selecione o centro de custo.')
+    throw new Error('Selecione o centro de estoque.')
+  }
+  if (!isUuidValue(centroCusto)) {
+    throw new Error('Selecione um centro de estoque valido.')
   }
   const dataEntradaRaw = trim(payload.dataEntrada)
   if (!dataEntradaRaw) {
@@ -1552,15 +1555,14 @@ function mapEntradaRecord(record) {
   if (!record) {
     return null
   }
-  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
-  const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
-  const centroCustoId = normalizeUuid(centroEstoqueValor ?? centroCustoRaw)
+  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? record.centroCusto ?? null
+  const centroCustoRaw = record.centroCusto ?? ''
+  const centroCustoId = normalizeUuid(centroEstoqueValor)
   const centroCustoNome =
     resolveTextValue(
       record.centroEstoqueNome ??
-        record.centroEstoqueNome ??
-        record.centro_custo_nome ??
         record.centro_estoque_nome ??
+        record.centroCustoNome ??
         '',
     ) ||
     (centroCustoId ? '' : resolveTextValue(centroCustoRaw))
@@ -2005,6 +2007,24 @@ async function carregarCentrosCusto() {
   return normalizeDomainOptions(data ?? [])
 }
 
+async function buscarCentrosEstoqueIdsPorTermo(valor) {
+  const termo = trim(valor)
+  if (!termo) {
+    return []
+  }
+  const like = `%${termo.replace(/\s+/g, '%')}%`
+  try {
+    const registros = await execute(
+      supabase.from(CENTRO_ESTOQUE_TABLE).select('id').ilike('almox', like).limit(50),
+      'Falha ao consultar centros de estoque.'
+    )
+    return (registros ?? []).map((item) => item?.id).filter(Boolean)
+  } catch (error) {
+    console.warn('Falha ao filtrar centros de estoque por nome.', error)
+    return []
+  }
+}
+
 async function carregarCentrosEstoqueCatalogo() {
   const data = await execute(
     supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox', { ascending: true }),
@@ -2047,11 +2067,17 @@ async function carregarEntradas(params = {}) {
     query = query.eq('materialId', params.materialId)
   }
   const centroFiltro = trim(params.centroCusto)
+  let centroFiltroTerm = ''
   if (centroFiltro) {
     if (isUuidValue(centroFiltro)) {
-      query = query.or(`centro_estoque.eq.${centroFiltro},centro_custo.eq.${centroFiltro}`)
+      query = query.eq('centro_estoque', centroFiltro)
     } else {
-      query = query.ilike('centro_custo', `%${centroFiltro}%`)
+      const centroIds = await buscarCentrosEstoqueIdsPorTermo(centroFiltro)
+      if (centroIds.length) {
+        query = query.in('centro_estoque', centroIds)
+      } else {
+        centroFiltroTerm = normalizeSearchTerm(centroFiltro)
+      }
     }
   }
   const registradoPor = trim(params.registradoPor)
@@ -2076,6 +2102,11 @@ async function carregarEntradas(params = {}) {
   let registros = (data ?? []).map(mapEntradaRecord)
   registros = await preencherUsuariosResponsaveis(registros)
   registros = await preencherCentrosEstoque(registros)
+  if (centroFiltroTerm) {
+    registros = registros.filter((entrada) =>
+      normalizeSearchTerm(entrada?.centroCusto).includes(centroFiltroTerm)
+    )
+  }
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
@@ -2640,6 +2671,17 @@ export const api = {
         return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
       }
     },
+    async listByIds(ids = []) {
+      const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)))
+      if (!uniqueIds.length) {
+        return []
+      }
+      const data = await execute(
+        buildPessoasViewQuery().in('id', uniqueIds),
+        'Falha ao listar pessoas pelos ids informados.'
+      )
+      return (data ?? []).map(mapPessoaRecord)
+    },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
       if (!dados.nome || !dados.matricula || !dados.centroServico || !dados.setor || !dados.cargo) {
@@ -3191,7 +3233,6 @@ export const api = {
             materialId: dados.materialId,
             quantidade: dados.quantidade,
             centro_estoque: dados.centroCusto,
-            centro_custo: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
           })
@@ -3220,7 +3261,6 @@ export const api = {
             materialId: dados.materialId,
             quantidade: dados.quantidade,
             centro_estoque: dados.centroCusto,
-            centro_custo: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
           })
@@ -3469,20 +3509,7 @@ export const api = {
         throw new Error('Saida invalida.')
       }
       const registros = await execute(
-        supabase
-          .from('saidas_historico')
-          .select(
-            `
-              id,
-              saida_id,
-              material_id,
-              material_saida,
-              created_at,
-              usuario:usuarioResponsavel ( id, display_name, username, email )
-            `
-          )
-          .eq('saida_id', id)
-          .order('created_at', { ascending: false }),
+        supabase.rpc('rpc_saida_historico', { p_saida_id: id }),
         'Falha ao listar historico de saida.'
       )
       return (registros ?? []).map(mapSaidaHistoryRecord)

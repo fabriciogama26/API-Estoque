@@ -18,7 +18,7 @@ const DEFAULT_MATERIAIS_VIEW = 'vw_materiais_vinculos'
 const MATERIAIS_VIEW = process.env.MATERIAIS_VIEW || DEFAULT_MATERIAIS_VIEW
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
-const CENTRO_ESTOQUE_TABLE = 'centro_estoque'
+const CENTRO_ESTOQUE_TABLE = 'centros_estoque'
 
 const CARACTERISTICA_ID_KEYS = [
   'caracteristicasIds',
@@ -254,18 +254,17 @@ function mapEntradaRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
   }
-  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
-  const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
+  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? record.centroCusto ?? null
+  const centroCustoRaw = record.centroCusto ?? ''
   const centroCustoId =
-    typeof (centroEstoqueValor ?? centroCustoRaw) === 'string' &&
-    UUID_REGEX.test(String(centroEstoqueValor ?? centroCustoRaw).trim())
-      ? String(centroEstoqueValor ?? centroCustoRaw).trim()
+    typeof centroEstoqueValor === 'string' && UUID_REGEX.test(String(centroEstoqueValor).trim())
+      ? String(centroEstoqueValor).trim()
       : null
   const centroCustoNome =
     trim(
       record.centroCustoNome ??
-        record.centro_custo_nome ??
         record.centro_estoque_nome ??
+        record.centroEstoqueNome ??
         '',
     ) || (centroCustoId ? '' : trim(centroCustoRaw))
   const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
@@ -1037,10 +1036,18 @@ function sanitizeEntradaPayload(payload = {}) {
     throw createHttpError(400, 'Data de entrada invalida.')
   }
 
+  const centroEstoqueId = trim(payload.centroCusto)
+  if (!centroEstoqueId) {
+    throw createHttpError(400, 'Centro de estoque obrigatorio.')
+  }
+  if (!UUID_REGEX.test(centroEstoqueId)) {
+    throw createHttpError(400, 'Selecione um centro de estoque valido.')
+  }
+
   return {
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
-    centroCusto: trim(payload.centroCusto),
+    centroCusto: centroEstoqueId,
     dataEntrada: dataEntradaIso,
     usuarioResponsavel: trim(payload.usuarioResponsavel) || null,
   }
@@ -1048,7 +1055,7 @@ function sanitizeEntradaPayload(payload = {}) {
 
 function validateEntradaPayload(payload) {
   if (!payload.materialId) throw createHttpError(400, 'Material obrigatorio para entrada.')
-  if (!payload.centroCusto) throw createHttpError(400, 'Centro de custo obrigatorio.')
+  if (!payload.centroCusto) throw createHttpError(400, 'Centro de estoque obrigatorio.')
   if (!payload.dataEntrada) throw createHttpError(400, 'Data de entrada obrigatoria.')
 }
 
@@ -1353,13 +1360,18 @@ async function carregarMovimentacoes(params) {
       'Falha ao listar materiais.',
     ),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
-    execute(saidasFiltered, 'Falha ao listar sa�das.'),
+    execute(saidasFiltered, 'Falha ao listar saídas.'),
   ])
+
+  const entradasNormalizadas = await preencherCentrosEstoque(
+    (entradas ?? []).map(mapEntradaRecord)
+  )
+  const saidasNormalizadas = (saidas ?? []).map(mapSaidaRecord)
 
   return {
     materiais: (materiaisRegistros ?? []).map(mapMaterialRecord),
-    entradas: (entradas ?? []).map(mapEntradaRecord),
-    saidas: (saidas ?? []).map(mapSaidaRecord),
+    entradas: entradasNormalizadas,
+    saidas: saidasNormalizadas,
     periodo,
   }
 }
@@ -1810,11 +1822,17 @@ export const EntradasOperations = {
     }
 
     const centroCusto = trim(params.centroCusto)
+    let centroFiltroTerm = ''
     if (centroCusto) {
       if (UUID_REGEX.test(centroCusto)) {
-        query = query.or(`centro_estoque.eq.${centroCusto},centro_custo.eq.${centroCusto}`)
+        query = query.eq('centro_estoque', centroCusto)
       } else {
-        query = query.ilike('centro_custo', `%${centroCusto}%`)
+        const centroIds = await buscarCentrosEstoqueIdsPorTermo(centroCusto)
+        if (centroIds.length) {
+          query = query.in('centro_estoque', centroIds)
+        } else {
+          centroFiltroTerm = normalizeSearchTerm(centroCusto)
+        }
       }
     }
     const registradoPor = trim(params.registradoPor)
@@ -1840,6 +1858,11 @@ export const EntradasOperations = {
       entradas.map(mapEntradaRecord)
     )
     entradas = await preencherCentrosEstoque(entradas)
+    if (centroFiltroTerm) {
+      entradas = entradas.filter((entrada) =>
+        normalizeSearchTerm(entrada?.centroCusto).includes(centroFiltroTerm)
+      )
+    }
 
     const termo = normalizeSearchTerm(params.termo)
     if (termo) {
@@ -1874,7 +1897,6 @@ export const EntradasOperations = {
             materialId: dados.materialId,
             quantidade: dados.quantidade,
             centro_estoque: dados.centroCusto,
-            centroCusto: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
           })
@@ -1913,7 +1935,6 @@ export const EntradasOperations = {
           materialId: dados.materialId,
           quantidade: dados.quantidade,
           centro_estoque: dados.centroCusto,
-          centroCusto: dados.centroCusto,
           dataEntrada: dados.dataEntrada,
           usuarioResponsavel: usuario,
         })
@@ -2039,33 +2060,19 @@ async function preencherCentrosEstoque(registros = []) {
     return registros
   }
   try {
-    const [porId, porCentro] = await Promise.all([
-      execute(
-        supabaseAdmin
-          .from(CENTRO_ESTOQUE_TABLE)
-          .select('id, almox')
-          .in('id', ids),
-        'Falha ao consultar centros de estoque.'
-      ),
-      execute(
-        supabaseAdmin
-          .from(CENTRO_ESTOQUE_TABLE)
-          .select('id, almox, centro_custo')
-          .in('centro_custo', ids),
-        'Falha ao consultar centros de estoque.'
-      ),
-    ])
-    const mapaPorId = new Map(
-      (porId ?? [])
+    const centros = await execute(
+      supabaseAdmin
+        .from(CENTRO_ESTOQUE_TABLE)
+        .select('id, almox')
+        .in('id', ids),
+      'Falha ao consultar centros de estoque.'
+    )
+    const mapa = new Map(
+      (centros ?? [])
         .map((centro) => [centro.id, trim(centro.almox ?? '')])
         .filter(([, nome]) => Boolean(nome))
     )
-    const mapaPorCentro = new Map(
-      (porCentro ?? [])
-        .map((centro) => [centro.centro_custo, trim(centro.almox ?? '')])
-        .filter(([, nome]) => Boolean(nome))
-    )
-    if (!mapaPorId.size && !mapaPorCentro.size) {
+    if (!mapa.size) {
       return registros
     }
     return registros.map((entrada) => {
@@ -2073,8 +2080,7 @@ async function preencherCentrosEstoque(registros = []) {
         return entrada
       }
       const nome =
-        mapaPorId.get(entrada.centroCustoId) ||
-        mapaPorCentro.get(entrada.centroCustoId)
+        mapa.get(entrada.centroCustoId)
       if (!nome) {
         return entrada
       }
@@ -2087,6 +2093,24 @@ async function preencherCentrosEstoque(registros = []) {
   } catch (error) {
     console.warn('Falha ao resolver centros de estoque.', error)
     return registros
+  }
+}
+
+async function buscarCentrosEstoqueIdsPorTermo(valor) {
+  const termo = trim(valor)
+  if (!termo) {
+    return []
+  }
+  const like = `%${termo.replace(/\s+/g, '%')}%`
+  try {
+    const registros = await execute(
+      supabaseAdmin.from(CENTRO_ESTOQUE_TABLE).select('id').ilike('almox', like).limit(50),
+      'Falha ao consultar centros de estoque.'
+    )
+    return (registros ?? []).map((item) => item?.id).filter(Boolean)
+  } catch (error) {
+    console.warn('Falha ao aplicar filtro por centro de estoque.', error)
+    return []
   }
 }
 

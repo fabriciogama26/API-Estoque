@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { InventoryIcon, SaveIcon } from '../components/icons.jsx'
+import { InventoryIcon, SaveIcon, InfoIcon } from '../components/icons.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import { dataClient as api } from '../services/dataClient.js'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -328,7 +328,10 @@ export function EstoquePage() {
   const totalValor = itensFiltrados.reduce((acc, item) => acc + Number(item.valorTotal ?? 0), 0)
 
   const resumoFiltrado = useMemo(() => {
-    const totalItens = itensFiltrados.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+    const totalItens = itensFiltrados.reduce(
+      (acc, item) => acc + Number(item.totalEntradas ?? item.quantidade ?? 0),
+      0
+    )
     const valorReposicao = itensFiltrados.reduce((acc, item) => acc + Number(item.valorReposicao ?? 0), 0)
     const ultimaAtualizacao = itensFiltrados
       .map((item) => (item.ultimaAtualizacao ? new Date(item.ultimaAtualizacao) : null))
@@ -354,6 +357,7 @@ export function EstoquePage() {
         title: 'Total em estoque',
         value: formatCurrency(totalValor),
         hint: 'Valor monetario dos itens filtrados',
+        tooltip: 'Saldo atual (quantidade em estoque x valor unitario) dos materiais filtrados.',
         icon: '⇅',
         accent: 'sky',
       },
@@ -362,6 +366,7 @@ export function EstoquePage() {
         title: 'Estoque total atual',
         value: formatInteger(resumoFiltrado.totalItens),
         hint: 'Capitalizado em quantidade',
+        tooltip: 'Quantidade total recebida no periodo filtrado (sem descontar saidas).',
         icon: '📦',
         accent: 'mint',
       },
@@ -375,6 +380,7 @@ export function EstoquePage() {
       },
       {
         id: 'ultimaAtualizacao',
+        tooltip: 'Momento da ultima movimentacao registrada nos itens filtrados.',
         title: 'Última movimentação',
         value: ultimaAtualizacaoFormatada,
         hint:
@@ -535,8 +541,16 @@ export function EstoquePage() {
           {summaryCards.map((card) => (
             <article
               key={card.id}
-              className={`estoque-summary-card estoque-summary-card--${card.accent}`}
+              className={`estoque-summary-card estoque-summary-card--${card.accent}${
+                card.tooltip ? ' estoque-summary-card--has-tooltip' : ''
+              }`}
             >
+              {card.tooltip ? (
+                <div className="summary-tooltip summary-tooltip--floating" role="tooltip">
+                  <InfoIcon size={16} />
+                  <span>{card.tooltip}</span>
+                </div>
+              ) : null}
               <div className="estoque-summary-card__header">
                 <span className="estoque-summary-card__title">{card.title}</span>
                 <span className="estoque-summary-card__icon" aria-hidden="true">

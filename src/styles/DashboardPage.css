@@ -16,7 +16,11 @@
   flex-direction: column;
   gap: 0.85rem;
   min-height: 160px;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.dashboard-insight-card--has-tooltip {
+  padding-left: 3rem;
 }
 
 .dashboard-insight-card::after {

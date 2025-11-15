@@ -286,12 +286,18 @@
   gap: 0.65rem;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
   min-height: 160px;
+  position: relative;
+}
+
+.estoque-summary-card--has-tooltip {
+  padding-left: 3rem;
 }
 
 .estoque-summary-card__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .estoque-summary-card__title {
@@ -387,4 +393,11 @@
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
+}
+.summary-tooltip--floating {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  width: 1.9rem;
+  height: 1.9rem;
 }

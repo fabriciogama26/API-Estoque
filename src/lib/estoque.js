@@ -226,6 +226,10 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     const saidasMaterial = saidas
       .filter((saida) => saida.materialId === material.id)
       .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
+      .filter((saida) => {
+        const statusTexto = typeof saida?.status === 'string' ? saida.status.trim().toLowerCase() : ''
+        return statusTexto !== 'cancelado'
+      })
 
     const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo)
     const { estoqueMinimo, deficitQuantidade, valorReposicao } = calcularDeficit(material, saldo)
@@ -240,11 +244,15 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
         centrosCustoSet.add(String(entrada.centroCusto).trim())
       }
     })
-    saidasMaterial.forEach((saida) => {
-      if (saida?.centroCusto) {
-        centrosCustoSet.add(String(saida.centroCusto).trim())
-      }
-    })
+
+    const totalEntradasMaterial = entradasMaterial.reduce(
+      (acc, entrada) => acc + Number(entrada.quantidade ?? 0),
+      0
+    )
+    const totalSaidasMaterial = saidasMaterial.reduce(
+      (acc, saida) => acc + Number(saida.quantidade ?? 0),
+      0
+    )
 
     const ultimaAtualizacaoDate = [...entradasMaterial.map((item) => item.dataEntrada), ...saidasMaterial.map((item) => item.dataEntrega)]
       .map((raw) => {
@@ -273,6 +281,8 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       valorReposicao,
       alerta: alertaAtivo,
       centrosCusto: Array.from(centrosCustoSet).filter(Boolean),
+      totalEntradas: totalEntradasMaterial,
+      totalSaidas: totalSaidasMaterial,
       ultimaAtualizacao: ultimaAtualizacaoDate ? ultimaAtualizacaoDate.toISOString() : null,
     }
   })

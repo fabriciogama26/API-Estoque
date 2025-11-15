@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
+import { AddIcon } from '../icons.jsx'
 
 export function AcidentesForm({
   form,
@@ -622,11 +623,13 @@ export function AcidentesForm({
             <div className="multi-select__actions">
               <button
                 type="button"
-                className="button button--ghost"
+                className="icon-button"
                 onClick={adicionarAgenteSelecionado}
                 disabled={!podeAdicionarAgente || shouldDisableAgente}
+                aria-label="Adicionar agente"
+                title="Adicionar agente"
               >
-                Adicionar
+                <AddIcon size={16} />
               </button>
             </div>
             <div className="multi-select__chips">
@@ -672,11 +675,13 @@ export function AcidentesForm({
             <div className="multi-select__actions">
               <button
                 type="button"
-                className="button button--ghost"
+                className="icon-button"
                 onClick={adicionarTipoSelecionado}
                 disabled={!podeAdicionarTipo || shouldDisableTipo}
+                aria-label="Adicionar tipo"
+                title="Adicionar tipo"
               >
-                Adicionar
+                <AddIcon size={16} />
               </button>
             </div>
             <div className="multi-select__chips">
@@ -721,11 +726,13 @@ export function AcidentesForm({
             <div className="multi-select__actions">
               <button
                 type="button"
-                className="button button--ghost"
+                className="icon-button"
                 onClick={adicionarLesaoSelecionada}
                 disabled={!podeAdicionarLesao || shouldDisableLesoes}
+                aria-label="Adicionar lesão"
+                title="Adicionar lesão"
               >
-                Adicionar
+                <AddIcon size={16} />
               </button>
             </div>
             <div className="multi-select__chips">
@@ -768,11 +775,13 @@ export function AcidentesForm({
             <div className="multi-select__actions">
               <button
                 type="button"
-                className="button button--ghost"
+                className="icon-button"
                 onClick={adicionarParteSelecionada}
                 disabled={!podeAdicionarParte || shouldDisablePartes}
+                aria-label="Adicionar parte lesionada"
+                title="Adicionar parte lesionada"
               >
-                Adicionar
+                <AddIcon size={16} />
               </button>
             </div>
             <div className="multi-select__chips">

@@ -1759,6 +1759,17 @@ const localApi = {
           return filterPessoas(pessoas, filters)
         })
       },
+      async listByIds(ids = []) {
+        const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)))
+        if (!uniqueIds.length) {
+          return []
+        }
+        return readState((state) =>
+          state.pessoas
+            .filter((pessoa) => uniqueIds.includes(pessoa.id))
+            .map(mapLocalPessoaRecord)
+        )
+      },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
       validatePessoaPayload(dados)

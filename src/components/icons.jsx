@@ -19,6 +19,8 @@ import {
   Users,
   Save,
   XCircle,
+  Plus,
+  Info,
 } from 'lucide-react'
 
 const defaultSize = 18
@@ -47,3 +49,5 @@ export const EditIcon = (props) => <PenSquare {...withDefaultProps(props)} />
 export const HistoryIcon = (props) => <History {...withDefaultProps(props)} />
 export const CancelIcon = (props) => <XCircle {...withDefaultProps(props)} />
 export const ExpandIcon = (props) => <Maximize2 {...withDefaultProps(props)} />
+export const AddIcon = (props) => <Plus {...withDefaultProps(props)} />
+export const InfoIcon = (props) => <Info {...withDefaultProps(props)} />

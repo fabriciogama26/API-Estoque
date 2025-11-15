@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AddIcon } from '../icons.jsx'
 import {
   GRUPO_MATERIAL_CALCADO,
   GRUPO_MATERIAL_VESTIMENTA,
@@ -196,14 +197,16 @@ export function MateriaisForm({
             </select>
             <button
               type="button"
-              className="button button--ghost"
+              className="icon-button"
               onClick={() => {
                 onAddCaracteristica?.(caracteristicaSelecionada)
                 setCaracteristicaSelecionada('')
               }}
               disabled={!caracteristicaSelecionada}
+              aria-label="Adicionar característica"
+              title="Adicionar característica"
             >
-              Adicionar
+              <AddIcon size={16} />
             </button>
           </div>
           {caracteristicasSelecionadas.length ? (
@@ -332,14 +335,16 @@ export function MateriaisForm({
             </select>
             <button
               type="button"
-              className="button button--ghost"
+              className="icon-button"
               onClick={() => {
                 onAddCor?.(corSelecionada)
                 setCorSelecionada('')
               }}
               disabled={!corSelecionada}
+              aria-label="Adicionar cor"
+              title="Adicionar cor"
             >
-              Adicionar
+              <AddIcon size={16} />
             </button>
           </div>
           {coresSelecionadas.length ? (

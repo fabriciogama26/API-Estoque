@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { DashboardIcon, MovementIcon, RevenueIcon, StockIcon, AlertIcon, BarsIcon, TrendIcon, ExpandIcon, CancelIcon } from '../components/icons.jsx'
+import {
+  DashboardIcon,
+  MovementIcon,
+  RevenueIcon,
+  StockIcon,
+  AlertIcon,
+  BarsIcon,
+  TrendIcon,
+  ExpandIcon,
+  CancelIcon,
+  InfoIcon,
+} from '../components/icons.jsx'
 import { dataClient as api } from '../services/dataClient.js'
 import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts/EntradasSaidasChart.jsx'
 import { EstoquePorMaterialChart } from '../components/charts/EstoqueCharts.jsx'
@@ -339,12 +350,14 @@ export function DashboardPage() {
   ), [data])
   const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
 
+
   const highlightCards = [
     {
       id: 'movimentacoes',
-      title: 'Movimentacões',
+      title: 'Movimentacoes',
       value: totalMovimentacoes,
       helper: `${resumoEntradas.quantidade} entradas / ${resumoSaidas.quantidade} saidas`,
+      tooltip: 'Quantidade total de registros de entrada e saida no periodo filtrado.',
       icon: MovementIcon,
       tone: 'blue',
     },
@@ -352,7 +365,8 @@ export function DashboardPage() {
       id: 'valor',
       title: 'Valor movimentado',
       value: formatCurrency(totalValorMovimentado),
-      helper: `${formatCurrency(resumoEntradas.valor)} em entradas / ${formatCurrency(resumoSaidas.valor)} em saídas`,
+      helper: `${formatCurrency(resumoEntradas.valor)} em entradas / ${formatCurrency(resumoSaidas.valor)} em saidas`,
+      tooltip: 'Soma do valor financeiro das entradas e saidas considerando o valor unitario dos materiais.',
       icon: RevenueIcon,
       tone: 'green',
     },
@@ -361,6 +375,7 @@ export function DashboardPage() {
       title: 'Itens em estoque',
       value: totalItensEstoque,
       helper: `${totalMateriais} materiais rastreados`,
+      tooltip: 'Quantidade atual disponivel em estoque (apos descontar as saidas).',
       icon: StockIcon,
       tone: 'purple',
     },
@@ -369,11 +384,11 @@ export function DashboardPage() {
       title: 'Alertas ativos',
       value: materiaisEmAlerta,
       helper: materiaisEmAlerta ? 'Atencao: revisar estoque minimo' : 'Tudo dentro do esperado',
+      tooltip: 'Materiais cujo estoque esta abaixo do minimo configurado.',
       icon: AlertIcon,
       tone: materiaisEmAlerta ? 'orange' : 'slate',
     },
   ]
-
   const closeChartModal = () => setExpandedChartId(null)
   const openChartModal = (chartId) => setExpandedChartId(chartId)
 
@@ -515,8 +530,19 @@ export function DashboardPage() {
       {error ? <p className="feedback feedback--error">{error}</p> : null}
 
       <div className="dashboard-highlights">
-        {highlightCards.map(({ id, title, value, helper, icon: IconComponent, tone }) => (
-          <article key={id} className={`dashboard-insight-card dashboard-insight-card--${tone}`}>
+        {highlightCards.map(({ id, title, value, helper, tooltip, icon: IconComponent, tone }) => (
+          <article
+            key={id}
+            className={`dashboard-insight-card dashboard-insight-card--${tone}${
+              tooltip ? ' dashboard-insight-card--has-tooltip' : ''
+            }`}
+          >
+            {tooltip ? (
+              <div className="summary-tooltip summary-tooltip--floating" role="tooltip">
+                <InfoIcon size={16} />
+                <span>{tooltip}</span>
+              </div>
+            ) : null}
             <header className="dashboard-insight-card__header">
               <p className="dashboard-insight-card__title">{title}</p>
               <span className="dashboard-insight-card__avatar">
