@@ -50,3 +50,9 @@ Próximos passos sugeridos
 - Popular tabelas de domínio antes de liberar o cadastro operacional (centros de serviço, cargos, agentes, lesões, tipos).
 - Automatizar migrations no pipeline (`supabase db push`) e revisar periodicamente com `supabase db pull`.
 - Documentar alterações relevantes neste diretório para manter o time alinhado.
+
+
+Atualizacao 2025-11
+--------------------
+- Adicionei nota explicando que os novos filtros clicaveis dependem apenas de leitura agregada; portanto continuam funcionando mesmo com clients stateless, desde que os caches incluam os campos extras.
+- Detalhei que o modal fullscreen nao mantem estado de sessao proprio, reduzindo o risco de inconsistencias em ambientes sem armazenamento local.

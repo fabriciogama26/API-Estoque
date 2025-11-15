@@ -1,4 +1,13 @@
 export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onChange, onSubmit, onClear }) {
+  const handleCheckboxChange = (name) => (event) => {
+    onChange({
+      target: {
+        name,
+        value: event.target.checked,
+      },
+    })
+  }
+
   return (
     <form className="form form--inline" onSubmit={onSubmit}>
       <label className="field">
@@ -42,6 +51,26 @@ export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onCh
             </option>
           ))}
         </select>
+      </label>
+      <label className="acidentes-filter-pill">
+        <input
+          type="checkbox"
+          className="acidentes-filter-pill__checkbox"
+          name="apenasSesmt"
+          checked={Boolean(filters.apenasSesmt)}
+          onChange={handleCheckboxChange('apenasSesmt')}
+        />
+        <span>Apenas SESMT</span>
+      </label>
+      <label className="acidentes-filter-pill">
+        <input
+          type="checkbox"
+          className="acidentes-filter-pill__checkbox"
+          name="apenasEsocial"
+          checked={Boolean(filters.apenasEsocial)}
+          onChange={handleCheckboxChange('apenasEsocial')}
+        />
+        <span>Apenas eSOCIAL</span>
       </label>
       <div className="form__actions">
         <button type="submit" className="button button--ghost">

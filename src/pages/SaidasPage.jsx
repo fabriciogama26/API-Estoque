@@ -164,6 +164,21 @@ const formatPessoaDetail = (pessoa) => {
   return pessoa.cargo ? pessoa.cargo : ''
 }
 
+const mergePessoasList = (base = [], extras = []) => {
+  const mapa = new Map()
+  ;(Array.isArray(base) ? base : []).forEach((item) => {
+    if (item?.id) {
+      mapa.set(item.id, item)
+    }
+  })
+  ;(Array.isArray(extras) ? extras : []).forEach((item) => {
+    if (item?.id) {
+      mapa.set(item.id, item)
+    }
+  })
+  return Array.from(mapa.values())
+}
+
 const pessoaMatchesTerm = (pessoa, termoNormalizado) => {
   if (!termoNormalizado) {
     return true
@@ -321,7 +336,20 @@ export function SaidasPage() {
         shouldLoadCentrosCusto ? api.centrosCusto.list() : Promise.resolve(null),
         shouldLoadCentrosServico ? api.centrosServico.list() : Promise.resolve(null),
       ])
-      setNomes(NomesData ?? [])
+      const pessoaIds = Array.from(
+        new Set((saidasData ?? []).map((saida) => saida.pessoaId).filter(Boolean))
+      )
+      if (pessoaIds.length && api?.pessoas?.listByIds) {
+        try {
+          const extras = await api.pessoas.listByIds(pessoaIds)
+          setNomes(mergePessoasList(NomesData ?? [], extras ?? []))
+        } catch (extraErr) {
+          console.warn('Falha ao obter pessoas adicionais.', extraErr)
+          setNomes(NomesData ?? [])
+        }
+      } else {
+        setNomes(NomesData ?? [])
+      }
       setMateriais(materiaisData ?? [])
       setSaidas(saidasData ?? [])
       if (centrosCustoData) {

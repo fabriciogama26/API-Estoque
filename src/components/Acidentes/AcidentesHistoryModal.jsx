@@ -14,26 +14,18 @@ export function AcidentesHistoryModal({ state, onClose }) {
   }
 
   return (
-    <div
-      className="acidentes-record-history__overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="acidente-history-title"
-      onClick={handleOverlayClick}
-    >
-      <div className="acidentes-record-history__modal" onClick={stopPropagation}>
-        <header className="acidentes-record-history__header">
-          <h3 id="acidente-history-title">Historico de edicoes - {state.acidente?.nome}</h3>
-          <button
-            type="button"
-            className="acidentes-record-history__close"
-            onClick={onClose}
-            aria-label="Fechar historico"
-          >
+    <div className="entradas-history__overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
+      <div className="entradas-history__modal" onClick={stopPropagation}>
+        <header className="entradas-history__header">
+          <div>
+            <h3>Historico do acidente</h3>
+            <p className="entradas-history__subtitle">{state.acidente?.id ?? ''}</p>
+          </div>
+          <button type="button" className="entradas-history__close" onClick={onClose} aria-label="Fechar historico">
             x
           </button>
         </header>
-        <div className="acidentes-record-history__body">
+        <div className="entradas-history__body">
           {state.isLoading ? (
             <p className="feedback">Carregando historico...</p>
           ) : state.error ? (

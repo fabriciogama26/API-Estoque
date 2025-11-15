@@ -61,6 +61,25 @@ const toIsoOrNull = (value, defaultNow = false) => {
   return date.toISOString()
 }
 
+const toBoolean = (value) => {
+  if (typeof value === 'boolean') {
+    return value
+  }
+  if (typeof value === 'number') {
+    return value !== 0
+  }
+  if (typeof value === 'string') {
+    const texto = value.trim().toLowerCase()
+    if (['true', '1', 'sim', 'yes', 'on'].includes(texto)) {
+      return true
+    }
+    if (['false', '0', 'nao', 'não', 'off'].includes(texto)) {
+      return false
+    }
+  }
+  return Boolean(value)
+}
+
 const toDateOnlyIso = (value) => {
   const raw = trim(value)
   if (!raw) {
@@ -240,6 +259,9 @@ const ACIDENTE_HISTORY_FIELDS = [
   'nome',
   'cargo',
   'data',
+  'dataEsocial',
+  'sesmt',
+  'dataSesmt',
   'tipo',
   'agente',
   'lesao',
@@ -449,6 +471,9 @@ const mapLocalAcidenteRecord = (acidente) => {
     lesao: lesoes[0] ?? acidente.lesao ?? '',
     partesLesionadas: partes,
     parteLesionada: partes[0] ?? acidente.parteLesionada ?? '',
+    dataEsocial: acidente.dataEsocial ?? acidente.data_esocial ?? null,
+    sesmt: Boolean(acidente.sesmt),
+    dataSesmt: acidente.dataSesmt ?? acidente.data_sesmt ?? null,
   }
 }
 
@@ -1402,6 +1427,9 @@ const sanitizeAcidentePayload = (payload = {}) => {
     cid: sanitizeOptional(payload.cid),
     cat: sanitizeOptional(payload.cat),
     observacao: sanitizeOptional(payload.observacao),
+    dataEsocial: toIsoOrNull(payload.dataEsocial, false),
+    sesmt: toBoolean(payload.sesmt),
+    dataSesmt: toIsoOrNull(payload.dataSesmt, false),
   }
 }
 
@@ -1730,6 +1758,17 @@ const localApi = {
           }
           return filterPessoas(pessoas, filters)
         })
+      },
+      async listByIds(ids = []) {
+        const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)))
+        if (!uniqueIds.length) {
+          return []
+        }
+        return readState((state) =>
+          state.pessoas
+            .filter((pessoa) => uniqueIds.includes(pessoa.id))
+            .map(mapLocalPessoaRecord)
+        )
       },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
@@ -2626,6 +2665,9 @@ const localApi = {
           cid: dados.cid,
           cat: dados.cat,
           observacao: dados.observacao,
+          dataEsocial: dados.dataEsocial,
+          sesmt: dados.sesmt,
+          dataSesmt: dados.dataSesmt,
           registradoPor: usuario,
           criadoEm: agora,
           atualizadoEm: null,

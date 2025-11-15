@@ -16,7 +16,11 @@
   flex-direction: column;
   gap: 0.85rem;
   min-height: 160px;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.dashboard-insight-card--has-tooltip {
+  padding-left: 3rem;
 }
 
 .dashboard-insight-card::after {
@@ -169,4 +173,127 @@
 .form--filters .form__actions {
   align-items: center;
   justify-content: flex-start;
+}
+
+.dashboard-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dashboard-card__actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.dashboard-card__expand {
+  border: none;
+  background: rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+  transition: background 0.2s ease;
+}
+
+.dashboard-card__expand:hover {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0f172a;
+}
+
+.chart-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1rem;
+}
+
+.chart-modal__content {
+  background: #fff;
+  border-radius: 1rem;
+  width: min(1200px, 100%);
+  height: min(90vh, 850px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.35);
+}
+
+.chart-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.chart-modal__title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-modal__close {
+  border: none;
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 999px;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+  transition: background 0.2s;
+}
+
+.chart-modal__close:hover {
+  background: rgba(248, 113, 113, 0.25);
+  color: #b91c1c;
+}
+
+.chart-modal__body {
+  flex: 1;
+  padding: 1rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chart-modal__body .dashboard-chart-container {
+  flex: 1;
+}
+
+.chart-filter-indicator {
+  margin: 0.75rem 0 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+  font-size: 0.95rem;
+}
+
+.chart-filter-indicator button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }

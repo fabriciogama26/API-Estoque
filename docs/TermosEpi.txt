@@ -28,3 +28,9 @@ Boas práticas
 - Certifique-se de que `termoEpiContext` retorne `colaborador`, `entregas`, `totais` e `empresa` para aproveitar todas as seções do template.
 - Ajuste a função serverless para fazer cache do arquivo ou registrar logs de auditoria conforme requisitos de compliance.
 - Valide links de logo (`https://...`) para evitar bloqueios por mixed content quando a aplicação estiver sob HTTPS.
+
+
+Atualizacao 2025-11
+--------------------
+- Expliquei como o novo padrao de resumo de material facilita a leitura dos termos gerados, pois os campos sao os mesmos exibidos nos graficos.
+- Detalhei que, ao revisar os textos dos termos, devemos garantir consistencia com o que aparece nas indicadores de estoque para evitar divergencias.

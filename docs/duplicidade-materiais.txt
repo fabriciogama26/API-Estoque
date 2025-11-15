@@ -26,3 +26,9 @@ Duplicidade de Materiais
    - Crie um material e outro com os mesmos campos + cores + características → o segundo insert deve falhar com `Material duplicado...`.
    - Tente editar cores/características de um material já existente para igualar outro → o update deve ser barrado.
    - Materiais diferentes (ex: CA ou valor/cores divergentes) continuam passando.
+
+
+Atualizacao 2025-11
+--------------------
+- Expliquei que, alem de consolidar registros duplicados, e preciso garantir a consistencia do `fabricanteNome`, pois os graficos clicaveis exibem o texto exatamente como armazenado.
+- Inclui checklist para revisar campos `resumo` e `grupoMaterial` apos mesclas, assegurando que o formato `Nome | Categoria | Numero | Caracteristica | Fabricante` permaneça limpo para uso nos eixos.

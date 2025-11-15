@@ -99,6 +99,9 @@ const ACIDENTE_HISTORY_FIELDS = [
   'nome',
   'cargo',
   'data',
+  'dataEsocial',
+  'sesmt',
+  'dataSesmt',
   'tipo',
   'agente',
   'lesao',
@@ -117,6 +120,31 @@ const ACIDENTE_HISTORY_FIELDS = [
 
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
+
+const PESSOAS_VIEW_SELECT = `
+  id,
+  nome,
+  matricula,
+  "dataAdmissao",
+  "usuarioCadastro",
+  "usuarioCadastroNome",
+  "usuarioEdicao",
+  "usuarioEdicaoNome",
+  "criadoEm",
+  "atualizadoEm",
+  centro_servico_id,
+  setor_id,
+  cargo_id,
+  centro_custo_id,
+  tipo_execucao_id,
+  centro_servico,
+  setor,
+  cargo,
+  centro_custo,
+  tipo_execucao
+`
+
+const buildPessoasViewQuery = () => supabase.rpc('rpc_pessoas_completa')
 
 const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_material_cor']
 const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
@@ -582,7 +610,10 @@ const normalizeEntradaInput = (payload = {}) => {
   }
   const centroCusto = trim(payload.centroCusto)
   if (!centroCusto) {
-    throw new Error('Selecione o centro de custo.')
+    throw new Error('Selecione o centro de estoque.')
+  }
+  if (!isUuidValue(centroCusto)) {
+    throw new Error('Selecione um centro de estoque valido.')
   }
   const dataEntradaRaw = trim(payload.dataEntrada)
   if (!dataEntradaRaw) {
@@ -682,6 +713,9 @@ const buildMaterialResumo = (material) => {
       if (!parte) {
         return false
       }
+      if (isUuidValue(parte)) {
+        return false
+      }
       const key = parte.toLowerCase()
       if (vistos.has(key)) {
         return false
@@ -732,6 +766,25 @@ async function fetchMaterialSnapshot(materialId) {
   } catch (error) {
     console.warn('Nao foi possivel resolver material.', error)
     return null
+  }
+}
+
+async function carregarMateriaisPorIds(ids = []) {
+  const selecionados = Array.from(new Set((ids || []).filter(Boolean)))
+  if (!selecionados.length) {
+    return new Map()
+  }
+  try {
+    const registros = await execute(
+      supabase.from('materiais_view').select(MATERIAL_SELECT_COLUMNS).in('id', selecionados),
+      'Falha ao listar materiais.'
+    )
+    return new Map(
+      (registros ?? []).map((material) => [material.id, mapMaterialRecord(material)]).filter(([id]) => Boolean(id))
+    )
+  } catch (error) {
+    console.warn('Nao foi possivel carregar materiais por ids.', error)
+    return new Map()
   }
 }
 
@@ -903,28 +956,20 @@ const pessoaMatchesSearch = (pessoa, termo) => {
 }
 
 const applyPessoaSearchFilters = (builder, like) => {
-  const baseFilters = [
+  const filtros = [
     `nome.ilike.${like}`,
     `matricula.ilike.${like}`,
     `usuarioCadastro.ilike.${like}`,
+    `usuarioCadastroNome.ilike.${like}`,
     `usuarioEdicao.ilike.${like}`,
+    `usuarioEdicaoNome.ilike.${like}`,
+    `centro_servico.ilike.${like}`,
+    `setor.ilike.${like}`,
+    `cargo.ilike.${like}`,
+    `centro_custo.ilike.${like}`,
+    `tipo_execucao.ilike.${like}`,
   ]
-
-  let query = builder.or(baseFilters.join(','))
-
-  const relatedTables = [
-    'centros_servico',
-    'setores',
-    'cargos',
-    'centros_custo',
-    'tipo_execucao',
-  ]
-
-  relatedTables.forEach((table) => {
-    query = query.or(`nome.ilike.${like}`, { foreignTable: table })
-  })
-
-  return query
+  return builder.or(filtros.join(','))
 }
 
 let agenteCatalogCache = null
@@ -1486,8 +1531,20 @@ function mapPessoaRecord(record) {
     tipoExecucao,
     tipoExecucaoId: record.tipo_execucao_id ?? tipoExecucaoRel?.id ?? null,
     dataAdmissao: record.dataAdmissao ?? record.data_admissao ?? null,
-    usuarioCadastro: resolveTextValue(record.usuarioCadastro ?? record.usuario_cadastro ?? ''),
-    usuarioEdicao: resolveTextValue(record.usuarioEdicao ?? record.usuario_edicao ?? ''),
+    usuarioCadastro: resolveTextValue(
+      record.usuarioCadastroNome ??
+        record.usuario_cadastro_nome ??
+        record.usuarioCadastro ??
+        record.usuario_cadastro ??
+        ''
+    ),
+    usuarioEdicao: resolveTextValue(
+      record.usuarioEdicaoNome ??
+        record.usuario_edicao_nome ??
+        record.usuarioEdicao ??
+        record.usuario_edicao ??
+        ''
+    ),
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
     historicoEdicao: normalizePessoaHistorico(historicoRaw),
@@ -1498,15 +1555,14 @@ function mapEntradaRecord(record) {
   if (!record) {
     return null
   }
-  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
-  const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? ''
-  const centroCustoId = normalizeUuid(centroEstoqueValor ?? centroCustoRaw)
+  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? record.centroCusto ?? null
+  const centroCustoRaw = record.centroCusto ?? ''
+  const centroCustoId = normalizeUuid(centroEstoqueValor)
   const centroCustoNome =
     resolveTextValue(
       record.centroEstoqueNome ??
-        record.centroEstoqueNome ??
-        record.centro_custo_nome ??
         record.centro_estoque_nome ??
+        record.centroCustoNome ??
         '',
     ) ||
     (centroCustoId ? '' : resolveTextValue(centroCustoRaw))
@@ -1740,6 +1796,9 @@ function mapAcidenteRecord(record) {
     local: resolveTextValue(record.local ?? centroServico),
     cat: record.cat ?? null,
     observacao: record.observacao ?? '',
+    dataEsocial: record.dataEsocial ?? record.data_esocial ?? null,
+    sesmt: Boolean(record.sesmt ?? record.sesmt_flag ?? false),
+    dataSesmt: record.dataSesmt ?? record.data_sesmt ?? null,
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
     registradoPor: record.registradoPor ?? record.registrado_por ?? '',
@@ -1948,6 +2007,24 @@ async function carregarCentrosCusto() {
   return normalizeDomainOptions(data ?? [])
 }
 
+async function buscarCentrosEstoqueIdsPorTermo(valor) {
+  const termo = trim(valor)
+  if (!termo) {
+    return []
+  }
+  const like = `%${termo.replace(/\s+/g, '%')}%`
+  try {
+    const registros = await execute(
+      supabase.from(CENTRO_ESTOQUE_TABLE).select('id').ilike('almox', like).limit(50),
+      'Falha ao consultar centros de estoque.'
+    )
+    return (registros ?? []).map((item) => item?.id).filter(Boolean)
+  } catch (error) {
+    console.warn('Falha ao filtrar centros de estoque por nome.', error)
+    return []
+  }
+}
+
 async function carregarCentrosEstoqueCatalogo() {
   const data = await execute(
     supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox', { ascending: true }),
@@ -1971,82 +2048,16 @@ async function carregarCentrosServico() {
 
 async function carregarPessoas() {
   const data = await execute(
-    supabase
-      .from('pessoas')
-      .select(`
-        id,
-        nome,
-        matricula,
-        "dataAdmissao",
-        "usuarioCadastro",
-        "usuarioEdicao",
-        "criadoEm",
-        "atualizadoEm",
-        centro_servico_id,
-        setor_id,
-        cargo_id,
-        centro_custo_id,
-        tipo_execucao_id,
-        centros_servico ( id, nome ),
-        setores ( id, nome ),
-        cargos ( id, nome ),
-        centros_custo ( id, nome ),
-        tipo_execucao ( id, nome )
-      `)
-      .order('nome', { ascending: true }),
+    buildPessoasViewQuery().order('nome', { ascending: true }),
     'Falha ao listar pessoas.'
   )
   const pessoas = (data ?? []).map(mapPessoaRecord)
-  return aplicarCargoFallback(pessoas)
+  return pessoas
 }
 
 function normalizeMatriculaKey(value) {
   const texto = trim(value)
   return texto ? texto.toUpperCase() : ''
-}
-
-async function carregarCargoFallbackPorMatricula() {
-  try {
-    const registros = await execute(
-      supabase.from('pessoas_view').select('matricula, cargo'),
-      'Falha ao consultar pessoas_view.'
-    )
-    const mapa = new Map()
-    ;(registros ?? []).forEach((registro) => {
-      const matriculaKey = normalizeMatriculaKey(registro?.matricula)
-      const cargoTexto = resolveTextValue(registro?.cargo ?? '')
-      if (matriculaKey && cargoTexto) {
-        mapa.set(matriculaKey, cargoTexto)
-      }
-    })
-    return mapa
-  } catch (error) {
-    console.warn('Nao foi possivel usar pessoas_view como fallback de cargo.', error)
-    return null
-  }
-}
-
-async function aplicarCargoFallback(pessoas) {
-  if (!Array.isArray(pessoas) || pessoas.length === 0) {
-    return pessoas ?? []
-  }
-  const faltantes = pessoas.filter(
-    (pessoa) => pessoa && !pessoa.cargo && normalizeMatriculaKey(pessoa.matricula)
-  )
-  if (faltantes.length === 0) {
-    return pessoas
-  }
-  const cargoMap = await carregarCargoFallbackPorMatricula()
-  if (!cargoMap || cargoMap.size === 0) {
-    return pessoas
-  }
-  faltantes.forEach((pessoa) => {
-    const cargoFallback = cargoMap.get(normalizeMatriculaKey(pessoa.matricula))
-    if (cargoFallback) {
-      pessoa.cargo = cargoFallback
-    }
-  })
-  return pessoas
 }
 
 async function carregarEntradas(params = {}) {
@@ -2056,11 +2067,17 @@ async function carregarEntradas(params = {}) {
     query = query.eq('materialId', params.materialId)
   }
   const centroFiltro = trim(params.centroCusto)
+  let centroFiltroTerm = ''
   if (centroFiltro) {
     if (isUuidValue(centroFiltro)) {
-      query = query.or(`centro_estoque.eq.${centroFiltro},centro_custo.eq.${centroFiltro}`)
+      query = query.eq('centro_estoque', centroFiltro)
     } else {
-      query = query.ilike('centro_custo', `%${centroFiltro}%`)
+      const centroIds = await buscarCentrosEstoqueIdsPorTermo(centroFiltro)
+      if (centroIds.length) {
+        query = query.in('centro_estoque', centroIds)
+      } else {
+        centroFiltroTerm = normalizeSearchTerm(centroFiltro)
+      }
     }
   }
   const registradoPor = trim(params.registradoPor)
@@ -2085,6 +2102,11 @@ async function carregarEntradas(params = {}) {
   let registros = (data ?? []).map(mapEntradaRecord)
   registros = await preencherUsuariosResponsaveis(registros)
   registros = await preencherCentrosEstoque(registros)
+  if (centroFiltroTerm) {
+    registros = registros.filter((entrada) =>
+      normalizeSearchTerm(entrada?.centroCusto).includes(centroFiltroTerm)
+    )
+  }
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
@@ -2510,23 +2532,6 @@ async function obterSaldoMaterial(materialId) {
   return { materialId, saldo }
 }
 
-function calcularDataTroca(dataEntregaIso, validadeDias) {
-  if (!validadeDias) {
-    return null
-  }
-  const data = new Date(dataEntregaIso)
-  if (Number.isNaN(data.getTime())) {
-    return null
-  }
-  const prazo = Number(validadeDias)
-  if (Number.isNaN(prazo) || prazo <= 0) {
-    return null
-  }
-  data.setUTCDate(data.getUTCDate() + prazo)
-  data.setUTCHours(0, 0, 0, 0)
-  return data.toISOString()
-}
-
 function montarContextoTermoEpi(pessoa, saidasDetalhadas) {
   const entregasOrdenadas = saidasDetalhadas
     .slice()
@@ -2541,12 +2546,12 @@ function montarContextoTermoEpi(pessoa, saidasDetalhadas) {
     id: saida.id,
     dataEntrega: saida.dataEntrega ?? null,
     quantidade: Number(saida.quantidade ?? 0),
-    descricao: saida.material?.nome ?? '',
+    descricao: saida.material ? buildMaterialResumo(saida.material) : '',
     numeroCa: saida.material?.ca ?? '',
     centroCusto: saida.centroCusto ?? '',
     centroServico: saida.centroServico ?? '',
     status: saida.status ?? '',
-    usuarioResponsavel: saida.usuarioResponsavel ?? '',
+    usuarioResponsavel: saida.usuarioResponsavelNome || saida.usuarioResponsavel || '',
     dataTroca: saida.dataTroca ?? null,
   }))
 
@@ -2627,29 +2632,7 @@ export const api = {
       const termo = trim(params.termo)
 
       const buildQuery = () => {
-        let builder = supabase
-          .from('pessoas')
-          .select(`
-            id,
-            nome,
-            matricula,
-            "dataAdmissao",
-            "usuarioCadastro",
-            "usuarioEdicao",
-            "criadoEm",
-            "atualizadoEm",
-            centro_servico_id,
-            setor_id,
-            cargo_id,
-            centro_custo_id,
-            tipo_execucao_id,
-            centros_servico ( id, nome ),
-            setores ( id, nome ),
-            cargos ( id, nome ),
-            centros_custo ( id, nome ),
-            tipo_execucao ( id, nome )
-          `)
-          .order('nome', { ascending: true })
+        let builder = buildPessoasViewQuery().order('nome', { ascending: true })
 
         if (filtros.centroServicoId) {
           builder = builder.eq('centro_servico_id', filtros.centroServicoId)
@@ -2674,7 +2657,7 @@ export const api = {
         }
         const data = await execute(query, 'Falha ao listar pessoas.')
         const registros = (data ?? []).map(mapPessoaRecord)
-        return aplicarCargoFallback(registros)
+        return registros
       } catch (error) {
         if (!termo) {
           throw error
@@ -2684,9 +2667,20 @@ export const api = {
           error
         )
         const fallbackData = await execute(buildQuery(), 'Falha ao listar pessoas.')
-        const registros = await aplicarCargoFallback((fallbackData ?? []).map(mapPessoaRecord))
+        const registros = (fallbackData ?? []).map(mapPessoaRecord)
         return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
       }
+    },
+    async listByIds(ids = []) {
+      const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)))
+      if (!uniqueIds.length) {
+        return []
+      }
+      const data = await execute(
+        buildPessoasViewQuery().in('id', uniqueIds),
+        'Falha ao listar pessoas pelos ids informados.'
+      )
+      return (data ?? []).map(mapPessoaRecord)
     },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
@@ -3239,7 +3233,6 @@ export const api = {
             materialId: dados.materialId,
             quantidade: dados.quantidade,
             centro_estoque: dados.centroCusto,
-            centro_custo: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
           })
@@ -3268,7 +3261,6 @@ export const api = {
             materialId: dados.materialId,
             quantidade: dados.quantidade,
             centro_estoque: dados.centroCusto,
-            centro_custo: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuario,
           })
@@ -3354,7 +3346,6 @@ export const api = {
       }
 
       const dataEntregaIso = dataEntregaDate.toISOString()
-      const dataTroca = calcularDataTroca(dataEntregaIso, material?.validadeDias)
 
       const registro = await executeSingle(
         supabase
@@ -3366,7 +3357,6 @@ export const api = {
             centro_custo: centroCustoIdFinal,
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
-            dataTroca,
             status,
             usuarioResponsavel: usuario,
           })
@@ -3443,7 +3433,6 @@ export const api = {
       }
 
       const dataEntregaIso = dataEntregaDate.toISOString()
-      const dataTroca = calcularDataTroca(dataEntregaIso, material?.validadeDias)
       const statusValor =
         trim(payload.statusId ?? payload.status ?? '') ||
         saidaAtual.statusId ||
@@ -3460,7 +3449,6 @@ export const api = {
             centro_custo: centroCustoIdFinal,
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
-            dataTroca,
             status: statusValor,
             usuarioResponsavel: usuario,
           })
@@ -3521,20 +3509,7 @@ export const api = {
         throw new Error('Saida invalida.')
       }
       const registros = await execute(
-        supabase
-          .from('saidas_historico')
-          .select(
-            `
-              id,
-              saida_id,
-              material_id,
-              material_saida,
-              created_at,
-              usuario:usuarioResponsavel ( id, display_name, username, email )
-            `
-          )
-          .eq('saida_id', id)
-          .order('created_at', { ascending: false }),
+        supabase.rpc('rpc_saida_historico', { p_saida_id: id }),
         'Falha ao listar historico de saida.'
       )
       return (registros ?? []).map(mapSaidaHistoryRecord)
@@ -3751,6 +3726,9 @@ export const api = {
         observacao: trim(payload.observacao),
         partesLesionadas: partes,
         partePrincipal,
+        dataEsocial: payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null,
+        sesmt: Boolean(payload.sesmt),
+        dataSesmt: payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null,
       }
       if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
         throw new Error('Preencha os campos obrigatorios do acidente.')
@@ -3765,6 +3743,9 @@ export const api = {
         partePrincipal: _partePrincipal,
         agentePrincipal: _agentePrincipal,
         tipoPrincipal: _tipoPrincipal,
+        dataEsocial,
+        sesmt,
+        dataSesmt,
         ...resto
       } = dados
       const registro = await executeSingle(
@@ -3774,6 +3755,9 @@ export const api = {
             ...resto,
             centro_servico: centroServicoDb,
             partes_lesionadas: partesPayload,
+            data_esocial: dataEsocial,
+            sesmt,
+            data_sesmt: dataSesmt,
             registradoPor: usuario,
           })
           .select(),
@@ -3848,6 +3832,18 @@ export const api = {
         cat: trim(payload.cat ?? atual.cat ?? ''),
         observacao: trim(payload.observacao ?? atual.observacao ?? ''),
         partePrincipal,
+        dataEsocial:
+          payload.dataEsocial !== undefined && payload.dataEsocial !== null
+            ? (payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null)
+            : atual.data_esocial ?? atual.dataEsocial ?? null,
+        sesmt:
+          payload.sesmt !== undefined
+            ? Boolean(payload.sesmt)
+            : Boolean(atual.sesmt),
+        dataSesmt:
+          payload.dataSesmt !== undefined && payload.dataSesmt !== null
+            ? (payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null)
+            : atual.data_sesmt ?? atual.dataSesmt ?? null,
       }
 
       if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
@@ -3878,6 +3874,9 @@ export const api = {
         cid: dados.cid,
         cat: dados.cat,
         observacao: dados.observacao,
+        dataEsocial: dados.dataEsocial,
+        sesmt: dados.sesmt,
+        dataSesmt: dados.dataSesmt,
       }
       const camposAlterados = []
       ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
@@ -3907,6 +3906,11 @@ export const api = {
         partesLesionadas: partesPayload,
         lesao: _lesaoPrincipal,
         partePrincipal: _partePrincipal,
+        agentePrincipal: _agentePrincipal,
+        tipoPrincipal: _tipoPrincipal,
+        dataEsocial,
+        sesmt,
+        dataSesmt,
         ...resto
       } = dados
       const registro = await executeSingle(
@@ -3916,6 +3920,9 @@ export const api = {
             ...resto,
             centro_servico: centroServicoDb,
             partes_lesionadas: partesPayload,
+            data_esocial: dataEsocial,
+            sesmt,
+            data_sesmt: dataSesmt,
             atualizadoPor: usuario,
             atualizadoEm: agora,
           })
@@ -3934,7 +3941,7 @@ export const api = {
     },
     async history(id) {
       if (!id) {
-        throw new Error('ID obrigatório.')
+        throw new Error('ID obrigatorio.')
       }
       const data = await execute(
         supabase
@@ -3942,16 +3949,50 @@ export const api = {
           .select('id, data_edicao, usuario_responsavel, campos_alterados')
           .eq('acidente_id', id)
           .order('data_edicao', { ascending: false }),
-        'Falha ao obter histórico do acidente.'
+        'Falha ao obter historico do acidente.'
       )
-      return (data ?? []).map((item) => ({
-        id: item.id,
-        dataEdicao: item.data_edicao ?? item.dataEdicao ?? null,
-        usuarioResponsavel: item.usuario_responsavel ?? item.usuarioResponsavel ?? '',
-        camposAlterados: Array.isArray(item.campos_alterados ?? item.camposAlterados)
-          ? item.campos_alterados ?? item.camposAlterados
-          : [],
-      }))
+      const registros = data ?? []
+      const responsaveisIds = Array.from(
+        new Set(
+          registros
+            .map((item) => (item.usuario_responsavel ?? item.usuarioResponsavel ?? '').trim())
+            .filter(Boolean)
+        )
+      )
+      let usuarioNomeMap = new Map()
+      if (responsaveisIds.length > 0) {
+        try {
+          const usuarios = await execute(
+            supabase.from('app_users').select('id, display_name, username, email').in('id', responsaveisIds),
+            'Falha ao consultar usuarios do historico de acidentes.'
+          )
+          usuarioNomeMap = new Map(
+            (usuarios ?? [])
+              .filter((usuario) => usuario?.id)
+              .map((usuario) => [
+                usuario.id,
+                resolveTextValue(usuario.display_name ?? usuario.username ?? usuario.email ?? usuario.id),
+              ])
+          )
+        } catch (usuarioError) {
+          console.warn('Nao foi possivel resolver nomes dos usuarios do historico de acidentes.', usuarioError)
+        }
+      }
+      return registros.map((item) => {
+        const usuarioId = (item.usuario_responsavel ?? item.usuarioResponsavel ?? '').trim()
+        const usuarioNome = usuarioId
+          ? usuarioNomeMap.get(usuarioId) ?? usuarioId
+          : 'Responsavel nao informado'
+        return {
+          id: item.id,
+          dataEdicao: item.data_edicao ?? item.dataEdicao ?? null,
+          usuarioResponsavel: usuarioNome,
+          usuarioResponsavelId: usuarioId || null,
+          camposAlterados: Array.isArray(item.campos_alterados ?? item.camposAlterados)
+            ? item.campos_alterados ?? item.camposAlterados
+            : [],
+        }
+      })
     },
 
 async dashboard(params = {}) {
@@ -4013,14 +4054,14 @@ async dashboard(params = {}) {
       let pessoa = null
       if (matricula) {
         pessoa = await executeSingle(
-          supabase.from('pessoas').select('*').eq('matricula', matricula),
+          buildPessoasViewQuery().eq('matricula', matricula),
           'Falha ao consultar colaborador.'
         )
       }
       if (!pessoa && nome) {
         const like = `%${nome.replace(/\s+/g, '%')}%`
         const resultados = await execute(
-          supabase.from('pessoas').select('*').ilike('nome', like).order('nome').limit(1),
+          buildPessoasViewQuery().ilike('nome', like).order('nome').limit(1),
           'Falha ao consultar colaborador.'
         )
         pessoa = resultados?.[0] ?? null
@@ -4045,10 +4086,22 @@ async dashboard(params = {}) {
         throw new Error('Nenhuma saida registrada para o colaborador informado.')
       }
 
-      const saidasDetalhadas = (saidas ?? []).map((registro) => ({
-        ...mapSaidaRecord(registro),
-        material: mapMaterialRecord(registro.material),
-      }))
+      const saidasOriginais = saidas ?? []
+      const saidasBasicas = saidasOriginais.map((registro) => mapSaidaRecord(registro))
+      const saidasComUsuarios = await preencherUsuariosResponsaveis(saidasBasicas)
+      const saidasComCentros = await preencherCentrosCustoSaidas(saidasComUsuarios)
+      const materiaisMap = await carregarMateriaisPorIds(
+        saidasComCentros.map((saida) => saida.materialId).filter(Boolean)
+      )
+
+      const saidasDetalhadas = saidasComCentros.map((saida, index) => {
+        const detalhado = materiaisMap.get(saida.materialId)
+        const fallbackMaterial = mapMaterialRecord(saidasOriginais[index]?.material)
+        return {
+          ...saida,
+          material: detalhado ?? fallbackMaterial ?? null,
+        }
+      })
 
       const contexto = montarContextoTermoEpi(mapPessoaRecord(pessoa), saidasDetalhadas)
       return {

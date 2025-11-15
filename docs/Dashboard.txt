@@ -31,3 +31,10 @@ Boas práticas para dados
 - Garanta que a API retorne `valorUnitario` para entradas/saídas; sem isso o cálculo `quantidade * valorUnitario` ficará zerado.
 - Para novos indicadores, estenda `api.estoque.dashboard` mantendo a estrutura atual (`entradas`, `saidas`, `estoqueAtual`, `materiaisMaisMovimentados`, etc.) para evitar ajustes na página.
 - Use seeds de `src/data/local-seed.json` como referência de formatos quando desenvolver no modo local.
+
+
+Atualizacao 2025-11
+--------------------
+- Documentei o fluxo de expansao individual de graficos (botao com `ExpandIcon`, modal fullscreen e fechamento com clique externo) e os estilos adicionados em `DashboardPage.css`.
+- Acrescentei a descricao do filtro contextual disparado pelos graficos de material/categoria/fabricante/centro, incluindo o indicador visual `chart-filter-indicator` e a forma como o termo global e preenchido automaticamente.
+- Registrei ajustes de usabilidade: resumo de materiais agora usa `formatEstoqueMaterialLabel`, tooltips exibem a descricao completa e os eixos Y receberam fontes menores.

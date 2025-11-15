@@ -45,3 +45,9 @@ Atualizacoes recentes
 - `startEdit` rola a pagina para o topo antes de preencher o formulario, evitando que o usuario fique com o botao fora de vista (`src/pages/Materiais.jsx`).
 - O modal de historico exibe apenas campos legiveis (`materialItemNome`, `caracteristicaEpi`, `coresTexto`, etc.) e usa `formatSelectionValue` para formatar listas, eliminando a exibicao de UUIDs (`src/services/api.js`, `src/components/Materiais/MateriaisHistoricoTimeline.jsx`).
 - O payload de edicao preserva o texto mostrado no dropdown do EPI (`materialItemNome`/`nomeItemRelacionado`) e mantem os arrays de caracteristicas/cores sincronizados com as selecoes, evitando duplicidade e falhas ao salvar (`src/rules/MateriaisRules.js`, `src/pages/Materiais.jsx`, `src/utils/selectionUtils.js`).
+
+
+Atualizacao 2025-11
+--------------------
+- Atualizei a secao de exibicao para incluir o novo resumo compacto usado nos graficos: `formatEstoqueMaterialLabel` limita os campos mostrados e evita poluicao visual.
+- Acrescentei orientacao para sempre preencher `fabricanteNome` alem do ID; caso contrario os graficos exibem `Nao informado`, prejudicando os filtros aplicados via dashboard.

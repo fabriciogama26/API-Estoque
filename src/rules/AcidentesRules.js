@@ -54,6 +54,40 @@ const collectTextList = (...inputs) => {
   return lista
 }
 
+const normalizeDateTimeValue = (value) => {
+  if (value === undefined || value === null) {
+    return null
+  }
+  const texto = String(value).trim()
+  if (!texto) {
+    return null
+  }
+  const date = new Date(texto)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return date.toISOString()
+}
+
+const normalizeBooleanValue = (value) => {
+  if (typeof value === 'boolean') {
+    return value
+  }
+  if (typeof value === 'number') {
+    return value !== 0
+  }
+  if (typeof value === 'string') {
+    const texto = value.trim().toLowerCase()
+    if (['true', '1', 'sim', 'yes', 'on'].includes(texto)) {
+      return true
+    }
+    if (['false', '0', 'nao', 'não', 'off'].includes(texto)) {
+      return false
+    }
+  }
+  return Boolean(value)
+}
+
 export function resolveUsuarioNome(user) {
   return user?.name || user?.username || user?.email || 'sistema'
 }
@@ -85,6 +119,9 @@ export function validateAcidenteForm(form) {
   }
   if (!form.data) {
     return 'Selecione a data do acidente.'
+  }
+  if (!normalizeDateTimeValue(form.data)) {
+    return 'Informe uma data valida para o acidente.'
   }
   if (!tiposSelecionados.length) {
     return 'Informe ao menos um tipo do acidente.'
@@ -184,12 +221,16 @@ export function createAcidentePayload(form, usuarioCadastro) {
     ? [form.parteLesionada.trim()]
     : []
   const observacao = typeof form.observacao === 'string' ? form.observacao.trim() : ''
+  const dataNormalizada = normalizeDateTimeValue(form.data)
+  const dataEsocial = normalizeDateTimeValue(form.dataEsocial)
+  const sesmt = normalizeBooleanValue(form.sesmt)
+  const dataSesmt = normalizeDateTimeValue(form.dataSesmt)
 
   return {
     matricula: form.matricula.trim(),
     nome: form.nome.trim(),
     cargo: form.cargo.trim(),
-    data: form.data || null,
+    data: dataNormalizada,
     diasPerdidos: integerOrNull(form.diasPerdidos),
     diasDebitados: integerOrNull(form.diasDebitados),
     hht: integerOrNull(form.hht),
@@ -208,6 +249,9 @@ export function createAcidentePayload(form, usuarioCadastro) {
     cat: form.cat.trim(),
     observacao,
     usuarioCadastro,
+    dataEsocial,
+    sesmt,
+    dataSesmt,
   }
 }
 
@@ -240,12 +284,16 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     ? [form.parteLesionada.trim()]
     : []
   const observacao = typeof form.observacao === 'string' ? form.observacao.trim() : ''
+  const dataNormalizada = normalizeDateTimeValue(form.data)
+  const dataEsocial = normalizeDateTimeValue(form.dataEsocial)
+  const sesmt = normalizeBooleanValue(form.sesmt)
+  const dataSesmt = normalizeDateTimeValue(form.dataSesmt)
 
   return {
     matricula: form.matricula.trim(),
     nome: form.nome.trim(),
     cargo: form.cargo.trim(),
-    data: form.data || null,
+    data: dataNormalizada,
     diasPerdidos: integerOrNull(form.diasPerdidos),
     diasDebitados: integerOrNull(form.diasDebitados),
     hht: integerOrNull(form.hht),
@@ -264,12 +312,17 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     cat: form.cat.trim(),
     observacao,
     usuarioResponsavel,
+    dataEsocial,
+    sesmt,
+    dataSesmt,
   }
 }
 
 export function filterAcidentes(acidentes, filters) {
   const termo = filters.termo.trim().toLowerCase()
   const centroServicoFiltro = String(filters.centroServico ?? filters.setor ?? 'todos').toLowerCase()
+  const apenasSesmt = Boolean(filters.apenasSesmt)
+  const apenasEsocial = Boolean(filters.apenasEsocial)
 
   return acidentes.filter((acidente) => {
     const tiposRegistro = collectTextList(acidente.tipos, acidente.tipo)
@@ -311,6 +364,14 @@ export function filterAcidentes(acidentes, filters) {
       if (!possuiLesao) {
         return false
       }
+    }
+
+    if (apenasSesmt && !acidente.sesmt) {
+      return false
+    }
+
+    if (apenasEsocial && !acidente.dataEsocial) {
+      return false
     }
 
     if (!termo) {

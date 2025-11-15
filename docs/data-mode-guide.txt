@@ -30,3 +30,9 @@ Cuidados ao alternar
 - Mudanças no modo não migram dados automaticamente. Registros criados offline permanecem no navegador.
 - Verifique se chaves de cache (`api-estoque-auth`, `api-estoque-local-data-v1`) não conflitam entre ambientes. Limpe-as ao alternar para evitar dados inconsistentes.
 - Alguns recursos dependem exclusivamente do Supabase (ex.: dashboard de acidentes remoto, geração de PDF). No modo local esses recursos podem mostrar mensagem de indisponibilidade.【F:src/pages/DashboardAcidentes.jsx†L60-L118】【F:src/utils/TermoEpiUtils.js†L1-L94】
+
+
+Atualizacao 2025-11
+--------------------
+- Adicionei orientacao para garantir que os datasets locais contenham `fabricanteNome` e `centroServico` legiveis, evitando exibicao de UUIDs nos graficos interativos durante o desenvolvimento offline.
+- Reforcei que o seed agora precisa incluir valores coerentes para que o novo filtro acionado pelos graficos produza resultados visiveis no modo local.

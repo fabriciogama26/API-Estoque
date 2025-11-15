@@ -35,3 +35,9 @@ Boas práticas
 - Configure políticas no Supabase para permitir que usuários autenticados atualizem `estoque_minimo` na tabela `materiais`.
 - Utilize os filtros de período para auditar movimentações específicas antes de gerar relatórios externos.
 - No modo local, mantenha `localApi.estoque.current` sincronizado com a estrutura esperada (`alertas` + `itens`) para evitar que cartões fiquem vazios.
+
+
+Atualizacao 2025-11
+--------------------
+- Descrevi a revisao de labels no estoque atual (`formatMaterialResumo`, truncamento amigavel e tooltip com descricao completa).
+- Documentei o mecanismo de filtros contextuais: ao clicar em um item dos graficos o estado `chartFilter` e atualizado e a listagem desta tela passa a refletir o mesmo termo.

@@ -25,3 +25,9 @@ Boas práticas
 - Qualquer nova tabela deve habilitar RLS e replicar o padrão (leitura para `authenticated`, escrita opcional). Crie migrations específicas para evitar alteração manual via Studio.
 - Use `supabase migration new add_policy_<tabela>` para versionar alterações de política.
 - Documente exceções (ex.: endpoints públicos) e valide periodicamente com `supabase db pull` para garantir sincronismo entre ambientes.
+
+
+Atualizacao 2025-11
+--------------------
+- Esclareci que `api.estoque.dashboard` passou a consultar `saidas.centro_servico` e `materiais.fabricanteNome`; confirme que as RLS existentes permitem leitura agregada desses campos.
+- Inclui recomendacao para adicionar testes de RLS cobrindo a rota `dashboard` quando novos filtros clicaveis forem expostos para perfis restritos.

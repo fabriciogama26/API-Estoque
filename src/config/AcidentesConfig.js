@@ -4,6 +4,9 @@ export const ACIDENTES_FORM_DEFAULT = {
   nome: '',
   cargo: '',
   data: '',
+  dataEsocial: '',
+  sesmt: false,
+  dataSesmt: '',
   diasPerdidos: '',
   diasDebitados: '',
   hht: '',
@@ -29,6 +32,8 @@ export const ACIDENTES_FILTER_DEFAULT = {
   setor: 'todos',
   agente: 'todos',
   lesao: 'todos',
+  apenasSesmt: false,
+  apenasEsocial: false,
 }
 
 export const ACIDENTES_HISTORY_DEFAULT = {

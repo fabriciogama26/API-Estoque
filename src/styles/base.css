@@ -479,3 +479,86 @@ ul, ol {
   margin: 0.25rem 0;
   font-size: 0.9rem;
 }
+
+.icon-button {
+  border: none;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--color-accent);
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.icon-button:hover,
+.icon-button:focus-visible {
+  background: var(--color-accent);
+  color: #fff;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+.summary-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: rgba(15, 23, 42, 0.65);
+  cursor: help;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.summary-tooltip span {
+  position: absolute;
+  top: 120%;
+  left: 2.25rem;
+  transform: translateX(0);
+  background: #0f172a;
+  color: #fff;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.45rem;
+  font-size: 0.75rem;
+  width: 220px;
+  max-width: 240px;
+  line-height: 1.3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2);
+  z-index: 30;
+}
+
+.summary-tooltip:hover,
+.summary-tooltip:focus-visible {
+  background: rgba(15, 23, 42, 0.15);
+  color: #0f172a;
+}
+
+.summary-tooltip:hover span,
+.summary-tooltip:focus-visible span {
+  opacity: 1;
+}
+
+.summary-tooltip--floating {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  z-index: 20;
+}
