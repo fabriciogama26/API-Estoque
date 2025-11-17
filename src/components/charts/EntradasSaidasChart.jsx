@@ -43,7 +43,7 @@ export function EntradasSaidasChart({ data, labelFormatter, valueFormatter, heig
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 12, right: 20, left: 12, bottom: 12 }}>
         <CartesianGrid stroke="rgba(148, 163, 184, 0.2)" strokeDasharray="4 4" />
-        <XAxis dataKey="periodo" tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} />
+        <XAxis dataKey="periodo" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
         <YAxis
           tickFormatter={valueFormatter}
           tick={{ fill: '#64748b', fontSize: 11 }}
@@ -74,7 +74,7 @@ export function ValorMovimentadoChart({ data, valueFormatter, height = 320 }) {
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 12, right: 20, left: 12, bottom: 12 }}>
         <CartesianGrid stroke="rgba(148, 163, 184, 0.2)" strokeDasharray="4 4" />
-        <XAxis dataKey="periodo" tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} />
+        <XAxis dataKey="periodo" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
         <YAxis
           tickFormatter={valueFormatter}
           tick={{ fill: '#64748b', fontSize: 11 }}

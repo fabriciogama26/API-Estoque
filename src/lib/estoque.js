@@ -419,6 +419,32 @@ export function montarDashboard({ materiais = [], entradas = [], saidas = [], pe
     pessoa: pessoasMap.get(saida.pessoaId) || null,
   }))
 
+  const materialContexto = new Map()
+  saidasDetalhadas.forEach((saida) => {
+    const materialId = saida.materialId
+    if (!materialId) {
+      return
+    }
+    const atual = materialContexto.get(materialId) ?? new Set()
+    const candidatos = [
+      saida.centroServico,
+      saida.setor,
+      saida.local,
+      saida.pessoa?.nome,
+      saida.pessoa?.centroServico,
+      saida.pessoa?.setor,
+      saida.pessoa?.local,
+      saida.pessoa?.cargo,
+    ]
+    candidatos
+      .map((valor) => (typeof valor === 'string' ? valor.trim() : ''))
+      .filter(Boolean)
+      .forEach((texto) => atual.add(texto))
+    if (atual.size) {
+      materialContexto.set(materialId, atual)
+    }
+  })
+
   const totalEntradasValor = somaValores(entradasFiltradas, materiaisMap)
   const totalSaidasValor = somaValores(saidasFiltradas, materiaisMap)
 
@@ -434,6 +460,7 @@ export function montarDashboard({ materiais = [], entradas = [], saidas = [], pe
       fabricante: material.fabricante,
       fabricanteNome,
       totalQuantidade,
+      contexto: Array.from(materialContexto.get(material.id) ?? []),
     }
   })
 

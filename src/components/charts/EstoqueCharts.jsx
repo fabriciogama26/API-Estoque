@@ -6,7 +6,7 @@ export function EstoquePorMaterialChart({ data, valueFormatter, height = 320, on
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout="vertical" margin={{ top: 12, right: 24, left: 16, bottom: 12 }}>
         <CartesianGrid horizontal={false} stroke="rgba(148, 163, 184, 0.2)" />
-        <XAxis type="number" tick={{ fill: '#64748b' }} tickLine={false} axisLine={false} />
+        <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
         <YAxis
           type="category"
           dataKey="nome"
@@ -48,8 +48,8 @@ export function MateriaisMaisUsadosChart({ data }) {
     <ResponsiveContainer width="100%" height={320}>
       <BarChart data={data} margin={{ top: 12, right: 24, left: 16, bottom: 12 }}>
         <CartesianGrid stroke="rgba(148, 163, 184, 0.2)" strokeDasharray="4 4" />
-        <XAxis dataKey="nome" tick={{ fill: '#64748b' }} tickLine={false} axisLine={false} />
-        <YAxis tick={{ fill: '#64748b' }} tickLine={false} axisLine={false} />
+        <XAxis dataKey="nome" tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
+        <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
         <Tooltip />
         <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ color: '#475569' }} />
         <Bar dataKey="totalQuantidade" name="Movimentacoes" radius={[6, 6, 0, 0]} fill="#34d399" />
