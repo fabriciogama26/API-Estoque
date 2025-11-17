@@ -11,6 +11,7 @@ import {
   ExpandIcon,
   CancelIcon,
   InfoIcon,
+  PersonIcon,
 } from '../components/icons.jsx'
 import { dataClient as api } from '../services/dataClient.js'
 import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts/EntradasSaidasChart.jsx'
@@ -24,6 +25,17 @@ const initialFilters = {
   periodoInicio: `${currentYear}-01`,
   periodoFim: `${currentYear}-12`,
   termo: '',
+}
+
+const chartInfoMessages = {
+  entradas: 'Comparativo mensal entre entradas e saídas considerando os filtros atuais.',
+  valor: 'Evolução do valor financeiro movimentado (entradas x saídas) no período filtrado.',
+  estoqueMaterial: 'Ranking dos materiais com maior volume de saídas dentro do período filtrado.',
+  estoqueCategoria: 'Categorias dos materiais que mais geraram saídas no período.',
+  topFabricantes: 'Fabricantes com maior movimentação (entradas + saídas) dentro do período.',
+  topCentros: 'Total de EPIs entregues por centro de serviço de acordo com as saídas filtradas.',
+  topSetores: 'Total de entregas por setor considerando as saídas filtradas.',
+  topPessoas: 'Colaboradores que mais receberam EPIs no período filtrado.',
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -63,6 +75,38 @@ function resolveCentroServicoDisplay(saida = {}) {
   return 'Nao informado'
 }
 
+function resolveSetorDisplay(saida = {}) {
+  const candidatos = [
+    saida.setorNome,
+    saida.setor,
+    saida.pessoa?.setor,
+    saida.pessoa?.centroServico,
+    saida.pessoa?.local,
+  ]
+  for (const candidato of candidatos) {
+    const texto = sanitizeDisplayText(candidato)
+    if (texto && !isLikelyUuid(texto)) {
+      return texto
+    }
+  }
+  return 'Nao informado'
+}
+
+function resolvePessoaDisplay(saida = {}) {
+  const candidatos = [
+    saida.pessoa?.nome,
+    saida.pessoaNome,
+    saida.nome,
+  ]
+  for (const candidato of candidatos) {
+    const texto = sanitizeDisplayText(candidato)
+    if (texto) {
+      return texto
+    }
+  }
+  return 'Nao informado'
+}
+
 function formatEstoqueMaterialLabel(item = {}) {
   const base = item.resumo || [item.nome, resolveFabricanteDisplay(item)].filter(Boolean).join(' | ')
   const partes = base.split('|').map((parte) => sanitizeDisplayText(parte)).filter(Boolean)
@@ -72,6 +116,41 @@ function formatEstoqueMaterialLabel(item = {}) {
   }
   return `${compacto.slice(0, 52)}...`
 }
+
+function ChartInfoButton({ infoKey, label }) {
+  const message = chartInfoMessages[infoKey]
+  if (!message) {
+    return null
+  }
+  return (
+    <button type="button" className="summary-tooltip dashboard-card__info" aria-label={label}>
+      <InfoIcon size={14} />
+      <span>{message}</span>
+    </button>
+  )
+}
+
+function ChartFilterBadge({ active, onClear }) {
+  if (!active) {
+    return null
+  }
+  return (
+    <button type="button" className="chart-filter-inline" onClick={onClear}>
+      <CancelIcon size={13} />
+      Limpar
+    </button>
+  )
+}
+
+function ChartContainer({ chartFilter, onClear, children }) {
+  return (
+    <div className="dashboard-chart-container">
+      <ChartFilterBadge active={Boolean(chartFilter)} onClear={onClear} />
+      {children}
+    </div>
+  )
+}
+
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -87,8 +166,18 @@ function formatPeriodoLabel(periodo) {
   return `${mes.padStart(2, '0')}/${ano}`
 }
 
+function normalizeSearchValue(value) {
+  const texto = sanitizeDisplayText(value)
+  if (!texto) {
+    return ''
+  }
+  const normalized =
+    typeof texto.normalize === 'function' ? texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : texto
+  return normalized.toLowerCase()
+}
+
 function normalizarTermo(termo) {
-  return termo ? termo.trim().toLowerCase() : ''
+  return normalizeSearchValue(termo)
 }
 
 function combinaComTermo(material = {}, termoNormalizado = '') {
@@ -102,10 +191,39 @@ function combinaComTermo(material = {}, termoNormalizado = '') {
     material.grupoMaterialNome,
     material.categoria,
   ]
-    .map((parte) => (parte ? String(parte).toLowerCase() : ''))
+    .map((parte) => normalizeSearchValue(parte))
     .filter(Boolean)
     .join(' ')
   return partes.includes(termoNormalizado)
+}
+
+function combinaSaidaComTermo(saida = {}, termoNormalizado = '') {
+  if (!termoNormalizado) return true
+  const campos = [
+    saida.nome,
+    saida.pessoa?.nome,
+    saida.pessoa?.matricula,
+    saida.pessoa?.cargo,
+    saida.pessoa?.centroServico,
+    saida.pessoa?.setor,
+    saida.pessoa?.local,
+    saida.pessoaNome,
+    saida.centroServico,
+    saida.centroServicoNome,
+    saida.setor,
+    saida.setorNome,
+    saida.local,
+    saida.material?.nome,
+    saida.material?.materialItemNome,
+    saida.material?.fabricante,
+    saida.material?.fabricanteNome,
+    saida.material?.resumo,
+    saida.material?.grupoMaterialNome,
+    saida.material?.grupoMaterial,
+    saida.material?.categoria,
+  ]
+  const corpus = campos.map((campo) => normalizeSearchValue(campo)).filter(Boolean).join(' ')
+  return corpus.includes(termoNormalizado)
 }
 
 function agruparPorPeriodo(entradas = [], saidas = []) {
@@ -154,55 +272,98 @@ function agruparPorPeriodo(entradas = [], saidas = []) {
 
 function filtrarPorTermo(lista = [], termoNormalizado) {
   if (!termoNormalizado) return lista
-  return lista.filter((item) => combinaComTermo(item.material, termoNormalizado))
+  return lista.filter((item) => {
+    if (
+      item?.pessoa ||
+      item?.pessoaId ||
+      item?.centroServico ||
+      item?.setor ||
+      item?.local ||
+      item?.pessoaNome
+    ) {
+      return combinaSaidaComTermo(item, termoNormalizado)
+    }
+    return combinaComTermo(item.material ?? item, termoNormalizado)
+  })
 }
 
-function montarEstoquePorMaterial(itens = [], termoNormalizado) {
-  return itens
-    .filter((item) => combinaComTermo(item, termoNormalizado))
-    .map((item) => ({
-      materialId: item.materialId,
-      nome: formatEstoqueMaterialLabel(item),
-      descricao: item.resumo || [item.nome, resolveFabricanteDisplay(item)].filter(Boolean).join(' | '),
-      filtro: item.nome || item.resumo || '',
-      quantidade: Number(item.quantidade ?? 0),
-    }))
+function montarTopMateriaisSaida(saidas = [], termoNormalizado) {
+  const materiais = new Map()
+  saidas.forEach((saida) => {
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const material = saida.material
+    if (!material) {
+      return
+    }
+    const nome = formatEstoqueMaterialLabel(material)
+    const chave = material.id || nome
+    const descricao = material.resumo || [material.nome, resolveFabricanteDisplay(material)].filter(Boolean).join(' | ')
+    const atual = materiais.get(chave) ?? {
+      materialId: material.id ?? chave,
+      nome,
+      descricao: descricao || nome,
+      filtro: nome,
+      quantidade: 0,
+    }
+    atual.quantidade += Number(saida.quantidade ?? 0)
+    materiais.set(chave, atual)
+  })
+  return Array.from(materiais.values())
+    .filter((item) => item.quantidade > 0)
     .sort((a, b) => b.quantidade - a.quantidade)
 }
 
-function montarCategorias(itens = [], termoNormalizado) {
+function montarTopCategoriasSaida(saidas = [], termoNormalizado) {
   const categorias = new Map()
-  itens.forEach((item) => {
-    if (!combinaComTermo(item, termoNormalizado)) return
-    const categoria = item.nome?.split(' ')[0] || 'Nao classificado'
-    const atual = categorias.get(categoria) ?? { categoria, quantidade: 0, filtro: categoria }
-    atual.quantidade += Number(item.quantidade ?? 0)
+  saidas.forEach((saida) => {
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const material = saida.material
+    const categoria =
+      material?.grupoMaterialNome ||
+      material?.grupoMaterial ||
+      material?.categoria ||
+      material?.grupo ||
+      'Nao classificado'
+    const atual = categorias.get(categoria) ?? {
+      categoria,
+      nome: categoria,
+      filtro: categoria,
+      quantidade: 0,
+    }
+    atual.quantidade += Number(saida.quantidade ?? 0)
     categorias.set(categoria, atual)
   })
-
-  return Array.from(categorias.values()).sort((a, b) => b.quantidade - a.quantidade)
+  return Array.from(categorias.values())
+    .filter((item) => item.quantidade > 0)
+    .sort((a, b) => b.quantidade - a.quantidade)
 }
 
-function montarRankingFabricantes(data = [], termoNormalizado) {
+function montarRankingFabricantes(saidas = [], termoNormalizado) {
   const fabricantes = new Map()
-  data
-    .filter((item) => combinaComTermo(item, termoNormalizado))
-    .forEach((item) => {
-      const nome = resolveFabricanteDisplay(item)
-      const chave = item.fabricante || nome || 'Nao informado'
-      const atual = fabricantes.get(chave) ?? {
-        id: chave,
-        nome,
-        descricao: nome,
-        filtro: nome,
-        quantidade: 0,
-      }
-      atual.nome = nome || atual.nome
-      atual.descricao = nome || atual.descricao
-      atual.filtro = nome || atual.filtro
-      atual.quantidade += Number(item.totalQuantidade ?? 0)
-      fabricantes.set(chave, atual)
-    })
+  saidas.forEach((saida) => {
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const material = saida.material ?? {}
+    const nome = resolveFabricanteDisplay(material)
+    const chave = material.fabricante || nome || 'Nao informado'
+    const atual = fabricantes.get(chave) ?? {
+      id: chave,
+      nome,
+      descricao: nome,
+      filtro: nome,
+      quantidade: 0,
+    }
+    atual.nome = nome || atual.nome
+    atual.descricao = nome || atual.descricao
+    atual.filtro = nome || atual.filtro
+    atual.quantidade += Number(saida.quantidade ?? 0)
+    fabricantes.set(chave, atual)
+  })
 
   return Array.from(fabricantes.values()).sort((a, b) => b.quantidade - a.quantidade)
 }
@@ -211,15 +372,11 @@ function montarTopCentrosServico(saidas = [], termoNormalizado) {
   const centros = new Map()
 
   saidas.forEach((saida) => {
-    const centroNome = resolveCentroServicoDisplay(saida)
-    const centroId = saida.centroServicoId || saida.setorId || centroNome
-    const materialMatch = combinaComTermo(saida.material ?? {}, termoNormalizado)
-    const centroMatch = termoNormalizado
-      ? centroNome.toLowerCase().includes(termoNormalizado)
-      : true
-    if (!materialMatch && !centroMatch) {
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
       return
     }
+    const centroNome = resolveCentroServicoDisplay(saida)
+    const centroId = saida.centroServicoId || saida.setorId || centroNome
     const atual = centros.get(centroId) ?? {
       id: centroId,
       nome: centroNome,
@@ -232,6 +389,52 @@ function montarTopCentrosServico(saidas = [], termoNormalizado) {
   })
 
   return Array.from(centros.values())
+    .filter((item) => item.quantidade > 0)
+    .sort((a, b) => b.quantidade - a.quantidade)
+}
+
+function montarTopSetores(saidas = [], termoNormalizado) {
+  const setores = new Map()
+  saidas.forEach((saida) => {
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const setorNome = resolveSetorDisplay(saida)
+    const setorId = saida.setorId || setorNome
+    const atual = setores.get(setorId) ?? {
+      id: setorId,
+      nome: setorNome,
+      descricao: setorNome,
+      filtro: setorNome,
+      quantidade: 0,
+    }
+    atual.quantidade += Number(saida.quantidade ?? 0)
+    setores.set(setorId, atual)
+  })
+  return Array.from(setores.values())
+    .filter((item) => item.quantidade > 0)
+    .sort((a, b) => b.quantidade - a.quantidade)
+}
+
+function montarTopPessoas(saidas = [], termoNormalizado) {
+  const pessoas = new Map()
+  saidas.forEach((saida) => {
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const pessoaNome = resolvePessoaDisplay(saida)
+    const pessoaId = saida.pessoaId || pessoaNome
+    const atual = pessoas.get(pessoaId) ?? {
+      id: pessoaId,
+      nome: pessoaNome,
+      descricao: pessoaNome,
+      filtro: pessoaNome,
+      quantidade: 0,
+    }
+    atual.quantidade += Number(saida.quantidade ?? 0)
+    pessoas.set(pessoaId, atual)
+  })
+  return Array.from(pessoas.values())
     .filter((item) => item.quantidade > 0)
     .sort((a, b) => b.quantidade - a.quantidade)
 }
@@ -286,21 +489,37 @@ export function DashboardPage() {
 
   const termoNormalizado = normalizarTermo(filters.termo)
 
+  const entradasDetalhadasFiltradas = useMemo(
+    () => filtrarPorTermo(data?.entradasDetalhadas ?? [], termoNormalizado),
+    [data, termoNormalizado]
+  )
+
+  const saidasDetalhadasFiltradas = useMemo(
+    () => filtrarPorTermo(data?.saidasDetalhadas ?? [], termoNormalizado),
+    [data, termoNormalizado]
+  )
+
+  const calcularQuantidadeTotal = (lista) =>
+    lista.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+  const calcularValorTotal = (lista) =>
+    lista.reduce(
+      (acc, item) => acc + Number(item.material?.valorUnitario ?? 0) * Number(item.quantidade ?? 0),
+      0
+    )
+
   const resumoEntradas = useMemo(() => ({
-    quantidade: data?.entradas?.quantidade ?? 0,
-    valor: data?.entradas?.valorTotal ?? 0,
-  }), [data])
+    quantidade: calcularQuantidadeTotal(entradasDetalhadasFiltradas),
+    valor: calcularValorTotal(entradasDetalhadasFiltradas),
+  }), [entradasDetalhadasFiltradas])
 
   const resumoSaidas = useMemo(() => ({
-    quantidade: data?.saidas?.quantidade ?? 0,
-    valor: data?.saidas?.valorTotal ?? 0,
-  }), [data])
+    quantidade: calcularQuantidadeTotal(saidasDetalhadasFiltradas),
+    valor: calcularValorTotal(saidasDetalhadasFiltradas),
+  }), [saidasDetalhadasFiltradas])
 
   const seriesHistorica = useMemo(() => {
-    const entradasDetalhadas = filtrarPorTermo(data?.entradasDetalhadas ?? [], termoNormalizado)
-    const saidasDetalhadas = filtrarPorTermo(data?.saidasDetalhadas ?? [], termoNormalizado)
-    return agruparPorPeriodo(entradasDetalhadas, saidasDetalhadas)
-  }, [data, termoNormalizado])
+    return agruparPorPeriodo(entradasDetalhadasFiltradas, saidasDetalhadasFiltradas)
+  }, [entradasDetalhadasFiltradas, saidasDetalhadasFiltradas])
 
   const valorMovimentadoSeries = useMemo(
     () => seriesHistorica.map(({ periodo, valorEntradas, valorSaidas }) => ({ periodo, valorEntradas, valorSaidas })),
@@ -308,23 +527,33 @@ export function DashboardPage() {
   )
 
   const estoquePorMaterial = useMemo(
-    () => montarEstoquePorMaterial(data?.estoqueAtual?.itens ?? [], termoNormalizado),
-    [data, termoNormalizado],
+    () => montarTopMateriaisSaida(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
   )
 
   const estoquePorCategoria = useMemo(
-    () => montarCategorias(data?.estoqueAtual?.itens ?? [], termoNormalizado),
-    [data, termoNormalizado],
+    () => montarTopCategoriasSaida(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
   )
 
   const rankingFabricantes = useMemo(
-    () => montarRankingFabricantes(data?.materiaisMaisMovimentados ?? [], termoNormalizado),
-    [data, termoNormalizado],
+    () => montarRankingFabricantes(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
   )
 
   const topCentrosServico = useMemo(
-    () => montarTopCentrosServico(data?.saidasDetalhadas ?? [], termoNormalizado),
-    [data, termoNormalizado],
+    () => montarTopCentrosServico(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
+  )
+
+  const topSetores = useMemo(
+    () => montarTopSetores(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
+  )
+
+  const topPessoas = useMemo(
+    () => montarTopPessoas(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
   )
 
   const estoquePorMaterialTop = useMemo(
@@ -340,6 +569,16 @@ export function DashboardPage() {
   const topCentrosServicoTop = useMemo(
     () => topCentrosServico.slice(0, 8),
     [topCentrosServico],
+  )
+
+  const topSetoresTop = useMemo(
+    () => topSetores.slice(0, 8),
+    [topSetores],
+  )
+
+  const topPessoasTop = useMemo(
+    () => topPessoas.slice(0, 8),
+    [topPessoas],
   )
 
   const totalMovimentacoes = resumoEntradas.quantidade + resumoSaidas.quantidade
@@ -372,10 +611,11 @@ export function DashboardPage() {
     },
     {
       id: 'estoque',
-      title: 'Itens em estoque',
-      value: totalItensEstoque,
-      helper: `${totalMateriais} materiais rastreados`,
-      tooltip: 'Quantidade atual disponivel em estoque (apos descontar as saidas).',
+      title: 'Em estoque / Saída',
+      value: `${totalItensEstoque} / ${resumoSaidas.quantidade}`,
+      helper: 'Disponivel agora / Saidas no periodo filtrado.',
+      tooltip:
+        'Mostra a quantidade fisica em estoque seguida do total de saidas registradas considerando os filtros aplicados.',
       icon: StockIcon,
       tone: 'purple',
     },
@@ -433,7 +673,7 @@ export function DashboardPage() {
       ),
     },
     estoqueMaterial: {
-      title: 'Estoque por material',
+      title: 'Top materiais',
       render: () => (
         <EstoquePorMaterialChart
           data={estoquePorMaterial}
@@ -443,7 +683,7 @@ export function DashboardPage() {
       ),
     },
     estoqueCategoria: {
-      title: 'Estoque por categoria',
+      title: 'Top categorias',
       render: () => (
         <EstoquePorCategoriaChart
           data={estoquePorCategoria}
@@ -472,7 +712,27 @@ export function DashboardPage() {
         />
       ),
     },
-  }), [seriesHistorica, valorMovimentadoSeries, estoquePorMaterial, estoquePorCategoria, rankingFabricantes, topCentrosServico])
+    topSetores: {
+      title: 'Top setores',
+      render: () => (
+        <EstoquePorMaterialChart
+          data={topSetores}
+          height={520}
+          onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'setor')}
+        />
+      ),
+    },
+    topPessoas: {
+      title: 'Top pessoas',
+      render: () => (
+        <EstoquePorMaterialChart
+          data={topPessoas}
+          height={520}
+          onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'pessoa')}
+        />
+      ),
+    },
+  }), [seriesHistorica, valorMovimentadoSeries, estoquePorMaterial, estoquePorCategoria, rankingFabricantes, topCentrosServico, topSetores, topPessoas])
 
   const activeChart = expandedChartId ? chartModalConfig[expandedChartId] : null
 
@@ -500,7 +760,7 @@ export function DashboardPage() {
           />
         </label>
         <label className="field">
-          <span>Material ou fabricante</span>
+          <span>Busca</span>
           <input
             name="termo"
             value={filters.termo}
@@ -517,15 +777,6 @@ export function DashboardPage() {
           </button>
         </div>
       </form>
-
-      {chartFilter ? (
-        <div className="chart-filter-indicator">
-          <span>Filtro aplicado: <strong>{chartFilter.value}</strong></span>
-          <button type="button" onClick={clearChartFilter}>
-            <CancelIcon size={14} /> Limpar
-          </button>
-        </div>
-      ) : null}
 
       {error ? <p className="feedback feedback--error">{error}</p> : null}
 
@@ -558,105 +809,165 @@ export function DashboardPage() {
       <div className="dashboard-grid dashboard-grid--two">
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
-            <h2 className="dashboard-card__title"><BarsIcon size={20} /> <span>Entradas x Saidas</span></h2>
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="entradas" label="Informacoes sobre o grafico Entradas x Saidas" />
+              <h2 className="dashboard-card__title"><BarsIcon size={20} /> <span>Entradas x Saidas</span></h2>
+            </div>
             <div className="dashboard-card__actions">
               <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('entradas')} aria-label="Expandir gráfico Entradas x Saidas">
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
-          <div className="dashboard-chart-container">
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EntradasSaidasChart data={seriesHistorica} labelFormatter={formatPeriodoLabel} />
-          </div>
+          </ChartContainer>
         </section>
 
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
-            <h2 className="dashboard-card__title"><RevenueIcon size={20} /> <span>Valor movimentado</span></h2>
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="valor" label="Informacoes sobre o grafico Valor movimentado" />
+              <h2 className="dashboard-card__title"><RevenueIcon size={20} /> <span>Valor movimentado</span></h2>
+            </div>
             <div className="dashboard-card__actions">
               <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('valor')} aria-label="Expandir gráfico Valor movimentado">
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
-          <div className="dashboard-chart-container">
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <ValorMovimentadoChart
               data={valorMovimentadoSeries}
               valueFormatter={formatCurrency}
             />
-          </div>
+          </ChartContainer>
         </section>
       </div>
 
       <div className="dashboard-grid dashboard-grid--two">
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
-            <h2 className="dashboard-card__title"><StockIcon size={20} /> <span>Estoque por material</span></h2>
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="estoqueMaterial" label="Informacoes sobre o grafico Top materiais" />
+              <h2 className="dashboard-card__title"><StockIcon size={20} /> <span>Top materiais</span></h2>
+            </div>
             <div className="dashboard-card__actions">
-              <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('estoqueMaterial')} aria-label="Expandir gráfico Estoque por material">
+              <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('estoqueMaterial')} aria-label="Expandir gráfico Top materiais">
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
-          <div className="dashboard-chart-container">
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EstoquePorMaterialChart
               data={estoquePorMaterialTop}
               onItemClick={(item) => handleChartSelect(item?.filtro || item?.descricao || item?.nome, 'material')}
             />
-          </div>
+          </ChartContainer>
         </section>
 
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
-            <h2 className="dashboard-card__title"><BarsIcon size={20} /> <span>Estoque por categoria</span></h2>
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="estoqueCategoria" label="Informacoes sobre o grafico Top categorias" />
+              <h2 className="dashboard-card__title"><BarsIcon size={20} /> <span>Top categorias</span></h2>
+            </div>
             <div className="dashboard-card__actions">
-              <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('estoqueCategoria')} aria-label="Expandir gráfico Estoque por categoria">
+              <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('estoqueCategoria')} aria-label="Expandir gráfico Top categorias">
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
-          <div className="dashboard-chart-container">
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EstoquePorCategoriaChart
               data={estoquePorCategoria}
-              onItemClick={(item) => handleChartSelect(item?.filtro || item?.categoria, 'categoria')}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome || item?.categoria, 'categoria')}
             />
-          </div>
+          </ChartContainer>
         </section>
       </div>
 
       <div className="dashboard-grid dashboard-grid--two">
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
-            <h2 className="dashboard-card__title"><TrendIcon size={20} /> <span>Top fabricantes</span></h2>
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="topFabricantes" label="Informacoes sobre o grafico Top fabricantes" />
+              <h2 className="dashboard-card__title"><TrendIcon size={20} /> <span>Top fabricantes</span></h2>
+            </div>
             <div className="dashboard-card__actions">
               <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('topFabricantes')} aria-label="Expandir gráfico Top fabricantes">
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
-          <div className="dashboard-chart-container">
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EstoquePorMaterialChart
               data={rankingFabricantesTop}
               onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'fabricante')}
             />
-          </div>
+          </ChartContainer>
         </section>
 
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
-            <h2 className="dashboard-card__title"><DashboardIcon size={20} /> <span>Top centro de serviços</span></h2>
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="topCentros" label="Informacoes sobre o grafico Top centro de servicos" />
+              <h2 className="dashboard-card__title"><DashboardIcon size={20} /> <span>Top centro de serviços</span></h2>
+            </div>
             <div className="dashboard-card__actions">
               <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('topCentros')} aria-label="Expandir gráfico Top centro de serviços">
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
-          <div className="dashboard-chart-container">
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EstoquePorMaterialChart
               data={topCentrosServicoTop}
               onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'centro')}
             />
-          </div>
+          </ChartContainer>
+        </section>
+      </div>
+
+      <div className="dashboard-grid dashboard-grid--two">
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
+          <header className="card__header dashboard-card__header">
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="topSetores" label="Informacoes sobre o grafico Top setores" />
+              <h2 className="dashboard-card__title"><BarsIcon size={20} /> <span>Top setores</span></h2>
+            </div>
+            <div className="dashboard-card__actions">
+              <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('topSetores')} aria-label="Expandir gráfico Top setores">
+                <ExpandIcon size={16} />
+              </button>
+            </div>
+          </header>
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
+            <EstoquePorMaterialChart
+              data={topSetoresTop}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'setor')}
+            />
+          </ChartContainer>
+        </section>
+
+        <section className="card dashboard-card--chart dashboard-card--chart-lg">
+          <header className="card__header dashboard-card__header">
+            <div className="dashboard-card__title-group">
+              <ChartInfoButton infoKey="topPessoas" label="Informacoes sobre o grafico Top pessoas" />
+              <h2 className="dashboard-card__title"><PersonIcon size={20} /> <span>Top pessoas</span></h2>
+            </div>
+            <div className="dashboard-card__actions">
+              <button type="button" className="dashboard-card__expand" onClick={() => openChartModal('topPessoas')} aria-label="Expandir gráfico Top pessoas">
+                <ExpandIcon size={16} />
+              </button>
+            </div>
+          </header>
+          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
+            <EstoquePorMaterialChart
+              data={topPessoasTop}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'pessoa')}
+            />
+          </ChartContainer>
         </section>
       </div>
 
@@ -670,10 +981,10 @@ export function DashboardPage() {
               </button>
             </header>
             <div className="chart-modal__body">
-              <div className="dashboard-chart-container">
-                {activeChart.render()}
-              </div>
-            </div>
+            <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
+              {activeChart.render()}
+            </ChartContainer>
+          </div>
           </div>
         </div>
       ) : null}

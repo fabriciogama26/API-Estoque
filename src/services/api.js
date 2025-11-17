@@ -1521,6 +1521,7 @@ function mapPessoaRecord(record) {
     nome: record.nome ?? '',
     matricula: record.matricula ?? '',
     centroServico,
+    local: resolveTextValue(record.local ?? centroServico),
     centroServicoId: record.centro_servico_id ?? centroServicoRel?.id ?? null,
     setor,
     setorId: record.setor_id ?? setorRel?.id ?? null,
@@ -1639,6 +1640,9 @@ function mapSaidaRecord(record) {
     centroServico: resolveTextValue(
       record.centroServicoNome ?? record.centroServico ?? record.centro_servico ?? ''
     ),
+    setorId: record.setorId ?? record.setor_id ?? null,
+    setor: resolveTextValue(record.setorNome ?? record.setor ?? ''),
+    local: resolveTextValue(record.local ?? ''),
     dataEntrega: record.dataEntrega ?? record.data_entrega ?? null,
     dataTroca: record.dataTroca ?? record.data_troca ?? null,
     statusId,
@@ -2381,6 +2385,74 @@ async function preencherCentrosCustoSaidas(registros = []) {
   }
 }
 
+function toAsciiLower(value) {
+  if (value === undefined || value === null) {
+    return ''
+  }
+  let texto = String(value)
+  if (typeof texto.normalize === 'function') {
+    texto = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  }
+  return texto.toLowerCase()
+}
+
+function precisaResolverCentroServico(saida) {
+  if (!saida) {
+    return false
+  }
+  const texto = resolveTextValue(saida.centroServico ?? '')
+  if (!texto) {
+    return true
+  }
+  if (isUuidValue(texto)) {
+    return true
+  }
+  return toAsciiLower(texto) === 'nao informado'
+}
+
+async function preencherCentrosServicoSaidas(registros = []) {
+  const candidatos = (registros ?? []).filter((saida) => precisaResolverCentroServico(saida))
+  if (!candidatos.length) {
+    return registros
+  }
+  const pessoaIds = Array.from(new Set(candidatos.map((saida) => saida.pessoaId).filter(Boolean)))
+  if (!pessoaIds.length) {
+    return registros
+  }
+  try {
+    const detalhes = await carregarPessoasViewDetalhes(pessoaIds)
+    if (!detalhes.size) {
+      return registros
+    }
+    return (registros ?? []).map((saida) => {
+      if (!precisaResolverCentroServico(saida)) {
+        return saida
+      }
+      const detalhe = detalhes.get(saida.pessoaId)
+      if (!detalhe) {
+        return saida
+      }
+      const centroNome = resolveTextValue(detalhe.centroServico ?? detalhe.local ?? detalhe.setor ?? '')
+      const setorNome = resolveTextValue(detalhe.setor ?? detalhe.centroServico ?? detalhe.local ?? '')
+      const localNome = resolveTextValue(detalhe.local ?? detalhe.centroServico ?? setorNome ?? '')
+      if (!centroNome && !setorNome && !localNome) {
+        return saida
+      }
+      return {
+        ...saida,
+        centroServico: centroNome || saida.centroServico,
+        centroServicoId: saida.centroServicoId || detalhe.centroServicoId || null,
+        setor: setorNome || saida.setor || '',
+        setorId: saida.setorId || detalhe.setorId || null,
+        local: localNome || saida.local || centroNome || setorNome || '',
+      }
+    })
+  } catch (error) {
+    console.warn('Nao foi possivel resolver centros de servico das saidas.', error)
+    return registros
+  }
+}
+
 async function carregarSaidas(params = {}) {
   let query = supabase
     .from('saidas')
@@ -2439,6 +2511,7 @@ async function carregarSaidas(params = {}) {
   registros = await preencherUsuariosResponsaveis(registros)
   registros = await preencherStatusSaida(registros)
   registros = await preencherCentrosCustoSaidas(registros)
+  registros = await preencherCentrosServicoSaidas(registros)
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
@@ -3529,12 +3602,14 @@ export const api = {
     },
     async dashboard(params = {}) {
       const periodo = parsePeriodo(params)
-      const [materiais, entradas, saidas, pessoas] = await Promise.all([
+      const [materiais, entradas, saidas] = await Promise.all([
         carregarMateriais(),
         carregarEntradas(params),
         carregarSaidas(params),
-        carregarPessoas(),
       ])
+      const pessoaIds = Array.from(new Set(saidas.map((saida) => saida.pessoaId).filter(Boolean)))
+      const pessoasDetalhes = pessoaIds.length ? await carregarPessoasViewDetalhes(pessoaIds) : new Map()
+      const pessoas = Array.from(pessoasDetalhes.values())
       return montarDashboard({ materiais, entradas, saidas, pessoas }, periodo)
     },
   },
@@ -4180,43 +4255,16 @@ async function carregarPessoasViewDetalhes(ids) {
   }
   try {
     const registros = await execute(
-      supabase
-        .from('pessoas_view')
-        .select(
-          `
-            id,
-            centro_servico_id,
-            centro_servico,
-            setor_id,
-            setor,
-            cargo_id,
-            cargo,
-            centro_custo_id,
-            centro_custo,
-            tipo_execucao_id,
-            tipo_execucao
-          `
-        )
-        .in('id', selecionados),
+      buildPessoasViewQuery().in('id', selecionados),
       'Falha ao consultar pessoas_view.'
     )
     const mapa = new Map()
     ;(registros ?? []).forEach((registro) => {
-      if (!registro?.id) {
+      const pessoa = mapPessoaRecord(registro)
+      if (!pessoa?.id) {
         return
       }
-      mapa.set(registro.id, {
-        centroServicoId: registro.centro_servico_id ?? null,
-        centroServico: resolveTextValue(registro.centro_servico ?? ''),
-        setorId: registro.setor_id ?? null,
-        setor: resolveTextValue(registro.setor ?? ''),
-        cargoId: registro.cargo_id ?? null,
-        cargo: resolveTextValue(registro.cargo ?? ''),
-        centroCustoId: registro.centro_custo_id ?? null,
-        centroCusto: resolveTextValue(registro.centro_custo ?? ''),
-        tipoExecucaoId: registro.tipo_execucao_id ?? null,
-        tipoExecucao: resolveTextValue(registro.tipo_execucao ?? ''),
-      })
+      mapa.set(pessoa.id, pessoa)
     })
     return mapa
   } catch (error) {
