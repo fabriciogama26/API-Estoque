@@ -19,7 +19,7 @@ Filtros suportados
 
 Componentes visuais
 -------------------
-- **DashboardCards:** mostra totais (acidentes, taxa de frequência/gravidade, dias perdidos) calculados via `resolveIndicadorValor` a partir do resumo normalizado.【F:src/pages/DashboardAcidentes.jsx†L174-L193】
+- **DashboardCards:** mostra totais (acidentes, taxa de frequência/gravidade, dias perdidos) calculados via `resolveIndicadorValor` a partir do resumo normalizado e uma segunda fileira com IA, IAG e IRA (valores entregues pela view). Os cartões de TF/TG agora exibem badges com a classificação da OIT.【F:src/pages/DashboardAcidentes.jsx†L174-L193】【F:src/components/DashboardCards.jsx†L1-L210】
 - **ChartTendencia:** curva temporal (por mês) usando `tendencia`.
 - **ChartTipos / ChartAgentes / ChartPartesLesionadas / ChartCargos:** gráficos de barras/pizza para distribuições categóricas. Esses componentes tratam dados vazios exibindo mensagens neutras.
 - **ChartLesoes:** barras horizontais que exibem a frequência das lesões principais registradas (campo `lesoes`), seguindo o mesmo estilo do cartão de partes lesionadas.【F:src/components/charts/ChartLesoes.jsx†L1-L66】
@@ -28,7 +28,7 @@ Componentes visuais
 Erros e pré-requisitos
 ----------------------
 - Quando `VITE_SUPABASE_URL` ou `VITE_SUPABASE_ANON_KEY` não estão configuradas e o modo não é local, a tela mostra erro orientando a configurar Supabase antes de prosseguir.【F:src/pages/DashboardAcidentes.jsx†L60-L96】
-- Certifique-se de criar/atualizar a view `vw_indicadores_acidentes` durante as migrations — o dashboard espera colunas agregadas compatíveis (ver `supabase/migrations/0023_*.sql` em diante).
+- Certifique-se de criar/atualizar a view `vw_indicadores_acidentes` durante as migrations — o dashboard espera colunas agregadas compatíveis (ver `supabase/migrations/0023_*.sql` em diante). Além das taxas clássicas, a view precisa expor `dias_debitados`, `total_trabalhadores`, `indice_acidentados`, `indice_avaliacao_gravidade` e `indice_relativo_acidentes`.
 - Seeds locais devem incluir exemplos em `localApi.acidentes.dashboard` para manter os gráficos populados durante desenvolvimento offline.
 
 

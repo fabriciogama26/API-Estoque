@@ -43,7 +43,7 @@ supabase/
     └── 0027_expand_material_history.sql            # Campos adicionais no histórico de materiais
 ```
 
-As migrations foram escritas para serem idempotentes sempre que possível. Mesmo assim, mantenha o versionamento da CLI em dia para garantir a execução na ordem correta.
+As migrations foram escritas para serem idempotentes sempre que possível. Mesmo assim, mantenha o versionamento da CLI em dia para garantir a execução na ordem correta. A tabela `public.app_users` foi simplificada: o `id` agora coincide com o UUID de `auth.users` (com FKs e RLS ajustados) e campos extras (`email`, `ativo`) foram adicionados para suportar o cartão *Status do sistema*.
 
 ## Como aplicar localmente
 
@@ -85,7 +85,7 @@ As migrations foram escritas para serem idempotentes sempre que possível. Mesmo
 ## Checklist rápido após rodar as migrations
 
 - [ ] Todas as tabelas essenciais existem e possuem RLS habilitado (verifique com `select * from pg_policies where schemaname = 'public';`).
-- [ ] Views `vw_indicadores_acidentes` e demais estruturas de suporte estão alinhadas com os dashboards (quando aplicável).
+- [ ] Views `vw_indicadores_acidentes` e demais estruturas de suporte estão alinhadas com os dashboards (quando aplicável). A view precisa expor `indice_acidentados`, `indice_avaliacao_gravidade`, `indice_relativo_acidentes`, `dias_debitados` e `total_trabalhadores` além das taxas tradicionais.
 - [ ] Tabelas de referência (`centros_servico`, `setores`, `cargos`, `centros_custo`, `tipo_execucao`, `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`) possuem dados mínimos para alimentar os formulários.
 - [ ] Usuários de teste foram criados no Supabase Auth e conseguem autenticar no frontend.
 - [ ] Seeds locais carregaram corretamente (caso esteja rodando o modo `local`).

@@ -15,7 +15,7 @@ create policy "app_users service role" on public.app_users
 create policy "app_users read own" on public.app_users
   for select using (
     auth.role() = 'authenticated' and
-    auth.uid() = auth_user_id
+    auth.uid() = id
   );
 
 create policy "materiais select" on public.materiais

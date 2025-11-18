@@ -13,7 +13,7 @@ Pré-requisitos
 
 Tabelas principais
 ------------------
-- **app_users**: mapeia usuários do Auth (`auth_user_id`, `username`, `display_name`). Opcional para perfis internos.【F:supabase/README.md†L12-L55】
+- **app_users**: mapeia usuários do Auth (`id` = mesmo UUID de `auth.users`, `username`, `display_name`). Opcional para perfis internos.【F:supabase/README.md†L12-L55】
 - **pessoas + pessoas_historico**: dados cadastrais (centro de serviço, cargo, setor, tipo de execução, datas) e auditoria de mudanças.【F:supabase/README.md†L12-L55】
 - **materiais + material_price_history**: cadastro de EPIs com estoque mínimo, CA, valor unitário e histórico de preço.【F:supabase/README.md†L12-L55】
 - **entradas / saidas**: movimentação de estoque com campos de auditoria (`usuarioResponsavel`, datas).【F:supabase/README.md†L12-L55】

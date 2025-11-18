@@ -4,12 +4,16 @@
 create extension if not exists pgcrypto;
 
 create table if not exists public.app_users (
-  id uuid primary key default gen_random_uuid(),
-  auth_user_id uuid unique,
-  username text not null unique,
+  id uuid not null default gen_random_uuid(),
+  username text not null,
   display_name text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  email text,
+  ativo boolean default true,
+  constraint app_users_pkey primary key (id),
+  constraint app_users_id_fkey foreign key (id) references auth.users (id),
+  constraint app_users_username_key unique (username)
 );
 
 create table if not exists public.materiais (
