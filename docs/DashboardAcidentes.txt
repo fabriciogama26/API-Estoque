@@ -22,6 +22,7 @@ Componentes visuais
 - **DashboardCards:** mostra totais (acidentes, taxa de frequência/gravidade, dias perdidos) calculados via `resolveIndicadorValor` a partir do resumo normalizado.【F:src/pages/DashboardAcidentes.jsx†L174-L193】
 - **ChartTendencia:** curva temporal (por mês) usando `tendencia`.
 - **ChartTipos / ChartAgentes / ChartPartesLesionadas / ChartCargos:** gráficos de barras/pizza para distribuições categóricas. Esses componentes tratam dados vazios exibindo mensagens neutras.
+- **ChartLesoes:** barras horizontais que exibem a frequência das lesões principais registradas (campo `lesoes`), seguindo o mesmo estilo do cartão de partes lesionadas.【F:src/components/charts/ChartLesoes.jsx†L1-L66】
 - **FiltrosDashboard:** exibe selects dinâmicos conforme opções disponíveis (modo local). No modo remoto as listas permanecem vazias e os selects padrão exibem somente “todas”.【F:src/pages/DashboardAcidentes.jsx†L1-L32】【F:src/components/FiltrosDashboard.jsx†L1-L104】
 
 Erros e pré-requisitos

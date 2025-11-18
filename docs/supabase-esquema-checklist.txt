@@ -28,7 +28,7 @@ Tabelas de referência
 
 Views e suportes
 ----------------
-- `vw_indicadores_acidentes`: alimenta o dashboard de acidentes (resumo, tendência, distribuições por tipo/agente/cargo/parte). Certifique-se de atualizar ao alterar o schema.【F:src/pages/DashboardAcidentes.jsx†L81-L152】
+- `vw_indicadores_acidentes`: alimenta o dashboard de acidentes (resumo, tendência e distribuições por tipo/agente/cargo/parte/lesão). Certifique-se de atualizar ao alterar o schema.【F:src/pages/DashboardAcidentes.jsx†L81-L229】
 - Outras views podem ser adicionadas para relatórios, desde que respeitem RLS.
 
 Checklist de validação

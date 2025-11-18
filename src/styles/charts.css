@@ -121,6 +121,12 @@
   padding-top: 2.5rem;
 }
 
+.dashboard-chart-container--simple {
+  padding-top: 0;
+  align-items: center;
+  justify-content: center;
+}
+
 .chart-filter-inline {
   position: absolute;
   top: 0.5rem;

@@ -396,12 +396,20 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
   const totalAcidentes = listaFiltrada.length
   const diasPerdidos = listaFiltrada.reduce((total, acidente) => total + toNumber(acidente?.diasPerdidos), 0)
   const hhtTotal = listaFiltrada.reduce((total, acidente) => total + toNumber(acidente?.hht), 0)
+  const totalAcidentesComAfastamento = listaFiltrada.filter((acidente) => toNumber(acidente?.diasPerdidos) > 0).length
+  const totalAcidentesSemAfastamento = listaFiltrada.filter((acidente) => toNumber(acidente?.diasPerdidos) === 0).length
 
   const resumo = {
     total_acidentes: totalAcidentes,
+    total_acidentes_afastamento: totalAcidentesComAfastamento,
+    total_acidentes_sem_afastamento: totalAcidentesSemAfastamento,
     dias_perdidos: diasPerdidos,
     hht_total: hhtTotal,
     taxa_frequencia: hhtTotal > 0 ? Number(((totalAcidentes * TAXA_BASE) / hhtTotal).toFixed(2)) : 0,
+    taxa_frequencia_afastamento:
+      hhtTotal > 0 ? Number(((totalAcidentesComAfastamento * TAXA_BASE) / hhtTotal).toFixed(2)) : 0,
+    taxa_frequencia_sem_afastamento:
+      hhtTotal > 0 ? Number(((totalAcidentesSemAfastamento * TAXA_BASE) / hhtTotal).toFixed(2)) : 0,
     taxa_gravidade: hhtTotal > 0 ? Number(((diasPerdidos * TAXA_BASE) / hhtTotal).toFixed(2)) : 0,
     periodo_label: buildPeriodoLabel(periodoInicio, periodoFim),
   }
@@ -423,6 +431,14 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     parte_lesionada: item.label,
     total: item.total,
   }))
+  const lesoes = distribuirPorChave(
+    listaFiltrada,
+    (item) => item?.lesoes ?? (item?.lesao ? [item.lesao] : []),
+    'Nao informado'
+  ).map((item) => ({
+    lesao: item.label,
+    total: item.total,
+  }))
   const cargos = distribuirPorChave(listaFiltrada, (item) => item?.cargo, 'Nao informado').map((item) => ({
     cargo: item.label,
     total: item.total,
@@ -441,6 +457,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     tendencia,
     tipos,
     partesLesionadas,
+    lesoes,
     cargos,
     agentes,
     options: availableOptions,
