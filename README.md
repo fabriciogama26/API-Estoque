@@ -14,6 +14,8 @@ Aplicação completa para controle de EPIs, construída com React (Vite) e integ
 - **Gráficos interativos:** cada widget do dashboard ganhou botão de expandir (`ExpandIcon`) e modal fullscreen com clique fora/`Esc` para fechar.
 - **Filtros contextuais:** cliques nos gráficos de material, categoria, fabricante e centro de serviços preenchem automaticamente o campo de busca (`chartFilter` + badge visual), afetando todas as demais telas.
 - **Legibilidade aprimorada:** labels utilizam `formatEstoqueMaterialLabel`, tooltips exibem a descrição completa e a tipografia dos eixos Y foi reduzida para evitar sobreposição.
+- **Indicadores SST atualizados:** o dashboard de acidentes agora traz as referências da OIT em badges (TF/TG) e uma segunda fileira com IA, IAG e IRA – os valores chegam da view `vw_indicadores_acidentes`.
+- **Status do sistema refinado:** o cartão do usuário passa a mostrar o `display_name` sincronizado com `app_users`, evitando exibir o e-mail truncado quando o perfil já está cadastrado no banco.
 
 ## Arquitetura
 
@@ -55,6 +57,8 @@ Crie um arquivo `.env.local` na raiz com as chaves necessárias:
 | `VITE_LOCAL_PASSWORD` | Senha do modo local (opcional, padrão `admin123`). |
 | `VITE_LOCAL_DISPLAY_NAME` | Nome exibido para o usuário local (opcional). |
 | `VITE_TERMO_EPI_EMPRESA_*` | Metadados opcionais do termo de EPI (nome, documento, endereço, contato e URLs de logos). |
+
+> Para exibir corretamente o nome no cartão *Status do sistema*, mantenha a tabela `public.app_users` sincronizada com o Supabase Auth: crie um registro usando o mesmo UUID (`id`) retornado para o usuário e preencha `username`, `display_name` (e opcionalmente `email`). O componente busca esse dado automaticamente.
 
 ### Variáveis de ambiente (funções opcionais)
 

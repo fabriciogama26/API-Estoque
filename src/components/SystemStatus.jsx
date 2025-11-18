@@ -67,8 +67,90 @@ function useSystemHealth() {
 export function SystemStatus({ className = '' }) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const [userProfile, setUserProfile] = useState(null)
   const health = useSystemHealth()
   const { state, message } = health
+
+  useEffect(() => {
+    if (!user?.id || isLocalMode || !supabase) {
+      setUserProfile(null)
+      return
+    }
+
+    let active = true
+    const loadProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_users')
+          .select('display_name, username, email')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (!active) {
+          return
+        }
+
+        if (error && error.code !== 'PGRST116') {
+          throw error
+        }
+
+        let resolvedProfile = data || null
+
+        if (!resolvedProfile) {
+          const candidates = []
+          if (user?.metadata?.username) {
+            candidates.push(String(user.metadata.username).trim())
+          }
+          if (user?.email) {
+            const email = String(user.email).trim()
+            candidates.push(email)
+            if (email.includes('@')) {
+              candidates.push(email.split('@')[0])
+            }
+          }
+
+          for (const candidate of candidates.filter(Boolean)) {
+            const identifier = candidate.trim()
+            if (!identifier) {
+              continue
+            }
+
+            const fetchProfile = async (column) => {
+              const { data: fallbackProfile, error: fallbackError } = await supabase
+                .from('app_users')
+                .select('display_name, username, email')
+                .ilike(column, identifier)
+                .maybeSingle()
+
+              if (fallbackError && fallbackError.code !== 'PGRST116') {
+                throw fallbackError
+              }
+
+              return fallbackProfile || null
+            }
+
+            resolvedProfile = (await fetchProfile('username')) || (await fetchProfile('email'))
+            if (resolvedProfile) {
+              break
+            }
+          }
+        }
+
+        setUserProfile(resolvedProfile)
+      } catch (err) {
+        console.warn('Falha ao carregar perfil do usuario', err)
+        if (active) {
+          setUserProfile(null)
+        }
+      }
+    }
+
+    loadProfile()
+
+    return () => {
+      active = false
+    }
+  }, [user?.id])
 
   const version = useMemo(() => {
     const value = import.meta.env.VITE_APP_VERSION || appInfo.version || '0.0.0'
@@ -85,7 +167,14 @@ export function SystemStatus({ className = '' }) {
     state === 'online' ? 'Online' : state === 'offline' ? 'Offline' : 'Desconhecido'
   const indicatorTitle = message ? `${statusLabel} - ${message}` : statusLabel
 
-  const displayName = user?.name || user?.metadata?.nome || user?.email || 'Usuario'
+  const displayName =
+    userProfile?.display_name ||
+    userProfile?.username ||
+    user?.name ||
+    user?.metadata?.nome ||
+    user?.metadata?.display_name ||
+    user?.email ||
+    'Usuario'
   const roleLabel = user?.role || user?.metadata?.cargo || 'Admin'
 
   const handleLogout = async () => {

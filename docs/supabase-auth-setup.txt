@@ -25,7 +25,7 @@ Passo a passo de configuração
    - Políticas padrão permitem leitura para `authenticated` e escrita controlada; ajuste conforme perfis seguindo [`docs/rls-policies-guide.txt`](rls-policies-guide.txt).
    - Caso use claims customizadas (ex.: `is_admin`), crie migrations adicionais para aplicar políticas específicas.
 5. **Usuários de teste**
-   - Cadastre contas em *Authentication > Users* ou via CLI (`supabase auth signups start`). Para vincular à tabela `app_users`, insira registros com `auth_user_id = user.id` retornado pelo Supabase.
+   - Cadastre contas em *Authentication > Users* ou via CLI (`supabase auth signups start`). Para vincular à tabela `app_users`, crie um registro usando o mesmo UUID (`id`) retornado pelo Supabase para o usuário e preencha `username`/`display_name`.
 6. **Desenvolvimento local**
    - `supabase start` + `supabase db reset` reproduzem o stack local (requer Docker). Sincronize variáveis com `supabase env pull/push` quando necessário.【F:supabase/README.md†L57-L102】
 7. **Recuperação de senha**

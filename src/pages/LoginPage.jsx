@@ -86,7 +86,7 @@ export function LoginPage() {
         </div>
 
         <header className="login-auth-card__titles">
-          <p className="login-auth-card__subtitle">Bem-vindo de volta. Acesse o sistema para registrar entrega ou devolucao de EPI.</p>
+          <p className="login-auth-card__subtitle">Bem-vindo de volta.</p>
         </header>
 
         <label className="field login-field--panel">
@@ -140,7 +140,9 @@ export function LoginPage() {
         </button>
 
         <footer className="login-auth-card__footer">
-          <p>Seu EPI é sua proteção. Registre corretamente cada movimentação.</p>
+          <p className="login-auth-card__footer-text">
+            Seu EPI é sua proteção. Registre corretamente cada movimentação.
+          </p>
         </footer>
       </form>
     </div>
