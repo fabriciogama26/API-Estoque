@@ -35,7 +35,7 @@ CustomTooltip.propTypes = {
   payload: PropTypes.array,
 }
 
-export function ChartAgentes({ data, nameKey, valueKey }) {
+export function ChartAgentes({ data, nameKey, valueKey, height }) {
   if (!Array.isArray(data) || data.length === 0) {
     return <div className="dashboard-card__empty">Nenhum dado disponivel</div>
   }
@@ -52,12 +52,13 @@ export function ChartAgentes({ data, nameKey, valueKey }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
+    <ResponsiveContainer width="100%" height={height}>
       <PieChart>
         <Pie
           data={sanitizedData}
           dataKey={valueKey}
           nameKey={nameKey}
+          innerRadius={70}
           outerRadius={120}
           paddingAngle={4}
           strokeWidth={0}
@@ -83,10 +84,12 @@ ChartAgentes.propTypes = {
   data: PropTypes.arrayOf(PropTypes.object),
   nameKey: PropTypes.string,
   valueKey: PropTypes.string,
+  height: PropTypes.number,
 }
 
 ChartAgentes.defaultProps = {
   data: [],
   nameKey: 'agente',
   valueKey: 'total',
+  height: 320,
 }

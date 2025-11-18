@@ -37,58 +37,53 @@ CustomTooltip.propTypes = {
   label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 }
 
-export function ChartCargos({ data, nameKey, valueKey, height }) {
+export function ChartLesoes({ data, nameKey, valueKey, height }) {
   if (!Array.isArray(data) || data.length === 0) {
     return <div className="dashboard-card__empty">Nenhum dado disponivel</div>
   }
 
-  const sanitizedData = data.map((item) => ({
-    ...item,
-    [valueKey]: Number.parseFloat(item?.[valueKey] ?? 0) || 0,
-  }))
-
-  const possuiValores = sanitizedData.some((item) => item[valueKey] > 0)
-  if (!possuiValores) {
-    return <div className="dashboard-card__empty">Nenhum dado disponivel para os filtros escolhidos</div>
-  }
+  const sortedData = data
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={sanitizedData} margin={{ top: 16, right: 16, left: 16, bottom: 24 }}>
-        <CartesianGrid stroke="rgba(148, 163, 184, 0.2)" vertical={false} />
+      <BarChart
+        data={sortedData}
+        layout="vertical"
+        margin={{ top: 16, right: 24, left: 80, bottom: 16 }}
+      >
+        <CartesianGrid stroke="rgba(148, 163, 184, 0.2)" horizontal={false} />
         <XAxis
-          dataKey={nameKey}
-          tick={{ fill: '#475569', fontSize: 11 }}
-          axisLine={false}
-          tickLine={false}
-          interval={0}
-          angle={-12}
-          textAnchor="end"
-          height={60}
-        />
-        <YAxis
+          type="number"
           tickFormatter={(value) => valueFormatter.format(value ?? 0)}
           tick={{ fill: '#64748b', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
         />
+        <YAxis
+          type="category"
+          dataKey={nameKey}
+          tick={{ fill: '#475569', fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          width={160}
+        />
         <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey={valueKey} name="Total" fill="#0ea5e9" radius={[8, 8, 0, 0]} minPointSize={6} />
+        <Bar dataKey={valueKey} name="Total" fill="#f97316" radius={[0, 8, 8, 0]} barSize={18} />
       </BarChart>
     </ResponsiveContainer>
   )
 }
 
-ChartCargos.propTypes = {
+ChartLesoes.propTypes = {
   data: PropTypes.arrayOf(PropTypes.object),
   nameKey: PropTypes.string,
   valueKey: PropTypes.string,
   height: PropTypes.number,
 }
 
-ChartCargos.defaultProps = {
+ChartLesoes.defaultProps = {
   data: [],
-  nameKey: 'cargo',
+  nameKey: 'lesao',
   valueKey: 'total',
   height: 360,
 }

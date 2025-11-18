@@ -50,6 +50,7 @@ export function ChartTendencia({
   acidentesKey,
   tfKey,
   tgKey,
+  height,
 }) {
   if (!Array.isArray(data) || data.length === 0) {
     return <div className="dashboard-card__empty">Nenhum dado disponível</div>
@@ -62,14 +63,20 @@ export function ChartTendencia({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={360}>
-      <LineChart data={data} margin={{ top: 12, right: 32, left: 12, bottom: 12 }}>
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data} margin={{ top: 12, right: 20, left: 12, bottom: 12 }}>
         <CartesianGrid stroke="rgba(148, 163, 184, 0.2)" strokeDasharray="4 4" />
-        <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fill: '#64748b' }} tickFormatter={formatPeriodoLabel} />
+        <XAxis
+          dataKey={xKey}
+          tickLine={false}
+          axisLine={false}
+          tick={{ fill: '#64748b', fontSize: 11 }}
+          tickFormatter={formatPeriodoLabel}
+        />
         <YAxis
           yAxisId="left"
           tickFormatter={(value) => accidentsFormatter.format(value ?? 0)}
-          tick={{ fill: '#64748b' }}
+          tick={{ fill: '#64748b', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
         />
@@ -77,9 +84,10 @@ export function ChartTendencia({
           yAxisId="right"
           orientation="right"
           tickFormatter={(value) => rateFormatter.format(value ?? 0)}
-          tick={{ fill: '#64748b' }}
+          tick={{ fill: '#64748b', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
+          width={90}
         />
         <Tooltip content={<CustomTooltip formatters={formatterMap} />} />
         <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ color: '#475569' }} />
@@ -121,6 +129,7 @@ ChartTendencia.propTypes = {
   acidentesKey: PropTypes.string,
   tfKey: PropTypes.string,
   tgKey: PropTypes.string,
+  height: PropTypes.number,
 }
 
 ChartTendencia.defaultProps = {
@@ -129,4 +138,5 @@ ChartTendencia.defaultProps = {
   acidentesKey: 'total_acidentes',
   tfKey: 'taxa_frequencia',
   tgKey: 'taxa_gravidade',
+  height: 360,
 }

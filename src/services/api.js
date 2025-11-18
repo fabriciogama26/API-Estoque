@@ -4070,7 +4070,7 @@ export const api = {
       })
     },
 
-async dashboard(params = {}) {
+    async dashboard(params = {}) {
       const acidentes = await carregarAcidentes()
       return montarDashboardAcidentes(acidentes, params)
     },

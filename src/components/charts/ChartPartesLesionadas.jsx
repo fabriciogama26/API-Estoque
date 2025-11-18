@@ -37,15 +37,15 @@ CustomTooltip.propTypes = {
   label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 }
 
-export function ChartPartesLesionadas({ data, nameKey, valueKey }) {
+export function ChartPartesLesionadas({ data, nameKey, valueKey, height }) {
   if (!Array.isArray(data) || data.length === 0) {
-    return <div className="dashboard-card__empty">Nenhum dado disponível</div>
+    return <div className="dashboard-card__empty">Nenhum dado disponivel</div>
   }
 
   const sortedData = data
 
   return (
-    <ResponsiveContainer width="100%" height={360}>
+    <ResponsiveContainer width="100%" height={height}>
       <BarChart
         data={sortedData}
         layout="vertical"
@@ -55,11 +55,18 @@ export function ChartPartesLesionadas({ data, nameKey, valueKey }) {
         <XAxis
           type="number"
           tickFormatter={(value) => valueFormatter.format(value ?? 0)}
-          tick={{ fill: '#64748b' }}
+          tick={{ fill: '#64748b', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
         />
-        <YAxis type="category" dataKey={nameKey} tick={{ fill: '#475569' }} axisLine={false} tickLine={false} />
+        <YAxis
+          type="category"
+          dataKey={nameKey}
+          tick={{ fill: '#475569', fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          width={140}
+        />
         <Tooltip content={<CustomTooltip />} />
         <Bar dataKey={valueKey} name="Total" fill="#2563eb" radius={[0, 8, 8, 0]} barSize={18} />
       </BarChart>
@@ -71,10 +78,12 @@ ChartPartesLesionadas.propTypes = {
   data: PropTypes.arrayOf(PropTypes.object),
   nameKey: PropTypes.string,
   valueKey: PropTypes.string,
+  height: PropTypes.number,
 }
 
 ChartPartesLesionadas.defaultProps = {
   data: [],
   nameKey: 'parte_lesionada',
   valueKey: 'total',
+  height: 360,
 }

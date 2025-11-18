@@ -5,6 +5,7 @@ import { PessoasForm } from '../components/Pessoas/PessoasForm.jsx'
 import { PessoasFilters } from '../components/Pessoas/PessoasFilters.jsx'
 import { PessoasTable } from '../components/Pessoas/PessoasTable.jsx'
 import { PessoasHistoryModal } from '../components/Pessoas/PessoasHistoryModal.jsx'
+import { PessoasResumoCards } from '../components/PessoasResumoCards.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { dataClient as api } from '../services/dataClient.js'
 import {
@@ -388,6 +389,12 @@ export function PessoasPage() {
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}
         onClear={handleFilterClear}
+      />
+
+      <PessoasResumoCards
+        pessoas={pessoas}
+        selectedCentro={filters.centroServico ?? filters.local ?? ''}
+        selectedSetor={filters.setor ?? ''}
       />
 
       <section className="card">

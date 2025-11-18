@@ -14,7 +14,8 @@ Formulário
 
 Filtros e listagem
 ------------------
-- Filtros por termo, centro de serviço, cargo, setor e tipo de execução. Botões “Aplicar” e “Limpar” recompõem a listagem através de `loadPessoas`.
+- Dois cartões de resumo acompanham os filtros e exibem o número de pessoas do centro de serviço e do setor selecionados; quando o filtro está em "Todos", exibem "—" e orientam o usuário a selecionar um valor.?F:src/components/PessoasResumoCards.jsx�L1-L84??F:src/pages/Pessoas.jsx�L367-L387?
+- Filtros por termo, centro de serviço, cargo, setor e tipo de execução. Botões "Aplicar" e "Limpar" recompõem a listagem através de `loadPessoas`.
 - A tabela mostra ações de editar e histórico; `historyState` evita múltiplas chamadas simultâneas. A paginação é controlada dentro do componente `PessoasTable`.
 - `refreshReferencias` carrega listas auxiliares de centros/setores/cargos/tipos a partir do endpoint `api.references.pessoas`.【F:src/pages/Pessoas.jsx†L52-L117】
 
