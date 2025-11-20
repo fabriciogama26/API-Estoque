@@ -69,6 +69,7 @@ export function PessoasPage() {
   const [pessoas, setPessoas] = useState([])
   const [pessoasOptions, setPessoasOptions] = useState([])
   const pessoasOptionsRef = useRef([])
+  const [resumo, setResumo] = useState({ totalGeral: 0, porCentro: [], porSetor: [] })
 
   useEffect(() => {
     pessoasOptionsRef.current = pessoasOptions
@@ -205,8 +206,30 @@ export function PessoasPage() {
     refreshReferencias()
   }, [refreshReferencias])
 
+  useEffect(() => {
+    if (api.pessoas?.resumo) {
+      api.pessoas
+        .resumo()
+        .then((data) => setResumo(data))
+        .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
+    }
+  }, [])
+
   const handleFormChange = (event) => {
-    const { name, value } = event.target
+    const { name, value, type, checked } = event.target
+    if (name === 'ativo') {
+      const proximoValor = type === 'checkbox' ? Boolean(checked) : value !== 'false'
+      const mensagem = proximoValor
+        ? 'Deseja reativar este colaborador? Ele volta a ser considerado nos cálculos e dashboards.'
+        : 'Deseja realmente inativar este colaborador? Ele continuará visível na lista, mas será ignorado nos cálculos e dashboards.'
+      const aprovado = typeof window === 'undefined' ? true : window.confirm(mensagem)
+      if (!aprovado) {
+        event.preventDefault?.()
+        return
+      }
+      setForm((prev) => ({ ...prev, ativo: proximoValor }))
+      return
+    }
     if (name === 'centroServico') {
       setForm((prev) => ({ ...prev, centroServico: value, local: value }))
       return
@@ -249,7 +272,8 @@ export function PessoasPage() {
     setError(null)
 
     try {
-      const usuario = resolveUsuarioNome(user)
+      const usuario =
+        (user && (user.id || user.user?.id)) || resolveUsuarioNome(user)
       if (editingPessoa) {
         await api.pessoas.update(editingPessoa.id, updatePessoaPayload(form, usuario))
       } else {
@@ -261,6 +285,12 @@ export function PessoasPage() {
       setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
       await loadPessoas(filters, true)
       await refreshReferencias()
+      if (api.pessoas?.resumo) {
+        api.pessoas
+          .resumo()
+          .then((data) => setResumo(data))
+          .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -279,6 +309,7 @@ export function PessoasPage() {
       cargo: pessoa.cargo || '',
       dataAdmissao: formatDateInputValue(pessoa.dataAdmissao),
       tipoExecucao: pessoa.tipoExecucao || '',
+      ativo: pessoa.ativo !== false,
     })
   }
 
@@ -316,6 +347,11 @@ export function PessoasPage() {
 
   const pessoasOrdenadas = useMemo(
     () => sortPessoasByNome(pessoas),
+    [pessoas],
+  )
+
+  const pessoasAtivas = useMemo(
+    () => pessoas.filter((pessoa) => pessoa?.ativo !== false),
     [pessoas],
   )
 
@@ -392,9 +428,10 @@ export function PessoasPage() {
       />
 
       <PessoasResumoCards
-        pessoas={pessoas}
+        pessoas={pessoasAtivas}
         selectedCentro={filters.centroServico ?? filters.local ?? ''}
         selectedSetor={filters.setor ?? ''}
+        resumo={resumo}
       />
 
       <section className="card">

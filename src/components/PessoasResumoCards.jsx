@@ -41,44 +41,60 @@ InsightCard.propTypes = {
   helper: PropTypes.string.isRequired,
 }
 
-function buildResumo(lista, filtroValor, extractor, fallbackHelper) {
+function buildResumo(lista, filtroValor, extractor, fallbackHelper, totalResumo = null, resumoLista = []) {
   const valor = filtroValor ? String(filtroValor).trim() : ''
   const valorLower = valor.toLowerCase()
-  if (!valor || valorLower === 'todos' || valorLower === 'todas') {
-    return {
-      value: '—',
-      helper: fallbackHelper,
-    }
-  }
+  const isTodos = !valor || valorLower === 'todos' || valorLower === 'todas'
   const chave = normalizeKey(valor)
-  const total = lista.filter((item) => normalizeKey(extractor(item)) === chave).length
-  const label = resolveDisplayValue(valor, 'Nao informado')
+  const totalResumoNumero = Number(totalResumo)
+  const total = isTodos
+    ? (Number.isFinite(totalResumoNumero) ? totalResumoNumero : lista.length)
+    : (() => {
+        if (Array.isArray(resumoLista) && resumoLista.length) {
+          const match = resumoLista.find((item) => {
+            const key = item?.centro_servico ?? item?.setor ?? ''
+            return normalizeKey(key) === chave
+          })
+          const matchTotal = Number(match?.total)
+          if (match && Number.isFinite(matchTotal)) {
+            return matchTotal
+          }
+        }
+        return lista.filter((item) => normalizeKey(extractor(item)) === chave).length
+      })()
+  const label = isTodos ? 'Total de pessoas' : resolveDisplayValue(valor, 'Nao informado')
+  const helper = isTodos ? fallbackHelper : `${label}`
   return {
     value: numberFormatter.format(total),
-    helper: `${label}`,
+    helper,
   }
 }
 
-export function PessoasResumoCards({ pessoas, selectedCentro, selectedSetor }) {
-  const lista = Array.isArray(pessoas) ? pessoas : []
+export function PessoasResumoCards({ pessoas, selectedCentro, selectedSetor, resumo }) {
+  const listaCompleta = Array.isArray(pessoas) ? pessoas : []
+  const lista = listaCompleta.filter((item) => item?.ativo !== false)
 
   const centroResumo = buildResumo(
     lista,
     selectedCentro,
     (item) => item?.centroServico ?? item?.local ?? '',
-    'Selecione um centro de serviço no filtro'
+    resumo?.porCentro?.length ? 'Total geral' : 'Selecione um centro de servico no filtro',
+    resumo?.totalGeral ?? null,
+    resumo?.porCentro ?? []
   )
   const setorResumo = buildResumo(
     lista,
     selectedSetor,
     (item) => item?.setor ?? '',
-    'Selecione um setor no filtro'
+    resumo?.porSetor?.length ? 'Total geral' : 'Selecione um setor no filtro',
+    resumo?.totalGeral ?? null,
+    resumo?.porSetor ?? []
   )
 
   return (
     <div className="dashboard-highlights pessoas-resumo-cards">
       <InsightCard
-        title="Pessoas por centro de serviço"
+        title="Pessoas por centro de servico"
         icon={PeopleIcon}
         variant="blue"
         value={centroResumo.value}
@@ -105,10 +121,16 @@ PessoasResumoCards.propTypes = {
   ),
   selectedCentro: PropTypes.string,
   selectedSetor: PropTypes.string,
+  resumo: PropTypes.shape({
+    totalGeral: PropTypes.number,
+    porCentro: PropTypes.array,
+    porSetor: PropTypes.array,
+  }),
 }
 
 PessoasResumoCards.defaultProps = {
   pessoas: [],
   selectedCentro: '',
   selectedSetor: '',
+  resumo: { totalGeral: null, porCentro: [], porSetor: [] },
 }

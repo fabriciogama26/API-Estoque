@@ -44,6 +44,7 @@ export function PessoasTable({ pessoas, onEdit, onHistory, editingId, isSaving, 
               <th>Cargo</th>
               <th>Data de admissao</th>
               <th>Tipo Execucao</th>
+              <th>Status</th>
               <th>Registrado por</th>
               <th>Cadastrado em</th>
               <th>Acoes</th>
@@ -59,6 +60,7 @@ export function PessoasTable({ pessoas, onEdit, onHistory, editingId, isSaving, 
                 <td>{pessoa.cargo || '-'}</td>
                 <td>{formatDate(pessoa.dataAdmissao)}</td>
                 <td>{pessoa.tipoExecucao || '-'}</td>
+                <td>{pessoa.ativo === false ? 'Inativo' : 'Ativo'}</td>
                 <td>{pessoa.usuarioCadastro || '-'}</td>
                 <td>{formatDate(pessoa.criadoEm)}</td>
                 <td>

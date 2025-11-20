@@ -125,6 +125,22 @@ export function PessoasForm({
           </select>
         </label>
       </div>
+      {editingPessoa ? (
+        <div className="pessoas-form__status">
+          <label className="field field--checkbox">
+            <input
+              type="checkbox"
+              name="ativo"
+              checked={form.ativo !== false}
+              onChange={onChange}
+            />
+            <span>Manter colaborador ativo nos cálculos e dashboards</span>
+          </label>
+          <p className="field__hint">
+            Pessoas inativas continuam visíveis na lista, mas deixam de aparecer nas métricas.
+          </p>
+        </div>
+      ) : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       <div className="form__actions">
         <button type="submit" className="button button--primary" disabled={isSaving}>

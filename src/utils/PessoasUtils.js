@@ -6,22 +6,26 @@ export function formatDate(dateISO) {
   if (!dateISO) {
     return '-'
   }
-  const date = new Date(dateISO)
+  const raw = String(dateISO).trim()
+  const dateOnlyMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/)
+  const value = dateOnlyMatch ? `${dateOnlyMatch[1]}T00:00:00Z` : raw
+  const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     return '-'
   }
-  return date.toLocaleDateString('pt-BR')
+  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
 }
 
 export function formatDateTime(dateISO) {
   if (!dateISO) {
     return '-'
   }
-  const date = new Date(dateISO)
+  const raw = String(dateISO).trim()
+  const date = new Date(raw)
   if (Number.isNaN(date.getTime())) {
     return '-'
   }
-  return date.toLocaleString('pt-BR')
+  return date.toLocaleString('pt-BR', { timeZone: 'UTC' })
 }
 
 export function uniqueSorted(values) {

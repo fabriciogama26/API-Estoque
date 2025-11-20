@@ -147,3 +147,22 @@
 .pessoas-record-history__body .pessoas-history-list {
   gap: 0.6rem;
 }
+
+.pessoas-form__status {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pessoas-form__status .field--checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pessoas-form__status .field__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
