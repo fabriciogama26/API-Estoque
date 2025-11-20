@@ -133,6 +133,7 @@ const sanitizePessoaPayload = (payload = {}) => {
     setor,
     dataAdmissao: toLocalDateIso(payload.dataAdmissao),
     tipoExecucao: trim(payload.tipoExecucao),
+    ativo: toBoolean(payload.ativo ?? true),
   }
 }
 
@@ -167,6 +168,7 @@ const mapLocalPessoaRecord = (pessoa) => {
     centroServico,
     setor,
     local: pessoa.local ?? centroServico,
+    ativo: pessoa.ativo !== false,
   }
 }
 
@@ -1795,6 +1797,7 @@ const localApi = {
           cargo: dados.cargo,
           dataAdmissao: dados.dataAdmissao,
           tipoExecucao: dados.tipoExecucao,
+          ativo: dados.ativo !== false,
           usuarioCadastro: usuario,
           usuarioEdicao: null,
           historicoEdicao: [],
@@ -1836,6 +1839,7 @@ const localApi = {
           cargo: atual.cargo ?? '',
           dataAdmissao: atual.dataAdmissao ?? null,
           tipoExecucao: atual.tipoExecucao ?? '',
+          ativo: atual.ativo !== false ? 'Ativo' : 'Inativo',
         }
         const camposNovos = {
           nome: dados.nome ?? '',
@@ -1845,6 +1849,7 @@ const localApi = {
           cargo: dados.cargo ?? '',
           dataAdmissao: dados.dataAdmissao ?? null,
           tipoExecucao: dados.tipoExecucao ?? '',
+          ativo: dados.ativo !== false ? 'Ativo' : 'Inativo',
         }
         const camposAlterados = buildHistoryChanges(camposAtuais, camposNovos)
 
@@ -1869,6 +1874,7 @@ const localApi = {
           cargo: dados.cargo,
           dataAdmissao: dados.dataAdmissao,
           tipoExecucao: dados.tipoExecucao,
+          ativo: dados.ativo !== false,
           usuarioEdicao: usuario,
           atualizadoEm: agora,
           historicoEdicao: historico,

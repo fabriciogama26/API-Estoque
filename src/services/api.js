@@ -33,6 +33,31 @@ const toNullableNumber = (value) => {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+const toBooleanValue = (value, fallback = true) => {
+  if (value === undefined || value === null) {
+    return fallback
+  }
+  if (typeof value === 'boolean') {
+    return value
+  }
+  if (typeof value === 'number') {
+    return value !== 0
+  }
+  if (typeof value === 'string') {
+    const texto = value.trim().toLowerCase()
+    if (!texto) {
+      return fallback
+    }
+    if (['true', '1', 'sim', 'yes', 'on', 'ativo'].includes(texto)) {
+      return true
+    }
+    if (['false', '0', 'nao', 'off', 'inativo'].includes(texto)) {
+      return false
+    }
+  }
+  return Boolean(value)
+}
+
 const randomId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -137,6 +162,7 @@ const PESSOAS_VIEW_SELECT = `
   cargo_id,
   centro_custo_id,
   tipo_execucao_id,
+  ativo,
   centro_servico,
   setor,
   cargo,
@@ -959,15 +985,14 @@ const applyPessoaSearchFilters = (builder, like) => {
   const filtros = [
     `nome.ilike.${like}`,
     `matricula.ilike.${like}`,
-    `usuarioCadastro.ilike.${like}`,
-    `usuarioCadastroNome.ilike.${like}`,
-    `usuarioEdicao.ilike.${like}`,
-    `usuarioEdicaoNome.ilike.${like}`,
     `centro_servico.ilike.${like}`,
     `setor.ilike.${like}`,
     `cargo.ilike.${like}`,
     `centro_custo.ilike.${like}`,
     `tipo_execucao.ilike.${like}`,
+    // Nomes dos usuários (colunas text), evitando aplicar ilike em UUID.
+    `usuario_cadastro_nome.ilike.${like}`,
+    `usuario_edicao_nome.ilike.${like}`,
   ]
   return builder.or(filtros.join(','))
 }
@@ -1388,11 +1413,45 @@ async function resolveUsuarioResponsavel() {
   const { data } = await supabase.auth.getSession()
   const user = data?.session?.user
   if (!user) {
-    return 'anônimo'
+    return 'anonimo'
   }
-  return user.id || 'anônimo'
+  const meta = user.user_metadata || {}
+  const metaNome =
+    meta.username ||
+    meta.display_name ||
+    meta.full_name ||
+    meta.name ||
+    ''
+
+  if (user.id) {
+    try {
+      const usuarioDb = await execute(
+        supabase.from('app_users').select('display_name, username, email').eq('id', user.id).limit(1).single(),
+        'Falha ao resolver usuario.'
+      )
+      const nomeDb =
+        resolveTextValue(usuarioDb?.username) ||
+        resolveTextValue(usuarioDb?.display_name) ||
+        resolveTextValue(usuarioDb?.email) ||
+        ''
+      if (nomeDb) {
+        return nomeDb
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel resolver usuario por app_users.', error)
+    }
+  }
+
+  const nomePreferencial = metaNome || user.email || user.id
+  return nomePreferencial ? String(nomePreferencial).trim() : 'anonimo'
 }
 
+async function resolveUsuarioId() {
+  ensureSupabase()
+  const { data } = await supabase.auth.getSession()
+  const user = data?.session?.user
+  return user?.id ?? null
+}
 function mapMaterialRecord(record) {
   if (!record) {
     return null
@@ -1487,6 +1546,7 @@ function mapPessoaRecord(record) {
   const cargoRel = record.cargos ?? record.cargo_rel
   const centroCustoRel = record.centros_custo ?? record.centro_custo_rel
   const tipoExecucaoRel = record.tipo_execucao ?? record.tipo_execucao_rel
+  const ativo = toBooleanValue(record.ativo, true)
 
   const resolveCampo = (...valores) => {
     for (const valor of valores) {
@@ -1549,6 +1609,7 @@ function mapPessoaRecord(record) {
     criadoEm: record.criadoEm ?? record.criado_em ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
     historicoEdicao: normalizePessoaHistorico(historicoRaw),
+    ativo,
   }
 }
 
@@ -1820,6 +1881,7 @@ function sanitizePessoaPayload(payload = {}) {
     cargo: trim(payload.cargo),
     tipoExecucao: trim(payload.tipoExecucao ?? '').toUpperCase(),
     dataAdmissao: sanitizeDate(payload.dataAdmissao),
+    ativo: toBooleanValue(payload.ativo, true),
   }
 }
 
@@ -1913,12 +1975,10 @@ function sanitizeDate(value) {
     return null
   }
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw)
-  const candidate = isDateOnly ? `${raw}T00:00:00` : raw
-  const date = new Date(candidate)
-  if (Number.isNaN(date.getTime())) {
+  if (!isDateOnly) {
     return null
   }
-  return date.toISOString()
+  return raw
 }
 
 function buildDateFilters(query, field, inicio, fim) {
@@ -2729,7 +2789,15 @@ export const api = {
           query = applyPessoaSearchFilters(query, like)
         }
         const data = await execute(query, 'Falha ao listar pessoas.')
-        const registros = (data ?? []).map(mapPessoaRecord)
+        let registros = (data ?? []).map(mapPessoaRecord)
+        if ((!registros || registros.length === 0) && !termo) {
+          // Fallback direto na view caso o RPC esteja desatualizado ou sem dados.
+          const fallbackDados = await execute(
+            supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT),
+            'Falha ao listar pessoas (fallback view).'
+          )
+          registros = (fallbackDados ?? []).map(mapPessoaRecord)
+        }
         return registros
       } catch (error) {
         if (!termo) {
@@ -2755,13 +2823,32 @@ export const api = {
       )
       return (data ?? []).map(mapPessoaRecord)
     },
+    async resumo() {
+      const data = await execute(
+        supabase.rpc('rpc_pessoas_resumo'),
+        'Falha ao obter resumo de pessoas.'
+      )
+      const registro = Array.isArray(data) ? data[0] : data ?? {}
+      const totalGeralBruto = registro.total_geral ?? registro.totalGeral ?? 0
+      const totalGeral = Number(totalGeralBruto) || 0
+      const porCentro = Array.isArray(registro.por_centro ?? registro.porCentro)
+        ? (registro.por_centro ?? registro.porCentro)
+        : []
+      const porSetor = Array.isArray(registro.por_setor ?? registro.porSetor)
+        ? (registro.por_setor ?? registro.porSetor)
+        : []
+      return { totalGeral, porCentro, porSetor }
+    },
     async create(payload) {
       const dados = sanitizePessoaPayload(payload)
       if (!dados.nome || !dados.matricula || !dados.centroServico || !dados.setor || !dados.cargo) {
         throw new Error('Preencha nome, matricula, centro de servico, setor e cargo.')
       }
 
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioId()
+      if (!usuarioId) {
+        throw new Error('Sessao invalida, usuario nao identificado.')
+      }
       const agora = new Date().toISOString()
       const referencias = await resolvePessoaReferencias(dados)
 
@@ -2777,9 +2864,10 @@ export const api = {
             centro_custo_id: referencias.centroCustoId,
             tipo_execucao_id: referencias.tipoExecucaoId,
             dataAdmissao: dados.dataAdmissao,
-            usuarioCadastro: usuario,
+            usuarioCadastro: usuarioId,
             criadoEm: agora,
             atualizadoEm: null,
+            ativo: dados.ativo !== false,
           })
           .select(`
             id,
@@ -2790,6 +2878,7 @@ export const api = {
             "usuarioEdicao",
             "criadoEm",
             "atualizadoEm",
+            ativo,
             centro_servico_id,
             setor_id,
             cargo_id,
@@ -2824,6 +2913,7 @@ export const api = {
             "usuarioEdicao",
             "criadoEm",
             "atualizadoEm",
+            ativo,
             centro_servico_id,
             setor_id,
             cargo_id,
@@ -2844,29 +2934,41 @@ export const api = {
 
       const atual = mapPessoaRecord(atualRaw)
       const dados = sanitizePessoaPayload(payload)
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioId()
+      const usuarioNome = await resolveUsuarioResponsavel()
+      if (!usuarioId) {
+        throw new Error('Sessao invalida, usuario nao identificado.')
+      }
       const agora = new Date().toISOString()
 
       const normalizeDateValue = (value) => {
         if (!value) {
           return null
         }
-        const date = new Date(value)
+        const raw = String(value).trim()
+        if (/^\\d{4}-\\d{2}-\\d{2}$/.test(raw)) {
+          return raw
+        }
+        const date = new Date(raw)
         if (Number.isNaN(date.getTime())) {
           return null
         }
-        return date.toISOString()
+        return date.toISOString().slice(0, 10)
       }
 
       const camposAlterados = []
-      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao'].forEach((campo) => {
+      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao', 'ativo'].forEach((campo) => {
         const valorAtual =
           campo === 'dataAdmissao'
             ? normalizeDateValue(atual.dataAdmissao)
+            : campo === 'ativo'
+            ? (atual.ativo !== false ? 'Ativo' : 'Inativo')
             : resolveTextValue(atual[campo] ?? '')
         const valorNovo =
           campo === 'dataAdmissao'
             ? normalizeDateValue(dados.dataAdmissao)
+            : campo === 'ativo'
+            ? (dados.ativo !== false ? 'Ativo' : 'Inativo')
             : resolveTextValue(dados[campo] ?? '')
         if (valorAtual !== valorNovo) {
           camposAlterados.push({
@@ -2884,7 +2986,7 @@ export const api = {
             .insert({
               pessoa_id: id,
               data_edicao: agora,
-              usuario_responsavel: usuario,
+              usuario_responsavel: usuarioId || usuarioNome,
               campos_alterados: camposAlterados,
             }),
           'Falha ao registrar historico de edicao.'
@@ -2906,7 +3008,8 @@ export const api = {
             tipo_execucao_id: referencias.tipoExecucaoId,
             dataAdmissao: dados.dataAdmissao,
             atualizadoEm: agora,
-            usuarioEdicao: usuario,
+            usuarioEdicao: usuarioId,
+            ativo: dados.ativo !== false,
           })
           .eq('id', id),
         'Falha ao atualizar pessoa.'
@@ -2924,6 +3027,7 @@ export const api = {
             "usuarioEdicao",
             "criadoEm",
             "atualizadoEm",
+            ativo,
             centro_servico_id,
             setor_id,
             cargo_id,
@@ -2955,9 +3059,67 @@ export const api = {
           .select('id, data_edicao, usuario_responsavel, campos_alterados')
           .eq('pessoa_id', id)
           .order('data_edicao', { ascending: true }),
-        'Falha ao obter histórico.'
+        'Falha ao obter historico.'
       )
-      return normalizePessoaHistorico(registros ?? [])
+      const lista = registros ?? []
+      const responsaveisBrutos = lista
+        .map((item) => (item.usuario_responsavel ?? item.usuarioResponsavel ?? '').trim())
+        .filter(Boolean)
+      const responsaveisIds = Array.from(new Set(responsaveisBrutos.filter((valor) => isUuidValue(valor))))
+      const responsaveisEmails = Array.from(new Set(responsaveisBrutos.filter((valor) => valor.includes('@'))))
+      let usuarioNomeMap = new Map()
+      if (responsaveisIds.length || responsaveisEmails.length) {
+        const consultas = []
+        if (responsaveisIds.length) {
+          consultas.push(
+            execute(
+              supabase
+                .from('app_users')
+                .select('id, display_name, username, email')
+                .in('id', responsaveisIds),
+              'Falha ao resolver usuarios responsaveis.'
+            )
+          )
+        }
+        if (responsaveisEmails.length) {
+          consultas.push(
+            execute(
+              supabase
+                .from('app_users')
+                .select('id, display_name, username, email')
+                .in('email', responsaveisEmails),
+              'Falha ao resolver usuarios responsaveis.'
+            )
+          )
+        }
+        const resultados = (await Promise.all(consultas)).flat().filter(Boolean)
+        usuarioNomeMap = new Map()
+        resultados.forEach((usuario) => {
+          const nome =
+            resolveTextValue(usuario.username) ||
+            resolveTextValue(usuario.display_name) ||
+            resolveTextValue(usuario.email) ||
+            ''
+          if (usuario.id) {
+            usuarioNomeMap.set(usuario.id, nome || usuario.id)
+          }
+          if (usuario.email) {
+            usuarioNomeMap.set(usuario.email, nome || usuario.email)
+          }
+        })
+      }
+
+      const enriquecido = lista.map((item) => {
+        const raw = item.usuario_responsavel ?? item.usuarioResponsavel ?? ''
+        const nome = usuarioNomeMap.get(raw) || raw || 'sistema'
+        return {
+          ...item,
+          usuario_responsavel: nome,
+          usuario_responsavel_id: isUuidValue(raw) ? raw : null,
+        }
+      })
+
+      return normalizePessoaHistorico(enriquecido)
     },
   },
   materiais: {
@@ -4200,44 +4362,87 @@ async function resolveReferenceId(table, value, errorMessage) {
     throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
   }
 
-  const data = await execute(
-    supabase.from(table).select('id').eq('nome', nome).limit(1),
-    'Falha ao consultar ' + table + '.'
-  )
+  const consulta = () => supabase.from(table).select('id').eq('nome', nome).limit(1)
+  let data = await execute(consulta(), 'Falha ao consultar ' + table + '.')
+  let encontrado = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
 
-  const id = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
-  if (!id) {
-    throw new Error(errorMessage ?? ('Valor "' + nome + '" não encontrado.'))
+  if (!encontrado) {
+    data = await execute(
+      supabase.from(table).select('id').ilike('nome', nome).limit(1),
+      'Falha ao consultar ' + table + '.'
+    )
+    encontrado = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
   }
-  return id
+
+  if (!encontrado) {
+    data = await execute(
+      supabase.from(table).select('id').ilike('nome', `%${nome}%`).limit(1),
+      'Falha ao consultar ' + table + '.'
+    )
+    encontrado = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
+  }
+
+  if (!encontrado) {
+    throw new Error(errorMessage ?? ('Valor "' + nome + '" nao encontrado.'))
+  }
+  return encontrado
+}
+
+async function resolveCentroCustoId(dados, centroServicoId) {
+  const nome = trim(dados.centroCusto ?? dados.centro_custo ?? '')
+  const consultas = []
+
+  // Se o centro de servico tem FK para centro de custo, usa diretamente.
+  if (centroServicoId) {
+    consultas.push(
+      supabase.from('centros_servico').select('centro_custo_id').eq('id', centroServicoId).limit(1)
+    )
+  }
+
+  // Se o nome foi informado, tenta pelos nomes.
+  if (nome) {
+    consultas.push(supabase.from('centros_custo').select('id').eq('nome', nome).limit(1))
+    consultas.push(supabase.from('centros_custo').select('id').ilike('nome', nome).limit(1))
+    consultas.push(supabase.from('centros_custo').select('id').ilike('nome', `%${nome}%`).limit(1))
+  }
+
+  for (const query of consultas) {
+    const data = await execute(query, 'Falha ao consultar centros de custo.')
+    if (!data) {
+      continue
+    }
+    const registro = Array.isArray(data) ? data[0] : data
+    const id = registro?.centro_custo_id ?? registro?.id ?? null
+    if (id && isUuidValue(id)) {
+      return id
+    }
+  }
+
+  throw new Error('Selecione um centro de custo valido.')
 }
 
 async function resolvePessoaReferencias(dados) {
   const centroServicoId = await resolveReferenceId(
     'centros_servico',
     dados.centroServico,
-    'Selecione um centro de serviço válido.'
+    'Selecione um centro de servico valido.'
   )
   const setorNome = dados.setor || dados.centroServico
   const setorId = await resolveReferenceId(
     'setores',
     setorNome,
-    'Selecione um setor válido.'
+    'Selecione um setor valido.'
   )
   const cargoId = await resolveReferenceId(
     'cargos',
     dados.cargo,
-    'Selecione um cargo válido.'
+    'Selecione um cargo valido.'
   )
-  const centroCustoId = await resolveReferenceId(
-    'centros_custo',
-    dados.centroServico,
-    'Selecione um centro de custo válido.'
-  )
+  const centroCustoId = await resolveCentroCustoId(dados, centroServicoId)
   const tipoExecucaoId = await resolveReferenceId(
     'tipo_execucao',
     dados.tipoExecucao || 'PROPRIO',
-    'Selecione o tipo de execução.'
+    'Selecione o tipo de execucao.'
   )
   return {
     centroServicoId,
@@ -4247,7 +4452,6 @@ async function resolvePessoaReferencias(dados) {
     tipoExecucaoId,
   }
 }
-
 async function carregarPessoasViewDetalhes(ids) {
   const selecionados = Array.from(new Set((ids || []).filter(Boolean)))
   if (selecionados.length === 0) {

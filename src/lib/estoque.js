@@ -401,12 +401,19 @@ function formatMaterialResumo(material) {
 export function montarDashboard({ materiais = [], entradas = [], saidas = [], pessoas = [] }, periodo = null) {
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
   const materiaisMap = new Map(materiaisNormalizados.map((material) => [material.id, material]))
-  const pessoasMap = new Map(pessoas.map((pessoa) => [pessoa.id, pessoa]))
+  const pessoasAtivas = (Array.isArray(pessoas) ? pessoas : []).filter((pessoa) => pessoa?.ativo !== false)
+  const pessoasMap = new Map(pessoasAtivas.map((pessoa) => [pessoa.id, pessoa]))
 
   const filtrar = (lista, campoData) => lista.filter((item) => filtrarPorPeriodo(item, campoData, periodo))
 
   const entradasFiltradas = filtrar(entradas, 'dataEntrada')
-  const saidasFiltradas = filtrar(saidas, 'dataEntrega')
+  const pessoaAtivaIds = new Set(pessoasAtivas.map((pessoa) => pessoa?.id).filter(Boolean))
+  const saidasFiltradas = filtrar(saidas, 'dataEntrega').filter((saida) => {
+    if (!saida?.pessoaId) {
+      return true
+    }
+    return pessoaAtivaIds.has(saida.pessoaId)
+  })
 
   const entradasDetalhadas = entradasFiltradas.map((entrada) => ({
     ...entrada,

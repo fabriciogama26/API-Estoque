@@ -8,14 +8,25 @@ const FIELD_LABELS = {
   cargo: 'Cargo',
   dataAdmissao: 'Data de admissao',
   tipoExecucao: 'Tipo Execucao',
+  ativo: 'Status',
 }
 
 function formatValue(campo, valor) {
-  if (!valor) {
-    return '-'
+  if (campo === 'ativo') {
+    const texto = String(valor || '').trim().toLowerCase()
+    if (!texto || texto === 'null' || texto === 'undefined') {
+      return '-'
+    }
+    if (['false', '0', 'inativo', 'inact', 'nao', 'não'].includes(texto)) {
+      return 'Inativo'
+    }
+    return 'Ativo'
   }
   if (campo === 'dataAdmissao') {
-    return formatDate(valor)
+    return valor ? formatDate(valor) : '-'
+  }
+  if (valor === undefined || valor === null || valor === '') {
+    return '-'
   }
   return valor
 }

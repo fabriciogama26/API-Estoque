@@ -9,12 +9,11 @@ function sanitizeDate(value) {
   if (!raw) {
     return null
   }
-  const candidate = `${raw}T00:00:00`
-  const date = new Date(candidate)
-  if (Number.isNaN(date.getTime())) {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+  if (!dateOnly) {
     return null
   }
-  return date.toISOString()
+  return raw
 }
 
 export function createPessoaPayload(form, usuario) {
@@ -30,6 +29,7 @@ export function createPessoaPayload(form, usuario) {
     dataAdmissao: sanitizeDate(form.dataAdmissao),
     tipoExecucao: sanitizeCampo(form.tipoExecucao),
     usuarioCadastro: usuario,
+    ativo: true,
   }
 }
 
@@ -46,6 +46,7 @@ export function updatePessoaPayload(form, usuario) {
     dataAdmissao: sanitizeDate(form.dataAdmissao),
     tipoExecucao: sanitizeCampo(form.tipoExecucao),
     usuarioResponsavel: usuario,
+    ativo: form.ativo !== false,
   }
 }
 
