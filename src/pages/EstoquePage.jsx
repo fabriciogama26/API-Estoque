@@ -394,7 +394,7 @@ export function EstoquePage() {
 
     try {
 
-      const usuario = user?.name || user?.username || 'sistema'
+      const usuario = user?.id || user?.user?.id || user?.name || user?.username || 'sistema'
 
       await api.materiais.update(item.materialId, {
 

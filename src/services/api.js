@@ -1379,29 +1379,31 @@ async function insereCaracteristicas(materialId, caracteristicaIds, caracteristi
 function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudit, includeUpdateAudit } = {}) {
   const nomePersist = dados.nome || ''
   const fabricantePersist = dados.fabricante || ''
+  const fabricanteValue = fabricantePersist ? fabricantePersist : null
   const grupoMaterialPersist = dados.grupoMaterialId || dados.grupoMaterial || ''
+  const grupoMaterialValue = grupoMaterialPersist ? grupoMaterialPersist : null
   const payload = {
     nome: nomePersist,
-    fabricante: fabricantePersist,
+    fabricante: fabricanteValue,
     validadeDias: dados.validadeDias ?? null,
     ca: dados.ca ?? '',
     valorUnitario: dados.valorUnitario ?? 0,
     estoqueMinimo: dados.estoqueMinimo ?? 0,
     ativo: dados.ativo ?? true,
     descricao: dados.descricao ?? '',
-    grupoMaterial: grupoMaterialPersist,
+    grupoMaterial: grupoMaterialValue,
     numeroCalcado: dados.numeroCalcado || null,
     numeroVestimenta: dados.numeroVestimenta || null,
     numeroEspecifico: dados.numeroEspecifico ?? '',
   }
 
-  if (includeCreateAudit) {
-    payload.usuarioCadastro = usuario ?? ''
+  if (includeCreateAudit && usuario) {
+    payload.usuarioCadastro = usuario
     payload.dataCadastro = agora ?? new Date().toISOString()
   }
 
-  if (includeUpdateAudit) {
-    payload.usuarioAtualizacao = usuario ?? ''
+  if (includeUpdateAudit && usuario) {
+    payload.usuarioAtualizacao = usuario
     payload.atualizadoEm = agora ?? new Date().toISOString()
   }
 
@@ -1451,6 +1453,74 @@ async function resolveUsuarioId() {
   const { data } = await supabase.auth.getSession()
   const user = data?.session?.user
   return user?.id ?? null
+}
+
+async function resolveUsuarioIdOrThrow() {
+  const usuarioId = await resolveUsuarioId()
+  if (!usuarioId) {
+    throw new Error('Sessao invalida, usuario nao identificado.')
+  }
+  return usuarioId
+}
+
+async function resolveGrupoMaterialId(valor) {
+  const texto = trim(valor)
+  if (!texto) {
+    return null
+  }
+  const uuid = normalizeUuid(texto)
+  if (uuid) {
+    return uuid
+  }
+  const data = await execute(
+    supabase
+      .from('grupos_material')
+      .select('id')
+      .ilike('nome', texto)
+      .order('ordem', { ascending: true, nullsFirst: false })
+      .limit(1),
+    'Falha ao resolver grupo de material.',
+  )
+  return Array.isArray(data) && data.length ? data[0]?.id ?? null : data?.id ?? null
+}
+
+async function resolveFabricanteId(valor) {
+  const texto = trim(valor)
+  if (!texto) {
+    return null
+  }
+  const uuid = normalizeUuid(texto)
+  if (uuid) {
+    return uuid
+  }
+  const data = await execute(
+    supabase.from('fabricantes').select('id').ilike('fabricante', texto).limit(1),
+    'Falha ao resolver fabricante.',
+  )
+  return Array.isArray(data) && data.length ? data[0]?.id ?? null : data?.id ?? null
+}
+
+async function resolveMaterialItemId(valor) {
+  const texto = trim(valor)
+  if (!texto) {
+    return null
+  }
+  const uuid = normalizeUuid(texto)
+  if (uuid) {
+    return uuid
+  }
+  const data = await execute(
+    supabase.from('grupos_material_itens').select('id').ilike('nome', texto).limit(1),
+    'Falha ao resolver item de material.',
+  )
+  return Array.isArray(data) && data.length ? data[0]?.id ?? null : data?.id ?? null
+}
+
+function ensureUuidOrThrow(valor, campo) {
+  if (!isUuidValue(valor)) {
+    throw new Error(`${campo} invalido. Selecione um registro cadastrado.`)
+  }
+  return valor
 }
 function mapMaterialRecord(record) {
   if (!record) {
@@ -1886,6 +1956,18 @@ function sanitizePessoaPayload(payload = {}) {
 }
 
 function sanitizeMaterialPayload(payload = {}) {
+  const nomeRawId = trim(
+    payload.nomeId ??
+      payload.nome_id ??
+      payload.nome ??
+      payload.materialItemNome ??
+      payload.nomeItemRelacionado ??
+      '',
+  )
+  const nomeId = normalizeRelationId(nomeRawId)
+  const nomeDisplay =
+    trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? payload.nome ?? '') || ''
+
   const grupoMaterialId = trim(payload.grupoMaterialId ?? payload.grupo_material_id ?? '')
   const grupoMaterialNome =
     trim(
@@ -1898,13 +1980,11 @@ function sanitizeMaterialPayload(payload = {}) {
   const grupoMaterial = grupoMaterialNome
   const numeroCalcado = trim(payload.numeroCalcado ?? payload.numero_calcado ?? '')
   const numeroVestimenta = trim(payload.numeroVestimenta ?? payload.numero_vestimenta ?? '')
-  const nomeDisplayId = trim(payload.nome ?? payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
-  const nomeEpi =
-    trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? payload.nome ?? '') || ''
+  const nomeDisplayId = nomeId || nomeDisplay
+  const nomeEpi = nomeDisplay || ''
   const materialItemNome =
     nomeEpi || trim(payload.materialItemNome ?? payload.nomeItemRelacionado ?? '')
   const fabricanteId = normalizeRelationId(payload.fabricante ?? payload.fabricante_id ?? '')
-  const nomeId = normalizeRelationId(nomeDisplayId)
   const fabricanteNome =
     trim(payload.fabricanteNome ?? payload.fabricante ?? payload.fabricante_nome ?? '') || ''
   const caracteristicasSelecionadas = normalizeOptionList(
@@ -1937,6 +2017,7 @@ function sanitizeMaterialPayload(payload = {}) {
   const numeroEspecifico = trim(payload.numeroEspecifico ?? payload.numero_especifico ?? '')
   return {
     nome: nomeId || '',
+    nomeId: nomeId || '',
     nomeItemRelacionado: materialItemNome || nomeEpi,
     materialItemNome: materialItemNome || nomeEpi,
     fabricante: fabricanteId ?? '',
@@ -2934,11 +3015,7 @@ export const api = {
 
       const atual = mapPessoaRecord(atualRaw)
       const dados = sanitizePessoaPayload(payload)
-      const usuarioId = await resolveUsuarioId()
-      const usuarioNome = await resolveUsuarioResponsavel()
-      if (!usuarioId) {
-        throw new Error('Sessao invalida, usuario nao identificado.')
-      }
+      const usuarioId = await resolveUsuarioIdOrThrow()
       const agora = new Date().toISOString()
 
       const normalizeDateValue = (value) => {
@@ -2986,7 +3063,7 @@ export const api = {
             .insert({
               pessoa_id: id,
               data_edicao: agora,
-              usuario_responsavel: usuarioId || usuarioNome,
+              usuario_responsavel: usuarioId,
               campos_alterados: camposAlterados,
             }),
           'Falha ao registrar historico de edicao.'
@@ -3139,8 +3216,24 @@ export const api = {
       if (!dados.nome || !dados.fabricante || !dados.validadeDias || dados.validadeDias <= 0) {
         throw new Error('Preencha nome, fabricante e validade (em dias).')
       }
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioIdOrThrow()
       const agora = new Date().toISOString()
+
+      const nomeItemId = await resolveMaterialItemId(dados.nome || dados.nomeId || dados.materialItemNome)
+      if (!nomeItemId) {
+        throw new Error('Material/EPI invalido. Selecione um item cadastrado.')
+      }
+      ensureUuidOrThrow(nomeItemId, 'Material/EPI')
+      const grupoMaterialId =
+        (await resolveGrupoMaterialId(dados.grupoMaterialId || dados.grupoMaterial)) || null
+      if ((dados.grupoMaterialId || dados.grupoMaterial) && !grupoMaterialId) {
+        throw new Error('Grupo de material invalido. Selecione um grupo cadastrado.')
+      }
+      const fabricanteId = await resolveFabricanteId(dados.fabricante || dados.fabricanteNome)
+      if (!fabricanteId) {
+        throw new Error('Fabricante invalido. Selecione um fabricante cadastrado.')
+      }
+      ensureUuidOrThrow(fabricanteId, 'Fabricante')
 
       const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
       const caracteristicaIds = Array.isArray(dados.caracteristicasIds)
@@ -3154,12 +3247,22 @@ export const api = {
         caracteristicaNames.length > 0
           ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
           : caracteristicaIds
-      const supabasePayload = buildMaterialSupabasePayload(dados, {
-        usuario,
+      const supabasePayload = buildMaterialSupabasePayload(
+        {
+          ...dados,
+          nome: nomeItemId,
+          nomeId: nomeItemId,
+          grupoMaterialId,
+          grupoMaterial: grupoMaterialId,
+          fabricante: fabricanteId,
+        },
+        {
+        usuario: usuarioId,
         agora,
         includeCreateAudit: true,
         includeUpdateAudit: true,
-      })
+        },
+      )
 
       let materialCriadoId
       try {
@@ -3223,7 +3326,7 @@ export const api = {
 
       const materialAtual = mapMaterialRecord(registroAtual)
       const dadosCombinados = sanitizeMaterialPayload({ ...materialAtual, ...payload })
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioIdOrThrow()
       const agora = new Date().toISOString()
       const camposAlterados = []
       MATERIAL_HISTORY_FIELDS.forEach((campo) => {
@@ -3244,7 +3347,7 @@ export const api = {
           .insert({
             materialId: id,
             valorUnitario: dadosCombinados.valorUnitario,
-            usuarioResponsavel: usuario,
+            usuarioResponsavel: usuarioId,
             criadoEm: agora,
             campos_alterados: camposAlterados,
           })
@@ -3265,7 +3368,36 @@ export const api = {
           }
         }
       }
-      const dados = sanitizeMaterialPayload(payload)
+      const nomeItemId = await resolveMaterialItemId(
+        dadosCombinados.nome || dadosCombinados.nomeId || dadosCombinados.materialItemNome,
+      )
+      if (!nomeItemId) {
+        throw new Error('Material/EPI invalido. Selecione um item cadastrado.')
+      }
+      ensureUuidOrThrow(nomeItemId, 'Material/EPI')
+      const grupoMaterialId =
+        (await resolveGrupoMaterialId(
+          dadosCombinados.grupoMaterialId || dadosCombinados.grupoMaterial,
+        )) || null
+      if ((dadosCombinados.grupoMaterialId || dadosCombinados.grupoMaterial) && !grupoMaterialId) {
+        throw new Error('Grupo de material invalido. Selecione um grupo cadastrado.')
+      }
+      const fabricanteId = await resolveFabricanteId(
+        dadosCombinados.fabricante || dadosCombinados.fabricanteNome,
+      )
+      if (!fabricanteId) {
+        throw new Error('Fabricante invalido. Selecione um fabricante cadastrado.')
+      }
+      ensureUuidOrThrow(fabricanteId, 'Fabricante')
+
+      const dados = {
+        ...dadosCombinados,
+        nome: nomeItemId,
+        nomeId: nomeItemId,
+        grupoMaterialId,
+        grupoMaterial: grupoMaterialId,
+        fabricante: fabricanteId,
+      }
       const coresIds = Array.isArray(dados.coresIds) ? dados.coresIds : []
       const caracteristicaIds = Array.isArray(dados.caracteristicasIds)
         ? dados.caracteristicasIds
@@ -3278,11 +3410,14 @@ export const api = {
         caracteristicaNames.length > 0
           ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
           : caracteristicaIds
-      const supabasePayload = buildMaterialSupabasePayload(dados, {
-        usuario,
-        agora,
-        includeUpdateAudit: true,
-      })
+      const supabasePayload = buildMaterialSupabasePayload(
+        dados,
+        {
+          usuario: usuarioId,
+          agora,
+          includeUpdateAudit: true,
+        },
+      )
 
       await execute(
         supabase.from('materiais').update(supabasePayload).eq('id', id),
@@ -3459,7 +3594,7 @@ export const api = {
       return buscarMateriaisPorTermo(termo, limit, { source: ENTRADAS_MATERIAIS_VIEW })
     },
     async create(payload) {
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioIdOrThrow()
       const dados = normalizeEntradaInput(payload)
       const registro = await executeSingle(
         supabase
@@ -3469,7 +3604,7 @@ export const api = {
             quantidade: dados.quantidade,
             centro_estoque: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
-            usuarioResponsavel: usuario,
+            usuarioResponsavel: usuarioId,
           })
           .select(),
         'Falha ao registrar entrada.'
@@ -3487,7 +3622,7 @@ export const api = {
         'Falha ao obter entrada.'
       )
       const entradaAnterior = entradaAtual ? mapEntradaRecord(entradaAtual) : null
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioIdOrThrow()
       const dados = normalizeEntradaInput(payload)
       const registro = await executeSingle(
         supabase
@@ -3497,7 +3632,7 @@ export const api = {
             quantidade: dados.quantidade,
             centro_estoque: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
-            usuarioResponsavel: usuario,
+            usuarioResponsavel: usuarioId,
           })
           .eq('id', id)
           .select(),
@@ -3534,7 +3669,7 @@ export const api = {
   saidas: {
     list: carregarSaidas,
     async create(payload) {
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioIdOrThrow()
       const pessoaId = trim(payload.pessoaId)
       const materialId = trim(payload.materialId)
       const quantidade = toNumber(payload.quantidade, null)
@@ -3593,7 +3728,7 @@ export const api = {
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
             status,
-            usuarioResponsavel: usuario,
+            usuarioResponsavel: usuarioId,
           })
           .select(),
         'Falha ao registrar saida.'
@@ -3615,7 +3750,7 @@ export const api = {
         throw new Error('Saida nao encontrada.')
       }
       const saidaAtual = mapSaidaRecord(atualRegistro)
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioIdOrThrow()
       const pessoaId = trim(payload.pessoaId ?? saidaAtual.pessoaId)
       const materialId = trim(payload.materialId ?? saidaAtual.materialId)
       const quantidade = toNumber(payload.quantidade, null)
@@ -3685,7 +3820,7 @@ export const api = {
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
             status: statusValor,
-            usuarioResponsavel: usuario,
+            usuarioResponsavel: usuarioId,
           })
           .eq('id', id)
           .select(),
@@ -3713,7 +3848,7 @@ export const api = {
       if (isSaidaCanceladaSync(saidaAtual)) {
         throw new Error('Saida ja cancelada.')
       }
-      const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioIdOrThrow()
       let statusCanceladoId = await resolveStatusSaidaIdByName(STATUS_CANCELADO_NOME)
       if (!statusCanceladoId) {
         throw new Error('Status CANCELADO nao encontrado.')
@@ -3723,7 +3858,7 @@ export const api = {
           .from('saidas')
           .update({
             status: statusCanceladoId,
-            usuarioResponsavel: usuario,
+            usuarioResponsavel: usuarioId,
           })
           .eq('id', id)
           .select(),

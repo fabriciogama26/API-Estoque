@@ -423,7 +423,7 @@ export function SaidasPage() {
         centroServico: form.centroServico.trim(),
         centroServicoId: form.centroServicoId,
         dataEntrega: form.dataEntrega,
-        usuarioResponsavel: user?.name || user?.username || 'sistema',
+        usuarioResponsavel: user?.id || user?.user?.id || user?.name || user?.username || 'sistema',
       }
       if (isEditMode) {
         await api.saidas.update(editingSaida.id, payload)
