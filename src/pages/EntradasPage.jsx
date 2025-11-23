@@ -285,7 +285,7 @@ const [historyState, setHistoryState] = useState({ ...HISTORY_INITIAL })
         quantidade: form.quantidade,
         centroCusto: form.centroCusto.trim(),
         dataEntrada: form.dataEntrada,
-        usuarioResponsavel: user?.name || user?.username || 'sistema',
+        usuarioResponsavel: user?.id || user?.user?.id || user?.name || user?.username || 'sistema',
       }
       if (!payload.materialId) {
         throw new Error('Selecione um material valido.')
