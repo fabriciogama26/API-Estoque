@@ -102,6 +102,16 @@ const toDateOnlyIso = (value) => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
+const toEndOfDayIso = (value) => {
+  const startIso = toDateOnlyIso(value)
+  if (!startIso) {
+    return null
+  }
+  const date = new Date(startIso)
+  date.setUTCHours(23, 59, 59, 999)
+  return date.toISOString()
+}
+
 const toLocalDateIso = (value) => {
   const raw = trim(value)
   if (!raw) {
@@ -603,8 +613,8 @@ const resolveEmpresaInfoLocal = () => ({
   documento: import.meta.env.VITE_TERMO_EPI_EMPRESA_DOCUMENTO || '',
   endereco: import.meta.env.VITE_TERMO_EPI_EMPRESA_ENDERECO || '',
   contato: import.meta.env.VITE_TERMO_EPI_EMPRESA_CONTATO || '',
-  logoUrl: import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_URL || '',
-  logoSecundarioUrl: import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_SECUNDARIO_URL || '',
+  logoUrl: trim(import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_URL) || '/logo_FAA.png',
+  logoSecundarioUrl: trim(import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_SECUNDARIO_URL) || '',
 })
 
 const buildDescricaoMaterialLocal = (material) => {
@@ -680,6 +690,20 @@ const montarContextoTermoEpiLocal = (pessoa, saidasDetalhadas) => {
 function obterContextoTermoEpiLocal(params = {}) {
   const matriculaParam = trim(params.matricula).toLowerCase()
   const nomeParam = trim(params.nome).toLowerCase()
+  const dataInicioIso = toDateOnlyIso(params.dataInicio)
+  const dataFimIso = toEndOfDayIso(params.dataFim)
+  const inicioTimestamp = dataInicioIso ? new Date(dataInicioIso).getTime() : null
+  const fimTimestamp = dataFimIso ? new Date(dataFimIso).getTime() : null
+
+  if (params.dataInicio && !dataInicioIso) {
+    throw createError(400, 'Data inicial invalida.')
+  }
+  if (params.dataFim && !dataFimIso) {
+    throw createError(400, 'Data final invalida.')
+  }
+  if (inicioTimestamp !== null && fimTimestamp !== null && inicioTimestamp > fimTimestamp) {
+    throw createError(400, 'Data inicial nao pode ser maior que a data final.')
+  }
 
   if (!matriculaParam && !nomeParam) {
     throw createError(400, 'Informe a matricula ou o nome do colaborador.')
@@ -710,9 +734,31 @@ function obterContextoTermoEpiLocal(params = {}) {
 
     const pessoaRecord = mapLocalPessoaRecord(pessoa)
 
-    const saidasPessoa = state.saidas.filter((saida) => saida.pessoaId === pessoa.id).map(mapLocalSaidaRecord)
+    const saidasPessoa = state.saidas
+      .filter((saida) => saida.pessoaId === pessoa.id)
+      .map(mapLocalSaidaRecord)
+      .filter((saida) => {
+        if (inicioTimestamp === null && fimTimestamp === null) {
+          return true
+        }
+        const entregaTime = saida.dataEntrega ? new Date(saida.dataEntrega).getTime() : null
+        if (entregaTime === null || Number.isNaN(entregaTime)) {
+          return false
+        }
+        if (inicioTimestamp !== null && entregaTime < inicioTimestamp) {
+          return false
+        }
+        if (fimTimestamp !== null && entregaTime > fimTimestamp) {
+          return false
+        }
+        return true
+      })
     if (!saidasPessoa.length) {
-      throw createError(404, 'Nenhuma saida registrada para o colaborador informado.')
+      const hasPeriodo = inicioTimestamp !== null || fimTimestamp !== null
+      const mensagem = hasPeriodo
+        ? 'Nenhuma saida registrada para o colaborador informado no periodo selecionado.'
+        : 'Nenhuma saida registrada para o colaborador informado.'
+      throw createError(404, mensagem)
     }
 
     const materiaisMap = new Map(state.materiais.map((material) => [material.id, mapLocalMaterialResumo(material)]))

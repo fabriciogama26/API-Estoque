@@ -10,6 +10,8 @@ import '../styles/DocumentPreviewModal.css'
 const initialForm = {
   matricula: '',
   nome: '',
+  dataInicio: '',
+  dataFim: '',
 }
 
 const initialPreview = {
@@ -40,6 +42,29 @@ export function TermosEpiPage() {
     event.preventDefault()
     const matricula = form.matricula.trim()
     const nome = form.nome.trim()
+    const dataInicio = form.dataInicio
+    const dataFim = form.dataFim
+
+    const dataInicioDate = dataInicio ? new Date(`${dataInicio}T00:00:00`) : null
+    const dataFimDate = dataFim ? new Date(`${dataFim}T23:59:59`) : null
+    if (
+      (dataInicioDate && Number.isNaN(dataInicioDate.getTime())) ||
+      (dataFimDate && Number.isNaN(dataFimDate.getTime()))
+    ) {
+      setPreview({
+        ...initialPreview,
+        error: 'Datas informadas sao invalidas.',
+      })
+      return
+    }
+
+    if (dataInicioDate && dataFimDate && dataInicioDate > dataFimDate) {
+      setPreview({
+        ...initialPreview,
+        error: 'Data inicial nao pode ser maior que a data final.',
+      })
+      return
+    }
 
     if (!matricula && !nome) {
       setPreview({
@@ -56,7 +81,11 @@ export function TermosEpiPage() {
     })
 
     try {
-      const query = matricula ? { matricula } : { nome }
+      const query = {
+        ...(matricula ? { matricula } : { nome }),
+        ...(dataInicio ? { dataInicio } : {}),
+        ...(dataFim ? { dataFim } : {}),
+      }
       const contexto = await dataApi.documentos.termoEpiContext(query)
       const html = buildEpiTermHtml(contexto)
       setPreview({
@@ -109,14 +138,13 @@ export function TermosEpiPage() {
         title="Termo de EPI"
         subtitle="Pesquise colaboradores e gere o termo de responsabilidade de EPI."
       />
-    
 
       <section className="card">
         <header className="card__header">
           <h2>Gerar termo</h2>
         </header>
-        <form className="form form--horizontal gap" onSubmit={handleSubmit}>
-          <div className="form__row">
+        <form className="form" onSubmit={handleSubmit}>
+          <div className="form__grid form__grid--two">
             <label className="field">
               <span>Matricula</span>
               <input
@@ -133,6 +161,24 @@ export function TermosEpiPage() {
                 value={form.nome}
                 onChange={handleChange}
                 placeholder="Ex.: Maria Souza"
+              />
+            </label>
+            <label className="field">
+              <span>Data inicial</span>
+              <input
+                type="date"
+                name="dataInicio"
+                value={form.dataInicio}
+                onChange={handleChange}
+              />
+            </label>
+            <label className="field">
+              <span>Data final</span>
+              <input
+                type="date"
+                name="dataFim"
+                value={form.dataFim}
+                onChange={handleChange}
               />
             </label>
           </div>

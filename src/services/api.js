@@ -1790,8 +1790,8 @@ function mapSaidaHistoryRecord(record) {
     return null
   }
   const usuarioNome = resolveTextValue(
-    record.usuario?.display_name ??
-      record.usuario?.username ??
+    record.usuario?.username ??
+      record.usuario?.display_name ??
       record.usuario?.email ??
       record.usuario_responsavel_nome ??
       record.usuarioResponsavel ??
@@ -2326,10 +2326,12 @@ async function preencherUsuariosResponsaveis(registros) {
         .in('id', ids),
       'Falha ao consultar usuarios.'
     )
+    const resolveUsuarioNome = (usuario) =>
+      resolveTextValue(usuario?.username ?? usuario?.display_name ?? usuario?.email ?? '')
     const mapa = new Map(
       (usuarios ?? []).map((usuario) => [
         usuario.id,
-        resolveTextValue(usuario.display_name ?? usuario.username ?? usuario.email ?? ''),
+        resolveUsuarioNome(usuario),
       ])
     )
     return registros.map((entrada) => {
@@ -4419,8 +4421,19 @@ export const api = {
     async termoEpiContext(params = {}) {
       const matricula = trim(params.matricula)
       const nome = trim(params.nome)
+      const dataInicioIso = toStartOfDayUtcIso(params.dataInicio)
+      const dataFimIso = toEndOfDayUtcIso(params.dataFim)
+      if (params.dataInicio && !dataInicioIso) {
+        throw new Error('Data inicial invalida.')
+      }
+      if (params.dataFim && !dataFimIso) {
+        throw new Error('Data final invalida.')
+      }
+      if (dataInicioIso && dataFimIso && new Date(dataInicioIso).getTime() > new Date(dataFimIso).getTime()) {
+        throw new Error('Data inicial nao pode ser maior que a data final.')
+      }
       if (!matricula && !nome) {
-        throw new Error('Informe a matrícula ou o nome do colaborador.')
+        throw new Error('Informe a matricula ou o nome do colaborador.')
       }
 
       let pessoa = null
@@ -4440,22 +4453,31 @@ export const api = {
       }
 
       if (!pessoa) {
-        throw new Error('Colaborador não encontrado.')
+        throw new Error('Colaborador nao encontrado.')
+      }
+
+      let saidasQuery = supabase
+        .from('saidas')
+        .select(
+          `*, material:materialId (*), pessoa:pessoaId (*)`
+        )
+        .eq('pessoaId', pessoa.id)
+
+      if (dataInicioIso || dataFimIso) {
+        saidasQuery = buildDateFilters(saidasQuery, 'dataEntrega', dataInicioIso, dataFimIso)
       }
 
       const saidas = await execute(
-        supabase
-          .from('saidas')
-          .select(
-            `*, material:materialId (*), pessoa:pessoaId (*)`
-          )
-          .eq('pessoaId', pessoa.id)
-          .order('dataEntrega', { ascending: true }),
+        saidasQuery.order('dataEntrega', { ascending: true }),
         'Falha ao listar saidas do colaborador.'
       )
 
       if (!saidas || saidas.length === 0) {
-        throw new Error('Nenhuma saida registrada para o colaborador informado.')
+        const hasPeriodo = Boolean(dataInicioIso || dataFimIso)
+        const mensagem = hasPeriodo
+          ? 'Nenhuma saida registrada para o colaborador informado no periodo selecionado.'
+          : 'Nenhuma saida registrada para o colaborador informado.'
+        throw new Error(mensagem)
       }
 
       const saidasOriginais = saidas ?? []
@@ -4476,6 +4498,8 @@ export const api = {
       })
 
       const contexto = montarContextoTermoEpi(mapPessoaRecord(pessoa), saidasDetalhadas)
+      const logoPrincipal = trim(import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_URL) || '/logo_FAA.png'
+      const logoSecundario = trim(import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_SECUNDARIO_URL)
       return {
         ...contexto,
         empresa: {
@@ -4483,8 +4507,8 @@ export const api = {
           documento: import.meta.env.VITE_TERMO_EPI_EMPRESA_DOCUMENTO ?? '',
           endereco: import.meta.env.VITE_TERMO_EPI_EMPRESA_ENDERECO ?? '',
           contato: import.meta.env.VITE_TERMO_EPI_EMPRESA_CONTATO ?? '',
-          logoUrl: import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_URL ?? '',
-          logoSecundarioUrl: import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_SECUNDARIO_URL ?? '',
+          logoUrl: logoPrincipal,
+          logoSecundarioUrl: logoSecundario ?? '',
         },
       }
     },
