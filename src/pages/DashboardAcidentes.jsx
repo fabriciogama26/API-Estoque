@@ -10,8 +10,6 @@ import { ChartCargos } from '../components/charts/ChartCargos.jsx'
 import { ChartAgentes } from '../components/charts/ChartAgentes.jsx'
 import { FiltrosDashboard } from '../components/FiltrosDashboard.jsx'
 import { dataClient } from '../services/dataClient.js'
-import { isLocalMode } from '../config/runtime.js'
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { resolveIndicadorValor } from '../utils/indicadores.js'
 
 import '../styles/DashboardPage.css'
@@ -60,62 +58,6 @@ const CHART_INFO_MESSAGES = {
   agentes: 'Distribuicao dos agentes causadores (considera multiplos agentes por acidente).',
 }
 
-const normalizeList = (values = []) => {
-  if (!Array.isArray(values)) {
-    return []
-  }
-  return values
-    .map((value) => (value === undefined || value === null ? '' : String(value).trim()))
-    .filter(Boolean)
-}
-
-async function fetchRemoteFilterOptions() {
-  try {
-    const { data, error } = await supabase.rpc('rpc_acidentes_filtros')
-    if (error) {
-      throw error
-    }
-    const payload = Array.isArray(data) && data.length ? data[0] : {}
-    return {
-      centrosServico: normalizeList(payload?.centros_servico ?? payload?.centros ?? []),
-      tipos: normalizeList(payload?.tipos ?? []),
-      lesoes: normalizeList(payload?.lesoes ?? []),
-      partesLesionadas: normalizeList(payload?.partes ?? payload?.partes_lesionadas ?? []),
-      agentes: normalizeList(payload?.agentes ?? []),
-      cargos: normalizeList(payload?.cargos ?? []),
-    }
-  } catch (err) {
-    console.warn('Falha ao carregar filtros remotos de acidentes.', err)
-    return { ...EMPTY_FILTER_OPTIONS }
-  }
-}
-
-function normalizeResumo(data) {
-  if (!data) {
-    return null
-  }
-
-  if (Array.isArray(data)) {
-    return data[0] ?? null
-  }
-
-  if (typeof data === 'object') {
-    return data
-  }
-
-  return null
-}
-
-function normalizeArray(data) {
-  if (Array.isArray(data)) {
-    return data
-  }
-  if (!data) {
-    return []
-  }
-  return []
-}
-
 export function DashboardAcidentes() {
   const [filters, setFilters] = useState(() => initialFilters())
   const [dashboardData, setDashboardData] = useState(EMPTY_STATE)
@@ -125,96 +67,43 @@ export function DashboardAcidentes() {
   const [expandedChartId, setExpandedChartId] = useState(null)
 
   const load = useCallback(async (params) => {
-    if (!isLocalMode && !isSupabaseConfigured()) {
-      setError('Configuracao do Supabase nao encontrada. Verifique as variaveis de ambiente.')
-      setDashboardData(EMPTY_STATE)
-      setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
-      return
-    }
-
     setIsLoading(true)
     setError(null)
 
     try {
-      if (isLocalMode) {
-        if (!dataClient?.acidentes?.dashboard) {
-          throw new Error('Recurso local para dashboard de acidentes indisponivel.')
-        }
-
-        const resultado = await dataClient.acidentes.dashboard(params)
-        const {
-          resumo = null,
-          tendencia = [],
-          tipos = [],
-          partesLesionadas = [],
-          lesoes = [],
-          cargos = [],
-          agentes = [],
-          options = {},
-        } = resultado ?? {}
-
-        setDashboardData({
-          resumo,
-          tendencia,
-          tipos,
-          partesLesionadas,
-          lesoes: Array.isArray(lesoes) ? lesoes : [],
-          cargos,
-          agentes,
-        })
-        setFilterOptions({
-          centrosServico: Array.isArray(options.centrosServico) ? options.centrosServico : [],
-          tipos: Array.isArray(options.tipos) ? options.tipos : [],
-          lesoes: Array.isArray(options.lesoes) ? options.lesoes : [],
-          partesLesionadas: Array.isArray(options.partesLesionadas) ? options.partesLesionadas : [],
-          agentes: Array.isArray(options.agentes) ? options.agentes : [],
-          cargos: Array.isArray(options.cargos) ? options.cargos : [],
-        })
-        return
+      if (!dataClient?.acidentes?.dashboard) {
+        throw new Error('Recurso de dashboard de acidentes indisponivel.')
       }
 
-      let query = supabase.from('vw_indicadores_acidentes').select('*')
-
-      if (params?.ano) {
-        query = query.eq('ano', Number(params.ano))
-      }
-
-      if (params?.unidade && params.unidade !== 'todas') {
-        query = query.eq('unidade', params.unidade)
-      }
-
-      const { data, error: queryError } = await query.maybeSingle()
-
-      if (queryError) {
-        throw queryError
-      }
-
-      if (!data) {
-        setDashboardData(EMPTY_STATE)
-        setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
-        return
-      }
-
-      const remoteOptions = await fetchRemoteFilterOptions()
-
-      const resumo = normalizeResumo(data.resumo ?? data.cards ?? data.indicadores ?? data.resumo_indicadores)
-      const tendencia = normalizeArray(data.tendencia ?? data.serie_mensal ?? data.mensal)
-      const tipos = normalizeArray(data.tipos ?? data.distribuicao_tipos ?? data.por_tipo)
-      const partes = normalizeArray(data.partes_lesionadas ?? data.partes ?? data.distribuicao_partes)
-      const lesoes = normalizeArray(data.lesoes ?? data.distribuicao_lesoes ?? data.por_lesao)
-      const cargos = normalizeArray(data.cargos ?? data.distribuicao_cargos ?? data.por_cargo)
-      const agentes = normalizeArray(data.agentes ?? data.distribuicao_agentes ?? data.por_agente)
+      const resultado = await dataClient.acidentes.dashboard(params)
+      const {
+        resumo = null,
+        tendencia = [],
+        tipos = [],
+        partesLesionadas = [],
+        lesoes = [],
+        cargos = [],
+        agentes = [],
+        options = {},
+      } = resultado ?? {}
 
       setDashboardData({
         resumo,
         tendencia,
         tipos,
-        partesLesionadas: partes,
-        lesoes,
+        partesLesionadas,
+        lesoes: Array.isArray(lesoes) ? lesoes : [],
         cargos,
         agentes,
       })
-      setFilterOptions(remoteOptions)
+      setFilterOptions({
+        centrosServico: Array.isArray(options.centrosServico) ? options.centrosServico : [],
+        tipos: Array.isArray(options.tipos) ? options.tipos : [],
+        lesoes: Array.isArray(options.lesoes) ? options.lesoes : [],
+        partesLesionadas: Array.isArray(options.partesLesionadas) ? options.partesLesionadas : [],
+        agentes: Array.isArray(options.agentes) ? options.agentes : [],
+        cargos: Array.isArray(options.cargos) ? options.cargos : [],
+      })
     } catch (err) {
       setError(err?.message ?? 'Falha ao carregar dashboard de acidentes.')
       setDashboardData(EMPTY_STATE)
