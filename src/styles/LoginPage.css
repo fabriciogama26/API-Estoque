@@ -190,3 +190,8 @@
 .login-auth-card__footer-text {
   color: #fff;
 }
+
+/* Mensagem de recuperacao na tela de login */
+.login-auth .feedback--success {
+  color: #ffffff;
+}
