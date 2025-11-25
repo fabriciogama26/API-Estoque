@@ -121,6 +121,7 @@ export function ResetPasswordPage() {
       return
     }
 
+    
     setIsSubmitting(true)
     try {
       const { error } = await supabase.auth.updateUser({ password: form.newPassword })
