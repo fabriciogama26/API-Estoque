@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/ProtectedRoute.jsx'
 import { MainLayout } from './layouts/MainLayout.jsx'
 import { LoginPage } from './pages/LoginPage.jsx'
+import { ResetPasswordPage } from './pages/ResetPasswordPage.jsx'
 import { PessoasPage } from './pages/Pessoas.jsx'
 import { ConfiguracoesPage } from './pages/Configuracoes.jsx'
 import { MateriaisPage } from './pages/Materiais.jsx'
@@ -17,6 +18,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>

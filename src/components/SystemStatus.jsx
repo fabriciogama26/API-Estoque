@@ -70,6 +70,7 @@ export function SystemStatus({ className = '' }) {
   const [userProfile, setUserProfile] = useState(null)
   const health = useSystemHealth()
   const { state, message } = health
+  const settingsDisabled = true
 
   useEffect(() => {
     if (!user?.id || isLocalMode || !supabase) {
@@ -183,6 +184,9 @@ export function SystemStatus({ className = '' }) {
   }
 
   const handleOpenSettings = () => {
+    if (settingsDisabled) {
+      return
+    }
     navigate('/configuracoes')
   }
 
@@ -225,6 +229,9 @@ export function SystemStatus({ className = '' }) {
             className="system-status__icon-button"
             onClick={handleOpenSettings}
             aria-label="Abrir configuracoes"
+            disabled={settingsDisabled}
+            aria-disabled={settingsDisabled}
+            title="Configuracoes desativadas"
           >
             <Settings size={18} />
           </button>
