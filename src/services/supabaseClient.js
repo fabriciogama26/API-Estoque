@@ -14,7 +14,8 @@ export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
-        persistSession: false,
+        // Mantem a sessao para que links de recuperacao de senha funcionem apos o redirect
+        persistSession: true,
         detectSessionInUrl: true,
       },
     })
