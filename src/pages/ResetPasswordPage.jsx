@@ -32,6 +32,22 @@ export function ResetPasswordPage() {
           return
         }
 
+        // Tenta extrair sessão direto da URL (hash/query) usando helper oficial
+        try {
+          const { data: urlSessionData, error: urlSessionError } = await supabase.auth.getSessionFromUrl({
+            storeSession: true,
+          })
+          if (urlSessionError) {
+            throw urlSessionError
+          }
+          if (urlSessionData?.session) {
+            setIsReady(true)
+            return
+          }
+        } catch (urlError) {
+          console.warn('getSessionFromUrl falhou', urlError)
+        }
+
         const currentUrl = new URL(window.location.href)
         const hashParams = new URLSearchParams(currentUrl.hash?.replace(/^#/, '') ?? '')
         const searchParams = currentUrl.searchParams
@@ -111,7 +127,7 @@ export function ResetPasswordPage() {
       if (error) {
         throw error
       }
-      setStatus({ type: 'success', message: 'Senha atualizada! Use-a para entrar novamente.' })
+      setStatus({ type: 'success', message: 'Senha atualizada! Redirecionando para o login...' })
       setForm({ newPassword: '', confirmPassword: '' })
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Nao foi possivel atualizar a senha.' })
@@ -120,9 +136,15 @@ export function ResetPasswordPage() {
     }
   }
 
-  const handleGoToLogin = () => {
-    navigate('/login')
-  }
+  useEffect(() => {
+    if (status?.type === 'success') {
+      const id = window.setTimeout(() => {
+        navigate('/login', { replace: true })
+      }, 1200)
+      return () => window.clearTimeout(id)
+    }
+    return undefined
+  }, [status?.type, navigate])
 
   const isFormDisabled = Boolean(sessionError) || isCheckingSession
 
@@ -193,9 +215,6 @@ export function ResetPasswordPage() {
               disabled={isSubmitting || isFormDisabled}
             >
               {isSubmitting ? 'Atualizando...' : 'Salvar nova senha'}
-            </button>
-            <button type="button" className="button button--ghost" onClick={handleGoToLogin}>
-              Voltar para o login
             </button>
           </div>
         </form>
