@@ -127,7 +127,7 @@
 }
 .dashboard-insight-card--blue .dashboard-insight-card__helper { color: var(--color-accent); }
 .dashboard-insight-card--blue .dashboard-insight-card__title::before {
-  content: "Ações Preventivas - ";
+  content: "";
 }
 
 /* Verde – Zero Acidentes */
@@ -140,7 +140,7 @@
 }
 .dashboard-insight-card--green .dashboard-insight-card__helper { color: var(--color-primary); }
 .dashboard-insight-card--green .dashboard-insight-card__title::before {
-  content: "Zero Acidentes - ";
+  content: "";
 }
 
 /* Laranja – Pendências de EPI */
@@ -153,7 +153,7 @@
 }
 .dashboard-insight-card--orange .dashboard-insight-card__helper { color: #f97316; }
 .dashboard-insight-card--orange .dashboard-insight-card__title::before {
-  content: "Pendências de EPI - ";
+  content: "";
 }
 
 /* Vermelho – Acidentes/Incidentes */
@@ -166,7 +166,7 @@
 }
 .dashboard-insight-card--red .dashboard-insight-card__helper { color: var(--color-danger); }
 .dashboard-insight-card--red .dashboard-insight-card__title::before {
-  content: "Acidentes/Incidentes - ";
+  content: "";
 }
 
 /* Cinza – Outros indicadores */
@@ -179,7 +179,7 @@
 }
 .dashboard-insight-card--slate .dashboard-insight-card__helper { color: #475569; }
 .dashboard-insight-card--slate .dashboard-insight-card__title::before {
-  content: "Outros Indicadores - ";
+  content: "";
 }
 
 /* TITULOS */
