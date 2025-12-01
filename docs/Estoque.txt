@@ -1,43 +1,47 @@
 Tela: Estoque Atual
 ===================
 
-Visão geral
+Visao geral
 -----------
-- Consolida o saldo por material, apresenta alertas de estoque mínimo e permite ajuste desse parâmetro por item.
-- O carregamento principal utiliza `api.estoque.current({ periodoInicio, periodoFim })`, que retorna `itens` e `alertas`.
-- Valores monetários são formatados em BRL e quantidades usam `Intl.NumberFormat` para consistência.【F:src/pages/EstoquePage.jsx†L15-L117】
+- Consolida saldo por material, lista alertas de estoque minimo e permite ajuste inline do minimo.
+- Carrega via `api.estoque.current({ periodoInicio, periodoFim })`, retornando `itens` e `alertas`.
+- Valores monetarios em BRL; quantidades com `Intl.NumberFormat`.
+
+Arquitetura (modular)
+---------------------
+- Hook/Contexto: `useEstoque` + `EstoqueContext` (para tela Estoque) cuidam de dados, filtros e atualizacoes; caches evitam recargas desnecessarias.
+- Filtros isolados em `useEstoqueFiltro.js`; regras em `src/rules/estoqueRules.js` (minimo, validacao).
+- Servicos: `dataClient.estoque.current` para saldo/alertas; `materiais.update` para salvar minimo.
+- Logs de erro: use `useErrorLogger('estoque')` para registrar falhas de carga ou update (integra com `app_errors`).
 
 Filtros
 -------
-- **Período (mês inicial/final):** converte para `Date` UTC para filtrar itens pela última atualização (`ultimaAtualizacao`).
-- **Termo de busca:** busca em nome, fabricante e centros de custo.
-- **Centro de custo:** select preenchido com valores únicos derivados dos itens carregados.
-- Botões *Aplicar filtros* (submete o formulário) e *Limpar filtros* (restaura defaults e recarrega).【F:src/pages/EstoquePage.jsx†L119-L200】
+- Periodo inicial/final (mes/ano), termo de busca (nome/fabricante/centro), centro de estoque.
+- Botoes: **Aplicar filtros** (submete), **Limpar filtros** (restaura defaults e recarrega).
 
 Alertas
 -------
-- Lista resumida na primeira seção com badge, quantidade atual, mínimo, déficit e valor estimado de reposição.
-- Apenas itens filtrados entram nos alertas; se não houver, mensagem neutra informa ausência de pendências.【F:src/pages/EstoquePage.jsx†L202-L266】
+- Cards mostram badge, quantidade atual, minimo, deficit e valor estimado de reposicao.
+- Apenas itens filtrados entram nos alertas; vazio exibe mensagem neutra.
 
 Resumo geral
 ------------
-- Total em estoque (valor), total de itens, valor necessário para reposição (soma do déficit) e data da última movimentação.
-- As métricas consideram apenas itens filtrados e são recalculadas em `useMemo` para eficiência.【F:src/pages/EstoquePage.jsx†L268-L318】
+- Total em estoque (valor), total de itens, valor de reposicao (soma do deficit) e data da ultima movimentacao.
+- Calculados via `useMemo` sobre itens filtrados.
 
 Lista de itens
 --------------
-- Cada cartão exibe fabricante, quantidade, valor unitário/total, validade (dias), CA, centros de custo e última atualização formatada.
-- Campo **Estoque mínimo** permite edição inline; ao salvar dispara `api.materiais.update` com `estoqueMinimo` e `usuarioResponsavel`, recarregando os dados na sequência.
-- Mensagens de erro por item informam entradas inválidas; botões ficam desativados enquanto a requisição está em andamento.【F:src/pages/EstoquePage.jsx†L320-L407】
+- Cada cartao: fabricante, quantidade, valor unitario/total, validade (dias), CA, centros de custo e ultima atualizacao formatada.
+- Campo **Estoque minimo** editavel inline; salva via `api.materiais.update` com `estoqueMinimo` e `usuarioResponsavel`, depois recarrega dados.
+- Erros por item exibem feedback; botoes desabilitam enquanto salva.
 
-Boas práticas
+Boas praticas
 -------------
-- Configure políticas no Supabase para permitir que usuários autenticados atualizem `estoque_minimo` na tabela `materiais`.
-- Utilize os filtros de período para auditar movimentações específicas antes de gerar relatórios externos.
-- No modo local, mantenha `localApi.estoque.current` sincronizado com a estrutura esperada (`alertas` + `itens`) para evitar que cartões fiquem vazios.
+- Configure politicas no Supabase para permitir update de `estoque_minimo` em `materiais` por usuarios autenticados.
+- No modo local, mantenha `localApi.estoque.current` alinhado com estrutura esperada (`alertas` + `itens`).
+- Use filtros de periodo para auditar movimentacoes especificas antes de relatorios externos.
 
-
-Atualizacao 2025-11
---------------------
-- Descrevi a revisao de labels no estoque atual (`formatMaterialResumo`, truncamento amigavel e tooltip com descricao completa).
-- Documentei o mecanismo de filtros contextuais: ao clicar em um item dos graficos o estado `chartFilter` e atualizado e a listagem desta tela passa a refletir o mesmo termo.
+Atualizacao 2025-12
+-------------------
+- Refatorada para hook/context com carregamento silencioso e sem flicker no botao de filtro; caches de chave evitam load repetido.
+- Integrou `useErrorLogger` na tela de estoque para registrar falhas.

@@ -9,6 +9,13 @@ Aplicação completa para controle de EPIs, construída com React (Vite) e integ
 - **Documentos:** geração do termo de EPI com visualização imediata e download em PDF renderizado no cliente.
 - **Modos de dados:** alternância entre Supabase (remoto) e armazenamento local (`localStorage`) com o mesmo conjunto de páginas.
 
+## Novidades 2025-12
+
+- **Dashboard de estoque modularizado:** `useDashboardEstoque` + `DashboardEstoqueContext` isolam filtros, cacheiam a chave de busca para evitar recargas repetidas e removem flicker nos botões; utils em `dashboardEstoqueUtils.js` formatam séries e rankings.
+- **Entradas reorganizada:** lógica de formulário/filtros/autocomplete movida para `useEntradasController` e `EntradasContext`, com serviços dedicados (`entradasService`) e logging de erros via `useErrorLogger('entradas')`.
+- **Rotas compatíveis:** além de `/entradas` e `/saidas`, o menu usa `/movimentacoes/entradas|saidas`; ambos caminhos são aceitos.
+- **Registro de erros no Supabase:** falhas capturadas pelos hooks são enviados para a tabela `app_errors` (ver migration `20251201000000_create_app_errors.sql`).
+
 ## Novidades 2025-11
 
 - **Gráficos interativos:** cada widget do dashboard ganhou botão de expandir (`ExpandIcon`) e modal fullscreen com clique fora/`Esc` para fechar.

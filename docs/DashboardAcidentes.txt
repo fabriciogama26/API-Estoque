@@ -32,7 +32,7 @@ Erros e pré-requisitos
 - Seeds locais devem incluir exemplos em `localApi.acidentes.dashboard` para manter os gráficos populados durante desenvolvimento offline.
 
 
-Atualizacao 2025-11
---------------------
-- Indiquei que o dashboard de acidentes pode herdar o mesmo mecanismo de modal fullscreen adotado no modulo de estoque caso novos graficos avancados sejam adicionados.
-- Mencionei que o pattern de filtros clicaveis esta isolado em `DashboardPage.jsx` e pode ser replicado parcialmente aqui caso gestores queiram segmentar dados por centro de servico.
+Atualizacao 2025-12
+-------------------
+- Fluxo modular: pagina orquestra `DashboardAcidentesContext` e `useDashboardAcidentes`, que cacheia a chave de filtros e evita flicker ao aplicar/limpar.
+- Filtros clicaveis seguem o mesmo padrao do dashboard de estoque; erros reportados via `useErrorLogger('dashboard_acidentes')`.

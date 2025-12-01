@@ -1,46 +1,49 @@
 Tela: Cadastro de Acidentes
 ===========================
 
-Visão geral
+Visao geral
 -----------
-- Tela responsável por registrar, editar e consultar acidentes de trabalho vinculados às pessoas cadastradas.
-- Mantém relacionamento com catálogos de agentes, tipos, lesões e partes lesionadas carregados do Supabase/local API e guarda histórico das alterações.
-- Permite filtrar a listagem por termo livre, tipo, centro de serviço e agente.
+- Registrar, editar e consultar acidentes de trabalho vinculados a pessoas cadastradas.
+- Usa catalogos de agentes, tipos, lesoes e partes lesionadas; mantem historico das alteracoes.
+- Filtros: termo livre, tipo, centro de servico, agente.
+
+Arquitetura (modular)
+---------------------
+- Hooks: `useAcidentes`, `useAcidenteForm`, `useAcidenteFiltro`, `usePessoas`, `useAgentes`, `useLocais`, `usePartes` isolam dados/estado.
+- Contexto opcional: `AcidentesContext` pode expor acidentes, filtros e actions (reload, setFilters) para componentes de UI.
+- Serviços: `acidentesService`/`pessoasService` concentram chamadas Supabase/local; utils em `src/utils/acidentesUtils.js` (normalizacao, parse, nomes de agentes).
+- Erros: usar `useErrorLogger('acidentes')` para registrar falhas de load, submit, filtros e historico na tabela `app_errors`.
 
 Fluxos principais
 -----------------
-1. **Cadastro/edição**
-   - Selecionar uma matrícula existente. O formulário bloqueia o campo enquanto os colaboradores estão sendo carregados para evitar edições incorretas.
-   - Campos obrigatórios: matrícula, nome/cargo (preenchidos automaticamente após a matrícula), data, dias perdidos, dias debitados, HHT, centro de serviço, local, agente(s), tipo(s), lesão(ões) e parte(s) lesionada(s).
-   - Campos auxiliares: CAT, observação, CID.
-   - Botão *Registrar acidente* cria o registro; durante uma edição é exibido *Salvar alterações* e o atalho *Cancelar edição* volta ao estado inicial.【F:src/components/Acidentes/AcidentesForm.jsx†L377-L444】【F:src/components/Acidentes/AcidentesForm.jsx†L520-L738】
-2. **Multiseleção de agentes, tipos, lesões e partes**
-   - Cada seção possui um `select` alimentado pelas opções carregadas da API. Ao clicar em **Adicionar** o valor atual é movido para uma lista de chips, permitindo múltiplos valores.
-   - Os chips exibem botão “x” para remoção e são obrigatórios (não é possível salvar sem pelo menos um item em cada categoria). Placeholders mudam conforme o carregamento para guiar o usuário.【F:src/components/Acidentes/AcidentesForm.jsx†L552-L719】
-3. **Histórico**
-   - O botão de relógio na tabela abre o modal de histórico para revisar alterações cronológicas (origem Supabase x modo local). O estado `historyState` impede múltiplas requisições simultâneas e mostra carregamento individual por linha.【F:src/components/Acidentes/AcidentesTable.jsx†L26-L116】【F:src/pages/Acidentes.jsx†L51-L87】
-4. **Filtros**
-   - Barra superior aceita termo livre (nome, matrícula, centro), filtro de tipo, centro de serviço e agente. Botão *Aplicar* envia para `filterAcidentes` no serviço; *Limpar* restaura os defaults.【F:src/components/Acidentes/AcidentesFilters.jsx†L1-L36】【F:src/pages/Acidentes.jsx†L18-L49】
+1) Cadastro/edicao
+   - Seleciona matricula existente; campos obrigatorios: matricula, data, dias perdidos/debitados, HHT, centro de servico, local, agente(s), tipo(s), lesao(oes), parte(s) lesionada(s).
+   - Campos auxiliares: CAT, observacao, CID, flags de lancamento (eSOCIAL/SESMT).
+   - Botao alterna entre *Registrar acidente* e *Salvar alteracoes*; *Cancelar edicao* reseta estado.
+2) Multiselecoes (agente/tipo/lesoes/partes)
+   - Select popula opcoes; **Adicionar** move o valor para chips removiveis. Bloqueia salvar sem ao menos um item em cada categoria obrigatoria.
+3) Historico
+   - Botao de relogio abre `AcidentesHistoryModal`; busca via `acidentesService.getAcidenteHistory(id)`. Estado controla loading/erro por modal.
+4) Filtros
+   - Barra superior controla `filters`; *Aplicar* usa `filterAcidentes` (utils); *Limpar* restaura defaults e reload.
 
 Carregamento de dados
 ---------------------
-- Pessoas, centros de serviço e locais são carregados em paralelo (`api.pessoas.list`, `api.acidentes.locals`) para alimentar autocomplete e selects.
-- Catálogos de agentes, tipos, lesões e partes possuem tratamento de erro individual — cada conjunto exibe `feedback--error` específico quando a requisição falha.
-- A listagem principal vem de `api.acidentes.list()` e é atualizada ao salvar/editar registros ou limpar filtros.【F:src/pages/Acidentes.jsx†L51-L170】【F:src/components/Acidentes/AcidentesForm.jsx†L720-L738】
+- Pessoas, centros/locais, agentes, tipos, lesoes e partes carregam em paralelo; cada catalogo trata erro isoladamente.
+- Lista principal `useAcidentes` atualiza apos salvar/editar ou limpar filtros.
 
-Regras e validações
+Regras e validacoes
 -------------------
-- As funções `validateAcidenteForm`, `createAcidentePayload` e `updateAcidentePayload` garantem payload coerente antes de enviar ao Supabase/local API (ver `src/rules/AcidentesRules.js`).
-- O formulário mantém consistência de dados entre campos derivados (por exemplo, chips x campos ocultos `lesao`/`parteLesionada`) para compatibilidade com tabelas antigas.【F:src/pages/Acidentes.jsx†L21-L38】【F:src/components/Acidentes/AcidentesForm.jsx†L661-L705】
+- `validateAcidenteForm`, `createAcidentePayload`, `updateAcidentePayload` (rules/utils) garantem payload coerente.
+- Mantem consistencia entre chips e campos derivados para compatibilidade com tabelas antigas.
 
-Boas práticas
+Boas praticas
 -------------
-- Carregue a tela após configurar catálogos de domínio no banco (agentes, tipos, lesões, partes) para evitar placeholders vazios.
-- Prefira usar a matrícula como chave primária durante importações em massa — o componente atualiza nome/cargo automaticamente com base nessa referência.
-- Utilize o modal de histórico para auditar ajustes manuais ou sincronizações feitas via Supabase Studio.
+- Publique catalogos (agentes, tipos, lesoes, partes) antes de abrir a tela.
+- Prefira matricula como chave em importacoes; nome/cargo sao derivados.
+- Use o historico para auditar ajustes feitos manualmente ou via Supabase.
 
-
-Atualizacao 2025-11
---------------------
-- Reforce que os graficos do painel de acidentes podem reutilizar o mesmo padrao de modal fullscreen e botoes de expandir adotados no dashboard de estoque. Basta copiar a estrutura `chart-modal__overlay` e as classes de acao.
-- Caso futuramente sejam criados filtros clicaveis semelhantes, a documentacao deve apontar para o `chartFilter` em `DashboardPage.jsx`, garantindo comportamento consistente entre indicadores de SST.
+Atualizacao 2025-12
+-------------------
+- Tela modularizada em hooks/services/utils; UI dividida em componentes (`AcidentesForm`, `AcidentesFilters`, `AcidentesTable`, `AcidentesHistoryModal`).
+- Logs de erro direcionados a `app_errors` via `useErrorLogger('acidentes')`; filtros/loads nao devem causar flicker.

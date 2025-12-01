@@ -1,31 +1,38 @@
 Tela: Entradas
 ==============
 
-Visão geral
+Visao geral
 -----------
-- Permite registrar novas entradas de materiais no estoque e acompanhar o histórico paginado.
-- Reutiliza catálogos de materiais carregados via `api.materiais.list()` para validar os registros e calcular valores totais.【F:src/pages/EntradasPage.jsx†L29-L79】
+- Registra novas entradas de materiais no estoque e exibe historico paginado.
+- Reutiliza catalogos de materiais (`api.materiais.list`) para validar registros e calcular valores totais.
+
+Arquitetura
+-----------
+- `EntradasProvider` (`src/context/EntradasContext.jsx`) expõe o estado do hook `useEntradasController`.
+- Logica e handlers no hook; utilitarios em `src/utils/entradasUtils.js` (datas, normalizacao, resumo do material, queries).
+- Servicos em `src/services/entradasService.js` para list/create/update/history de entradas, listar/buscar materiais e centros de estoque.
+- Logs de erro: `useEntradasController` usa `useErrorLogger('entradas')` para reportar falhas de carga, submit, filtros, historico e busca de materiais.
 
 Cadastro
 --------
-- Campos obrigatórios: material, quantidade, centro de custo e data da entrada. Todos os inputs possuem validações básicas (número mínimo 1, data obrigatória).
-- Ao salvar, envia payload contendo `usuarioResponsavel` (nome do usuário autenticado) e limpa o formulário ao concluir.【F:src/pages/EntradasPage.jsx†L81-L126】
-- Erros de validação exibem `feedback--error` acima dos botões.
+- Campos obrigatorios: material, quantidade, centro de estoque e data da entrada (numero minimo 1).
+- Payload inclui `usuarioResponsavel` (usuario autenticado) e limpa formulario/auto-complete ao concluir.
+- Erros de validacao exibem `feedback--error` acima dos botoes.
 
-Filtros e listagem
-------------------
-- Filtros: termo livre (material/fabricante/usuário), material, centro de custo e faixa de datas.
-- O histórico utiliza `TablePagination` com `TABLE_PAGE_SIZE`. Cada linha calcula o valor total multiplicando a quantidade pela última informação de valor unitário do material.【F:src/pages/EntradasPage.jsx†L128-L212】【F:src/pages/EntradasPage.jsx†L214-L276】
-- Botão **Atualizar** refaz a consulta com filtros atuais; se não houver registros, exibe mensagem neutra.
+Filtros, auto-complete e listagem
+---------------------------------
+- Filtros: termo livre (material/fabricante/usuario), registrado por, centro de estoque e faixa de datas. **Aplicar** chama `load(filters)`; **Limpar** restaura filtros iniciais e recarrega.
+- Auto-complete: inicia busca apos `MATERIAL_SEARCH_MIN_CHARS`, com debounce (`MATERIAL_SEARCH_DEBOUNCE_MS`) e limite de resultados; usa `api.materiais.search` quando disponivel, senao fallback local.
+- Historico usa `TablePagination` com `TABLE_PAGE_SIZE`. Cada linha calcula valor total (quantidade * valorUnitario). Se a API nao retornar centros de estoque, o hook deriva opcoes dos registros.
+- Botao **Atualizar** refaz a consulta com filtros atuais; em vazio, mostra mensagem neutra.
 
-Boas práticas
+Boas praticas
 -------------
-- Mantenha o catálogo de materiais completo (incluindo fabricante e valor unitário) para que o histórico apresente informações consistentes.
-- Ao operar no modo local, garanta que `localApi.entradas.list` replique os mesmos campos (`materialId`, `dataEntrada`, `quantidade`, `centroCusto`, `usuarioResponsavel`).
-- Use os filtros de data para recortes específicos antes de exportar relatórios externos.
+- Mantenha o catalogo de materiais completo (fabricante e valor unitario) para historico consistente.
+- No modo local, `localApi.entradas.*` deve replicar `materialId`, `dataEntrada`, `quantidade`, `centroCusto`, `usuarioResponsavel`.
+- Use filtros de data para recortes especificos antes de exportar relatorios externos.
 
-
-Atualizacao 2025-11
---------------------
-- Acrescentei observacao de que os filtros disparados pelos graficos preenchem automaticamente o campo `termo` desta tela, portanto mantenha o handler de `onChange` limpando `chartFilter` como feito no dashboard.
-- Detalhei o impacto da agregacao por fabricante/centro nas consultas de entradas, incentivando a registrar `centroServico` sempre que disponivel para alimentar os novos indicadores.
+Atualizacao 2025-12
+-------------------
+- Modularizacao: pagina apenas orquestra `EntradasProvider`; logica de busca, filtros, historico e autocomplete foi extraida para hook + utils/services.
+- Registro de erros da tela enviado para Supabase via `useErrorLogger('entradas')`.

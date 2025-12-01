@@ -1,40 +1,43 @@
 Tela: Dashboards de Estoque
 ===========================
 
-Visão geral
+Visao geral
 -----------
-- Consolida indicadores de movimentação de estoque (entradas, saídas, valor total e reposição) no período filtrado.
-- Agrupa dados por período (mês/ano) e apresenta gráficos de barras/linhas para evolução, ranking de materiais e distribuição por categoria.
-- Fonte de dados é `api.estoque.dashboard`, que retorna blocos específicos para cada widget.【F:src/pages/DashboardPage.jsx†L63-L107】
+- Consolida indicadores de movimentacao de estoque (entradas, saidas, valor total, alertas) no periodo filtrado.
+- Grupos por periodo (mes/ano) e rankings (materiais, categorias, fabricantes, centros, setores, pessoas).
+- Fonte: `api.estoque.dashboard` via `fetchDashboardEstoque` (`src/services/dashboardEstoqueApi.js`).
 
-Filtros disponíveis
+Arquitetura
+-----------
+- Hook `useDashboardEstoque` concentra filtros, cacheia a chave de busca para evitar recargas repetidas e monta series/ rankings; utils em `src/utils/dashboardEstoqueUtils.js`.
+- `DashboardEstoqueProvider` expõe estado e mensagens de tooltip; pagina `DashboardPage.jsx` so orquestra filtros, cards e grade de graficos.
+- Sem spinner global: botao de filtro permanece estatico; dados so atualizam quando a chave de filtros muda.
+
+Filtros disponiveis
 -------------------
-- **Período inicial/final (AAAA-MM):** aplica recorte mensal inclusive nas consultas de entradas/saídas.
-- **Termo livre:** busca por nome/fabricante, reutilizado em todos os cards para limitar os materiais exibidos.
-- Botão *Aplicar filtros* dispara nova chamada; *Limpar filtros* restaura o ano corrente completo.【F:src/pages/DashboardPage.jsx†L34-L61】【F:src/pages/DashboardPage.jsx†L109-L139】
+- Periodo inicial/final (AAAA-MM) e termo livre (nome/fabricante/categoria/centro/setor/pessoa).
+- Clique em graficos aplica filtro contextual (`chartFilter`) e exibe badge "Limpar".
+- **Aplicar filtros** chama `load(filters)`; **Limpar filtros** restaura o ano corrente.
 
 Indicadores principais
 ----------------------
-- **Cards de resumo:** total de entradas (quantidade + valor), total de saídas e saldo do estoque atual. Valores formatados com `Intl.NumberFormat` para BRL.【F:src/pages/DashboardPage.jsx†L18-L33】【F:src/pages/DashboardPage.jsx†L141-L178】
-- **Série histórica (EntradasSaidasChart):** soma de quantidades e valores mês a mês a partir de `entradasDetalhadas`/`saidasDetalhadas`. A agregação é feita pela função `agruparPorPeriodo` antes de renderizar o gráfico de barras combinadas.【F:src/pages/DashboardPage.jsx†L41-L76】【F:src/pages/DashboardPage.jsx†L180-L190】
-- **Estoque por material:** lista top-N ordenada por quantidade disponível, exibida em gráfico horizontal (`EstoquePorMaterialChart`).【F:src/pages/DashboardPage.jsx†L192-L197】
-- **Categorias:** monta mapa por primeira palavra do nome (fallback “Não classificado”) para agrupar famílias de EPIs.【F:src/pages/DashboardPage.jsx†L198-L205】
-- **Materiais mais movimentados:** ranking das saídas acumuladas (quantidade) no período analisado.【F:src/pages/DashboardPage.jsx†L206-L213】
+- Cards de resumo (movimentacoes, valor movimentado, estoque/saidas, alertas ativos, materiais monitorados) com variantes de cor (`tone`) definidas em `highlightCards`.
+- Serie historica (EntradasSaidasChart) agrega quantidades/valores por mes via `agruparPorPeriodo`.
+- Valor movimentado (ValorMovimentadoChart) usa a mesma serie com formatacao BRL.
+- Rankings: materiais, categorias, fabricantes, centros, setores e pessoas construidos pelas funcoes `montarTop*` dos utils (filtros aplicados localmente).
 
-Estados e tratamento de erros
------------------------------
-- `isLoading` exibe mensagem na área principal enquanto aguarda os dados; erros exibem `feedback--error` com a mensagem retornada pela API.【F:src/pages/DashboardPage.jsx†L113-L122】【F:src/pages/DashboardPage.jsx†L232-L251】
-- Em caso de retorno vazio, cada gráfico mostra feedback neutro (“sem dados”) implementado nos componentes de chart.
+Erros e comportamento
+---------------------
+- Erros de carga sao reportados via `useErrorLogger('dashboard_estoque')`; pagina exibe mensagem de erro ao inves de flicker.
+- Modal de expansao nos graficos usa `expandedChartId`; clique fora ou no X fecha.
 
-Boas práticas para dados
+Boas praticas para dados
 ------------------------
-- Garanta que a API retorne `valorUnitario` para entradas/saídas; sem isso o cálculo `quantidade * valorUnitario` ficará zerado.
-- Para novos indicadores, estenda `api.estoque.dashboard` mantendo a estrutura atual (`entradas`, `saidas`, `estoqueAtual`, `materiaisMaisMovimentados`, etc.) para evitar ajustes na página.
-- Use seeds de `src/data/local-seed.json` como referência de formatos quando desenvolver no modo local.
+- Retorne `valorUnitario` nas entradas/saidas para que os valores financeiros sejam corretos.
+- Mantenha campos de exibicao preenchidos (fabricante, centro de servico, setor, pessoa) para evitar rótulos "Nao informado".
+- No modo local, mantenha o formato da resposta de `api.estoque.dashboard` alinhado aos utils para evitar ajustes na pagina.
 
-
-Atualizacao 2025-11
---------------------
-- Documentei o fluxo de expansao individual de graficos (botao com `ExpandIcon`, modal fullscreen e fechamento com clique externo) e os estilos adicionados em `DashboardPage.css`.
-- Acrescentei a descricao do filtro contextual disparado pelos graficos de material/categoria/fabricante/centro, incluindo o indicador visual `chart-filter-indicator` e a forma como o termo global e preenchido automaticamente.
-- Registrei ajustes de usabilidade: resumo de materiais agora usa `formatEstoqueMaterialLabel`, tooltips exibem a descricao completa e os eixos Y receberam fontes menores.
+Atualizacao 2025-12
+-------------------
+- Refatorado para hook/context e utils dedicados; cache da chave de filtros remove recargas desnecessarias e flicker nos botoes.
+- Filtros clicaveis centralizados no hook; pagina apenas cola componentes.
