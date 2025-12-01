@@ -1,6 +1,18 @@
-export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onChange, onSubmit, onClear }) {
+import { useAcidentesContext } from '../../../context/AcidentesContext.jsx'
+
+export function AcidentesFilters() {
+  const {
+    filters,
+    handleFilterChange,
+    handleFilterSubmit,
+    handleFilterClear,
+    tiposFiltro: tipos,
+    centrosServico,
+    agentesFiltro: agentes,
+  } = useAcidentesContext()
+
   const handleCheckboxChange = (name) => (event) => {
-    onChange({
+    handleFilterChange({
       target: {
         name,
         value: event.target.checked,
@@ -9,19 +21,19 @@ export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onCh
   }
 
   return (
-    <form className="form form--inline" onSubmit={onSubmit}>
+    <form className="form form--inline" onSubmit={handleFilterSubmit}>
       <label className="field">
         <span>Buscar</span>
         <input
           name="termo"
           value={filters.termo}
-          onChange={onChange}
+          onChange={handleFilterChange}
           placeholder="Nome, matricula, centro de servico"
         />
       </label>
       <label className="field">
         <span>Tipo</span>
-        <select name="tipo" value={filters.tipo} onChange={onChange}>
+        <select name="tipo" value={filters.tipo} onChange={handleFilterChange}>
           <option value="todos">Todos</option>
           {tipos.map((tipo) => (
             <option key={tipo} value={tipo}>
@@ -32,7 +44,7 @@ export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onCh
       </label>
       <label className="field">
         <span>Centro de servico</span>
-        <select name="centroServico" value={filters.centroServico} onChange={onChange}>
+        <select name="centroServico" value={filters.centroServico} onChange={handleFilterChange}>
           <option value="todos">Todos</option>
           {centrosServico.map((centro) => (
             <option key={centro} value={centro}>
@@ -43,7 +55,7 @@ export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onCh
       </label>
       <label className="field">
         <span>Agente</span>
-        <select name="agente" value={filters.agente} onChange={onChange}>
+        <select name="agente" value={filters.agente} onChange={handleFilterChange}>
           <option value="todos">Todos</option>
           {agentes.map((agente) => (
             <option key={agente} value={agente}>
@@ -76,7 +88,7 @@ export function AcidentesFilters({ filters, tipos, centrosServico, agentes, onCh
         <button type="submit" className="button button--ghost">
           Aplicar
         </button>
-        <button type="button" className="button button--ghost" onClick={onClear}>
+        <button type="button" className="button button--ghost" onClick={handleFilterClear}>
           Limpar
         </button>
       </div>
