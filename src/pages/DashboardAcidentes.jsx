@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { AlertIcon, BarsIcon, PieIcon, TrendIcon, InfoIcon, ExpandIcon, CancelIcon } from '../components/icons.jsx'
 import { DashboardCards } from '../components/DashboardCards.jsx'
@@ -9,140 +9,32 @@ import { ChartLesoes } from '../components/charts/ChartLesoes.jsx'
 import { ChartCargos } from '../components/charts/ChartCargos.jsx'
 import { ChartAgentes } from '../components/charts/ChartAgentes.jsx'
 import { FiltrosDashboard } from '../components/FiltrosDashboard.jsx'
-import { dataClient } from '../services/dataClient.js'
-import { resolveIndicadorValor } from '../utils/indicadores.js'
+import { DashboardAcidentesProvider, useDashboardAcidentesContext } from '../context/DashboardAcidentesContext.jsx'
+import { CHART_INFO_MESSAGES } from '../utils/dashboardAcidentesUtils.js'
 
 import '../styles/DashboardPage.css'
 
-const CURRENT_YEAR = new Date().getFullYear()
-
-const initialFilters = () => ({
-  ano: String(CURRENT_YEAR),
-  unidade: 'todas',
-  periodoInicio: `${CURRENT_YEAR}-01`,
-  periodoFim: `${CURRENT_YEAR}-12`,
-  centroServico: '',
-  tipo: '',
-  lesao: '',
-  parteLesionada: '',
-  agente: '',
-  cargo: '',
-})
-
-const EMPTY_STATE = {
-  resumo: null,
-  tendencia: [],
-  tipos: [],
-  partesLesionadas: [],
-  lesoes: [],
-  cargos: [],
-  agentes: [],
-}
-
-const EMPTY_FILTER_OPTIONS = {
-  centrosServico: [],
-  tipos: [],
-  lesoes: [],
-  partesLesionadas: [],
-  agentes: [],
-  cargos: [],
-}
-
-const CHART_INFO_MESSAGES = {
-  tendencia:
-    'Combina o total mensal de acidentes com as taxas de frequencia/gravidade calculadas a partir do HHT informado nas fichas.',
-  tipos: 'Mostra a proporcao de cada tipo de acidente registrado para o periodo filtrado.',
-  partes: 'Agrupa as partes lesionadas principais selecionadas em cada acidente.',
-  lesoes: 'Distribui as lesoes principais registradas nas fichas (considera multiplas lesoes).',
-  cargos: 'Total de acidentes em relacao ao cargo informado na ficha do colaborador.',
-  agentes: 'Distribuicao dos agentes causadores (considera multiplos agentes por acidente).',
-}
-
 export function DashboardAcidentes() {
-  const [filters, setFilters] = useState(() => initialFilters())
-  const [dashboardData, setDashboardData] = useState(EMPTY_STATE)
-  const [filterOptions, setFilterOptions] = useState(() => ({ ...EMPTY_FILTER_OPTIONS }))
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [expandedChartId, setExpandedChartId] = useState(null)
+  return (
+    <DashboardAcidentesProvider>
+      <DashboardAcidentesContent />
+    </DashboardAcidentesProvider>
+  )
+}
 
-  const load = useCallback(async (params) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      if (!dataClient?.acidentes?.dashboard) {
-        throw new Error('Recurso de dashboard de acidentes indisponivel.')
-      }
-
-      const resultado = await dataClient.acidentes.dashboard(params)
-      const {
-        resumo = null,
-        tendencia = [],
-        tipos = [],
-        partesLesionadas = [],
-        lesoes = [],
-        cargos = [],
-        agentes = [],
-        options = {},
-      } = resultado ?? {}
-
-      setDashboardData({
-        resumo,
-        tendencia,
-        tipos,
-        partesLesionadas,
-        lesoes: Array.isArray(lesoes) ? lesoes : [],
-        cargos,
-        agentes,
-      })
-      setFilterOptions({
-        centrosServico: Array.isArray(options.centrosServico) ? options.centrosServico : [],
-        tipos: Array.isArray(options.tipos) ? options.tipos : [],
-        lesoes: Array.isArray(options.lesoes) ? options.lesoes : [],
-        partesLesionadas: Array.isArray(options.partesLesionadas) ? options.partesLesionadas : [],
-        agentes: Array.isArray(options.agentes) ? options.agentes : [],
-        cargos: Array.isArray(options.cargos) ? options.cargos : [],
-      })
-    } catch (err) {
-      setError(err?.message ?? 'Falha ao carregar dashboard de acidentes.')
-      setDashboardData(EMPTY_STATE)
-      setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load(initialFilters())
-  }, [load])
-
-  const handleFilterChange = (event) => {
-    const { name, value } = event.target
-    setFilters((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleSubmit = (event) => {
-    event.preventDefault()
-    load(filters)
-  }
-
-  const handleReset = () => {
-    const defaults = initialFilters()
-    setFilters(defaults)
-    load(defaults)
-  }
-
-  const helperText = useMemo(() => {
-    const resumo = dashboardData.resumo ?? {}
-    return (
-      resumo.periodo_label ||
-      resumo.periodo ||
-      resumo.referencia ||
-      resolveIndicadorValor(resumo, ['periodo_referencia', 'periodoReferenciado']) ||
-      null
-    )
-  }, [dashboardData.resumo])
+function DashboardAcidentesContent() {
+  const {
+    filters,
+    filterOptions,
+    dashboardData,
+    error,
+    handleFilterChange,
+    handleSubmit,
+    handleReset,
+    expandedChartId,
+    setExpandedChartId,
+    helperText,
+  } = useDashboardAcidentesContext()
 
   const chartModalConfig = useMemo(
     () => ({
@@ -193,7 +85,6 @@ export function DashboardAcidentes() {
   )
 
   const activeChart = expandedChartId ? chartModalConfig[expandedChartId] : null
-
   const openChartModal = (chartId) => setExpandedChartId(chartId)
   const closeChartModal = () => setExpandedChartId(null)
 
@@ -211,7 +102,6 @@ export function DashboardAcidentes() {
         onChange={handleFilterChange}
         onSubmit={handleSubmit}
         onReset={handleReset}
-        isLoading={isLoading}
       />
 
       {error ? <p className="feedback feedback--error">{error}</p> : null}

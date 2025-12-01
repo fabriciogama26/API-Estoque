@@ -1,7 +1,14 @@
 import { TablePagination } from '../../TablePagination.jsx'
 import { formatCurrency, formatDateTimeValue } from '../../../utils/estoqueUtils.js'
 
-export function EstoqueAlerts({ alertas, alertasPage, totalAlertasPages, onPageChange, pageSize, totalAlertas }) {
+export function EstoqueAlerts({
+  alertas,
+  alertasPage,
+  totalAlertasPages,
+  onPageChange,
+  pageSize,
+  totalAlertas,
+}) {
   if (!alertas.length) {
     return <p className="feedback">Nenhum alerta no periodo.</p>
   }

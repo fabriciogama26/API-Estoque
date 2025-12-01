@@ -1,4 +1,10 @@
-export function EstoqueFilters({ filters, centrosCusto, isLoading, onSubmit, onChange, onClear }) {
+export function EstoqueFilters({
+  filters,
+  centrosCusto,
+  onSubmit,
+  onChange,
+  onClear,
+}) {
   return (
     <form className="form form--inline" onSubmit={onSubmit}>
       <label className="field">
@@ -50,8 +56,8 @@ export function EstoqueFilters({ filters, centrosCusto, isLoading, onSubmit, onC
         <span>Apenas alertas</span>
       </label>
       <div className="form__actions">
-        <button type="submit" className="button button--primary" disabled={isLoading}>
-          {isLoading ? 'Filtrando...' : 'Aplicar filtros'}
+        <button type="submit" className="button button--primary">
+          Aplicar filtros
         </button>
         <button type="button" className="button button--ghost" onClick={onClear}>
           Limpar filtros

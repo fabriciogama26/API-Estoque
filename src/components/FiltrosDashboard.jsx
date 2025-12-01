@@ -1,14 +1,6 @@
 import PropTypes from 'prop-types'
 
-export function FiltrosDashboard({
-  filters,
-  options,
-  onChange,
-  onSubmit,
-  onReset,
-  isLoading,
-  className,
-}) {
+export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset, className }) {
   const formClassName = ['form', 'form--inline', 'form--filters']
     .concat(className ? [className] : [])
     .join(' ')
@@ -48,7 +40,6 @@ export function FiltrosDashboard({
             value={filters.periodoInicio ?? ''}
             onChange={onChange}
             max={filters.periodoFim || undefined}
-            disabled={isLoading}
           />
         </label>
 
@@ -60,18 +51,12 @@ export function FiltrosDashboard({
             value={filters.periodoFim ?? ''}
             onChange={onChange}
             min={filters.periodoInicio || undefined}
-            disabled={isLoading}
           />
         </label>
 
         <label className="field">
           <span>Centro de servico</span>
-          <select
-            name="centroServico"
-            value={filters.centroServico ?? ''}
-            onChange={onChange}
-            disabled={isLoading}
-          >
+          <select name="centroServico" value={filters.centroServico ?? ''} onChange={onChange}>
             <option value="">Todos</option>
             {centrosServicoOptions.map((value) => (
               <option key={value} value={value}>
@@ -83,7 +68,7 @@ export function FiltrosDashboard({
 
         <label className="field">
           <span>Tipo</span>
-          <select name="tipo" value={filters.tipo ?? ''} onChange={onChange} disabled={isLoading}>
+          <select name="tipo" value={filters.tipo ?? ''} onChange={onChange}>
             <option value="">Todos</option>
             {tiposOptions.map((value) => (
               <option key={value} value={value}>
@@ -95,7 +80,7 @@ export function FiltrosDashboard({
 
         <label className="field">
           <span>Lesao</span>
-          <select name="lesao" value={filters.lesao ?? ''} onChange={onChange} disabled={isLoading}>
+          <select name="lesao" value={filters.lesao ?? ''} onChange={onChange}>
             <option value="">Todas</option>
             {lesoesOptions.map((value) => (
               <option key={value} value={value}>
@@ -107,12 +92,7 @@ export function FiltrosDashboard({
 
         <label className="field">
           <span>Parte lesionada</span>
-          <select
-            name="parteLesionada"
-            value={filters.parteLesionada ?? ''}
-            onChange={onChange}
-            disabled={isLoading}
-          >
+          <select name="parteLesionada" value={filters.parteLesionada ?? ''} onChange={onChange}>
             <option value="">Todas</option>
             {partesLesionadasLista.map((value) => (
               <option key={value} value={value}>
@@ -124,7 +104,7 @@ export function FiltrosDashboard({
 
         <label className="field">
           <span>Agente</span>
-          <select name="agente" value={filters.agente ?? ''} onChange={onChange} disabled={isLoading}>
+          <select name="agente" value={filters.agente ?? ''} onChange={onChange}>
             <option value="">Todos</option>
             {agentesOptions.map((value) => (
               <option key={value} value={value}>
@@ -136,7 +116,7 @@ export function FiltrosDashboard({
 
         <label className="field">
           <span>Cargo</span>
-          <select name="cargo" value={filters.cargo ?? ''} onChange={onChange} disabled={isLoading}>
+          <select name="cargo" value={filters.cargo ?? ''} onChange={onChange}>
             <option value="">Todos</option>
             {cargosOptions.map((value) => (
               <option key={value} value={value}>
@@ -148,10 +128,10 @@ export function FiltrosDashboard({
       </div>
 
       <div className="form__actions">
-        <button type="submit" className="button button--primary" disabled={isLoading}>
-          {isLoading ? 'Filtrando...' : 'Aplicar filtros'}
+        <button type="submit" className="button button--primary">
+          Aplicar filtros
         </button>
-        <button type="button" className="button button--ghost" onClick={onReset} disabled={isLoading}>
+        <button type="button" className="button button--ghost" onClick={onReset}>
           Limpar filtros
         </button>
       </div>
@@ -182,11 +162,9 @@ FiltrosDashboard.propTypes = {
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   onReset: PropTypes.func.isRequired,
-  isLoading: PropTypes.bool,
 }
 
 FiltrosDashboard.defaultProps = {
   options: undefined,
   className: undefined,
-  isLoading: false,
 }

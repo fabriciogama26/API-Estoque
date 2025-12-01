@@ -67,7 +67,7 @@ export function AcidentesHistoryTimeline({ registros }) {
                 ) : (
                   changes.map((change) => (
                     <p key={`${registro.id}-${change.campo}`}>
-                      <strong>{change.label}:</strong> "{change.before}" -> "{change.after}"
+                      <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
                     </p>
                   ))
                 )}

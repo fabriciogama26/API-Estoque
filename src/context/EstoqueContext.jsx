@@ -32,16 +32,17 @@ export function EstoqueProvider({ children }) {
     )
   }
 
-  const applyFilters = () => estoqueState.load({ ...filtroState.filters })
-  const resetFilters = () => {
+  const applyFilters = async () => {
+    await estoqueState.load({ ...filtroState.filters }, { silent: true })
+  }
+  const resetFilters = async () => {
     filtroState.setFilters({ ...INITIAL_FILTERS })
-    estoqueState.load({ ...INITIAL_FILTERS })
+    await estoqueState.load({ ...INITIAL_FILTERS }, { silent: true })
   }
 
   const value = {
     // dados
     estoque: estoqueState.estoque,
-    isLoading: estoqueState.isLoading,
     error: estoqueState.error,
     // filtros
     filters: filtroState.filters,
@@ -69,6 +70,7 @@ export function EstoqueProvider({ children }) {
     savingMinStock: estoqueState.savingMinStock,
     handleMinStockChange: estoqueState.handleMinStockChange,
     handleMinStockSave,
+    isLoading: estoqueState.isLoading,
     // tamanhos de pagina
     alertasPageSize: ALERTAS_PAGE_SIZE,
     itensPageSize: ITENS_PAGE_SIZE,

@@ -11,11 +11,9 @@ import './styles/index.css'
 const root = document.getElementById('root')
 
 createRoot(root).render(
-  <StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </AuthProvider>
-  </StrictMode>
+  <AuthProvider>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </AuthProvider>
 )

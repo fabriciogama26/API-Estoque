@@ -1,50 +1,70 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { listEstoqueAtual } from '../services/estoqueApi.js'
 import { updateMaterial } from '../services/materiaisService.js'
 
+let hasRunInitialLoad = false
+
 export function useEstoque(initialFilters, userResolver, onError) {
   const [estoque, setEstoque] = useState({ itens: [], alertas: [] })
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [minStockDrafts, setMinStockDrafts] = useState({})
   const [savingMinStock, setSavingMinStock] = useState({})
   const [minStockErrors, setMinStockErrors] = useState({})
+  const initRef = useRef(false)
+  const lastLoadKeyRef = useRef(null)
+  const estoqueRef = useRef({ itens: [], alertas: [] })
+  const lastParamsRef = useRef(null)
 
   const load = useCallback(
-    async (params = initialFilters) => {
-      setIsLoading(true)
-      setError(null)
+    async (params = initialFilters, { force = false, silent = false } = {}) => {
+      const key = JSON.stringify(params || {})
+      if (!force && lastLoadKeyRef.current === key) {
+        return null
+      }
+      lastLoadKeyRef.current = key
       try {
         const data = await listEstoqueAtual({
           periodoInicio: params.periodoInicio || undefined,
           periodoFim: params.periodoFim || undefined,
         })
-        setEstoque({ itens: data?.itens ?? [], alertas: data?.alertas ?? [] })
-        setMinStockDrafts(() => {
-          const drafts = {}
-          ;(data?.itens ?? []).forEach((item) => {
-            drafts[item.materialId] =
-              item.estoqueMinimo !== undefined && item.estoqueMinimo !== null
-                ? String(item.estoqueMinimo)
-                : ''
+        const next = { itens: data?.itens ?? [], alertas: data?.alertas ?? [] }
+        const currentKey = JSON.stringify(estoqueRef.current)
+        const nextKey = JSON.stringify(next)
+        if (currentKey !== nextKey) {
+          setEstoque(next)
+          estoqueRef.current = next
+          setMinStockDrafts(() => {
+            const drafts = {}
+            ;(next.itens ?? []).forEach((item) => {
+              drafts[item.materialId] =
+                item.estoqueMinimo !== undefined && item.estoqueMinimo !== null
+                  ? String(item.estoqueMinimo)
+                  : ''
+            })
+            return drafts
           })
-          return drafts
-        })
-        setMinStockErrors({})
+          setMinStockErrors({})
+        }
+        lastParamsRef.current = params
+        return data
       } catch (err) {
         setError(err.message)
         if (typeof onError === 'function') {
           onError(err, { area: 'load_estoque' })
         }
-      } finally {
-        setIsLoading(false)
+        return null
       }
     },
     [initialFilters, onError],
   )
 
   useEffect(() => {
-    load({ ...initialFilters })
+    if (initRef.current || hasRunInitialLoad) {
+      return
+    }
+    initRef.current = true
+    hasRunInitialLoad = true
+    load({ ...initialFilters }, { force: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -87,7 +107,7 @@ export function useEstoque(initialFilters, userResolver, onError) {
         estoqueMinimo: parsed,
         usuarioResponsavel: usuario,
       })
-      await load({ ...filters })
+      await load({ ...filters }, { force: true })
     } catch (err) {
       setError(err.message)
       if (typeof onError === 'function') {
@@ -104,9 +124,10 @@ export function useEstoque(initialFilters, userResolver, onError) {
 
   return {
     estoque,
-    isLoading,
+    isLoading: false,
     error,
     load,
+    lastParams: lastParamsRef.current,
     minStockDrafts,
     savingMinStock,
     minStockErrors,
