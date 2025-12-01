@@ -1,3 +1,5 @@
+import { formatDateTimeFull, formatHistoryValue } from '../../../utils/acidentesUtils.js'
+
 const FIELD_LABELS = {
   matricula: 'Matricula',
   nome: 'Nome',
@@ -22,44 +24,6 @@ const FIELD_LABELS = {
   dataSesmt: 'Data SESMT',
 }
 
-const formatDate = (value) => {
-  if (!value) {
-    return '-'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
-  return date.toLocaleDateString('pt-BR')
-}
-
-const formatDateTime = (value) => {
-  if (!value) {
-    return '-'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
-  return date.toLocaleString('pt-BR')
-}
-
-const formatValue = (campo, valor) => {
-  if (valor === null || valor === undefined || valor === '') {
-    return 'Nao informado'
-  }
-  if (Array.isArray(valor)) {
-    return valor.length ? valor.join(', ') : 'Nao informado'
-  }
-  if (campo === 'data' || campo === 'dataEsocial' || campo === 'dataSesmt') {
-    return formatDate(valor)
-  }
-  if (campo === 'sesmt') {
-    return valor ? 'Sim' : 'Nao'
-  }
-  return String(valor)
-}
-
 const buildChanges = (registro) => {
   if (!Array.isArray(registro?.camposAlterados) || registro.camposAlterados.length === 0) {
     return []
@@ -67,8 +31,8 @@ const buildChanges = (registro) => {
   return registro.camposAlterados
     .map(({ campo, de, para }) => {
       const label = FIELD_LABELS[campo] ?? campo
-      const before = formatValue(campo, de)
-      const after = formatValue(campo, para)
+      const before = formatHistoryValue(campo, de)
+      const after = formatHistoryValue(campo, para)
       if (before === after) {
         return null
       }
@@ -93,7 +57,7 @@ export function AcidentesHistoryTimeline({ registros }) {
             <li key={registro.id} className="entradas-history__item">
               <div className="entradas-history__item-header">
                 <div>
-                  <strong>{formatDateTime(registro.dataEdicao)}</strong>
+                  <strong>{formatDateTimeFull(registro.dataEdicao)}</strong>
                   <p>{registro.usuarioResponsavel || 'Responsavel nao informado'}</p>
                 </div>
               </div>
@@ -103,7 +67,7 @@ export function AcidentesHistoryTimeline({ registros }) {
                 ) : (
                   changes.map((change) => (
                     <p key={`${registro.id}-${change.campo}`}>
-                      <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
+                      <strong>{change.label}:</strong> "{change.before}" -> "{change.after}"
                     </p>
                   ))
                 )}

@@ -13,44 +13,43 @@ import { DashboardPage } from './pages/DashboardPage.jsx'
 import { DashboardAcidentes } from './pages/DashboardAcidentes.jsx'
 import { AcidentesPage } from './pages/Acidentes.jsx'
 import { TermosEpiPage } from './pages/TermosEpiPage.jsx'
+import { ErrorBoundaryWithLogger } from './components/ErrorBoundary.jsx'
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <ErrorBoundaryWithLogger page="app-root">
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      <Route element={<ProtectedRoute />}>
-        <Route element={<MainLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="dashboard/acidentes" element={<DashboardAcidentes />} />
-          <Route path="estoque" element={<EstoquePage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="dashboard/acidentes" element={<DashboardAcidentes />} />
+            <Route path="estoque" element={<EstoquePage />} />
 
-          <Route path="cadastros">
-            <Route path="pessoas" element={<PessoasPage />} />
-            <Route path="materiais" element={<MateriaisPage />} />
-          </Route>
+            <Route path="cadastros">
+              <Route path="pessoas" element={<PessoasPage />} />
+              <Route path="materiais" element={<MateriaisPage />} />
+            </Route>
 
-          <Route path="acidentes">
-            <Route path="cadastro" element={<AcidentesPage />} />
-          </Route>
+            <Route path="acidentes">
+              <Route path="cadastro" element={<AcidentesPage />} />
+            </Route>
 
-          <Route path="configuracoes" element={<ConfiguracoesPage />} />
+            <Route path="configuracoes" element={<ConfiguracoesPage />} />
 
-          <Route path="movimentacoes">
             <Route path="entradas" element={<EntradasPage />} />
             <Route path="saidas" element={<SaidasPage />} />
-          </Route>
 
-          <Route path="termos">
-            <Route path="epi" element={<TermosEpiPage />} />
+            <Route path="documentos/termo-epi" element={<TermosEpiPage />} />
           </Route>
         </Route>
-      </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundaryWithLogger>
   )
 }
 
