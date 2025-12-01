@@ -40,8 +40,13 @@ function App() {
 
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
 
+            {/* Movimenta��es de estoque (alias para manter rotas antigas e menu novo) */}
             <Route path="entradas" element={<EntradasPage />} />
             <Route path="saidas" element={<SaidasPage />} />
+            <Route path="movimentacoes">
+              <Route path="entradas" element={<EntradasPage />} />
+              <Route path="saidas" element={<SaidasPage />} />
+            </Route>
 
             <Route path="documentos/termo-epi" element={<TermosEpiPage />} />
           </Route>
