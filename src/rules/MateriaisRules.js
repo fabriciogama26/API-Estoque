@@ -303,8 +303,59 @@ export function updateMaterialPayload(form, usuarioResponsavel) {
   }
 }
 
+const normalizeSearchValue = (value) => normalizeKeyPart(value || '')
+
+const tokenizeFilterValues = (value) => {
+  if (value === null || value === undefined) {
+    return []
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => tokenizeFilterValues(item))
+  }
+
+  if (typeof value === 'object') {
+    const partes = [
+      value.id,
+      value.uuid,
+      value.value,
+      value.valor,
+      value.nome,
+      value.label,
+      value.texto,
+      value.text,
+    ]
+    return partes
+      .map((parte) => (parte === null || parte === undefined ? '' : String(parte).trim()))
+      .filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(/[;|,]/)
+      .map((parte) => parte.trim())
+      .filter(Boolean)
+  }
+
+  return [String(value)]
+}
+
+const matchesFilter = (filterValue, ...candidates) => {
+  const alvo = normalizeSearchValue(filterValue)
+  if (!alvo) {
+    return true
+  }
+
+  const valores = []
+  candidates.forEach((candidate) => {
+    valores.push(...tokenizeFilterValues(candidate))
+  })
+
+  return valores.some((valor) => normalizeSearchValue(valor) === alvo)
+}
+
 export function filterMateriais(materiais, filters) {
-  const termo = filters.termo.trim().toLowerCase()
+  const termo = normalizeSearchValue(filters.termo)
 
   return materiais.filter((material) => {
     if (filters.status === 'ativos' && material.ativo === false) {
@@ -312,6 +363,60 @@ export function filterMateriais(materiais, filters) {
     }
 
     if (filters.status === 'inativos' && material.ativo !== false) {
+      return false
+    }
+
+    if (
+      !matchesFilter(
+        filters.grupo,
+        material.grupoMaterialId,
+        material.grupoMaterial,
+        material.grupoMaterialNome,
+      )
+    ) {
+      return false
+    }
+
+    if (
+      !matchesFilter(
+        filters.tamanho,
+        material.numeroCalcado,
+        material.numeroCalcadoNome,
+        material.numeroVestimenta,
+        material.numeroVestimentaNome,
+        material.numeroEspecifico,
+      )
+    ) {
+      return false
+    }
+
+    if (!matchesFilter(filters.fabricante, material.fabricante, material.fabricanteNome)) {
+      return false
+    }
+
+    if (
+      !matchesFilter(
+        filters.caracteristica,
+        material.caracteristicas,
+        material.caracteristicasIds,
+        material.caracteristicasNomes,
+        material.caracteristicaEpi,
+        material.caracteristicasTexto,
+      )
+    ) {
+      return false
+    }
+
+    if (
+      !matchesFilter(
+        filters.cor,
+        material.cores,
+        material.coresIds,
+        material.coresNomes,
+        material.corMaterial,
+        material.coresTexto,
+      )
+    ) {
       return false
     }
 
@@ -332,6 +437,7 @@ export function filterMateriais(materiais, filters) {
       material.numeroCalcadoNome,
       material.numeroVestimenta,
       material.numeroVestimentaNome,
+      material.numeroEspecifico,
       material.caracteristicaEpi,
       material.caracteristicasTexto,
       ...(Array.isArray(material.caracteristicasNomes) ? material.caracteristicasNomes : []),
@@ -341,14 +447,15 @@ export function filterMateriais(materiais, filters) {
       material.descricao,
       material.usuarioCadastro,
       material.usuarioCadastroNome,
+      material.usuarioCadastroUsername,
       material.usuarioAtualizacao,
       material.usuarioAtualizacaoNome,
+      material.registradoPor,
     ]
       .filter(Boolean)
       .join(' ')
-      .toLowerCase()
 
-    return target.includes(termo)
+    return normalizeSearchValue(target).includes(termo)
   })
 }
 

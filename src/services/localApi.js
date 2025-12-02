@@ -603,8 +603,15 @@ const mapLocalMaterialRecord = (material) => {
     coresIds: coresLista.map((item) => item?.id).filter(Boolean),
     coresNomes,
     coresTexto: coresNomes.join('; '),
+    usuarioCadastroUsername: material.usuarioCadastroUsername ?? material.usuarioCadastro ?? '',
     usuarioCadastroNome: material.usuarioCadastroNome ?? '',
+    usuarioAtualizacaoUsername: material.usuarioAtualizacaoUsername ?? material.usuarioAtualizacao ?? '',
     usuarioAtualizacaoNome: material.usuarioAtualizacaoNome ?? '',
+    registradoPor:
+      material.usuarioCadastroUsername ??
+      material.usuarioCadastroNome ??
+      material.usuarioCadastro ??
+      '',
   }
 }
 

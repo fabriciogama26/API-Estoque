@@ -715,6 +715,28 @@ export function MateriaisPage() {
     [materiaisFiltrados],
   )
 
+  const grupoFilterOptions = useMemo(
+    () => normalizeSelectionList(materialGroups),
+    [materialGroups],
+  )
+
+  const tamanhoNumeroFilterOptions = useMemo(
+    () => normalizeSelectionList([...calcadoOptions, ...tamanhoOptions]),
+    [calcadoOptions, tamanhoOptions],
+  )
+
+  const fabricanteFilterOptions = useMemo(
+    () => normalizeSelectionList(fabricanteOptions),
+    [fabricanteOptions],
+  )
+
+  const caracteristicaFilterOptions = useMemo(
+    () => normalizeSelectionList(caracteristicaOptions),
+    [caracteristicaOptions],
+  )
+
+  const corFilterOptions = useMemo(() => normalizeSelectionList(corOptions), [corOptions])
+
   return (
     <div className="stack">
       <PageHeader
@@ -760,6 +782,11 @@ export function MateriaisPage() {
 
       <MateriaisFilters
         filters={filters}
+        grupos={grupoFilterOptions}
+        tamanhos={tamanhoNumeroFilterOptions}
+        fabricantes={fabricanteFilterOptions}
+        caracteristicas={caracteristicaFilterOptions}
+        cores={corFilterOptions}
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}
         onClear={handleFilterClear}
