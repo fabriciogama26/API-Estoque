@@ -1,37 +1,28 @@
-Tela: Pessoas
-=============
+Tela: Cadastro de Pessoas
 
-Visão geral
------------
-- Administra o cadastro de colaboradores, incluindo vínculos com centros de serviço, cargos, setores e tipos de execução.
-- Trabalha com cache local de opções (`pessoasOptionsRef`) para reaproveitar dados enquanto filtra resultados específicos.【F:src/pages/Pessoas.jsx†L1-L86】
+Visao geral
 
-Formulário
-----------
-- Campos principais: matrícula, nome, centro de serviço/local, cargo, setor, tipo de execução, datas de admissão/demissão, contato e observações.
-- `handleFormChange` sincroniza centro de serviço e local automaticamente, e normaliza `tipoExecucao` para maiúsculas.【F:src/pages/Pessoas.jsx†L88-L150】
-- Na criação/edição utiliza `createPessoaPayload` e `updatePessoaPayload` das regras para enviar ao Supabase/local API.
+Cadastro/edicao de colaboradores (funcionarios, terceiros, estagiarios) com vinculo a centro de servico, centro de custo, setor, cargo e tipo de execucao. Filtros e historico de alteracoes.
 
-Filtros e listagem
-------------------
-- Dois cartões de resumo acompanham os filtros e exibem o número de pessoas do centro de serviço e do setor selecionados; quando o filtro está em "Todos", exibem "—" e orientam o usuário a selecionar um valor.?F:src/components/PessoasResumoCards.jsx�L1-L84??F:src/pages/Pessoas.jsx�L367-L387?
-- Filtros por termo, centro de serviço, cargo, setor e tipo de execução. Botões "Aplicar" e "Limpar" recompõem a listagem através de `loadPessoas`.
-- A tabela mostra ações de editar e histórico; `historyState` evita múltiplas chamadas simultâneas. A paginação é controlada dentro do componente `PessoasTable`.
-- `refreshReferencias` carrega listas auxiliares de centros/setores/cargos/tipos a partir do endpoint `api.references.pessoas`.【F:src/pages/Pessoas.jsx†L52-L117】
+Arquitetura (modular)
 
-Histórico
----------
-- Ao abrir o modal, a página consulta `api.pessoas.history(id)` (via componente) e mantém cache em `historyCache` para reutilização posterior.
-- `PessoasHistoryModal` mostra linha do tempo com usuário, campos alterados e timestamp.【F:src/pages/Pessoas.jsx†L57-L86】【F:src/pages/Pessoas.jsx†L152-L210】
+- Hooks: usePessoasController (formulario/filtros/tabela), usePessoas (lista), usePessoasFiltro, useErrorLogger('pessoas').
+- Servicos: pessoasService (listar, historico, resumo), integra dataMode remoto/local.
+- Utils: pessoasUtils (formatacao de datas, uniqueSorted, resolveUsuarioNome).
+- Erros: log em app_errors via useErrorLogger.
 
-Boas práticas
--------------
-- Garanta que migrations que criam tabelas de referência (centros_servico, cargos, setores, tipos_execucao) estejam aplicadas antes de popular a tela.
-- Utilize o histórico para auditar atualizações feitas via importação ou scripts externos.
-- Ao operar offline, mantenha os seeds em `src/data/local-seed.json` atualizados para refletir o schema atual.
+Campos e fluxos
 
+- Campos principais: matricula, nome, centro_servico_id/centro_custo_id, setor_id, cargo_id, tipo_execucao_id, dataAdmissao, ativo.
+- Historico: timeline com alteracoes (usuario, data, campos modificados).
+- Filtros: termo livre, centro de servico, setor, cargo, ativo; limpar restaura defaults.
+- Tabela: paginacao local; coluna “Registrado por” usa usuarioCadastroUsername (view pessoas_view atualizada).
 
-Atualizacao 2025-11
---------------------
-- Documentei a importancia de preencher `centroServico` e `setor` nas fichas de pessoas para que o grafico "Top centro de serviços" consiga somar saídas corretamente.
-- Acrescentei lembrete para manter textos humanamente legiveis (sem IDs), pois os novos grafos exibem exatamente o valor cadastrado.
+Boas praticas
+
+- Usar matricula como chave; manter catalogos de centro/sector/cargo atualizados.
+- Conferir pessoas_view apos migrations para garantir aliases legados (centro_servico, centro_custo, tipo_execucao) usados nas telas.
+
+Atualizacao 2025-12
+
+- Tela modularizada com hooks/services/utils; view pessoas_view inclui usuarioCadastroUsername e aliases legados para compatibilidade.

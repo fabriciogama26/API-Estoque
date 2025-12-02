@@ -1,30 +1,26 @@
-Tela: Login
-===========
+Tela: Autenticacao (Login e Reset de Senha)
 
-Visão geral
------------
-- Tela inicial para autenticação do usuário, com suporte a modo remoto (Supabase) e modo local (credenciais em `.env.local`).
-- A interface inclui campos de email e senha, botão para recuperação de senha (apenas modo remoto) e mensagens de feedback contextual.【F:src/pages/LoginPage.jsx†L1-L118】
+Visao geral
 
-Comportamento
--------------
-- Ao submeter, chama `useAuth().login`. Em caso de sucesso redireciona para a rota anterior (`location.state.from`) ou `/`.
-- Erros de autenticação são exibidos logo acima do botão principal.
-- Botão “Esqueceu a senha?” chama `useAuth().recoverPassword`. No modo local lança erro informando indisponibilidade; no remoto envia e-mail via Supabase Auth (respeitando `VITE_SUPABASE_PASSWORD_REDIRECT`).【F:src/pages/LoginPage.jsx†L120-L190】【F:src/context/AuthContext.jsx†L90-L168】
+Login com Supabase Auth no modo remoto e modo local (credenciais via .env.local) para desenvolvimento offline. Recuperacao de senha via email e pagina de redefinicao com validacao do link.
 
-Credenciais por modo
---------------------
-- **Local:** valores definidos por `VITE_LOCAL_USERNAME`, `VITE_LOCAL_PASSWORD`, `VITE_LOCAL_DISPLAY_NAME` (defaults `admin`/`admin123`). A sessão fica no `localStorage` e existe timeout de inatividade de 10 minutos.【F:src/context/AuthContext.jsx†L7-L84】【F:src/context/AuthContext.jsx†L170-L238】
-- **Remoto:** exige `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`. O login usa `supabase.auth.signInWithPassword` e a recuperação `resetPasswordForEmail` com redirect opcional.【F:src/context/AuthContext.jsx†L96-L151】【F:src/context/AuthContext.jsx†L153-L200】
+Arquitetura (modular)
 
-Boas práticas
--------------
-- Configure SSL/Custom Domain no Supabase antes de habilitar recuperação de senha em produção (link enviado precisa apontar para domínio válido).
-- Personalize `logo2.png` em `public/` para refletir a identidade visual da empresa.
-- Evite usar usuários com `service_role` no frontend; restrinja ao perfil `anon` com políticas RLS adequadas.
+- Hooks: useLoginForm (estado, submit, recuperacao), useResetPassword (restaura sessao do link, valida senhas, envia update).
+- Servicos: authService (resetPasswordForEmail, updateUser, restoreResetSession) usando supabaseClient; errorLogService registra falhas em app_errors.
+- Contexto: AuthContext fornece user, login, recoverPassword, logout; suporta persistSession e autoRefresh.
 
+Fluxos
 
-Atualizacao 2025-11
---------------------
-- Mencionei que o indicador de filtro derivado dos graficos e limpo automaticamente quando o usuario sai da sessao, evitando reutilizar termos antigos no proximo login.
-- Adicionei nota reforçando que o botao de expandir graficos so aparece para usuarios autenticados, seguindo as mesmas verificacoes descritas aqui.
+- Login: email + senha; em modo local compara com VITE_LOCAL_USERNAME/PASSWORD; em modo remoto usa supabase.auth.signInWithPassword.
+- Recuperacao: envia resetPasswordForEmail com redirect configuravel; feedback de sucesso/erro.
+- ResetPasswordPage: valida sessao via getSession/getSessionFromUrl/exchangeCodeForSession/setSession; exige senha >=8 e confirmacao; redireciona ao login apos sucesso.
+
+Boas praticas
+
+- Manter variaveis VITE_SUPABASE_URL/ANON_KEY configuradas; usar redirectTo para reset se necessario.
+- Registrar erros (login, recovery, updatePassword, restoreResetSession) em app_errors para auditoria.
+
+Atualizacao 2025-12
+
+- Telas modularizadas com hooks/services e logging; compatibilidade com modo local preservada.
