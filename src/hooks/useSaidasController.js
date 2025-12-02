@@ -605,6 +605,7 @@ export function useSaidasController() {
     handleFilterChange,
     handleFilterSubmit,
     handleFilterClear,
+    load,
     cancelEditSaida,
     startEditSaida,
     openHistory,

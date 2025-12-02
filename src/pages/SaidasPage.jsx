@@ -37,6 +37,7 @@ function SaidasContent() {
     isSearchingPessoas,
     pessoaSearchError,
     isSaidaCancelada,
+    load,
     handleChange,
     handleSubmit,
     handleFilterChange,
