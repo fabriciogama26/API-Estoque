@@ -37,6 +37,7 @@ function SaidasContent() {
     isSearchingPessoas,
     pessoaSearchError,
     isSaidaCancelada,
+    load,
     handleChange,
     handleSubmit,
     handleFilterChange,
@@ -299,6 +300,7 @@ function SaidasContent() {
                   const pessoa = pessoas.find((p) => p.id === saida.pessoaId)
                   const material = materiais.find((m) => m.id === saida.materialId)
                   const statusLower = (saida.status || '').toString().trim().toLowerCase()
+                  const registradoPor = saida.usuarioResponsavelUsername || saida.usuarioResponsavelNome || saida.usuarioResponsavel || 'Nao informado'
                   return (
                     <tr key={saida.id} className={isSaidaCancelada(saida) ? 'data-table__row--muted' : ''}>
                       <td>
@@ -316,7 +318,7 @@ function SaidasContent() {
                       <td>{saida.centroCusto || saida.centroCustoId || '-'}</td>
                       <td>{saida.centroServico || saida.centroServicoId || '-'}</td>
                       <td>{formatDisplayDateTime(saida.dataEntrega)}</td>
-                      <td>{saida.usuarioResponsavelNome || saida.usuarioResponsavel || 'Nao informado'}</td>
+                      <td>{registradoPor}</td>
                       <td className={statusLower === 'cancelado' ? 'text-muted' : ''}>{saida.status || 'registrado'}</td>
                       <td>
                         <div className="table-actions materiais-data-table__actions">
