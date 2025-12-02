@@ -55,7 +55,7 @@ const navSections = [
     id: 'termos',
     title: 'Termos',
     icon: ChecklistIcon,
-    items: [{ to: '/termos/epi', label: 'Termo de EPI', icon: ChecklistIcon }],
+    items: [{ to: '/documentos/termo-epi', label: 'Termo de EPI', icon: ChecklistIcon }],
   },
 ]
 
