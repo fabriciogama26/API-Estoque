@@ -1,33 +1,73 @@
-export function resolveUsuarioNome(user) {
-  return user?.name || user?.username || user?.email || 'sistema'
-}
+import {
+  PESSOAS_FILTER_DEFAULT,
+  PESSOAS_FORM_DEFAULT,
+} from '../config/PessoasConfig.js'
 
-export function formatDate(dateISO) {
-  if (!dateISO) {
-    return '-'
-  }
-  const raw = String(dateISO).trim()
-  const dateOnlyMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/)
-  const value = dateOnlyMatch ? `${dateOnlyMatch[1]}T00:00:00Z` : raw
+export const formatDateInputValue = (value) => {
+  if (!value) return ''
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
-  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
 }
 
-export function formatDateTime(dateISO) {
-  if (!dateISO) {
-    return '-'
+export const buildPessoasQuery = (filters = PESSOAS_FILTER_DEFAULT) => {
+  const query = {}
+  const termo = filters.termo?.trim()
+  if (termo) query.termo = termo
+  const centroServico = filters.centroServico ?? filters.local
+  if (centroServico && centroServico.toLowerCase() !== 'todos') {
+    query.centroServico = centroServico
   }
-  const raw = String(dateISO).trim()
-  const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) {
-    return '-'
+  const cargo = filters.cargo
+  if (cargo && cargo.toLowerCase() !== 'todos') {
+    query.cargo = cargo
   }
-  return date.toLocaleString('pt-BR', { timeZone: 'UTC' })
+  const setor = filters.setor
+  if (setor && setor.toLowerCase() !== 'todos') {
+    query.setor = setor
+  }
+  const tipoExecucao = filters.tipoExecucao?.trim()
+  if (tipoExecucao && tipoExecucao.toLowerCase() !== 'todos') {
+    query.tipoExecucao = tipoExecucao
+  }
+  return query
 }
 
-export function uniqueSorted(values) {
-  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b))
+export const mapOptionsById = (lista = []) =>
+  new Map((lista || []).filter((item) => item?.id).map((item) => [item.id, item.nome ?? item.label ?? '']))
+
+export const normalizeFormDefaults = () => ({ ...PESSOAS_FORM_DEFAULT })
+export const normalizeFilterDefaults = () => ({ ...PESSOAS_FILTER_DEFAULT })
+
+export const uniqueSorted = (lista = []) =>
+  Array.from(
+    new Set(
+      (lista || [])
+        .map((item) => (item ?? '').toString().trim())
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
+
+export const formatDate = (value) => {
+  if (!value) return 'Nao informado'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Nao informado'
+  return date.toLocaleDateString('pt-BR', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+}
+
+export const formatDateTime = (value) => {
+  if (!value) return 'Nao informado'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Nao informado'
+  return date.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    hour12: false,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  })
+}
+
+export const resolveUsuarioNome = (user) => {
+  if (!user) return 'sistema'
+  return user.display_name || user.name || user.username || user.email || user.id || 'sistema'
 }
