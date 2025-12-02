@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from '../../utils/PessoasUtils.js'
+import { formatDate, formatDateTime } from '../../utils/pessoasUtils.js'
 
 const FIELD_LABELS = {
   nome: 'Nome',

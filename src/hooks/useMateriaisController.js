@@ -603,7 +603,6 @@ export function useMateriaisController() {
     closeHistoryModal,
     startEdit,
     resetForm,
-    resetForm,
     loadMateriais,
     setCurrentPage: () => {},
   }
