@@ -1,6 +1,4 @@
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useLoginForm } from '../hooks/useLoginForm.js'
 import '../styles/LoginPage.css'
 
 const logoSrc = '/logo2.png'
@@ -24,59 +22,16 @@ const LockIcon = () => (
 )
 
 export function LoginPage() {
-  const { login, recoverPassword } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [form, setForm] = useState({ username: '', password: '' })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState(null)
-  const [status, setStatus] = useState(null)
-  const [isRecovering, setIsRecovering] = useState(false)
-
-  const from = location.state?.from?.pathname ?? '/'
-
-  const handleChange = (event) => {
-    const { name, value, type, checked } = event.target
-    setError(null)
-    setStatus(null)
-    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setStatus(null)
-    setError(null)
-    setIsSubmitting(true)
-    try {
-      await login(form)
-      navigate(from, { replace: true })
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handlePasswordRecovery = async () => {
-    setStatus(null)
-    setError(null)
-
-    const email = form.username?.trim() ?? ''
-    if (!email) {
-      setError('Informe seu email para recuperar a senha.')
-      return
-    }
-
-    setIsRecovering(true)
-    try {
-      await recoverPassword(email)
-      setStatus('Enviamos um link de recuperação para o seu email.')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setIsRecovering(false)
-    }
-  }
+  const {
+    form,
+    isSubmitting,
+    error,
+    status,
+    isRecovering,
+    handleChange,
+    handleSubmit,
+    handlePasswordRecovery,
+  } = useLoginForm()
 
   return (
     <div className="login-auth login-auth--login">
