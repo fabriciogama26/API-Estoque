@@ -26,6 +26,11 @@ export const createMateriaisFormDefault = () => ({
 export const MATERIAIS_FILTER_DEFAULT = {
   termo: '',
   status: 'todos',
+  grupo: '',
+  tamanho: '',
+  fabricante: '',
+  caracteristica: '',
+  cor: '',
 }
 
 // Estado padrão do modal de histórico de movimentações

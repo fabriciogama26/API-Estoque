@@ -234,7 +234,9 @@ const MATERIAL_SELECT_COLUMNS = `
   "numeroCalcadoNome",
   "numeroVestimentaNome",
   "usuarioCadastroNome",
+  "usuarioCadastroUsername",
   "usuarioAtualizacaoNome",
+  "usuarioAtualizacaoUsername",
   "fabricanteNome"
 `
 
@@ -1557,6 +1559,13 @@ function mapMaterialRecord(record) {
   const usuarioCadastroNome =
     trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
     usuarioCadastroId
+  const usuarioCadastroUsername = trim(
+    record.usuarioCadastroUsername ??
+      record.usuario_cadastro_username ??
+      record.username ??
+      record.usuario?.username ??
+      ''
+  )
 
   const usuarioAtualizacaoId = trim(
     record.usuarioAtualizacao ?? record.usuario_atualizacao ?? '',
@@ -1564,6 +1573,9 @@ function mapMaterialRecord(record) {
   const usuarioAtualizacaoNome =
     trim(record.usuarioAtualizacaoNome ?? record.usuario_atualizacao_nome ?? '') ||
     usuarioAtualizacaoId
+  const usuarioAtualizacaoUsername = trim(
+    record.usuarioAtualizacaoUsername ?? record.usuario_atualizacao_username ?? ''
+  )
 
   return {
     id: record.id,
@@ -1600,8 +1612,11 @@ function mapMaterialRecord(record) {
     coresTexto,
     usuarioCadastro: usuarioCadastroId,
     usuarioCadastroNome,
+    usuarioCadastroUsername: usuarioCadastroUsername || null,
     usuarioAtualizacao: usuarioAtualizacaoId,
     usuarioAtualizacaoNome,
+    usuarioAtualizacaoUsername: usuarioAtualizacaoUsername || null,
+    registradoPor: usuarioCadastroUsername || usuarioCadastroNome || usuarioCadastroId || '',
     dataCadastro: record.dataCadastro ?? record.data_cadastro ?? null,
     atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
   }
