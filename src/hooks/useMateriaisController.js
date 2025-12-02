@@ -31,7 +31,7 @@ import {
   isValidUuid,
   mapHistoryWithUsuario,
   normalizeSelectionWithCurrent,
-} from '../utils/materiaisUtils.js'
+} from '../utils/MateriaisUtils.js'
 import { sanitizeDigits, formatCurrencyInput } from '../utils/MateriaisUtils.js'
 import {
   createMaterial,
