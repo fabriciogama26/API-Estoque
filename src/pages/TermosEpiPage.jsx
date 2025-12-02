@@ -1,135 +1,22 @@
-import { useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon } from '../components/icons.jsx'
-import { dataClient as dataApi } from '../services/dataClient.js'
-import { buildEpiTermHtml } from '../../shared/documents/epiTermTemplate.js'
-import { downloadTermoEpiPdf } from '../utils/TermoEpiUtils.js'
 import { AutoResizeIframe } from '../components/AutoResizeIframe.jsx'
+import { useTermoEpi } from '../hooks/useTermoEpi.js'
 import '../styles/DocumentPreviewModal.css'
 
-const initialForm = {
-  matricula: '',
-  nome: '',
-  dataInicio: '',
-  dataFim: '',
-}
-
-const initialPreview = {
-  isLoading: false,
-  error: null,
-  context: null,
-  html: '',
-}
-
 export function TermosEpiPage() {
-  const [form, setForm] = useState(initialForm)
-  const [preview, setPreview] = useState(initialPreview)
-  const [isDownloading, setIsDownloading] = useState(false)
+  const {
+    form,
+    preview,
+    isDownloading,
+    resumo,
+    handleChange,
+    handleSubmit,
+    handleReset,
+    handleDownload,
+  } = useTermoEpi()
 
-  useEffect(() => {
-    window.__TERMO_PREVIEW = preview
-    return () => {
-      delete window.__TERMO_PREVIEW
-    }
-  }, [preview])
-
-  const handleChange = (event) => {
-    const { name, value } = event.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    const matricula = form.matricula.trim()
-    const nome = form.nome.trim()
-    const dataInicio = form.dataInicio
-    const dataFim = form.dataFim
-
-    const dataInicioDate = dataInicio ? new Date(`${dataInicio}T00:00:00`) : null
-    const dataFimDate = dataFim ? new Date(`${dataFim}T23:59:59`) : null
-    if (
-      (dataInicioDate && Number.isNaN(dataInicioDate.getTime())) ||
-      (dataFimDate && Number.isNaN(dataFimDate.getTime()))
-    ) {
-      setPreview({
-        ...initialPreview,
-        error: 'Datas informadas sao invalidas.',
-      })
-      return
-    }
-
-    if (dataInicioDate && dataFimDate && dataInicioDate > dataFimDate) {
-      setPreview({
-        ...initialPreview,
-        error: 'Data inicial nao pode ser maior que a data final.',
-      })
-      return
-    }
-
-    if (!matricula && !nome) {
-      setPreview({
-        ...initialPreview,
-        error: 'Informe a matricula ou o nome do colaborador.',
-      })
-      return
-    }
-
-    setPreview({
-      ...initialPreview,
-      isLoading: true,
-      error: null,
-    })
-
-    try {
-      const query = {
-        ...(matricula ? { matricula } : { nome }),
-        ...(dataInicio ? { dataInicio } : {}),
-        ...(dataFim ? { dataFim } : {}),
-      }
-      const contexto = await dataApi.documentos.termoEpiContext(query)
-      const html = buildEpiTermHtml(contexto)
-      setPreview({
-        isLoading: false,
-        error: null,
-        context: contexto,
-        html,
-      })
-    } catch (err) {
-      setPreview({
-        ...initialPreview,
-        error: err.message || 'Nao foi possivel gerar o termo.',
-      })
-    }
-  }
-
-  const handleDownload = async () => {
-    if (!preview.context || !preview.html) {
-      return
-    }
-
-    try {
-      setIsDownloading(true)
-      await downloadTermoEpiPdf({ html: preview.html, context: preview.context })
-    } catch (err) {
-      setPreview((prev) => ({
-        ...prev,
-        error: err.message || 'Falha ao baixar o PDF.',
-      }))
-    } finally {
-      setIsDownloading(false)
-    }
-  }
-
-  const handleReset = () => {
-    setForm(initialForm)
-    setPreview(initialPreview)
-  }
-
-  const context = preview.context
-  const ultimaEntregaLabel = context?.totais?.ultimaEntrega
-    ? new Date(context.totais.ultimaEntrega).toLocaleDateString('pt-BR')
-    : '-'
-  const origemLabel = context?.origem === 'local' ? 'Dados locais' : context?.origem === 'remoto' ? 'Banco (Supabase)' : null
+  const { context, ultimaEntregaLabel, origemLabel } = resumo
 
   return (
     <div className="stack">
