@@ -4,6 +4,6 @@ module.exports = {
   EntradaService: require('./EntradaService'),
   SaidaService: require('./SaidaService'),
   EstoqueService: require('./EstoqueService'),
-  AuthService: require('./AuthService'),
+  AuthService: require('./authService'),
   AcidenteService: require('./AcidenteService'),
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PessoasActions } from './PessoasActions.jsx'
 import { TablePagination } from '../TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../../config/pagination.js'
-import { formatDate } from '../../utils/PessoasUtils.js'
+import { formatDate } from '../../utils/pessoasUtils.js'
 
 const PAGE_SIZE = TABLE_PAGE_SIZE
 

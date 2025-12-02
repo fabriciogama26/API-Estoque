@@ -179,7 +179,6 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     alertasPaginados,
     totalAlertasPages,
     paginatedItens,
-    itensFiltrados,
     itensPage,
     totalItensPages,
     setItensPage,
