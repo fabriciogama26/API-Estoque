@@ -1,31 +1,27 @@
-Tela: Saídas
-============
+Tela: Saidas de Materiais
 
-Visão geral
------------
-- Registro de entregas de EPIs para pessoas cadastradas, com controle de centro de custo/serviço, status e rastreamento financeiro.
-- Carrega em paralelo pessoas (`api.pessoas.list`), materiais (`api.materiais.list`) e saídas (`api.saidas.list`) aplicando filtros dinâmicos.【F:src/pages/SaidasPage.jsx†L1-L87】
+Visao geral
 
-Cadastro
---------
-- Campos obrigatórios: pessoa, material, quantidade, centro de custo, centro de serviço e data de entrega.
-- Ao escolher a pessoa, o centro de serviço é sugerido automaticamente a partir do cadastro (`NomesMap`).
-- Payload inclui `usuarioResponsavel` com nome do usuário logado e o formulário é limpo após salvar.【F:src/pages/SaidasPage.jsx†L89-L156】
+Registrar, editar, consultar e cancelar saídas de EPI/materiais. Filtros por periodo, centro de servico, categoria, termo livre. Caminhos suportados: /saidas e /movimentacoes/saidas.
 
-Filtros e listagem
-------------------
-- Filtros: termo livre, pessoa, material, centro de custo, centro de serviço, status e faixa de datas.
-- Histórico paginado por `TablePagination`; colunas exibem material, colaborador, quantidade, centros, status, datas de entrega/troca e valor total calculado (`quantidade * valorUnitario`).【F:src/pages/SaidasPage.jsx†L158-L318】
-- Botão **Atualizar** refaz a busca com filtros atuais; mensagens de carregamento e vazio são mostradas conforme estado.
+Arquitetura (modular)
 
-Boas práticas
--------------
-- Garanta que materiais possuam `valorUnitario` e pessoas tenham centro de serviço/cargo atualizados para exibição correta.
-- Utilize o campo `status` para processos de devolução/troca; atualizações posteriores devem manter o mesmo ID de saída para preservar o histórico.
-- Seeds do modo local devem espelhar as estruturas (incluindo `dataTroca`, `status`, `usuarioResponsavel`) para evitar colunas vazias.
+- Hook useSaidasController + context (quando aplicado) para formulario, filtros, tabela e paginacao.
+- Servico: saidasService (listar/criar/atualizar/cancelar) com dataMode remoto/local.
+- Utils: saidasUtils para formatar e filtrar registros.
+- Erros: useErrorLogger('saidas') registra falhas em app_errors.
 
+Fluxos principais
 
-Atualizacao 2025-11
---------------------
-- Reforcei a obrigatoriedade de informar `centroServico`, explicando que o novo grafico "Top centro de serviços" soma exatamente esse campo.
-- Acrescentei guia rapido de como os filtros disparados pelos graficos retornam para esta tela via campo `termo`, facilitando investigações.
+- Formulario: material, centro de servico, quantidade, valor, destino/pessoa e observacao; salvar ou editar; cancelar saida destaca botao em vermelho.
+- Filtros: periodo, centro de servico, categoria, termo livre; limpar restaura defaults.
+- Tabela: paginacao local; historico de alteracoes exibido quando fornecido pelo backend.
+
+Boas praticas
+
+- Evitar recarga quando filtros nao mudam; manter botoes sem flicker e loaders dentro dos blocos.
+- Exibir acao "Cancelar saida" com cor de atencao (vermelho) para evitar confusao.
+
+Atualizacao 2025-12
+
+- Tela modularizada com hooks/services/utils; logging de erros ativo; caminhos alternativos aceitos sem quebrar roteamento.

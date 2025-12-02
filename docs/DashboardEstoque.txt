@@ -1,0 +1,28 @@
+Tela: Dashboard (Estoque)
+
+Visao geral
+
+Monitora movimentacoes de estoque (entradas/saidas), valor movimentado, itens em alerta e materiais monitorados. Cartoes com indicadores e graficos com distribuicoes.
+
+Arquitetura (modular)
+
+- Hook useDashboardEstoque: consolida dados, prepara series e rankings; cacheia chave de filtro para evitar recargas repetidas e piscas.
+- Context DashboardEstoqueContext (ou EstoqueContext) compartilha filtros, estado de carregamento e handlers para os widgets.
+- Servicos: dashboardEstoqueApi, entradasService, saidasService e materiaisService fornecem dados consolidados.
+- Utils: dashboardEstoqueUtils formatam valores, series e labels.
+- Erros: useErrorLogger('dashboard-estoque') para falhas de carga.
+
+Fluxos e filtros
+
+- Filtros principais: periodo, centro de servico, categoria, fabricante, termo livre. Filtro aplicado sem flicker; limpar restaura defaults.
+- Cards: Movimentacoes, Valor movimentado, Em estoque/Saida, Alertas ativos, Materiais monitorados.
+- Graficos: distribuicoes e tendencias usam os mesmos filtros; clique em graficos pode preencher filtro de busca (chartFilter).
+
+Boas praticas
+
+- Usar a chave de parametros cacheada para nao refazer fetch com os mesmos filtros.
+- Manter botoes e estados visuais estaveis; colocar loading dentro dos blocos.
+
+Atualizacao 2025-12
+
+- Dashboard modularizado com hook dedicado, utils e contexto; carregamento mais rapido e sem piscas.

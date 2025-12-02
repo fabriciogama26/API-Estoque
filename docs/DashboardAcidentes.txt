@@ -1,38 +1,28 @@
 Tela: Dashboard de Acidentes
-============================
 
-Visão geral
------------
-- Reúne indicadores de segurança do trabalho (taxas, distribuição por agentes/tipos/partes/cargos) com base nos acidentes registrados.
-- Funciona tanto no modo local (`localApi.acidentes.dashboard`) quanto no modo remoto via view `vw_indicadores_acidentes` do Supabase.【F:src/pages/DashboardAcidentes.jsx†L1-L79】
+Visao geral
 
-Fluxo de carregamento
----------------------
-1. Ao montar, carrega os filtros padrão (ano/período corrente) e busca os dados.
-2. No modo local, a API deve retornar `{ resumo, tendencia, tipos, partesLesionadas, cargos, agentes, options }`.
-3. No modo remoto, consulta a view e normaliza as colunas (`resumo`, `tendencia`, `tipos`, `partes_lesionadas`, etc.). Em ausência de dados, exibe estado vazio e limpa opções.【F:src/pages/DashboardAcidentes.jsx†L81-L152】
+Monitora indicadores SST: total de acidentes, dias perdidos, TF/TG, IA/IAG/IRA, distribuicao por agente/tipo/parte/cargo e tendencias mensais. Usa dados da tela de Acidentes.
 
-Filtros suportados
-------------------
-- Ano, unidade (todas ou específica), período inicial/final, centro de serviço, tipo, lesão, parte lesionada, agente e cargo.
-- Alterações atualizam o estado local; *Aplicar* dispara `load(filters)` e *Limpar* restaura `initialFilters()`.【F:src/pages/DashboardAcidentes.jsx†L30-L59】【F:src/pages/DashboardAcidentes.jsx†L154-L172】
+Arquitetura (modular)
 
-Componentes visuais
--------------------
-- **DashboardCards:** mostra totais (acidentes, taxa de frequência/gravidade, dias perdidos) calculados via `resolveIndicadorValor` a partir do resumo normalizado e uma segunda fileira com IA, IAG e IRA (valores entregues pela view). Os cartões de TF/TG agora exibem badges com a classificação da OIT.【F:src/pages/DashboardAcidentes.jsx†L174-L193】【F:src/components/DashboardCards.jsx†L1-L210】
-- **ChartTendencia:** curva temporal (por mês) usando `tendencia`.
-- **ChartTipos / ChartAgentes / ChartPartesLesionadas / ChartCargos:** gráficos de barras/pizza para distribuições categóricas. Esses componentes tratam dados vazios exibindo mensagens neutras.
-- **ChartLesoes:** barras horizontais que exibem a frequência das lesões principais registradas (campo `lesoes`), seguindo o mesmo estilo do cartão de partes lesionadas.【F:src/components/charts/ChartLesoes.jsx†L1-L66】
-- **FiltrosDashboard:** exibe selects dinâmicos conforme opções disponíveis (modo local). No modo remoto as listas permanecem vazias e os selects padrão exibem somente “todas”.【F:src/pages/DashboardAcidentes.jsx†L1-L32】【F:src/components/FiltrosDashboard.jsx†L1-L104】
+- Hook useDashboardAcidentes: carrega indicadores, prepara series e rankings; cacheia filtros para evitar recarga duplicada e flicker.
+- Context (DashboardAcidentesProvider) compartilha filtros, estado de loading e dados para os cards/graficos.
+- Servicos: dashboardAcidentesApi (Supabase) ou modo local via dataClient.
+- Utils: dashboardAcidentesUtils para formatar valores, legendas e referencias OIT.
+- Erros: useErrorLogger('dashboard-acidentes') registra falhas de carga/filtro em app_errors.
 
-Erros e pré-requisitos
-----------------------
-- Quando `VITE_SUPABASE_URL` ou `VITE_SUPABASE_ANON_KEY` não estão configuradas e o modo não é local, a tela mostra erro orientando a configurar Supabase antes de prosseguir.【F:src/pages/DashboardAcidentes.jsx†L60-L96】
-- Certifique-se de criar/atualizar a view `vw_indicadores_acidentes` durante as migrations — o dashboard espera colunas agregadas compatíveis (ver `supabase/migrations/0023_*.sql` em diante). Além das taxas clássicas, a view precisa expor `dias_debitados`, `total_trabalhadores`, `indice_acidentados`, `indice_avaliacao_gravidade` e `indice_relativo_acidentes`.
-- Seeds locais devem incluir exemplos em `localApi.acidentes.dashboard` para manter os gráficos populados durante desenvolvimento offline.
+Filtros e fluxos
 
+- Filtros: periodo inicial/final, centro de servico, tipo, lesao, parte lesionada, agente, cargo. Aplicar sem piscas; limpar restaura defaults.
+- Cards: IA/IAG/IRA, TF/TG, pendencias de EPI, zero acidentes, outros indicadores com expand/legendas.
+- Graficos: distribuicao por tipo/agente/parte/cargo e tendencia mensal; cliques podem refletir filtros em graficos relacionados (quando habilitado).
+
+Boas praticas
+
+- Reutilizar a chave de filtro cacheada; evitar re-renderes que troquem ordem de hooks.
+- Manter loaders dentro dos cards/graficos em vez de bloquear o header de filtros.
 
 Atualizacao 2025-12
--------------------
-- Fluxo modular: pagina orquestra `DashboardAcidentesContext` e `useDashboardAcidentes`, que cacheia a chave de filtros e evita flicker ao aplicar/limpar.
-- Filtros clicaveis seguem o mesmo padrao do dashboard de estoque; erros reportados via `useErrorLogger('dashboard_acidentes')`.
+
+- Dashboard modularizado com hook/context, sem flicker no botao de filtro; logs de erro no Supabase; compatibilidade com modo local/remoto.

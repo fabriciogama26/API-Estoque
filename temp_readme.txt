@@ -11,12 +11,10 @@ Aplicação completa para controle de EPIs, construída com React (Vite) e integ
 
 ## Novidades 2025-12
 
-- **Dashboard de estoque modularizado:** `useDashboardEstoque` + `DashboardEstoqueContext` isolam filtros, cacheiam a chave de busca para evitar recargas repetidas e removem flicker nos botoes; utils em `dashboardEstoqueUtils.js` formatam series e rankings.
-- **Entradas/Saidas reorganizadas:** logica de formulario/filtros/autocomplete movida para controllers e contextos dedicados, com servicos (`entradasService`/`saidasService`) e logging via `useErrorLogger`.
-- **Rotas compativeis:** alem de `/entradas` e `/saidas`, o menu usa `/movimentacoes/entradas|saidas`; ambos caminhos sao aceitos.
-- **Materiais/Pessoas:** imports case-sensitive corrigidos (`pessoasUtils`, `authService`), view `pessoas_view` atualizada com `usuarioCadastroUsername` e aliases legados.
-- **Termo de EPI:** tela modularizada (`useTermoEpi` + `termoEpiService`), preview/download com estados separados e logging de erros.
-- **Auth refatorado:** hooks `useLoginForm` e `useResetPassword` + `authService` e `errorLogService`; erros enviados para `app_errors`.
+- **Dashboard de estoque modularizado:** `useDashboardEstoque` + `DashboardEstoqueContext` isolam filtros, cacheiam a chave de busca para evitar recargas repetidas e removem flicker nos botões; utils em `dashboardEstoqueUtils.js` formatam séries e rankings.
+- **Entradas reorganizada:** lógica de formulário/filtros/autocomplete movida para `useEntradasController` e `EntradasContext`, com serviços dedicados (`entradasService`) e logging de erros via `useErrorLogger('entradas')`.
+- **Rotas compatíveis:** além de `/entradas` e `/saidas`, o menu usa `/movimentacoes/entradas|saidas`; ambos caminhos são aceitos.
+- **Registro de erros no Supabase:** falhas capturadas pelos hooks são enviados para a tabela `app_errors` (ver migration `20251201000000_create_app_errors.sql`).
 
 ## Novidades 2025-11
 
@@ -158,5 +156,4 @@ A pasta [`docs/`](docs) descreve fluxos específicos (cadastros, dashboards, ter
 - Finalizar políticas RLS específicas para cada perfil de usuário.
 - Adicionar testes automatizados para fluxos críticos (cadastros e dashboards).
 - Monitorar os tempos de resposta do Supabase e considerar caching em visões ou funções se necessário.
-
 

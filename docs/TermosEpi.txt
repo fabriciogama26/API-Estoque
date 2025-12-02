@@ -1,36 +1,28 @@
 Tela: Termo de EPI
-==================
 
-Visão geral
------------
-- Gera o termo de responsabilidade de EPI para colaboradores, com pré-visualização em HTML e opção de download em PDF.
-- O contexto é buscado via `dataClient.documentos.termoEpiContext` usando matrícula ou nome; o HTML é montado por `buildEpiTermHtml` (template compartilhado).【F:src/pages/TermosEpiPage.jsx†L1-L87】【F:shared/documents/epiTermTemplate.js†L38-L120】
+Visao geral
 
-Fluxo do usuário
-----------------
-1. Preencher matrícula ou nome e clicar em **Gerar termo**.
-2. A página exibe mensagens de carregamento/erro conforme resposta. Ao receber o contexto, renderiza resumo (nome, centro de serviço, última entrega) e o documento dentro de `AutoResizeIframe`.
-3. O botão **Baixar PDF** chama `downloadTermoEpiPdf`, que envia o HTML normalizado para a função serverless `/termo-epi` (Vercel/Supabase Functions) e faz download do arquivo nomeado automaticamente.【F:src/pages/TermosEpiPage.jsx†L89-L178】【F:src/utils/TermoEpiUtils.js†L1-L94】
+Gerar e baixar o termo de responsabilidade de EPI para colaboradores, com pre-visualizacao HTML e PDF renderizado no cliente.
 
-Pré-requisitos
---------------
-- Variáveis `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` e `VITE_SUPABASE_FUNCTIONS_URL` devem estar configuradas para o PDF (modo remoto).
-- Em modo local, apenas a pré-visualização HTML funciona; o download retornará erro se as variáveis estiverem ausentes.
-- A função serverless espera o campo `html` no corpo e utiliza a mesma chave `anon` para autenticação.
+Arquitetura (modular)
 
-Personalização do documento
----------------------------
-- Metadados da empresa podem ser definidos via `VITE_TERMO_EPI_EMPRESA_*` (nome, documento, endereço, contato, URLs de logos). O template renderiza até duas logos (principal + secundária) e repete dados de contato no cabeçalho.【F:shared/documents/epiTermTemplate.js†L40-L78】【F:shared/documents/epiTermTemplate.js†L96-L140】
-- A tabela de entregas mostra as últimas movimentações com campos: data, quantidade, descrição, CA, responsável, data de troca, motivo e assinatura. Linhas vazias completam até 10 registros por padrão.【F:shared/documents/epiTermTemplate.js†L18-L37】【F:shared/documents/epiTermTemplate.js†L122-L188】
+- Hook useTermoEpi: controla formulario, validacao, carga do contexto, preview HTML e download do PDF.
+- Servico: termoEpiService (fetchTermoEpiContext) usando dataClient (Supabase ou local).
+- Utils: TermoEpiUtils (download PDF) e template compartilhado `shared/documents/epiTermTemplate.js`.
+- Erros: logError com page 'termo-epi' registra falhas de geracao e download em app_errors.
 
-Boas práticas
--------------
-- Certifique-se de que `termoEpiContext` retorne `colaborador`, `entregas`, `totais` e `empresa` para aproveitar todas as seções do template.
-- Ajuste a função serverless para fazer cache do arquivo ou registrar logs de auditoria conforme requisitos de compliance.
-- Valide links de logo (`https://...`) para evitar bloqueios por mixed content quando a aplicação estiver sob HTTPS.
+Fluxos
 
+- Formulario: matricula ou nome (obrigatorio informar um), periodo opcional (dataInicio/dataFim). Valida datas (formato e ordem).
+- Gerar termo: busca contexto via service, monta HTML pelo template e mostra preview em iframe.
+- Download: gera PDF a partir do HTML e contexto; mostra erro em caso de falha.
+- Resumo: exibe colaborador, centro de servico, ultima entrega, itens entregues e origem dos dados (local ou Supabase).
 
-Atualizacao 2025-11
---------------------
-- Expliquei como o novo padrao de resumo de material facilita a leitura dos termos gerados, pois os campos sao os mesmos exibidos nos graficos.
-- Detalhei que, ao revisar os textos dos termos, devemos garantir consistencia com o que aparece nas indicadores de estoque para evitar divergencias.
+Boas praticas
+
+- Validar datas antes de chamar o service; informar pelo menos matricula ou nome.
+- Exibir mensagens de erro no preview e registrar no log para acompanhar falhas de PDF ou carga.
+
+Atualizacao 2025-12
+
+- Tela refatorada com hook/service/utils; logging de erros adicionado; preview e download separados por estado isLoading/isDownloading.

@@ -1,47 +1,33 @@
-Tela: Estoque Atual
-===================
+Tela: Estoque (resumo e alertas)
 
 Visao geral
------------
-- Consolida saldo por material, lista alertas de estoque minimo e permite ajuste inline do minimo.
-- Carrega via `api.estoque.current({ periodoInicio, periodoFim })`, retornando `itens` e `alertas`.
-- Valores monetarios em BRL; quantidades com `Intl.NumberFormat`.
+
+Visualiza saldo total, valor para reposicao, alertas de minimo e distribuicoes por categoria/fabricante/centro. Permite filtrar e paginar alertas.
+
+Escopo da tela
+
+Uso por almoxarifado e gestao para monitorar rupturas e valores. Integra com Entradas/Saidas e com Dashboard de Estoque.
 
 Arquitetura (modular)
----------------------
-- Hook/Contexto: `useEstoque` + `EstoqueContext` (para tela Estoque) cuidam de dados, filtros e atualizacoes; caches evitam recargas desnecessarias.
-- Filtros isolados em `useEstoqueFiltro.js`; regras em `src/rules/estoqueRules.js` (minimo, validacao).
-- Servicos: `dataClient.estoque.current` para saldo/alertas; `materiais.update` para salvar minimo.
-- Logs de erro: use `useErrorLogger('estoque')` para registrar falhas de carga ou update (integra com `app_errors`).
 
-Filtros
--------
-- Periodo inicial/final (mes/ano), termo de busca (nome/fabricante/centro), centro de estoque.
-- Botoes: **Aplicar filtros** (submete), **Limpar filtros** (restaura defaults e recarrega).
+- Hook useEstoqueFiltro: controla filtros, evita reload quando params nao mudam, entrega alertas filtrados.
+- Context EstoqueContext: centraliza estado de estoque, filtros, tamanhos de pagina e reload.
+- Hook useDashboardEstoque: prepara cards e graficos; cacheia chave de busca para evitar flicker.
+- Servicos: estoqueApi/entradasService/saidasService e materiaisService abastecem cards e alertas.
+- Utils: dashboardEstoqueUtils/estoqueUtils formatam cards, graficos e legendas.
+- Erros: useErrorLogger('estoque') registra falhas de carga/filtros em app_errors.
 
-Alertas
--------
-- Cards mostram badge, quantidade atual, minimo, deficit e valor estimado de reposicao.
-- Apenas itens filtrados entram nos alertas; vazio exibe mensagem neutra.
+Fluxos principais
 
-Resumo geral
-------------
-- Total em estoque (valor), total de itens, valor de reposicao (soma do deficit) e data da ultima movimentacao.
-- Calculados via `useMemo` sobre itens filtrados.
-
-Lista de itens
---------------
-- Cada cartao: fabricante, quantidade, valor unitario/total, validade (dias), CA, centros de custo e ultima atualizacao formatada.
-- Campo **Estoque minimo** editavel inline; salva via `api.materiais.update` com `estoqueMinimo` e `usuarioResponsavel`, depois recarrega dados.
-- Erros por item exibem feedback; botoes desabilitam enquanto salva.
+- Cards superiores: Estoque total atual e Valor para reposicao (ambos com icone info), alertas paginados com botoes estaticos.
+- Filtros: centro de servico, categoria, fabricante, termo livre; aplicar/limpar sem piscas de botao.
+- Alertas: cards listam saldo atual/minimo e detalhes do material; paginacao local (pageSize configuravel no contexto).
 
 Boas praticas
--------------
-- Configure politicas no Supabase para permitir update de `estoque_minimo` em `materiais` por usuarios autenticados.
-- No modo local, mantenha `localApi.estoque.current` alinhado com estrutura esperada (`alertas` + `itens`).
-- Use filtros de periodo para auditar movimentacoes especificas antes de relatorios externos.
+
+- Evitar refazer load se filtros nao mudaram; manter botoes sem flicker e carregar skeletons dentro dos blocos.
+- Garantir que alertas usem a mesma chave de filtro usada nos cards para consistencia visual.
 
 Atualizacao 2025-12
--------------------
-- Refatorada para hook/context com carregamento silencioso e sem flicker no botao de filtro; caches de chave evitam load repetido.
-- Integrou `useErrorLogger` na tela de estoque para registrar falhas.
+
+- Tela modularizada com contexto e hooks; info icons restaurados; botoes de filtro estaveis e carregamento dentro dos blocos.

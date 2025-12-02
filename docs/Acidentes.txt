@@ -1,49 +1,84 @@
 Tela: Cadastro de Acidentes
-===========================
 
 Visao geral
------------
-- Registrar, editar e consultar acidentes de trabalho vinculados a pessoas cadastradas.
-- Usa catalogos de agentes, tipos, lesoes e partes lesionadas; mantem historico das alteracoes.
-- Filtros: termo livre, tipo, centro de servico, agente.
+
+- Registrar, editar e consultar acidentes de trabalho vinculados a pessoas cadastradas (funcionarios, estagiarios, terceiros autorizados).
+
+- Utiliza catalogos de agentes, tipos, lesoes e partes lesionadas para padronizar registros e permitir analises estatisticas.
+
+- Mantem historico de alteracoes (quem alterou, quando e o que foi modificado).
+
+- Filtros por termo livre, tipo, centro de servico e agente para localizar rapidamente registros especificos.
+
+Escopo da tela
+
+- Registro de acidentes tipicos, de trajeto e quase-acidentes (quando configurados nos tipos).
+- Uso principal por SESMT, CIPA, RH e liderancas com permissao de consulta.
+- Integra integracao logica com o Dashboard de Acidentes, que consome esses dados.
 
 Arquitetura (modular)
----------------------
-- Hooks: `useAcidentes`, `useAcidenteForm`, `useAcidenteFiltro`, `usePessoas`, `useAgentes`, `useLocais`, `usePartes` isolam dados/estado.
-- Contexto opcional: `AcidentesContext` pode expor acidentes, filtros e actions (reload, setFilters) para componentes de UI.
-- Serviços: `acidentesService`/`pessoasService` concentram chamadas Supabase/local; utils em `src/utils/acidentesUtils.js` (normalizacao, parse, nomes de agentes).
-- Erros: usar `useErrorLogger('acidentes')` para registrar falhas de load, submit, filtros e historico na tabela `app_errors`.
+
+Hooks de dados/estado:
+- useAcidentes: carrega lista principal, controla loading/erro e expõe reload().
+- useAcidenteForm: cuida do formulario (estado, validacao, submit, edicao/cancelamento).
+- useAcidenteFiltro: mantem filters e aplica filterAcidentes para gerar a lista filtrada.
+- usePessoas, useAgentes, useLocais, usePartes: catálogos auxiliares isolados, cada um com loading/erro proprio.
+
+Contexto (opcional):
+- AcidentesContext pode centralizar acidentes, filters, reload, setFilters e catalogos para evitar prop-drilling entre formulario, filtros, tabela e modal de historico.
+
+Servicos:
+- acidentesService: listar, criar, atualizar, historico, catalogos (agentes/tipos/lesoes/partes).
+- pessoasService: listar pessoas com matricula, cargo, centro de servico, local, etc.
+
+Utilitarios:
+- src/utils/acidentesUtils.js: normalizacao, parse de listas, nomes/keys de agentes, conversoes de data/hora e funcoes de filtro.
+
+Erros:
+- Uso de useErrorLogger('acidentes') para registrar falhas de carregamento, submit, filtros e historico na tabela app_errors (Supabase).
+
+Campos principais do formulario
+
+Identificacao da pessoa:
+- Matricula (obrigatorio). Preenche automaticamente nome, cargo, centro de servico e local.
+- Nome, Cargo, Centro de servico, Setor, Local derivam da pessoa (ajustaveis conforme permissao).
+
+Dados do acidente:
+- Data/hora (obrigatorio), Dias perdidos, Dias debitados, HHT.
+
+Classificacao:
+- Agente(s), Tipo(s), Lesao(oes), Parte(s) lesionada(s) via multiselect + chips; validacao garante grupos obrigatorios preenchidos.
+
+Complementares:
+- CID, CAT, Observacao, flags eSocial/SESMT e datas correlatas.
 
 Fluxos principais
------------------
-1) Cadastro/edicao
-   - Seleciona matricula existente; campos obrigatorios: matricula, data, dias perdidos/debitados, HHT, centro de servico, local, agente(s), tipo(s), lesao(oes), parte(s) lesionada(s).
-   - Campos auxiliares: CAT, observacao, CID, flags de lancamento (eSOCIAL/SESMT).
-   - Botao alterna entre *Registrar acidente* e *Salvar alteracoes*; *Cancelar edicao* reseta estado.
-2) Multiselecoes (agente/tipo/lesoes/partes)
-   - Select popula opcoes; **Adicionar** move o valor para chips removiveis. Bloqueia salvar sem ao menos um item em cada categoria obrigatoria.
-3) Historico
-   - Botao de relogio abre `AcidentesHistoryModal`; busca via `acidentesService.getAcidenteHistory(id)`. Estado controla loading/erro por modal.
-4) Filtros
-   - Barra superior controla `filters`; *Aplicar* usa `filterAcidentes` (utils); *Limpar* restaura defaults e reload.
 
-Carregamento de dados
----------------------
-- Pessoas, centros/locais, agentes, tipos, lesoes e partes carregam em paralelo; cada catalogo trata erro isoladamente.
-- Lista principal `useAcidentes` atualiza apos salvar/editar ou limpar filtros.
+Cadastro/edicao:
+- Seleciona matricula, preenche obrigatorios, salva (novo) ou atualiza (edicao). Cancelar limpa estado e zera edicao.
 
-Regras e validacoes
--------------------
-- `validateAcidenteForm`, `createAcidentePayload`, `updateAcidentePayload` (rules/utils) garantem payload coerente.
-- Mantem consistencia entre chips e campos derivados para compatibilidade com tabelas antigas.
+Multiselecoes:
+- Select + adicionar geram chips; remocao pelo chip; validacao impede submit sem grupos obrigatorios.
+
+Historico:
+- AcidentesHistoryModal chama acidentesService.getAcidenteHistory(id) e cacheia por acidente.id; mostra data/hora, usuario e campos alterados.
+
+Filtros:
+- Form de filtros controla filters; Aplicar usa filterAcidentes; Limpar restaura ACIDENTES_FILTER_DEFAULT.
+
+Carregamento:
+- Catalogos carregados em paralelo com estados proprios; useAcidentes recarrega apos salvar/editar ou via reload manual.
+
+Regras/validacao:
+- validateAcidenteForm, createAcidentePayload e updateAcidentePayload convertem campos numericos e mantem consistencia entre campos de lista e legados.
 
 Boas praticas
--------------
-- Publique catalogos (agentes, tipos, lesoes, partes) antes de abrir a tela.
-- Prefira matricula como chave em importacoes; nome/cargo sao derivados.
-- Use o historico para auditar ajustes feitos manualmente ou via Supabase.
+
+- Garantir catalogos populados antes de liberar a tela.
+- Preferir matricula como chave; nome/cargo sao derivados.
+- Usar historico como auditoria para correcoes/importacoes.
 
 Atualizacao 2025-12
--------------------
-- Tela modularizada em hooks/services/utils; UI dividida em componentes (`AcidentesForm`, `AcidentesFilters`, `AcidentesTable`, `AcidentesHistoryModal`).
-- Logs de erro direcionados a `app_errors` via `useErrorLogger('acidentes')`; filtros/loads nao devem causar flicker.
+
+- Tela refatorada em hooks/services/utils com componentes: AcidentesForm, AcidentesFilters, AcidentesTable, AcidentesHistoryModal.
+- Logs de erro enviados para app_errors; carregamentos/filtros evitam flicker.

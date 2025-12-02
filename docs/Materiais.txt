@@ -1,53 +1,28 @@
-Tela: Materiais
-===============
+Tela: Cadastro de Materiais (EPI)
 
-Visão geral
------------
-- Tela mais completa do módulo: cadastra/edita materiais de EPI, gerencia catálogos auxiliares (grupos, características, cores, numerações) e exibe histórico de preços.
-- A página orquestra múltiplas requisições paralelas (`api.materiais.listDetalhado`, `groups`, `caracteristicas`, `cores`, `medidasCalcado`, `medidasVestimenta`, `fabricantes`) com tratamento individual de erros e indicadores de carregamento.【F:src/pages/Materiais.jsx†L33-L153】
+Visao geral
 
-Formulário
-----------
-- Campos principais: grupo de material (define comportamentos para calcado/vestimenta), item do catálogo, nome, fabricante, validade (dias), CA, valor unitário, descrição, centros de custo, numeração, características e cores.
-- O `<MateriaisForm>` injeta `onChange={handleFormChange}` e `onSubmit={handleSubmit}`, de modo que cada alteração de campo do JSX controlado cai em `handleFormChange` antes de chegar ao estado React. Isso garante consistência enquanto o componente renderiza feedbacks de carregamento/erro e habilita/desabilita selects conforme os loaders de grupos/itens/fabricantes/tamanhos.【F:src/pages/Materiais.jsx†L640-L686】【F:src/components/Materiais/MateriaisForm.jsx†L27-L206】
-- `handleFormChange` intercepta todas as mudanças de `<input>/<select>` para manter o formulário coerente antes do submit: sanitiza CA para apenas números, formata moeda, converte seleções em `{id, nome}` legíveis, sincroniza fabricante/nome do EPI e, quando o grupo muda, zera campos dependentes (lista de itens, números de calçado/vestimenta) para forçar recarga e evitar combinações inválidas.【F:src/pages/Materiais.jsx†L279-L365】
-- Mudanças em `grupoMaterialId` disparam efeitos derivados: o hook `useEffect` observa o campo e chama `api.materiais.items` para carregar os EPIs do grupo, enquanto outro `useEffect` realinha o campo `nome` quando a lista assíncrona chega — ambos dependem da limpeza feita por `handleFormChange` para decidir quando resetar ou reaproveitar valores existentes.【F:src/pages/Materiais.jsx†L198-L271】
-- Botões de adicionar/remover características e cores usam `normalizeSelectionList` e `findOptionByValue` para deduplicar seleções, gerar listas ordenadas e manter arrays de IDs (`caracteristicas_epi`, `coresIds`) prontos para o payload; essas funções só conseguem preservar consistência porque `handleFormChange` mantém as chaves auxiliares (`fabricanteNome`, `materialItemNome`, etc.) sincronizadas com o valor exibido.【F:src/pages/Materiais.jsx†L367-L418】【F:src/utils/selectionUtils.js†L1-L86】
-- O estado inicial do formulário vem de `createMateriaisFormDefault`, e `resetForm` reutiliza essa fábrica tanto ao cancelar edição quanto após salvar/criar materiais, garantindo que futuros `handleFormChange` partam de valores conhecidos.【F:src/config/MateriaisConfig.js†L1-L27】【F:src/pages/Materiais.jsx†L439-L520】
-- Ao iniciar edição (`startEdit`), o formulário é preenchido com dados normalizados do material selecionado, adicionando o item atual às opções locais para que `handleFormChange` continue reconhecendo o valor ativo mesmo antes das listas remotas carregarem; `cancelEdit` apenas delega para `resetForm` e, portanto, também refaz o estado observado por `handleFormChange`.【F:src/pages/Materiais.jsx†L522-L616】
-- Botão **Salvar alterações** envia o `onSubmit` do `<form>` e dispara o fluxo de atualização descrito abaixo, após passar por `handleSubmit` (que depende dos campos já sanitizados por `handleFormChange`).【F:src/components/Materiais/MateriaisForm.jsx†L63-L216】【F:src/pages/Materiais.jsx†L439-L520】
+Cadastro e manutencao de materiais/EPI com fabricantes, grupos, cores, caracteristicas e historico de precos. Suporta modo Supabase e local.
 
-Fluxo ao salvar alterações (edição)
------------------------------------
-1. O submit do formulário chama `handleSubmit`, que cancela o evento, limpa erros anteriores e executa `validateMaterialForm` para garantir grupo, item, fabricante, validade, valor e listas de características/cores válidas.【F:src/pages/Materiais.jsx†L473-L521】【F:src/rules/MateriaisRules.js†L163-L236】
-2. Com a validação ok, `handleSubmit` resolve o nome do usuário logado (`resolveUsuarioNome`), monta o payload com `updateMaterialPayload(form, usuario)` — que sanitiza campos via `buildMaterialPayload` — e chama `api.materiais.update` passando o `id` que está em `editingMaterial`. Em seguida, o componente aguarda a promise, reseta o formulário, limpa caches de histórico e recarrega a listagem/grupos para refletir os dados atualizados.【F:src/pages/Materiais.jsx†L478-L520】【F:src/rules/MateriaisRules.js†L240-L310】
-   - Esse payload já chega normalizado porque `handleFormChange` garantiu que campos de seleção tragam os IDs corretos, listas estejam deduplicadas e valores monetários/numéricos estejam prontos para validação. `updateMaterialPayload` apenas refina (merge de listas, cálculo de número específico, sanitização de CA/moeda) antes de enviar ao serviço.【F:src/pages/Materiais.jsx†L279-L418】【F:src/rules/MateriaisRules.js†L240-L310】
-3. Dentro de `api.materiais.update`, o serviço busca o registro atual no Supabase, combina com o payload sanitizado e identifica campos alterados para gravar no `material_price_history` (incluindo usuário e timestamp). O payload é preparado por `sanitizeMaterialPayload`, que usa `resolveRefs`/`resolveReferencia` para converter nomes (fabricante, grupo, numerações) em UUIDs antes de persistir, e `buildHistoryChanges` gera um diff JSON que é armazenado no histórico antes de `syncMaterialRelations` atualizar as tabelas auxiliares de cores e características. Depois disso o objeto final é montado com `buildMaterialSupabasePayload`, a tabela `materiais` é atualizada e o registro mais recente é retornado pela view `materiais_view`; qualquer falha é repassada ao formulário.【F:src/services/api.js†L1938-L2059】
+Arquitetura (modular)
 
-Listagem e filtros
-------------------
-- `MateriaisFilters` permite filtrar por termo, grupo, fabricante, validade mínima/máxima e status de estoque. Os filtros alimentam `filterMateriais`/`sortMateriaisByNome` antes de repassar para a tabela.【F:src/pages/Materiais.jsx†L523-L603】
-- A tabela mostra ações de editar e histórico. O botão **Atualizar** refaz a consulta no Supabase/local API mantendo a ordenação alfabética.【F:src/pages/Materiais.jsx†L605-L640】
+- Hooks: useMateriaisController (formulario, filtros, tabela, paginacao), useMateriais (lista), useFabricantes/grupos/etc para catalogos.
+- Servicos: materiaisService (listar/criar/atualizar/historico), MaterialService (backend legacy), integra dataMode remoto/local.
+- Utils: MateriaisUtils (formatacao, parse de currency, sanitizacao), duplicidade com hashes na migration dedicada.
+- Erros: useErrorLogger('materiais') envia falhas para app_errors.
 
-Histórico de preços
--------------------
-- Ao abrir o modal de histórico, a página consulta `api.materiais.history(material.id)` apenas uma vez e armazena em `historyCache`; chamadas subsequentes reutilizam o cache local para evitar requisições redundantes.【F:src/pages/Materiais.jsx†L57-L75】【F:src/pages/Materiais.jsx†L457-L520】
-- `MateriaisHistoryModal` recebe o estado `historyModal` com bandeiras de carregamento/erro e exibe a linha do tempo de alterações.
+Fluxos principais
 
-Boas práticas
--------------
-- Popule as tabelas de referência (grupos, características, cores, medidas) antes de abrir a tela em produção para evitar formulários vazios.
-- Ao adicionar novos campos no Supabase, atualize `createMateriaisFormDefault`, `MateriaisForm` e `createMaterialPayload`/`updateMaterialPayload` em `src/rules/MateriaisRules.js` para manter coerência.
-- Use o histórico para auditar alterações manuais feitas via Studio ou integrações externas.
-Atualizacoes recentes
----------------------
-- O fluxo de atualizacao agora resolve IDs ausentes diretamente pelos nomes do catalogo (cores/caracteristicas) e reinvoca `insereCores`/`insereCaracteristicas` apos limpar os vinculos, garantindo que a base reflita exatamente o que foi selecionado no formulario (`src/services/api.js`).
-- `startEdit` rola a pagina para o topo antes de preencher o formulario, evitando que o usuario fique com o botao fora de vista (`src/pages/Materiais.jsx`).
-- O modal de historico exibe apenas campos legiveis (`materialItemNome`, `caracteristicaEpi`, `coresTexto`, etc.) e usa `formatSelectionValue` para formatar listas, eliminando a exibicao de UUIDs (`src/services/api.js`, `src/components/Materiais/MateriaisHistoricoTimeline.jsx`).
-- O payload de edicao preserva o texto mostrado no dropdown do EPI (`materialItemNome`/`nomeItemRelacionado`) e mantem os arrays de caracteristicas/cores sincronizados com as selecoes, evitando duplicidade e falhas ao salvar (`src/rules/MateriaisRules.js`, `src/pages/Materiais.jsx`, `src/utils/selectionUtils.js`).
+- Formulario: dados basicos (nome/item, fabricante, grupo, numero especifico), medidas (calcado/vestimenta), CA, validade, valor unitario, estoque minimo, ativo.
+- Historico de preco: tabela/mensagem ao salvar com diffs (updateHistory) e timeline.
+- Filtros: termo livre, grupo, fabricante, ativo; limpar restaura defaults; paginacao local.
+- Acoes: editar, historico, ativar/desativar material; duplicidade prevenida por hash_base/hash_completo (fabricante+grupo+item+numeroEspecifico+caracteristicas).
 
+Boas praticas
 
-Atualizacao 2025-11
---------------------
-- Atualizei a secao de exibicao para incluir o novo resumo compacto usado nos graficos: `formatEstoqueMaterialLabel` limita os campos mostrados e evita poluicao visual.
-- Acrescentei orientacao para sempre preencher `fabricanteNome` alem do ID; caso contrario os graficos exibem `Nao informado`, prejudicando os filtros aplicados via dashboard.
+- Sempre usar parse/format de currency via utils; validar campos numericos antes do submit.
+- Respeitar mensagens de duplicidade do gatilho; corrigir catalogos antes de forcar insert.
+
+Atualizacao 2025-12
+
+- Tela modularizada com hooks/services/utils; imports corrigidos (MateriaisUtils case-sensitive); logging de erros ativo.
