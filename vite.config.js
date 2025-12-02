@@ -9,7 +9,7 @@ export default defineConfig({
     // host: '0.0.0.0', // habilite para acessar pela rede
     port: Number(process.env.VITE_PORT || 5173),
     watch: {
-      ignored: ['**/SupabaseBackup/**']
+      ignored: ['**/SupabaseBackup/**', '**/node_modules_old/**']
     }
   }
 })
