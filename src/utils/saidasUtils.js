@@ -1,0 +1,191 @@
+// Defaults de formulário e filtros
+export const initialSaidaForm = {
+  pessoaId: '',
+  materialId: '',
+  quantidade: '',
+  centroCusto: '',
+  centroCustoId: '',
+  centroServico: '',
+  centroServicoId: '',
+  dataEntrega: '',
+}
+
+export const initialSaidaFilters = {
+  termo: '',
+  registradoPor: '',
+  centroCusto: '',
+  centroServico: '',
+  status: '',
+  dataInicio: '',
+  dataFim: '',
+}
+
+// Limites de busca e debounce
+export const MATERIAL_SEARCH_MIN_CHARS = 2
+export const MATERIAL_SEARCH_MAX_RESULTS = 10
+export const MATERIAL_SEARCH_DEBOUNCE_MS = 250
+export const PESSOA_SEARCH_MIN_CHARS = 2
+export const PESSOA_SEARCH_MAX_RESULTS = 10
+export const PESSOA_SEARCH_DEBOUNCE_MS = 250
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const isLikelyUuid = (value) => UUID_PATTERN.test(String(value || '').trim())
+
+export const normalizeSearchValue = (value) => {
+  if (value === undefined || value === null) return ''
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+export const materialMatchesTerm = (material, termoNormalizado) => {
+  if (!termoNormalizado) return true
+  const campos = [
+    material?.nome,
+    material?.nomeItemRelacionado,
+    material?.materialItemNome,
+    material?.grupoMaterial,
+    material?.grupoMaterialNome,
+    material?.numeroCalcado,
+    material?.numeroVestimenta,
+    material?.numeroEspecifico,
+    material?.fabricante,
+    material?.fabricanteNome,
+    material?.corMaterial,
+    material?.coresTexto,
+    material?.ca,
+    material?.id,
+  ]
+  return campos.map(normalizeSearchValue).some((campo) => campo.includes(termoNormalizado))
+}
+
+export const pessoaMatchesTerm = (pessoa, termoNormalizado) => {
+  if (!termoNormalizado) return true
+  const campos = [pessoa?.nome, pessoa?.matricula, pessoa?.centroServico, pessoa?.local, pessoa?.setor, pessoa?.cargo]
+  return campos.map(normalizeSearchValue).some((campo) => campo.includes(termoNormalizado))
+}
+
+export const formatMaterialSummary = (material) => {
+  if (!material) return ''
+  const nome =
+    [material.materialItemNome, material.nome, material.nomeId, material.id].find(
+      (valor) => valor && !isLikelyUuid(valor),
+    ) || ''
+  const grupo = material.grupoMaterialNome || material.grupoMaterial || ''
+  const detalheCandidates = [
+    material.numeroCalcadoNome,
+    material.numeroCalcado,
+    material.numeroVestimentaNome,
+    material.numeroVestimenta,
+    material.numeroEspecifico,
+    material.ca,
+    material.corMaterial,
+    Array.isArray(material.coresNomes) ? material.coresNomes[0] : '',
+  ]
+  const detalhe = detalheCandidates.find((valor) => valor && !isLikelyUuid(valor)) || ''
+  const corDescricao =
+    material.coresTexto ||
+    material.corMaterial ||
+    (Array.isArray(material.coresNomes) ? material.coresNomes.join(', ') : '')
+  const caracteristicaDescricao =
+    material.caracteristicasTexto ||
+    (Array.isArray(material.caracteristicasNomes) ? material.caracteristicasNomes.join(', ') : '')
+  const fabricante =
+    material.fabricanteNome || (material.fabricante && !isLikelyUuid(material.fabricante) ? material.fabricante : '') || ''
+  const resumo = [nome, grupo, detalhe, corDescricao, caracteristicaDescricao, fabricante]
+  const vistos = new Set()
+  const partes = resumo.filter((parte) => {
+    const texto = (parte || '').toString().trim()
+    if (!texto) return false
+    const chave = texto.toLowerCase()
+    if (vistos.has(chave)) return false
+    vistos.add(chave)
+    return true
+  })
+  return partes.join(' | ')
+}
+
+export const formatPessoaSummary = (pessoa) => {
+  if (!pessoa) return ''
+  const nome = (pessoa.nome || '').trim()
+  const matricula = (pessoa.matricula || '').trim()
+  const cargo = (pessoa.cargo || '').trim()
+  if (nome && matricula) {
+    return cargo ? `${nome} (${matricula}) - ${cargo}` : `${nome} (${matricula})`
+  }
+  return nome || matricula
+}
+
+export const formatPessoaDetail = (pessoa) => {
+  if (!pessoa) return ''
+  return pessoa.cargo ? pessoa.cargo : ''
+}
+
+export const mergePessoasList = (base = [], extras = []) => {
+  const mapa = new Map()
+  ;(Array.isArray(base) ? base : []).forEach((item) => {
+    if (item?.id) {
+      mapa.set(item.id, item)
+    }
+  })
+  ;(Array.isArray(extras) ? extras : []).forEach((item) => {
+    if (item?.id) {
+      mapa.set(item.id, item)
+    }
+  })
+  return Array.from(mapa.values())
+}
+
+export const buildSaidasQuery = (filters) => {
+  const query = {}
+  const centroCusto = filters.centroCusto?.trim()
+  if (centroCusto) query.centroCusto = centroCusto
+  const centroServico = filters.centroServico?.trim()
+  if (centroServico) query.centroServico = centroServico
+  const registradoPor = filters.registradoPor?.trim()
+  if (registradoPor) query.registradoPor = registradoPor
+  const status = filters.status?.trim()
+  if (status) query.status = status
+  if (filters.dataInicio) query.dataInicio = filters.dataInicio
+  if (filters.dataFim) query.dataFim = filters.dataFim
+  const termo = filters.termo?.trim()
+  if (termo) query.termo = termo
+  return query
+}
+
+export const formatCurrency = (value) =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    maximumFractionDigits: 2,
+  }).format(Number(value ?? 0))
+
+export const formatDisplayDateTime = (value) => {
+  if (!value) return 'Nao informado'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Nao informado'
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return date.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    hour12: false,
+    timeZone,
+  })
+}
+
+export const formatDisplayDate = (value) => {
+  if (!value) return 'Nao informado'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Nao informado'
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return date.toLocaleDateString('pt-BR', { timeZone })
+}
+
+export const formatDateToInput = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
