@@ -1,58 +1,37 @@
-import { supabase } from './supabaseClient.js'
+import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 
-const TABLE = 'app_errors'
-
-const trimText = (value) => (typeof value === 'string' ? value.trim() : '')
-
-const buildFingerprint = (message, page, stack) => {
-  const base = `${trimText(page)}|${trimText(message)}|${trimText(stack).slice(0, 180)}`
-  // Hash simples para evitar dependências
-  let hash = 0
-  for (let i = 0; i < base.length; i += 1) {
-    hash = (hash << 5) - hash + base.charCodeAt(i)
-    hash |= 0
+async function insertError(payload) {
+  if (!isSupabaseConfigured() || !supabase) {
+    return
   }
-  return `fp_${Math.abs(hash)}`
+
+  const base = payload || {}
+  const fingerprint =
+    base.fingerprint ||
+    `${base.page || 'unknown'}|${(base.message || '').slice(0, 200)}|${base.severity || 'error'}`
+
+  const record = {
+    environment: 'app',
+    page: base.page || '',
+    user_id: base.userId || null,
+    message: base.message || 'Erro desconhecido',
+    stack: base.stack || null,
+    context: base.context || null,
+    severity: base.severity || 'error',
+    fingerprint,
+  }
+
+  const { error } = await supabase.from('app_errors').insert(record)
+  if (error) {
+    // Não propaga falha de log para não quebrar UX
+    console.warn('Falha ao registrar erro', error)
+  }
 }
 
-export async function logError({
-  message,
-  stack = '',
-  page = '',
-  context = null,
-  severity = 'error',
-  userId = null,
-  environment = 'app',
-}) {
-  if (!supabase) {
-    console.warn('Supabase client indisponivel para log de erros.')
-    return null
+export async function logError(payload) {
+  try {
+    await insertError(payload)
+  } catch (err) {
+    console.warn('Erro ao registrar log de erro', err)
   }
-
-  const payload = {
-    message: trimText(message) || 'Erro desconhecido',
-    stack: trimText(stack),
-    page: trimText(page),
-    severity: trimText(severity) || 'error',
-    user_id: userId ? String(userId) : null,
-    environment: trimText(environment) || 'app',
-    fingerprint: buildFingerprint(message, page, stack),
-    context,
-  }
-
-  const { error, data } = await supabase.from(TABLE).upsert(
-    {
-      ...payload,
-      created_at: new Date().toISOString(),
-      // dedupe por fingerprint + page
-    },
-    { onConflict: 'fingerprint' },
-  )
-
-  if (error) {
-    console.warn('Falha ao registrar erro no Supabase:', error.message)
-    return null
-  }
-
-  return data ?? null
 }
