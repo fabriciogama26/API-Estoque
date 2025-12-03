@@ -48,7 +48,9 @@ function App() {
               <Route path="saidas" element={<SaidasPage />} />
             </Route>
 
+            {/* Documentos */}
             <Route path="documentos/termo-epi" element={<TermosEpiPage />} />
+            <Route path="termos/epi" element={<Navigate to="/documentos/termo-epi" replace />} />
           </Route>
         </Route>
 

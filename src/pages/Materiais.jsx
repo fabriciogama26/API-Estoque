@@ -98,6 +98,11 @@ function MateriaisContent() {
 
       <MateriaisFilters
         filters={filters}
+        grupos={materialGroups}
+        tamanhos={[...calcadoOptions, ...tamanhoOptions]}
+        fabricantes={fabricanteOptions}
+        caracteristicas={caracteristicaOptions}
+        cores={corOptions}
         onChange={handleFilterChange}
         onSubmit={handleFilterSubmit}
         onClear={handleFilterClear}

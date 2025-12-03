@@ -26,3 +26,43 @@ Boas praticas
 Atualizacao 2025-12
 
 - Tela refatorada com hook/service/utils; logging de erros adicionado; preview e download separados por estado isLoading/isDownloading.
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- TermosEpiPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/TermosEpiPage.jsx
+  - Responsavel por: orquestrar formulario, preview e download consumindo o hook de termo.
+- useTermoEpi
+  - Tipo: hook de formulario/preview
+  - Caminho: src/hooks/useTermoEpi.js
+  - Responsavel por: estado do formulario, validacao de datas, carga de contexto, geracao de HTML e download de PDF; controla isLoading/isDownloading.
+
+Constantes e configuracoes
+--------------------------
+- INITIAL_FORM / INITIAL_PREVIEW
+  - Tipo: estados iniciais
+  - Caminho: src/hooks/useTermoEpi.js
+  - Uso: reset de formulario e preview.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- buildEpiTermHtml
+  - Tipo: template de documento
+  - Caminho: shared/documents/epiTermTemplate.js
+  - Responsavel por: montar HTML do termo com base no contexto carregado.
+- downloadTermoEpiPdf
+  - Tipo: utilitario de download
+  - Caminho: src/utils/TermoEpiUtils.js
+  - Responsavel por: gerar/baixar PDF a partir do HTML e contexto.
+
+Servicos e integracoes externas
+-------------------------------
+- termoEpiService.fetchTermoEpiContext
+  - Tipo: servico de API
+  - Caminho: src/services/termoEpiService.js
+  - Responsavel por: buscar contexto do termo (via dataClient/Supabase ou local) a partir de matricula/nome e periodo.

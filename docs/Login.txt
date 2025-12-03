@@ -24,3 +24,51 @@ Boas praticas
 Atualizacao 2025-12
 
 - Telas modularizadas com hooks/services e logging; compatibilidade com modo local preservada.
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- LoginPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/LoginPage.jsx
+  - Responsavel por: UI de login, aciona o hook de formulario e mostra feedbacks.
+- useLoginForm
+  - Tipo: hook de formulario
+  - Caminho: src/hooks/useLoginForm.js
+  - Responsavel por: estado de username/senha, submit, recuperacao de senha, mensagens de erro/sucesso.
+- ResetPasswordPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/ResetPasswordPage.jsx
+  - Responsavel por: UI de redefinicao de senha consumindo hook dedicado.
+- useResetPassword
+  - Tipo: hook de reset
+  - Caminho: src/hooks/useResetPassword.js
+  - Responsavel por: restaurar sessao do link, validar senha/confirmacao, enviar update e redirecionar.
+
+Constantes e configuracoes
+--------------------------
+- LOCAL_AUTH (AuthContext)
+  - Tipo: configuracao de modo local
+  - Caminho: src/context/AuthContext.jsx
+  - Uso: credenciais padrao em modo offline.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- logError
+  - Tipo: logger de erro
+  - Caminho: src/services/errorLogService.js
+  - Responsavel por: registrar falhas de login/recovery/reset em app_errors.
+
+Servicos e integracoes externas
+-------------------------------
+- authService (sendPasswordRecovery, updatePassword, restoreResetSession)
+  - Tipo: servico de Auth
+  - Caminho: src/services/authService.js
+  - Responsavel por: enviar email de recuperacao, atualizar senha e restaurar sessao via Supabase.
+- AuthContext
+  - Tipo: contexto de autenticacao
+  - Caminho: src/context/AuthContext.jsx
+  - Responsavel por: login (Supabase ou modo local), logout, recoverPassword, persistencia de sessao.

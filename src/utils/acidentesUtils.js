@@ -155,3 +155,20 @@ export const formatHistoryValue = (campo, valor) => {
   }
   return String(valor)
 }
+
+export const formatDateTimeFullPreserve = (value) => {
+  if (!value) {
+    return '-'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+  const isUtcIso = typeof value === 'string' && value.trim().endsWith('Z')
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    ...(isUtcIso ? { timeZone: 'UTC' } : {}),
+  })
+  return formatter.format(date)
+}

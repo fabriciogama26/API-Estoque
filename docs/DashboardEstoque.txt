@@ -1,28 +1,115 @@
-Tela: Dashboard (Estoque)
+Tela: Dashboard de Estoque
+=========================
 
 Visao geral
+-----------
+- Consolida indicadores de movimentacao de estoque (entradas, saidas, saldo e valor movimentado) no periodo filtrado.
+- Mostra series historicas, rankings e cards de resumo para apoiar compras, reposicao e auditoria.
+- Fonte principal: `api.estoque.dashboard` via `fetchDashboardEstoque` (`dashboardEstoqueApi`).
 
-Monitora movimentacoes de estoque (entradas/saidas), valor movimentado, itens em alerta e materiais monitorados. Cartoes com indicadores e graficos com distribuicoes.
+Arquitetura
+-----------
+- Hook `useDashboardEstoque`:
+  - Mantem filtros, dados, estado de loading/erro.
+  - Gera uma chave de filtros para evitar recargas desnecessarias.
+  - Monta series historicas (entradas/saidas) e rankings (materiais, categorias, fabricantes, centros, setores, pessoas).
+- Contexto `DashboardEstoqueProvider`:
+  - Expõe o estado do hook, funcoes de recarregar e mensagens/tip de graficos.
+  - Facilita compartilhamento de dados entre filtros, cards e graficos.
+- Utils:
+  - `dashboardEstoqueUtils` concentra agregacoes, formatacao de datas, moeda e funcoes `montarTop*`.
+- Pagina `DashboardPage.jsx`:
+  - Apenas orquestra: recebe dados do contexto, renderiza filtros, cards e grade de graficos.
+- Erros:
+  - `useErrorLogger('dashboard_estoque')` registra falhas de carga e problemas de formataçao.
 
-Arquitetura (modular)
+Filtros disponiveis
+-------------------
+- Periodo inicial/final (AAAA-MM).
+- Termo livre (nome do material, fabricante, categoria, centro, setor, pessoa).
+- Filtro contextual por grafico:
+  - Clique em um grafico aplica `chartFilter` (ex.: filtrar por um centro ou categoria especifica).
+  - Badge "Limpar filtro do grafico" aparece quando o filtro contextual esta ativo.
+- Botoes:
+  - "Aplicar filtros" chama `load(filters)` no hook.
+  - "Limpar filtros" restaura o ano corrente e recarrega dados padrao.
 
-- Hook useDashboardEstoque: consolida dados, prepara series e rankings; cacheia chave de filtro para evitar recargas repetidas e piscas.
-- Context DashboardEstoqueContext (ou EstoqueContext) compartilha filtros, estado de carregamento e handlers para os widgets.
-- Servicos: dashboardEstoqueApi, entradasService, saidasService e materiaisService fornecem dados consolidados.
-- Utils: dashboardEstoqueUtils formatam valores, series e labels.
-- Erros: useErrorLogger('dashboard-estoque') para falhas de carga.
+Indicadores principais
+----------------------
+- Cards de resumo:
+  - Quantidade total de movimentacoes (entradas + saidas).
+  - Valor movimentado no periodo.
+  - Relacao estoque/saidas (quando aplicavel).
+  - Numero de alertas de estoque critico.
+  - Total de materiais monitorados.
+- Serie historica:
+  - `EntradasSaidasChart` agrega quantidades e valores mensais via `agruparPorPeriodo`.
+- Valor movimentado:
+  - `ValorMovimentadoChart` usa a mesma base da serie historica, formatando valores em BRL.
+- Rankings:
+  - Materiais mais movimentados.
+  - Categorias, fabricantes, centros de estoque/servico.
+  - Setores e pessoas responsaveis pelas movimentacoes.
+  - Baseados em funcoes `montarTop*`, aplicando filtros em memoria sem nova consulta a API.
 
-Fluxos e filtros
+Erros e comportamento
+---------------------
+- Erros de carga sao capturados e exibidos em mensagem unica no lugar dos graficos/cards, evitando que o layout quebre.
+- Nao ha spinner global travando a pagina:
+  - O botao de filtros permanece estatico.
+  - Somente cards e graficos atualizam quando novos dados chegam.
+- Modal de expansao de graficos:
+  - Usa `expandedChartId` para abrir um grafico em destaque.
+  - Clique fora ou no botao de fechar encerra o modo expandido.
 
-- Filtros principais: periodo, centro de servico, categoria, fabricante, termo livre. Filtro aplicado sem flicker; limpar restaura defaults.
-- Cards: Movimentacoes, Valor movimentado, Em estoque/Saida, Alertas ativos, Materiais monitorados.
-- Graficos: distribuicoes e tendencias usam os mesmos filtros; clique em graficos pode preencher filtro de busca (chartFilter).
-
-Boas praticas
-
-- Usar a chave de parametros cacheada para nao refazer fetch com os mesmos filtros.
-- Manter botoes e estados visuais estaveis; colocar loading dentro dos blocos.
+Boas praticas para dados
+------------------------
+- Sempre retornar `valorUnitario` nas entradas/saidas para permitir calculo correto de valores financeiros.
+- Manter campos de exibicao preenchidos (fabricante, centro, setor, pessoa) para evitar rotulos "Nao informado".
+- Em modo local, manter o formato da resposta de `api.estoque.dashboard` alinhado aos utils para nao precisar ajustar a pagina a cada mudanca de mock.
 
 Atualizacao 2025-12
+-------------------
+- Refatorado para hook/context e utils dedicados.
+- Cache de chave de filtros reduz recargas e flicker ao aplicar/limpar filtros.
+- Filtros clicaveis de graficos centralizados no hook; a pagina apenas monta a interface.
 
-- Dashboard modularizado com hook dedicado, utils e contexto; carregamento mais rapido e sem piscas.
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- DashboardPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/DashboardPage.jsx
+  - Responsavel por: orquestrar filtros, cards e graficos do dashboard de estoque usando o contexto.
+- useDashboardEstoque
+  - Tipo: hook de dados/dashboard
+  - Caminho: src/hooks/useDashboardEstoque.js
+  - Responsavel por: carregar indicadores, montar series/rankings, controlar filtros, cachear chave de busca e estado de loading/erro.
+- DashboardEstoqueProvider / EstoqueContext
+  - Tipo: contexto
+  - Caminho: src/context/EstoqueContext.jsx
+  - Responsavel por: disponibilizar dados do hook para filtros/cards/graficos, tamanhos de pagina e handlers.
+
+Constantes e configuracoes
+--------------------------
+- Tamanhos de pagina e chaves de filtro (ex.: alertasPageSize)
+  - Tipo: configuracoes do contexto
+  - Caminho: src/context/EstoqueContext.jsx
+  - Uso: controla paginacao de alertas e cards e evita reload repetido.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- formatadores e builders de series/rankings
+  - Tipo: utilitarios
+  - Caminho: src/utils/dashboardEstoqueUtils.js
+  - Responsavel por: formatar valores, montar series historicas, rankings e labels/tooltips.
+
+Servicos e integracoes externas
+-------------------------------
+- dashboardEstoqueApi
+  - Tipo: servico de API
+  - Caminho: src/services/dashboardEstoqueApi.js
+  - Responsavel por: buscar dados consolidados do dashboard (entradas/saidas, valores, rankings).

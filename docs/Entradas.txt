@@ -1,27 +1,120 @@
-Tela: Entradas de Materiais
+Tela: Entradas
+==============
 
 Visao geral
+-----------
+- Registra novas entradas de materiais no estoque.
+- Exibe historico paginado das movimentacoes de entrada.
+- Reutiliza catalogos de materiais para validar registros e calcular valores totais (quantidade × valor unitario).
 
-Registrar, editar e consultar entradas de EPI/materiais no estoque, com filtros por periodo, centro de servico, categoria e termo livre. Pagina suportando caminhos /entradas e /movimentacoes/entradas.
+Arquitetura
+-----------
+- Contexto:
+  - `EntradasProvider` (`EntradasContext`) expõe o estado e as acoes do hook `useEntradasController`.
+- Hook `useEntradasController`:
+  - Centraliza estado do formulario, filtros, lista e paginacao.
+  - Implementa handlers de submit, update, load, autocomplete e historico.
+  - Faz integracao com logs via `useErrorLogger('entradas')`.
+- Utils:
+  - `entradasUtils` cuida de datas, normalizacao de campos, resumo do material e montagem de queries.
+- Servicos:
+  - `entradasService` concentra:
+    - `list`, `create`, `update`, `history` de entradas.
+    - Busca/listagem de materiais e centros de estoque/custo.
+- Erros:
+  - `useErrorLogger('entradas')` registra falhas de carga, submit, filtros, historico e erros de busca de materiais.
 
-Arquitetura (modular)
+Cadastro
+--------
+- Campos obrigatorios:
+  - Material (selecionado via autocomplete ou lista).
+  - Quantidade (minimo 1, valor numerico).
+  - Centro de estoque/servico (ou equivalente).
+  - Data da entrada.
+- Payload:
+  - Inclui `usuarioResponsavel` (usuario autenticado).
+  - Calcula valor total quando `valorUnitario` estiver disponivel.
+- Comportamento:
+  - Ao concluir cadastro com sucesso, limpa o formulario e, quando aplicavel, limpa a selecao/autocomplete.
+  - Erros de validacao sao exibidos em area de feedback acima dos botoes.
 
-- Hook useEntradasController + EntradasContext: controla formulario, filtros, tabela e paginacao.
-- Servico: entradasService (listar/criar/atualizar/cancelar) com dataMode (Supabase/local).
-- Utils: entradasUtils para formatar valores, montar payloads e filtrar.
-- Erros: useErrorLogger('entradas') grava falhas em app_errors.
-
-Fluxos principais
-
-- Formulario: seleciona material, centro de servico, quantidade, valor unitario, data e observacao; salva cria ou edita.
-- Filtros: periodo, centro de servico, categoria, termo livre; limpar restaura defaults.
-- Tabela: paginacao local configuravel; acao de cancelar entrada destacada em vermelho.
+Filtros, auto-complete e listagem
+---------------------------------
+- Filtros:
+  - Termo livre (material, fabricante, usuario).
+  - Registrado por (usuario).
+  - Centro de estoque/custo.
+  - Faixa de datas.
+  - "Aplicar" chama `load(filters)` com os filtros atuais.
+  - "Limpar" restaura filtros padrao e recarrega a lista.
+- Auto-complete de materiais:
+  - Dispara busca apos um minimo de caracteres (`MATERIAL_SEARCH_MIN_CHARS`).
+  - Usa debounce (`MATERIAL_SEARCH_DEBOUNCE_MS`) para nao sobrecarregar a API.
+  - Tenta usar `api.materiais.search`; se nao existir, aplica fallback local sobre `api.materiais.list`.
+  - Limita a quantidade de resultados retornados por consulta.
+- Historico:
+  - Usa `TablePagination` com `TABLE_PAGE_SIZE` para paginar.
+  - Cada linha exibe:
+    - Material, quantidade, centro de estoque/custo.
+    - Valor unitario e valor total (quando disponivel).
+    - Usuario responsavel e data da entrada.
+  - Se a API nao retornar centros de estoque, o hook deriva opcoes a partir dos registros ja carregados.
+- Botoes:
+  - "Atualizar" refaz a consulta com os filtros atuais.
+  - Quando nao ha registros no filtro/periodo, exibe mensagem neutra em vez de tabela vazia quebrada.
 
 Boas praticas
-
-- Evitar refetch se filtros nao mudarem; manter botoes de filtro estaveis sem flicker.
-- Usar caminho alternativo /movimentacoes/entradas quando acionado por menu.
+-------------
+- Manter catalogo de materiais com fabricante e valor unitario sempre preenchidos para garantir historico financeiro consistente.
+- Em modo local, `localApi.entradas.*` deve replicar campos como `materialId`, `dataEntrada`, `quantidade`, `centroCusto`, `usuarioResponsavel`.
+- Utilizar filtros de data para recortes especificos antes de gerar relatorios externos.
 
 Atualizacao 2025-12
+-------------------
+- Pagina modularizada: agora apenas orquestra `EntradasProvider` e componentes visuais.
+- Logica de busca, filtros, historico e autocomplete extraida para hook + utils + services.
+- Erros da tela registrados no Supabase (ou sistema equivalente) via `useErrorLogger('entradas')`.
 
-- Tela modularizada com hooks/services/utils; botao de cancelar em vermelho; logging de erros ativo.
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- EntradasPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/EntradasPage.jsx
+  - Responsavel por: orquestrar formulario, filtros e tabela de entradas via contexto/controller.
+- useEntradasController
+  - Tipo: hook/controller
+  - Caminho: src/hooks/useEntradasController.js
+  - Responsavel por: estado de formulario, filtros, tabela, paginacao, submit/editar/cancelar e historico.
+- EntradasContext (quando usado)
+  - Tipo: contexto
+  - Caminho: src/context/EntradasContext.jsx
+  - Responsavel por: compartilhar estado/handlers do controller com os componentes.
+- MateriaisForm/Filters/Table/History (variacoes para entradas)
+  - Tipo: componentes de UI
+  - Caminho: src/components/Entradas/*
+  - Responsavel por: UI de filtros, form, tabela e historico consumindo o controller.
+
+Constantes e configuracoes
+--------------------------
+- Defaults de formulario/filtro/historico
+  - Tipo: configuracoes
+  - Caminho: src/config/EntradasConfig.js (ou constantes no controller)
+  - Uso: estados iniciais de formulario, filtros e modal de historico.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- filterEntradas, build payloads, formatadores
+  - Tipo: utilitarios/regras
+  - Caminho: src/utils/entradasUtils.js e src/rules/EntradasRules.js
+  - Responsavel por: montar payloads, filtrar lista, formatar valores/datas e validar campos.
+
+Servicos e integracoes externas
+-------------------------------
+- entradasService
+  - Tipo: servico de API
+  - Caminho: src/services/entradasService.js
+  - Responsavel por: listar/criar/atualizar/cancelar entradas (Supabase ou modo local via dataClient).

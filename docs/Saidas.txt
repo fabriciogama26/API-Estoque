@@ -25,3 +25,47 @@ Boas praticas
 Atualizacao 2025-12
 
 - Tela modularizada com hooks/services/utils; logging de erros ativo; caminhos alternativos aceitos sem quebrar roteamento.
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- SaidasPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/SaidasPage.jsx
+  - Responsavel por: orquestrar formulario, filtros, tabela e historico/cancelamento via controller/contexto.
+- useSaidasController
+  - Tipo: hook/controller
+  - Caminho: src/hooks/useSaidasController.js
+  - Responsavel por: estado do form, filtros, tabela, paginacao, submit/editar/cancelar saida.
+- SaidasContext (quando usado)
+  - Tipo: contexto
+  - Caminho: src/context/SaidasContext.jsx
+  - Responsavel por: compartilhar estado/handlers do controller com componentes de UI.
+- Componentes de UI (form, filtros, tabela, modal)
+  - Tipo: componentes React
+  - Caminho: src/components/Saidas/*
+  - Responsavel por: UI de filtros, formulario, tabela e historico/cancelamento consumindo o controller.
+
+Constantes e configuracoes
+--------------------------
+- Defaults de formulario/filtro/historico
+  - Tipo: configuracoes
+  - Caminho: src/config/SaidasConfig.js (ou constantes no controller)
+  - Uso: estados iniciais do form, filtros e modal de historico/cancelamento.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- filterSaidas, montagem de payloads, formatadores
+  - Tipo: utilitarios/regras
+  - Caminho: src/utils/saidasUtils.js e src/rules/SaidasRules.js (quando presentes)
+  - Responsavel por: filtrar lista, formatar valores/datas e montar payloads para salvar/editar/cancelar.
+
+Servicos e integracoes externas
+-------------------------------
+- saidasService
+  - Tipo: servico de API
+  - Caminho: src/services/saidasService.js
+  - Responsavel por: listar/criar/atualizar/cancelar saidas (Supabase ou modo local via dataClient).

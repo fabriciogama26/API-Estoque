@@ -1,28 +1,118 @@
 Tela: Dashboard de Acidentes
+============================
 
 Visao geral
+-----------
+- Reune indicadores de seguranca do trabalho com base nos acidentes registrados.
+- Exibe taxas (frequencia, gravidade), dias perdidos/debitados, IA, IAG, IRA e distribuicoes por agente, tipo, parte lesionada, lesao principal e cargo.
+- Funciona em:
+  - Modo local: `localApi.acidentes.dashboard`.
+  - Modo remoto: view `vw_indicadores_acidentes` no Supabase.
 
-Monitora indicadores SST: total de acidentes, dias perdidos, TF/TG, IA/IAG/IRA, distribuicao por agente/tipo/parte/cargo e tendencias mensais. Usa dados da tela de Acidentes.
+Fluxo de carregamento
+---------------------
+1. Ao montar, aplica filtros padrao (ano/período corrente) e carrega os dados.
+2. Modo local:
+   - API retorna objeto com: `resumo`, `tendencia`, `tipos`, `partesLesionadas`, `cargos`, `agentes`, `options`.
+3. Modo remoto:
+   - Consulta a view `vw_indicadores_acidentes`.
+   - Normaliza colunas para o formato interno (`resumo`, `tendencia`, `tipos`, `partes_lesionadas`, `cargos`, `agentes`, `lesoes`).
+   - Se nao houver dados, exibe estado vazio e limpa opcoes dinamicas de filtros.
 
-Arquitetura (modular)
+Filtros suportados
+------------------
+- Ano.
+- Unidade (todas ou especifica).
+- Periodo inicial/final.
+- Centro de servico.
+- Tipo de acidente.
+- Lesao.
+- Parte lesionada.
+- Agente.
+- Cargo.
+- Alteracoes atualizam o estado local de filtros.
+- "Aplicar" dispara `load(filters)`.
+- "Limpar" restaura `initialFilters()` (filtros padrao).
 
-- Hook useDashboardAcidentes: carrega indicadores, prepara series e rankings; cacheia filtros para evitar recarga duplicada e flicker.
-- Context (DashboardAcidentesProvider) compartilha filtros, estado de loading e dados para os cards/graficos.
-- Servicos: dashboardAcidentesApi (Supabase) ou modo local via dataClient.
-- Utils: dashboardAcidentesUtils para formatar valores, legendas e referencias OIT.
-- Erros: useErrorLogger('dashboard-acidentes') registra falhas de carga/filtro em app_errors.
+Componentes visuais
+-------------------
+- `DashboardCards`:
+  - Mostram totais de acidentes, taxa de frequencia (TF), taxa de gravidade (TG) e dias perdidos/debitados.
+  - Segunda fileira com IA, IAG e IRA.
+  - TF/TG exibem badges com classificacao por faixas (ex.: inspiradas em OIT).
+- `ChartTendencia`:
+  - Curva temporal (por mes) da serie `tendencia`.
+- `ChartTipos`, `ChartAgentes`, `ChartPartesLesionadas`, `ChartCargos`:
+  - Graficos categorizados (barras/pizza) para distribuiçoes de acidentes.
+  - Tratam dados vazios exibindo mensagem neutra no lugar do grafico.
+- `ChartLesoes`:
+  - Barras horizontais com frequencia das lesoes principais (campo `lesoes`).
+- `FiltrosDashboard`:
+  - Exibe selects dinamicos conforme `options` (modo local).
+  - No modo remoto, se nao houver opcoes, mantém apenas a opcao "todas" para cada filtro.
 
-Filtros e fluxos
+Erros e pre-requisitos
+----------------------
+- Supabase:
+  - Quando `VITE_SUPABASE_URL` ou `VITE_SUPABASE_ANON_KEY` nao estiverem configuradas (fora do modo local), a tela exibe aviso para ajustar as variaveis de ambiente.
+- View `vw_indicadores_acidentes`:
+  - Deve ser criada/atualizada nas migrations.
+  - Precisa expor: taxas classicas (TF, TG), `dias_debitados`, `total_trabalhadores`, `indice_acidentados`, `indice_avaliacao_gravidade`, `indice_relativo_acidentes`.
+- Seeds locais:
+  - `localApi.acidentes.dashboard` deve conter dados de exemplo para testes offline.
+- Erros:
+  - `useErrorLogger('dashboard_acidentes')` registra falhas de consulta e normalizacao.
 
-- Filtros: periodo inicial/final, centro de servico, tipo, lesao, parte lesionada, agente, cargo. Aplicar sem piscas; limpar restaura defaults.
-- Cards: IA/IAG/IRA, TF/TG, pendencias de EPI, zero acidentes, outros indicadores com expand/legendas.
-- Graficos: distribuicao por tipo/agente/parte/cargo e tendencia mensal; cliques podem refletir filtros em graficos relacionados (quando habilitado).
-
-Boas praticas
-
-- Reutilizar a chave de filtro cacheada; evitar re-renderes que troquem ordem de hooks.
-- Manter loaders dentro dos cards/graficos em vez de bloquear o header de filtros.
+Arquitetura e comportamento
+---------------------------
+- Contexto + hook:
+  - `DashboardAcidentesContext` e `useDashboardAcidentes` centralizam `filters`, `data`, `isLoading`, `error` e logica de filtros clicaveis.
+  - Ha cache de chave de filtros para evitar recargas a cada digitacao.
+- Filtros clicaveis:
+  - Clicar em um segmento de grafico pode aplicar filtro direto (ex.: focar em um agente ou tipo).
+  - Um botao ou badge permite limpar o filtro clicavel rapidamente.
 
 Atualizacao 2025-12
+-------------------
+- Fluxo modular consolidado: pagina apenas orquestra contexto/hook, filtros, cards e graficos.
+- Padrão de filtros clicaveis alinhado ao dashboard de estoque.
 
-- Dashboard modularizado com hook/context, sem flicker no botao de filtro; logs de erro no Supabase; compatibilidade com modo local/remoto.
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- DashboardAcidentes
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/DashboardAcidentes.jsx
+  - Responsavel por: montar filtros, cards e graficos consumindo o contexto/hook de dashboard de acidentes.
+- useDashboardAcidentes
+  - Tipo: hook de dados/dashboard
+  - Caminho: src/hooks/useDashboardAcidentes.js
+  - Responsavel por: carregar indicadores SST, preparar series/rankings, controlar filtros e cachear chave de busca para evitar recargas.
+- DashboardAcidentesContext / Provider
+  - Tipo: contexto
+  - Caminho: src/context/DashboardAcidentesContext.jsx (quando presente)
+  - Responsavel por: compartilhar filtros, dados, isLoading/error e handlers (aplicar/limpar/expandir graficos).
+
+Constantes e configuracoes
+--------------------------
+- Defaults de filtros/estado
+  - Tipo: configuracao
+  - Caminho: src/config/DashboardAcidentesConfig.js (ou constantes no hook)
+  - Uso: estado inicial de filtros e colecoes.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- formatadores e builders de indicadores SST
+  - Tipo: utilitarios
+  - Caminho: src/utils/dashboardAcidentesUtils.js
+  - Responsavel por: formatar TF/TG/IA/IAG/IRA, montar series, rankings e labels/legendas.
+
+Servicos e integracoes externas
+-------------------------------
+- dashboardAcidentesApi
+  - Tipo: servico de API
+  - Caminho: src/services/dashboardAcidentesApi.js
+  - Responsavel por: buscar dados consolidados de acidentes (Supabase ou local via dataClient).

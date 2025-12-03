@@ -1,35 +1,27 @@
-import { Pencil, History as HistoryIcon } from 'lucide-react'
+import { Eye, Pencil, History as HistoryIcon } from 'lucide-react'
 import {
   formatDateWithOptionalTime as formatDate,
-  formatNumberValue as formatNumber,
-  formatStatusWithDate,
+  formatDateTimeFullPreserve,
 } from '../../../utils/acidentesUtils.js'
 
-export function AcidentesTableRow({ acidente, onEdit, onHistory, isSaving, historyState, isEditing }) {
+export function AcidentesTableRow({
+  acidente,
+  onEdit,
+  onHistory,
+  onDetails,
+  isSaving,
+  historyState,
+  isEditing,
+}) {
   const disableEdit = isEditing || isSaving
   const isHistoryLoading = Boolean(historyState?.isLoading && historyState?.acidente?.id === acidente.id)
   const disableHistory = isSaving || isHistoryLoading || typeof onHistory !== 'function'
+  const disableDetails = isSaving || isEditing || typeof onDetails !== 'function'
 
-  const partesSelecionadas = Array.isArray(acidente.partesLesionadas)
-    ? acidente.partesLesionadas.filter(Boolean)
-    : acidente.parteLesionada
-      ? [acidente.parteLesionada]
-      : []
-  const lesoesSelecionadas = Array.isArray(acidente.lesoes)
-    ? acidente.lesoes.filter(Boolean)
-    : acidente.lesao
-      ? [acidente.lesao]
-      : []
-  const agentesSelecionados = Array.isArray(acidente.agentes)
-    ? acidente.agentes.filter(Boolean)
-    : acidente.agente
-      ? [acidente.agente]
-      : []
-  const tiposSelecionados = Array.isArray(acidente.tipos)
-    ? acidente.tipos.filter(Boolean)
-    : acidente.tipo
-      ? [acidente.tipo]
-      : []
+  const registradoPor =
+    acidente.registradoPor ?? acidente.usuarioCadastroNome ?? acidente.usuarioCadastro ?? '-'
+  const criadoEm =
+    acidente.criadoEm ?? acidente.criado_em ?? acidente.createdAt ?? acidente.created_at ?? null
 
   return (
     <tr>
@@ -37,21 +29,28 @@ export function AcidentesTableRow({ acidente, onEdit, onHistory, isSaving, histo
         <strong>{acidente.nome}</strong>
       </td>
       <td>{acidente.matricula || '-'}</td>
+      <td>{acidente.cargo || '-'}</td>
       <td>{formatDate(acidente.data)}</td>
-      <td>{formatStatusWithDate(Boolean(acidente.dataEsocial), acidente.dataEsocial)}</td>
-      <td>{formatStatusWithDate(Boolean(acidente.sesmt), acidente.dataSesmt)}</td>
-      <td>{formatNumber(acidente.diasPerdidos)}</td>
-      <td>{formatNumber(acidente.diasDebitados)}</td>
-      <td>{agentesSelecionados.length ? agentesSelecionados.join(', ') : '-'}</td>
-      <td>{tiposSelecionados.length ? tiposSelecionados.join(', ') : '-'}</td>
-      <td>{lesoesSelecionadas.length ? lesoesSelecionadas.join(', ') : '-'}</td>
-      <td>{partesSelecionadas.length ? partesSelecionadas.join(', ') : '-'}</td>
+      <td>{acidente.centroServico || acidente.setor || '-'}</td>
       <td>{acidente.local || '-'}</td>
-      <td>{formatNumber(acidente.hht)}</td>
       <td>{acidente.cat || '-'}</td>
       <td>{acidente.cid || '-'}</td>
+      <td>{registradoPor || '-'}</td>
+      <td>{criadoEm ? formatDateTimeFullPreserve(criadoEm) : '-'}</td>
       <td>
         <div className="pessoas-data-table__actions">
+          {typeof onDetails === 'function' ? (
+            <button
+              type="button"
+              className="pessoas-table-action-button"
+              onClick={() => onDetails(acidente)}
+              disabled={disableDetails}
+              aria-label={`Detalhar ${acidente.nome}`}
+              title="Ver detalhes do acidente"
+            >
+              <Eye size={16} strokeWidth={1.8} />
+            </button>
+          ) : null}
           <button
             type="button"
             className="pessoas-table-action-button"

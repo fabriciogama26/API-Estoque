@@ -144,7 +144,7 @@ export function AcidentesForm({
           <input name="cargo" value={form.cargo} readOnly required placeholder="Operador" />
         </label>
         <label className="field">
-          <span>Data <span className="asterisco">*</span></span>
+          <span>Data do Acidente <span className="asterisco">*</span></span>
           <input
             type="datetime-local"
             name="data"
@@ -153,6 +153,7 @@ export function AcidentesForm({
             required
             step="60"
           />
+          <small className="field__hint">Informe data e hora do acidente.</small>
         </label>
         <label className="field field--checkbox">
           <input
