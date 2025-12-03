@@ -26,3 +26,51 @@ Boas praticas
 Atualizacao 2025-12
 
 - Tela modularizada com hooks/services/utils; imports corrigidos (MateriaisUtils case-sensitive); logging de erros ativo.
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- MateriaisPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/Materiais.jsx
+  - Responsavel por: orquestrar formulario, filtros, tabela e historico via MateriaisProvider.
+- useMateriaisController
+  - Tipo: hook/controller
+  - Caminho: src/hooks/useMateriaisController.js
+  - Responsavel por: estado do form, filtros, lista, paginacao, historico de preco, submit/editar e carregamento de catalogos.
+- MateriaisProvider / MateriaisContext
+  - Tipo: contexto
+  - Caminho: src/context/MateriaisContext.jsx
+  - Responsavel por: expor dados/handlers do controller para form, filtros, tabela e modal.
+- Componentes MateriaisForm/Filters/Table/HistoryModal
+  - Tipo: componentes de UI
+  - Caminho: src/components/Materiais/*
+  - Responsavel por: UI do cadastro, filtros, tabela e historico usando props do contexto.
+
+Constantes e configuracoes
+--------------------------
+- MATERIAIS_FILTER_DEFAULT, HISTORY_MODAL_DEFAULT, createMateriaisFormDefault
+  - Tipo: configuracoes/initial state
+  - Caminho: src/config/MateriaisConfig.js
+  - Uso: estados iniciais de formulario, filtros e modal de historico.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- validateMaterialForm, createMaterialPayload, updateMaterialPayload, filterMateriais, parseCaracteristicaEpi, sortMateriaisByNome
+  - Tipo: regras/validacao/filtro
+  - Caminho: src/rules/MateriaisRules.js
+  - Responsavel por: validar obrigatorios, montar payloads, filtrar lista e preparar edicao.
+- formatCurrency, formatCurrencyInput, findOptionByValue, normalizeSelectionList/Item/Key, selectionToArray
+  - Tipo: utilitarios de dados
+  - Caminho: src/utils/MateriaisUtils.js e src/utils/selectionUtils.js
+  - Responsavel por: normalizar selects, formatar valores e chaves para formularios/filtros/historico.
+
+Servicos e integracoes externas
+-------------------------------
+- materiaisService
+  - Tipo: servico de API
+  - Caminho: src/services/materiaisService.js
+  - Responsavel por: listar/criar/atualizar materiais, historico de preco, catalogos (grupos, itens, fabricantes, cores, caracteristicas, calcados, tamanhos).

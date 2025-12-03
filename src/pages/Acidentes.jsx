@@ -5,6 +5,7 @@ import { AcidentesForm } from '../components/Acidentes/Form/AcidentesForm.jsx'
 import { AcidentesFilters } from '../components/Acidentes/Filters/AcidentesFilters.jsx'
 import { AcidentesTable } from '../components/Acidentes/Table/AcidentesTable.jsx'
 import { AcidentesHistoryModal } from '../components/Acidentes/Modal/AcidentesHistoryModal.jsx'
+import { AcidenteDetailsModal } from '../components/Acidentes/Modal/AcidenteDetailsModal.jsx'
 import { ACIDENTES_HISTORY_DEFAULT } from '../config/AcidentesConfig.js'
 import { getAcidenteHistory } from '../services/acidentesService.js'
 import { usePessoas } from '../hooks/usePessoas.js'
@@ -49,6 +50,7 @@ function AcidentesPageContent() {
 
   const [historyCache, setHistoryCache] = useState({})
   const [historyState, setHistoryState] = useState(() => ({ ...ACIDENTES_HISTORY_DEFAULT }))
+  const [detailsState, setDetailsState] = useState({ open: false, acidente: null })
 
   const {
     form,
@@ -107,6 +109,14 @@ function AcidentesPageContent() {
 
   const closeHistory = () => {
     setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT })
+  }
+
+  const openDetails = (acidente) => {
+    setDetailsState({ open: true, acidente })
+  }
+
+  const closeDetails = () => {
+    setDetailsState({ open: false, acidente: null })
   }
 
   return (
@@ -175,6 +185,7 @@ function AcidentesPageContent() {
             acidentes={acidentesFiltrados}
             onEdit={startEdit}
             onHistory={openHistory}
+            onDetails={openDetails}
             editingId={editingAcidente?.id ?? null}
             isSaving={isSaving}
             historyState={historyState}
@@ -183,6 +194,7 @@ function AcidentesPageContent() {
       </section>
 
       <AcidentesHistoryModal state={historyState} onClose={closeHistory} />
+      <AcidenteDetailsModal open={detailsState.open} acidente={detailsState.acidente} onClose={closeDetails} />
     </div>
   )
 }

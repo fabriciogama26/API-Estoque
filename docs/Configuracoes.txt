@@ -1,0 +1,40 @@
+Tela: Configuracoes
+===================
+
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- ConfiguracoesPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/Configuracoes.jsx
+  - Responsavel por: exibir o header de configuracoes e renderizar a secao de troca de senha para o usuario logado.
+- ChangePasswordSection
+  - Tipo: componente de secao
+  - Caminho: src/pages/Configuracoes.jsx
+  - Responsavel por: controlar o formulario de troca de senha (estado local), validar campos e acionar Supabase para reautenticacao e atualizacao da senha.
+- handleChange
+  - Tipo: handler de formulario
+  - Caminho: src/pages/Configuracoes.jsx (ChangePasswordSection)
+  - Responsavel por: atualizar o estado do formulario de senha conforme o input.
+- handleSubmit
+  - Tipo: handler de submit
+  - Caminho: src/pages/Configuracoes.jsx (ChangePasswordSection)
+  - Responsavel por: validar configuracao do Supabase, checar tamanho e confirmacao da nova senha, reautenticar com senha atual e chamar supabase.auth.updateUser para salvar a nova senha.
+
+Constantes e configuracoes
+--------------------------
+- Form state inicial ({ currentPassword, newPassword, confirmPassword })
+  - Tipo: objeto de estado inicial
+  - Caminho: src/pages/Configuracoes.jsx
+  - Uso: inicializar o formulario de troca de senha.
+
+Servicos e integracoes externas
+-------------------------------
+- supabase / isSupabaseConfigured
+  - Tipo: cliente Supabase e flag de configuracao
+  - Caminho: src/services/supabaseClient.js
+  - Responsavel por: executar signInWithPassword (reauth) e updateUser (troca de senha); validar se Supabase esta configurado antes de operar.

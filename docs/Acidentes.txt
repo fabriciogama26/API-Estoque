@@ -1,84 +1,159 @@
 Tela: Cadastro de Acidentes
+===========================
 
 Visao geral
-
+-----------
 - Registrar, editar e consultar acidentes de trabalho vinculados a pessoas cadastradas (funcionarios, estagiarios, terceiros autorizados).
-
-- Utiliza catalogos de agentes, tipos, lesoes e partes lesionadas para padronizar registros e permitir analises estatisticas.
-
-- Mantem historico de alteracoes (quem alterou, quando e o que foi modificado).
-
-- Filtros por termo livre, tipo, centro de servico e agente para localizar rapidamente registros especificos.
+- Usa catalogos de agentes, tipos de acidente, lesoes e partes lesionadas para padronizar os registros e permitir analises estatisticas.
+- Mantem historico de alteracoes por acidente (quem alterou, quando e o que foi modificado).
+- Possui filtros por termo livre, tipo, centro de servico e agente.
 
 Escopo da tela
-
-- Registro de acidentes tipicos, de trajeto e quase-acidentes (quando configurados nos tipos).
+--------------
+- Registro de acidentes tipicos, de trajeto e quase-acidentes (dependendo dos tipos configurados).
 - Uso principal por SESMT, CIPA, RH e liderancas com permissao de consulta.
-- Integra integracao logica com o Dashboard de Acidentes, que consome esses dados.
+- Fonte de dados primaria para o Dashboard de Acidentes.
 
 Arquitetura (modular)
-
-Hooks de dados/estado:
-- useAcidentes: carrega lista principal, controla loading/erro e expõe reload().
-- useAcidenteForm: cuida do formulario (estado, validacao, submit, edicao/cancelamento).
-- useAcidenteFiltro: mantem filters e aplica filterAcidentes para gerar a lista filtrada.
-- usePessoas, useAgentes, useLocais, usePartes: catálogos auxiliares isolados, cada um com loading/erro proprio.
-
-Contexto (opcional):
-- AcidentesContext pode centralizar acidentes, filters, reload, setFilters e catalogos para evitar prop-drilling entre formulario, filtros, tabela e modal de historico.
-
-Servicos:
-- acidentesService: listar, criar, atualizar, historico, catalogos (agentes/tipos/lesoes/partes).
-- pessoasService: listar pessoas com matricula, cargo, centro de servico, local, etc.
-
-Utilitarios:
-- src/utils/acidentesUtils.js: normalizacao, parse de listas, nomes/keys de agentes, conversoes de data/hora e funcoes de filtro.
-
-Erros:
-- Uso de useErrorLogger('acidentes') para registrar falhas de carregamento, submit, filtros e historico na tabela app_errors (Supabase).
+---------------------
+- Hooks principais:
+  - `useAcidentes`: carrega a lista de acidentes, controla `isLoading`, `error` e expõe `reload()`.
+  - `useAcidenteForm`: controla estado do formulario, validacao, submit, edicao/cancelamento.
+  - `useAcidenteFiltro`: guarda `filters` e aplica `filterAcidentes` gerando a lista filtrada.
+  - `usePessoas`, `useAgentes`, `useLocais`, `usePartes`: carregam catálogos auxiliares de forma isolada, cada um com seu loading/erro.
+- Contexto opcional:
+  - `AcidentesContext` pode centralizar acidentes, filtros, funcoes de recarga e catálogos para evitar prop-drilling entre formulario, filtros, tabela e modal de historico.
+- Servicos:
+  - `acidentesService`: listar, criar, atualizar, carregar historico, agentes, tipos, lesoes e partes.
+  - `pessoasService`: lista pessoas com matricula, nome, cargo, centro de servico e local.
+- Utils:
+  - `acidentesUtils`: funcoes puras como `toInputDateTime`, `parseList`, `normalizeAgenteNome`, `normalizeAgenteKey`, `extractAgenteNome` e auxiliares de filtro.
+- Erros:
+  - `useErrorLogger('acidentes')` registra falhas de carga, submit, filtros e historico na tabela de logs (ex.: `app_errors`).
 
 Campos principais do formulario
-
-Identificacao da pessoa:
-- Matricula (obrigatorio). Preenche automaticamente nome, cargo, centro de servico e local.
-- Nome, Cargo, Centro de servico, Setor, Local derivam da pessoa (ajustaveis conforme permissao).
-
-Dados do acidente:
-- Data/hora (obrigatorio), Dias perdidos, Dias debitados, HHT.
-
-Classificacao:
-- Agente(s), Tipo(s), Lesao(oes), Parte(s) lesionada(s) via multiselect + chips; validacao garante grupos obrigatorios preenchidos.
-
-Complementares:
-- CID, CAT, Observacao, flags eSocial/SESMT e datas correlatas.
+-------------------------------
+- Identificacao da pessoa:
+  - Matricula (obrigatorio) – campo chave; ao informar, preenche automaticamente nome, cargo, centro de servico e local.
+  - Nome, Cargo, Centro de servico, Setor, Local – derivados da pessoa, com possibilidade de ajuste conforme permissao.
+- Dados do acidente:
+  - Data/hora do acidente (obrigatorio).
+  - Dias perdidos e Dias debitados (obrigatorios quando aplicavel, armazenados como numero, exibidos como texto).
+  - HHT (horas-homem trabalhadas) referente ao periodo usado nos indicadores.
+- Classificacao:
+  - Agente(s) – selecionados em lista; o ultimo agente alimenta o campo principal `agente`.
+  - Tipo(s) de acidente – lista derivada do agente atual quando a API suporta `agentTypes`.
+  - Lesao(oes) – carregadas dinamicamente via `acidentes.lesions(agente)`.
+  - Partes lesionadas – permite informar uma ou mais regioes afetadas.
+- Campos complementares:
+  - CID, CAT, Observacao, Data eSocial, flag SESMT, Data SESMT.
 
 Fluxos principais
+-----------------
+1) Cadastro/edicao
+   - Usuario seleciona uma matricula existente; sistema preenche dados da pessoa.
+   - Preenche campos obrigatorios: matricula, data, dias perdidos/debitados, HHT, centro de servico, local, agente(s), tipo(s), lesao(oes), parte(s) lesionada(s).
+   - Campos auxiliares: CAT, observacao, CID, flags de lancamento (eSocial/SESMT).
+   - Botao alterna entre "Registrar acidente" (novo) e "Salvar alteracoes" (edicao).
+   - "Cancelar edicao" limpa o formulario, reseta estado de edicao e limpa caches associados se necessario.
 
-Cadastro/edicao:
-- Seleciona matricula, preenche obrigatorios, salva (novo) ou atualiza (edicao). Cancelar limpa estado e zera edicao.
+2) Multiselecoes (agente/tipo/lesoes/partes)
+   - Select exibe opcoes disponiveis; ao confirmar/adicionar, o item vira chip removivel.
+   - Se uma lista obrigatoria estiver vazia, o formulario bloqueia o submit.
+   - Ao remover o ultimo agente, limpa tipos, lesoes e partes associadas.
 
-Multiselecoes:
-- Select + adicionar geram chips; remocao pelo chip; validacao impede submit sem grupos obrigatorios.
+3) Historico
+   - Botao de relogio na tabela abre `AcidentesHistoryModal`.
+   - O modal busca `acidentesService.getAcidenteHistory(id)` e exibe registros com data, usuario e campos alterados.
+   - O resultado pode ser cacheado por `acidente.id` para evitar chamadas repetidas.
 
-Historico:
-- AcidentesHistoryModal chama acidentesService.getAcidenteHistory(id) e cacheia por acidente.id; mostra data/hora, usuario e campos alterados.
+4) Filtros
+   - Formulario de filtros controla `filters` (termo, tipo, centro de servico, agente, etc.).
+   - "Aplicar" usa `filterAcidentes(acidentes, filters)` para gerar a lista filtrada.
+   - "Limpar" restaura `ACIDENTES_FILTER_DEFAULT` e recarrega a lista principal, se necessario.
 
-Filtros:
-- Form de filtros controla filters; Aplicar usa filterAcidentes; Limpar restaura ACIDENTES_FILTER_DEFAULT.
+Carregamento de dados
+---------------------
+- Pessoas, locais, agentes, tipos, lesoes e partes sao carregados em paralelo, cada catalogo com seu proprio `isLoading` e `error`.
+- A lista principal `useAcidentes` atualiza apos:
+  - Criar ou editar um acidente.
+  - Acionar o botao "Atualizar".
+  - Limpar filtros, se o fluxo exigir reload.
 
-Carregamento:
-- Catalogos carregados em paralelo com estados proprios; useAcidentes recarrega apos salvar/editar ou via reload manual.
-
-Regras/validacao:
-- validateAcidenteForm, createAcidentePayload e updateAcidentePayload convertem campos numericos e mantem consistencia entre campos de lista e legados.
+Regras e validacoes
+-------------------
+- `validateAcidenteForm`:
+  - Garante preenchimento de campos obrigatorios.
+  - Converte texto para numero em campos como dias perdidos, dias debitados e HHT.
+  - Checa se os grupos obrigatorios (agentes/tipos/lesoes/partes) estao preenchidos quando configurados.
+- `createAcidentePayload` e `updateAcidentePayload`:
+  - Montam o payload no formato esperado pela API/BD.
+  - Mantem consistencia entre listas (`agentes`, `tipos`, `lesoes`, `partesLesionadas`) e campos unicos legados (`agente`, `tipo`, `lesao`, `parteLesionada`).
 
 Boas praticas
-
-- Garantir catalogos populados antes de liberar a tela.
-- Preferir matricula como chave; nome/cargo sao derivados.
-- Usar historico como auditoria para correcoes/importacoes.
+-------------
+- Garantir que catalogos (agentes, tipos, lesoes, partes) estejam criados/populados antes de liberar a tela para os usuarios.
+- Preferir matricula como chave em imports e integracoes; nome e cargo sao derivados da tabela de pessoas.
+- Usar o historico como ferramenta de auditoria, principalmente quando ha ajustes manuais de dados.
 
 Atualizacao 2025-12
+-------------------
+- Tela refatorada para hooks, services e utils dedicados.
+- UI dividida em componentes (`AcidentesForm`, `AcidentesFilters`, `AcidentesTable`, `AcidentesHistoryModal`).
+- Tratamento de erros integrado com `useErrorLogger('acidentes')`.
 
-- Tela refatorada em hooks/services/utils com componentes: AcidentesForm, AcidentesFilters, AcidentesTable, AcidentesHistoryModal.
-- Logs de erro enviados para app_errors; carregamentos/filtros evitam flicker.
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- AcidentesPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/Acidentes.jsx
+  - Responsavel por: orquestrar formulario, filtros, tabela e modal de historico via hooks/contexto.
+- useAcidentes
+  - Tipo: hook de dados
+  - Caminho: src/hooks/useAcidentes.js
+  - Responsavel por: listar acidentes, controlar isLoading/error e expor reload() apos salvar/editar.
+- useAcidenteForm
+  - Tipo: hook de formulario
+  - Caminho: src/hooks/useAcidenteForm.js
+  - Responsavel por: estado do form, handleFormChange, handleSubmit, startEdit, cancelEdit, resetForm; valida/payload.
+- useAcidenteFiltro
+  - Tipo: hook de filtros
+  - Caminho: src/hooks/useAcidenteFiltro.js
+  - Responsavel por: manter filters, handleFilterChange/Clear e gerar acidentesFiltrados com filterAcidentes.
+- Componentes AcidentesForm / AcidentesFilters / AcidentesTable / AcidentesHistoryModal
+  - Tipo: componentes de UI
+  - Caminho: src/components/Acidentes/*
+  - Responsavel por: UI do form, filtros, tabela e modal usando props dos hooks/contexto.
+
+Constantes e configuracoes
+--------------------------
+- ACIDENTES_FORM_DEFAULT, ACIDENTES_FILTER_DEFAULT, ACIDENTES_HISTORY_DEFAULT
+  - Tipo: objetos de configuracao
+  - Caminho: src/config/AcidentesConfig.js
+  - Uso: estados iniciais de formulario, filtros e modal de historico.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- validateAcidenteForm, createAcidentePayload, updateAcidentePayload, filterAcidentes, extractAgentes/Tipos/Lesoes/Partes/Centros
+  - Tipo: regras/validacao/filtro
+  - Caminho: src/rules/AcidentesRules.js
+  - Responsavel por: validar obrigatorios, montar payloads e extrair/filtro de dados auxiliares.
+- toInputDateTime, parseList, normalizeAgenteNome/Key, extractAgenteNome e helpers de normalizacao/filtro
+  - Tipo: utilitarios de dados
+  - Caminho: src/utils/acidentesUtils.js
+  - Responsavel por: normalizar datas/listas e nomes/keys de agentes para formularios e filtros.
+
+Servicos e integracoes externas
+-------------------------------
+- acidentesService
+  - Tipo: servico de API
+  - Caminho: src/services/acidentesService.js
+  - Responsavel por: listar/criar/atualizar acidentes, historico e catalogos (agentes/tipos/lesoes/partes).
+- pessoasService
+  - Tipo: servico de API
+  - Caminho: src/services/pessoasService.js
+  - Responsavel por: listar pessoas (matricula/nome/cargo/centro/local) usadas no formulario de acidentes.

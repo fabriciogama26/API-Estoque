@@ -26,3 +26,51 @@ Boas praticas
 Atualizacao 2025-12
 
 - Tela modularizada com hooks/services/utils; view pessoas_view inclui usuarioCadastroUsername e aliases legados para compatibilidade.
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- PessoasPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/Pessoas.jsx
+  - Responsavel por: orquestrar formulario, filtros, tabela e historico usando hooks de pessoas.
+- usePessoasController
+  - Tipo: hook/controller
+  - Caminho: src/hooks/usePessoasController.js
+  - Responsavel por: estado de formulario/filtros, listagem, historico, submit/editar e carregamento de catalogos auxiliares.
+- usePessoas (quando utilizado)
+  - Tipo: hook de dados
+  - Caminho: src/hooks/usePessoas.js
+  - Responsavel por: listar pessoas e controlar estados de loading/erro.
+- Componentes PessoasTable, PessoasHistoryTimeline, filtros/formularios correspondentes
+  - Tipo: componentes de UI
+  - Caminho: src/components/Pessoas/*
+  - Responsavel por: UI de tabela, historico e filtros consumindo o controller.
+
+Constantes e configuracoes
+--------------------------
+- PESSOAS_FILTER_DEFAULT, PESSOAS_FORM_DEFAULT, PESSOAS_HISTORY_DEFAULT (nomes equivalentes)
+  - Tipo: configuracoes
+  - Caminho: src/config/PessoasConfig.js
+  - Uso: estados iniciais de formulario, filtros e historico.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- uniqueSorted, formatDate/formatDateTime, resolveUsuarioNome
+  - Tipo: utilitarios
+  - Caminho: src/utils/pessoasUtils.js
+  - Responsavel por: ordenar/remover duplicados, formatar datas e resolver nome do usuario para exibicao.
+- Regras/validacao
+  - Tipo: funcoes de regra
+  - Caminho: src/rules/PessoasRules.js
+  - Responsavel por: validacoes especificas e helpers de filtro.
+
+Servicos e integracoes externas
+-------------------------------
+- pessoasService
+  - Tipo: servico de API
+  - Caminho: src/services/pessoasService.js
+  - Responsavel por: listar/atualizar pessoas, obter historico e resumos (Supabase ou local via dataClient).
