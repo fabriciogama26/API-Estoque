@@ -46,6 +46,8 @@ const matchesTerm = (material = {}, termoNormalizado = '') => {
     material.numeroCalcadoNome,
     material.numeroVestimenta,
     material.numeroVestimentaNome,
+    material.id,
+    material.materialId,
   ]
   if (Array.isArray(material.centrosCusto)) {
     camposTexto.push(material.centrosCusto.join(' '))

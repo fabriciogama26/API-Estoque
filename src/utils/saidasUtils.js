@@ -3,6 +3,8 @@ export const initialSaidaForm = {
   pessoaId: '',
   materialId: '',
   quantidade: '',
+  centroEstoqueId: '',
+  centroEstoque: '',
   centroCusto: '',
   centroCustoId: '',
   centroServico: '',
@@ -24,7 +26,7 @@ export const initialSaidaFilters = {
 export const MATERIAL_SEARCH_MIN_CHARS = 2
 export const MATERIAL_SEARCH_MAX_RESULTS = 10
 export const MATERIAL_SEARCH_DEBOUNCE_MS = 250
-export const PESSOA_SEARCH_MIN_CHARS = 2
+export const PESSOA_SEARCH_MIN_CHARS = 1
 export const PESSOA_SEARCH_MAX_RESULTS = 10
 export const PESSOA_SEARCH_DEBOUNCE_MS = 250
 
@@ -185,7 +187,13 @@ export const formatDisplayDate = (value) => {
 
 export const formatDateToInput = (value) => {
   if (!value) return ''
+  // Se já vier no formato YYYY-MM-DD, devolve direto
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value
+  }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
+  // Corrige o fuso para não somar/subtrair dia no input type="date"
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return localDate.toISOString().slice(0, 10)
 }

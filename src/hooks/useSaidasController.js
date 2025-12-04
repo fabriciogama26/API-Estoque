@@ -29,6 +29,7 @@ import {
   createSaida,
   getMaterialEstoque,
   getSaidaHistory,
+  listCentrosEstoque,
   listCentrosCusto,
   listCentrosServico,
   listMateriais,
@@ -63,8 +64,10 @@ export function useSaidasController() {
   const [pessoas, setPessoas] = useState([])
   const [materiais, setMateriais] = useState([])
   const [saidas, setSaidas] = useState([])
+  const [centrosEstoqueOptions, setCentrosEstoqueOptions] = useState([])
   const [centrosCustoOptions, setCentrosCustoOptions] = useState([])
   const [centrosServicoOptions, setCentrosServicoOptions] = useState([])
+  const [statusOptions, setStatusOptions] = useState([])
 
   const [form, setForm] = useState(initialSaidaForm)
   const [filters, setFilters] = useState(initialSaidaFilters)
@@ -107,12 +110,21 @@ export function useSaidasController() {
       setError(null)
       try {
         const materiaisPromise = listMateriais()
+        const shouldLoadCentrosEstoque = centrosEstoqueOptions.length === 0
         const shouldLoadCentrosCusto = centrosCustoOptions.length === 0
         const shouldLoadCentrosServico = centrosServicoOptions.length === 0
-        const [pessoasData, materiaisData, saidasData, centrosCustoData, centrosServicoData] = await Promise.all([
+        const [
+          pessoasData,
+          materiaisData,
+          saidasData,
+          centrosEstoqueData,
+          centrosCustoData,
+          centrosServicoData,
+        ] = await Promise.all([
           listPessoas(),
           materiaisPromise,
           listSaidas(buildSaidasQuery(params)),
+          shouldLoadCentrosEstoque ? listCentrosEstoque() : Promise.resolve(null),
           shouldLoadCentrosCusto ? listCentrosCusto() : Promise.resolve(null),
           shouldLoadCentrosServico ? listCentrosServico() : Promise.resolve(null),
         ])
@@ -130,6 +142,15 @@ export function useSaidasController() {
         }
         setMateriais(materiaisData ?? [])
         setSaidas(saidasData ?? [])
+        if (centrosEstoqueData) {
+          const normalizarCentro = (item) => {
+            const id = item?.id || item?.centroCustoId || item?.centro_custo || null
+            const nome = item?.nome || item?.almox || item?.descricao || item?.codigo || ''
+            if (!id) return null
+            return { id, nome: nome || id }
+          }
+          setCentrosEstoqueOptions((centrosEstoqueData ?? []).map(normalizarCentro).filter(Boolean))
+        }
         if (centrosCustoData) setCentrosCustoOptions(centrosCustoData ?? [])
         if (centrosServicoData) setCentrosServicoOptions(centrosServicoData ?? [])
       } catch (err) {
@@ -139,7 +160,7 @@ export function useSaidasController() {
         setIsLoading(false)
       }
     },
-    [filters, centrosCustoOptions.length, centrosServicoOptions.length, reportError],
+    [filters, centrosEstoqueOptions.length, centrosCustoOptions.length, centrosServicoOptions.length, reportError],
   )
 
   useEffect(() => {
@@ -147,9 +168,39 @@ export function useSaidasController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const dedupeMateriais = useCallback((lista = []) => {
+    const mapa = new Map()
+    ;(Array.isArray(lista) ? lista : []).forEach((item) => {
+      const id = item?.id ?? item?.materialId ?? item?.material_id
+      if (!id) return
+      if (!mapa.has(id)) {
+        mapa.set(id, item)
+      }
+    })
+    return Array.from(mapa.values())
+  }, [])
+
   const handleChange = (event) => {
     const { name, value } = event.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+    setForm((prev) => {
+      if (name === 'centroEstoqueId') {
+        const centro = centrosEstoqueOptions.find((c) => String(c.id) === String(value))
+        return {
+          ...prev,
+          centroEstoqueId: value,
+          centroEstoque: centro?.nome || value,
+          materialId: '',
+        }
+      }
+      return { ...prev, [name]: value }
+    })
+    if (name === 'centroEstoqueId') {
+      setMaterialSearchValue('')
+      setMaterialSuggestions([])
+      setMaterialDropdownOpen(false)
+      setMaterialSearchError(null)
+      setMaterialEstoque(null)
+    }
   }
 
   const resetFormState = useCallback(() => {
@@ -182,6 +233,8 @@ export function useSaidasController() {
         pessoaId: form.pessoaId,
         materialId: form.materialId,
         quantidade: form.quantidade,
+        centroEstoque: form.centroEstoque || form.centroEstoqueId,
+        centroEstoqueId: form.centroEstoqueId,
         centroCusto: form.centroCusto,
         centroCustoId: form.centroCustoId,
         centroServico: form.centroServico,
@@ -189,8 +242,8 @@ export function useSaidasController() {
         dataEntrega: form.dataEntrega,
         usuarioResponsavel: user?.id || user?.user?.id || user?.name || user?.username || 'sistema',
       }
-      if (!payload.pessoaId || !payload.materialId || !payload.dataEntrega) {
-        throw new Error('Preencha pessoa, material e data da entrega.')
+      if (!payload.pessoaId || !payload.materialId || !payload.dataEntrega || !payload.centroEstoqueId) {
+        throw new Error('Preencha pessoa, centro de estoque, material e data da entrega.')
       }
       if (editingSaida) {
         await updateSaida(editingSaida.id, payload)
@@ -229,6 +282,8 @@ export function useSaidasController() {
       pessoaId: saida.pessoaId || '',
       materialId: saida.materialId || '',
       quantidade: String(saida.quantidade ?? ''),
+      centroEstoque: saida.centroEstoque || '',
+      centroEstoqueId: saida.centroEstoqueId || '',
       centroCusto: saida.centroCusto || '',
       centroCustoId: saida.centroCustoId || '',
       centroServico: saida.centroServico || '',
@@ -289,8 +344,8 @@ export function useSaidasController() {
   const handleMaterialInputChange = (event) => {
     const value = event.target.value
     setMaterialSearchValue(value)
-    setForm((prev) => ({ ...prev, materialId: '' }))
     setMaterialSearchError(null)
+    setForm((prev) => ({ ...prev, materialId: '' }))
     if (value.trim().length >= MATERIAL_SEARCH_MIN_CHARS) {
       setMaterialDropdownOpen(true)
     } else {
@@ -342,10 +397,10 @@ export function useSaidasController() {
     setForm((prev) => ({
       ...prev,
       pessoaId: pessoa.id,
-      centroServico: pessoa.centroServico || prev.centroServico,
-      centroServicoId: pessoa.centroServicoId || prev.centroServicoId,
-      centroCusto: pessoa.centroCusto || prev.centroCusto,
-      centroCustoId: pessoa.centroCustoId || prev.centroCustoId,
+      centroServico: pessoa.centroServico || '',
+      centroServicoId: pessoa.centroServicoId || '',
+      centroCusto: pessoa.centroCusto || '',
+      centroCustoId: pessoa.centroCustoId || '',
     }))
     setPessoaSearchValue(formatPessoaSummary(pessoa))
     setPessoaSuggestions([])
@@ -398,6 +453,13 @@ export function useSaidasController() {
       materialSearchTimeoutRef.current = null
     }
     const termo = materialSearchValue.trim()
+    if (!form.centroEstoqueId) {
+      setMaterialSuggestions([])
+      setIsSearchingMaterials(false)
+      setMaterialSearchError(null)
+      setMaterialDropdownOpen(false)
+      return
+    }
     if (form.materialId || termo.length < MATERIAL_SEARCH_MIN_CHARS) {
       setMaterialSuggestions([])
       setIsSearchingMaterials(false)
@@ -412,12 +474,16 @@ export function useSaidasController() {
       try {
         let resultados = []
         if (searchMateriais) {
-          resultados = await searchMateriais({ termo, limit: MATERIAL_SEARCH_MAX_RESULTS })
+          resultados = await searchMateriais({
+            termo,
+            limit: MATERIAL_SEARCH_MAX_RESULTS,
+            centroEstoqueId: form.centroEstoqueId,
+          })
         } else {
           resultados = fallbackMaterialSearch(termo)
         }
         if (!cancelled) {
-          setMaterialSuggestions(resultados ?? [])
+          setMaterialSuggestions(dedupeMateriais(resultados ?? []))
           setMaterialDropdownOpen(true)
         }
       } catch (err) {
@@ -489,10 +555,14 @@ export function useSaidasController() {
   }, [pessoaSearchValue, form.pessoaId, fallbackPessoaSearch, reportError])
 
   useEffect(() => {
-    if (!form.materialId) return
+    if (!form.materialId || !form.centroEstoqueId) {
+      setMaterialEstoqueLoading(false)
+      setMaterialEstoque(null)
+      return
+    }
     setMaterialEstoqueLoading(true)
     setMaterialEstoqueError(null)
-    getMaterialEstoque(form.materialId)
+    getMaterialEstoque(form.materialId, form.centroEstoqueId)
       .then((estoque) => setMaterialEstoque(estoque))
       .catch((err) => {
         setMaterialEstoqueError(err.message || 'Falha ao obter estoque.')
@@ -500,7 +570,7 @@ export function useSaidasController() {
         reportError(err, { area: 'saidas_material_estoque', materialId: form.materialId })
       })
       .finally(() => setMaterialEstoqueLoading(false))
-  }, [form.materialId, reportError])
+}, [form.materialId, form.centroEstoqueId, saidas.length, reportError])
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(saidas.length / TABLE_PAGE_SIZE))
@@ -565,6 +635,71 @@ export function useSaidasController() {
     ],
   )
 
+  const statusFilterOptions = useMemo(() => {
+    const uniq = new Set(
+      saidas
+        .map((s) => (s.statusNome || s.status || '').toString().trim())
+        .filter(Boolean)
+    )
+    return Array.from(uniq)
+      .map((label) => ({ id: label, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [saidas])
+
+  const centroEstoqueFilterOptions = useMemo(() => {
+    const mapaIdParaNome = new Map(
+      (centrosEstoqueOptions ?? []).map((c) => [String(c.id ?? c.nome ?? ''), c.nome ?? c.id ?? ''])
+    )
+    const uniqIds = new Set(
+      saidas
+        .map((s) => (s.centroEstoqueId || s.centroEstoque || '').toString().trim())
+        .filter(Boolean)
+    )
+    return Array.from(uniqIds)
+      .map((id) => ({
+        id,
+        label: mapaIdParaNome.get(id) || id,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [saidas, centrosEstoqueOptions])
+
+  const centroServicoFilterOptions = useMemo(() => {
+    const uniq = new Set(
+      saidas
+        .map((s) => (s.centroServico || s.centroServicoId || '').toString().trim())
+        .filter(Boolean)
+    )
+    return Array.from(uniq)
+      .map((label) => ({ id: label, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [saidas])
+
+  const centroCustoFilterOptions = useMemo(() => {
+    const uniq = new Set(
+      saidas
+        .map((s) => (s.centroCusto || s.centroCustoId || '').toString().trim())
+        .filter(Boolean)
+    )
+    return Array.from(uniq)
+      .map((label) => ({ id: label, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [saidas])
+
+  const registradoPorFilterOptions = useMemo(() => {
+    const uniq = new Set(
+      saidas
+        .map((s) =>
+          (s.usuarioResponsavelNome || s.usuarioResponsavelId || s.usuarioResponsavel || '')
+            .toString()
+            .trim()
+        )
+        .filter(Boolean)
+    )
+    return Array.from(uniq)
+      .map((label) => ({ id: label, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [saidas])
+
   const paginatedSaidas = useMemo(() => {
     const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE
     return saidasFiltradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
@@ -576,8 +711,14 @@ export function useSaidasController() {
     saidas,
     pessoas,
     materiais,
+    centrosEstoqueOptions,
     centrosCustoOptions,
     centrosServicoOptions,
+    statusOptions: statusFilterOptions,
+    centroEstoqueFilterOptions,
+    centroServicoFilterOptions,
+    centroCustoFilterOptions,
+    registradoPorFilterOptions,
     editingSaida,
     isSaving,
     isLoading,

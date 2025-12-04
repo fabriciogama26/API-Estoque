@@ -1,4 +1,4 @@
-import { Pencil, History as HistoryIcon } from 'lucide-react'
+import { Pencil, History as HistoryIcon, Eye } from 'lucide-react'
 
 // Ações para cada material na tabela de materiais
 export function MateriaisActions({
@@ -7,6 +7,7 @@ export function MateriaisActions({
   isSaving,
   onEdit,
   onHistory,
+  onView,
   isHistoryLoading,
 }) {
   const isEditDisabled = isEditing || isSaving
@@ -15,6 +16,17 @@ export function MateriaisActions({
   // Evita renderizar ações para materiais inexistentes
   return (
     <div className="materiais-data-table__actions">
+      {onView ? (
+        <button
+          type="button"
+          className="materiais-table-action-button"
+          onClick={() => onView(material)}
+          disabled={isSaving}
+          aria-label={`Ver detalhes de ${material.nome || material.nomeItemRelacionado || 'material'}`}
+        >
+          <Eye size={16} strokeWidth={1.8} />
+        </button>
+      ) : null}
       <button
         type="button"
         className="materiais-table-action-button"

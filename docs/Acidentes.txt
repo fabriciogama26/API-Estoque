@@ -37,7 +37,7 @@ Campos principais do formulario
   - Matricula (obrigatorio) – campo chave; ao informar, preenche automaticamente nome, cargo, centro de servico e local.
   - Nome, Cargo, Centro de servico, Setor, Local – derivados da pessoa, com possibilidade de ajuste conforme permissao.
 - Dados do acidente:
-  - Data/hora do acidente (obrigatorio).
+  - Data/hora do acidente (obrigatorio) exibida como "Data do Acidente" e com captura de hora.
   - Dias perdidos e Dias debitados (obrigatorios quando aplicavel, armazenados como numero, exibidos como texto).
   - HHT (horas-homem trabalhadas) referente ao periodo usado nos indicadores.
 - Classificacao:
@@ -71,6 +71,10 @@ Fluxos principais
    - Formulario de filtros controla `filters` (termo, tipo, centro de servico, agente, etc.).
    - "Aplicar" usa `filterAcidentes(acidentes, filters)` para gerar a lista filtrada.
    - "Limpar" restaura `ACIDENTES_FILTER_DEFAULT` e recarrega a lista principal, se necessario.
+
+5) Tabela e detalhes
+   - Colunas exibidas: Nome, Matricula, Cargo, Data, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
+   - Acoes: editar, historico e detalhar. O botao "Detalhar" abre um modal com os demais campos (agente/tipo/lesoes/partes, dias, HHT, eSOCIAL, SESMT, observacao), cabecalho com ID do cadastro e resumo de matricula/nome/data.
 
 Carregamento de dados
 ---------------------
@@ -124,7 +128,7 @@ Funcoes principais
   - Tipo: hook de filtros
   - Caminho: src/hooks/useAcidenteFiltro.js
   - Responsavel por: manter filters, handleFilterChange/Clear e gerar acidentesFiltrados com filterAcidentes.
-- Componentes AcidentesForm / AcidentesFilters / AcidentesTable / AcidentesHistoryModal
+- Componentes AcidentesForm / AcidentesFilters / AcidentesTable / AcidentesHistoryModal / AcidenteDetailsModal
   - Tipo: componentes de UI
   - Caminho: src/components/Acidentes/*
   - Responsavel por: UI do form, filtros, tabela e modal usando props dos hooks/contexto.

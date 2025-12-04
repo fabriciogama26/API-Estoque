@@ -1,8 +1,9 @@
-import { formatCurrency } from '../../utils/MateriaisUtils.js'
+﻿import { formatCurrency } from '../../utils/MateriaisUtils.js'
 import { formatSelectionValue } from '../../utils/selectionUtils.js'
 
 const FIELD_LABELS = {
-  materialItemNome: 'Nome',
+  materialItemNome: 'Material',
+  nome: 'Material',
   fabricanteNome: 'Fabricante',
   validadeDias: 'Validade (dias)',
   ca: 'CA',
@@ -11,6 +12,7 @@ const FIELD_LABELS = {
   ativo: 'Status',
   descricao: 'Descrição',
   grupoMaterial: 'Grupo de material',
+  grupoMaterialNome: 'Grupo de material',
   numeroCalcado: 'Número de calçado',
   numeroVestimenta: 'Número de vestimenta',
   numeroEspecifico: 'Número específico',
@@ -24,13 +26,9 @@ const FIELD_LABELS = {
 const SELECTION_FIELDS = new Set(['caracteristicaEpi', 'caracteristicas', 'caracteristicas_epi', 'cores'])
 
 const formatDateTime = (value) => {
-  if (!value) {
-    return '-'
-  }
+  if (!value) return '-'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
+  if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleString('pt-BR')
 }
 
@@ -56,26 +54,19 @@ const formatValue = (campo, valor) => {
   return String(valor)
 }
 
-const formatChange = (registro) => {
-  if (Array.isArray(registro?.camposAlterados) && registro.camposAlterados.length > 0) {
-    return registro.camposAlterados
-      .map(({ campo, de, para }) => {
-        const label = FIELD_LABELS[campo] ?? campo
-        const antigo = formatValue(campo, de)
-        const novo = formatValue(campo, para)
-        return `${label}: "${antigo}" -> "${novo}"`
-      })
-      .join('; ')
+const buildChanges = (registro) => {
+  if (!Array.isArray(registro?.camposAlterados) || registro.camposAlterados.length === 0) {
+    return []
   }
-
-  if (registro?.valorUnitario !== null && registro?.valorUnitario !== undefined) {
-    const numero = Number(registro.valorUnitario)
-    if (!Number.isNaN(numero)) {
-      return `Valor unitário registrado: ${formatCurrency(numero)}`
-    }
-  }
-
-  return 'Sem alterações registradas'
+  return registro.camposAlterados
+    .map(({ campo, de, para }) => {
+      const label = FIELD_LABELS[campo] ?? campo
+      const antes = formatValue(campo, de)
+      const depois = formatValue(campo, para)
+      if (antes === depois) return null
+      return { campo, label, before: antes, after: depois }
+    })
+    .filter(Boolean)
 }
 
 export function MateriaisHistoricoTimeline({ registros }) {
@@ -83,15 +74,34 @@ export function MateriaisHistoricoTimeline({ registros }) {
     return null
   }
 
+  const ordenados = registros
+    .slice()
+    .sort((a, b) => new Date(b.dataRegistro ?? b.criadoEm ?? 0) - new Date(a.dataRegistro ?? a.criadoEm ?? 0))
+
   return (
-    <ul className="materiais-history-list">
-      {registros.map((registro) => {
+    <ul className="entradas-history__list">
+      {ordenados.map((registro) => {
         const data = registro.dataRegistro ?? registro.criadoEm
+        const changes = buildChanges(registro)
         return (
-          <li key={registro.id}>
-            <span>{formatDateTime(data)}</span>
-            <span>{registro.usuarioResponsavel || '-'}</span>
-            <span>{formatChange(registro)}</span>
+          <li key={registro.id} className="entradas-history__item">
+            <div className="entradas-history__item-header">
+              <div>
+                <strong>{formatDateTime(data)}</strong>
+                <p>{registro.usuarioResponsavel || 'Responsavel não informado'}</p>
+              </div>
+            </div>
+            <div className="entradas-history__item-body">
+              {changes.length === 0 ? (
+                <p className="feedback">Sem alterações registradas.</p>
+              ) : (
+                changes.map((change) => (
+                  <p key={`${registro.id}-${change.campo}`}>
+                    <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
+                  </p>
+                ))
+              )}
+            </div>
           </li>
         )
       })}
