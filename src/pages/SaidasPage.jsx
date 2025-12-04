@@ -1,3 +1,5 @@
+﻿import { useState } from 'react'
+import { Eye } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ExitIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
@@ -7,14 +9,18 @@ import { SaidasProvider, useSaidasContext } from '../context/SaidasContext.jsx'
 import '../styles/MateriaisPage.css'
 
 function SaidasContent() {
+  const [detalheState, setDetalheState] = useState({ open: false, saida: null, pessoa: null, material: null })
   const {
     form,
     filters,
     saidas,
     pessoas,
     materiais,
-    centrosCustoOptions,
-    centrosServicoOptions,
+    centrosEstoqueOptions,
+    statusOptions,
+    centroEstoqueFilterOptions,
+    centroServicoFilterOptions,
+    registradoPorFilterOptions,
     editingSaida,
     isSaving,
     isLoading,
@@ -62,7 +68,6 @@ function SaidasContent() {
     paginatedSaidas,
     saidasFiltradas,
     formatCurrency,
-    formatDisplayDate,
     formatDisplayDateTime,
     formatMaterialSummary,
     formatPessoaSummary,
@@ -70,16 +75,32 @@ function SaidasContent() {
     setCancelState,
   } = useSaidasContext()
 
+  const handleOpenDetalhes = (saida) => {
+    const pessoa = pessoas.find((p) => p.id === saida.pessoaId)
+    const material = materiais.find((m) => m.id === saida.materialId)
+    setDetalheState({ open: true, saida, pessoa, material })
+  }
+
+  const handleCloseDetalhes = () => {
+    setDetalheState({ open: false, saida: null, pessoa: null, material: null })
+  }
+
+  const resolveCentroEstoqueNome = (valor) => {
+    if (!valor) return '-'
+    const found = centrosEstoqueOptions.find((c) => String(c.id) === String(valor))
+    return found?.nome || valor
+  }
+
   return (
     <div className="stack">
       <PageHeader
         icon={<ExitIcon size={28} />}
-        title="Saidas"
-        subtitle="Registre entregas de EPIs e acompanhe o historico."
+        title="Saídas"
+        subtitle="Registre entregas de EPIs e acompanhe o histórico."
       />
 
       <form className="card form" onSubmit={handleSubmit}>
-        <h2>Registrar saida</h2>
+        <h2>Registrar saída</h2>
         <div className="form__grid form__grid--two">
           <label className="field autocomplete">
             <span>Pessoa*</span>
@@ -126,6 +147,18 @@ function SaidasContent() {
             </div>
           </label>
 
+          <label className="field">
+            <span>Centro de estoque*</span>
+            <select name="centroEstoqueId" value={form.centroEstoqueId} onChange={handleChange} required>
+              <option value="">Selecione</option>
+              {centrosEstoqueOptions.map((item) => (
+                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <label className="field autocomplete">
             <span>Material*</span>
             <div className="autocomplete__control">
@@ -136,6 +169,7 @@ function SaidasContent() {
                 onFocus={handleMaterialFocus}
                 onBlur={handleMaterialBlur}
                 placeholder="Digite para buscar materiais"
+                disabled={!form.centroEstoqueId}
                 required
               />
               {materialSearchValue ? (
@@ -177,27 +211,42 @@ function SaidasContent() {
           </label>
 
           <label className="field">
-            <span>Centro de estoque</span>
-            <select name="centroCusto" value={form.centroCusto} onChange={handleChange}>
-              <option value="">Selecione</option>
-              {centrosCustoOptions.map((item) => (
-                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
-                  {item.nome}
-                </option>
-              ))}
-            </select>
+            <span>Em estoque</span>
+            <input
+              value={
+                materialEstoqueLoading
+                  ? 'Consultando...'
+                  : form.materialId
+                  ? materialEstoque?.quantidade ?? 0
+                  : ''
+              }
+              readOnly
+              disabled
+            />
           </label>
 
           <label className="field">
-            <span>Centro de serviço</span>
-            <select name="centroServico" value={form.centroServico} onChange={handleChange}>
-              <option value="">Selecione</option>
-              {centrosServicoOptions.map((item) => (
-                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
-                  {item.nome}
-                </option>
-              ))}
-            </select>
+            <span>Centro de Custo*</span>
+            <input
+              name="centroCusto"
+              value={form.centroCusto}
+              onChange={handleChange}
+              placeholder="Centro de custo do colaborador"
+              readOnly
+              required
+            />
+          </label>
+
+          <label className="field">
+            <span>Centro de serviço*</span>
+            <input
+              name="centroServico"
+              value={form.centroServico}
+              onChange={handleChange}
+              placeholder="Centro de serviço do colaborador"
+              readOnly
+              required
+            />
           </label>
 
           <label className="field">
@@ -217,11 +266,17 @@ function SaidasContent() {
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
           <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? (editingSaida ? 'Salvando...' : 'Registrando...') : editingSaida ? 'Salvar alteracoes' : 'Registrar saida'}
+            {isSaving
+              ? editingSaida
+                ? 'Salvando...'
+                : 'Registrando...'
+              : editingSaida
+              ? 'Salvar alterações'
+              : 'Registrar saída'}
           </button>
           {editingSaida ? (
             <button type="button" className="button button--ghost" onClick={cancelEditSaida} disabled={isSaving}>
-              Cancelar edicao
+              Cancelar edição
             </button>
           ) : null}
         </div>
@@ -234,22 +289,24 @@ function SaidasContent() {
         </label>
         <label className="field">
           <span>Registrado por</span>
-          <input name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange} placeholder="ID ou nome" />
-        </label>
-        <label className="field">
-          <span>Centro de estoque</span>
-          <input name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange} placeholder="Centro de estoque" />
-        </label>
-        <label className="field">
-          <span>Centro de serviço</span>
-          <input name="centroServico" value={filters.centroServico} onChange={handleFilterChange} placeholder="Centro de serviço" />
+          <select name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange}>
+            <option value="">Todos</option>
+            {registradoPorFilterOptions.map((opt) => (
+              <option key={opt.id} value={opt.label}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Status</span>
           <select name="status" value={filters.status} onChange={handleFilterChange}>
             <option value="">Todos</option>
-            <option value="registrado">Registrado</option>
-            <option value="cancelado">Cancelado</option>
+            {statusOptions.map((opt) => (
+              <option key={opt.id} value={opt.label}>
+                {opt.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className="field">
@@ -272,7 +329,7 @@ function SaidasContent() {
 
       <section className="card">
         <header className="card__header">
-          <h2>Historico de saídas</h2>
+          <h2>Histórico de saídas</h2>
           <button type="button" className="button button--ghost" onClick={() => load(filters, { resetPage: true })} disabled={isLoading}>
             Atualizar
           </button>
@@ -287,12 +344,11 @@ function SaidasContent() {
                   <th>Pessoa</th>
                   <th>Material</th>
                   <th>Quantidade</th>
-                  <th>Centro de estoque</th>
-                  <th>Centro de serviço</th>
-                  <th>Data</th>
-                  <th>Registrado por</th>
+                  <th>Data entrega</th>
                   <th>Status</th>
-                  <th>Acoes</th>
+                  <th>Registrado por</th>
+                  <th>Cadastrado em</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,7 +356,11 @@ function SaidasContent() {
                   const pessoa = pessoas.find((p) => p.id === saida.pessoaId)
                   const material = materiais.find((m) => m.id === saida.materialId)
                   const statusLower = (saida.status || '').toString().trim().toLowerCase()
-                  const registradoPor = saida.usuarioResponsavelUsername || saida.usuarioResponsavelNome || saida.usuarioResponsavel || 'Nao informado'
+                  const registradoPor =
+                    saida.usuarioResponsavelUsername ||
+                    saida.usuarioResponsavelNome ||
+                    saida.usuarioResponsavel ||
+                    'Não informado'
                   return (
                     <tr key={saida.id} className={isSaidaCancelada(saida) ? 'data-table__row--muted' : ''}>
                       <td>
@@ -310,25 +370,33 @@ function SaidasContent() {
                       <td>
                         <strong>{formatMaterialSummary(material) || saida.materialId || 'Material removido'}</strong>
                         <p className="data-table__muted">
-                          ID: {material?.id || saida.materialId || 'Nao informado'} | Valor unit.:{' '}
+                          ID: {material?.id || saida.materialId || 'Não informado'} | Valor unit.:{' '}
                           {formatCurrency(material?.valorUnitario ?? 0)}
                         </p>
                       </td>
                       <td>{saida.quantidade}</td>
-                      <td>{saida.centroCusto || saida.centroCustoId || '-'}</td>
-                      <td>{saida.centroServico || saida.centroServicoId || '-'}</td>
                       <td>{formatDisplayDateTime(saida.dataEntrega)}</td>
+                      <td className={statusLower === 'cancelado' ? 'text-muted' : ''}>{saida.status || 'Registrado'}</td>
                       <td>{registradoPor}</td>
-                      <td className={statusLower === 'cancelado' ? 'text-muted' : ''}>{saida.status || 'registrado'}</td>
+                      <td>{saida.criadoEm ? formatDisplayDateTime(saida.criadoEm) : '-'}</td>
                       <td>
                         <div className="table-actions materiais-data-table__actions">
+                          <button
+                            type="button"
+                            className="materiais-table-action-button"
+                            onClick={() => handleOpenDetalhes(saida)}
+                            aria-label={`Ver detalhes da saída ${saida.id}`}
+                            title="Ver detalhes"
+                          >
+                            <Eye size={16} strokeWidth={1.8} />
+                          </button>
                           {!isSaidaCancelada(saida) ? (
                             <button
                               type="button"
                               className="materiais-table-action-button"
                               onClick={() => startEditSaida(saida)}
-                              aria-label={`Editar saida ${saida.id}`}
-                              title="Editar saida"
+                              aria-label={`Editar saída ${saida.id}`}
+                              title="Editar saída"
                             >
                               <EditIcon size={16} />
                             </button>
@@ -337,8 +405,8 @@ function SaidasContent() {
                             type="button"
                             className="materiais-table-action-button"
                             onClick={() => openHistory(saida)}
-                            aria-label={`Historico da saida ${saida.id}`}
-                            title="Historico da saida"
+                            aria-label={`Histórico da saída ${saida.id}`}
+                            title="Histórico da saída"
                           >
                             <HistoryIcon size={16} />
                           </button>
@@ -347,8 +415,8 @@ function SaidasContent() {
                             type="button"
                             className="materiais-table-action-button materiais-table-action-button--danger"
                             onClick={() => openCancelModal(saida)}
-                            aria-label={`Cancelar saida ${saida.id}`}
-                            title="Cancelar saida"
+                            aria-label={`Cancelar saída ${saida.id}`}
+                            title="Cancelar saída"
                           >
                               <CancelIcon size={16} />
                             </button>
@@ -371,6 +439,120 @@ function SaidasContent() {
       </section>
 
       <SaidasHistoryModal state={historyState} onClose={closeHistory} />
+      {detalheState.open && detalheState.saida ? (
+        <div className="saida-details__overlay" role="dialog" aria-modal="true" onClick={handleCloseDetalhes}>
+          <div className="saida-details__modal" onClick={(event) => event.stopPropagation()}>
+            <header className="saida-details__header">
+              <div>
+                <p className="saida-details__eyebrow">ID da saída</p>
+                <h3 className="saida-details__title">{detalheState.saida.id || 'ID não informado'}</h3>
+              </div>
+              <button type="button" className="saida-details__close" onClick={handleCloseDetalhes} aria-label="Fechar detalhes">
+                <CancelIcon size={18} />
+              </button>
+            </header>
+
+            <div className="saida-details__section">
+              <h4 className="saida-details__section-title">Dados principais</h4>
+              <div className="saida-details__grid">
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Pessoa</span>
+                  <p className="saida-details__value">
+                    {formatPessoaSummary(detalheState.pessoa) || detalheState.saida.pessoaId || '-'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Material</span>
+                  <p className="saida-details__value">
+                    {formatMaterialSummary(detalheState.material) || detalheState.saida.materialId || '-'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Quantidade</span>
+                  <p className="saida-details__value">{detalheState.saida.quantidade ?? '-'}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Status</span>
+                  <p className="saida-details__value">{detalheState.saida.status || 'Registrado'}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Data de entrega</span>
+                  <p className="saida-details__value">{formatDisplayDateTime(detalheState.saida.dataEntrega)}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Data de troca</span>
+                  <p className="saida-details__value">
+                    {detalheState.saida.dataTroca ? formatDisplayDateTime(detalheState.saida.dataTroca) : '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="saida-details__section">
+              <h4 className="saida-details__section-title">Centros</h4>
+              <div className="saida-details__grid">
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Centro de estoque</span>
+                  <p className="saida-details__value">
+                    {resolveCentroEstoqueNome(detalheState.saida.centroEstoque || detalheState.saida.centroEstoqueId)}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Centro de custo</span>
+                  <p className="saida-details__value">
+                    {detalheState.saida.centroCusto || detalheState.saida.centroCustoId || '-'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Centro de serviço</span>
+                  <p className="saida-details__value">
+                    {detalheState.saida.centroServico || detalheState.saida.centroServicoId || '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="saida-details__section">
+              <h4 className="saida-details__section-title">Registro</h4>
+              <div className="saida-details__grid">
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Registrado por</span>
+                  <p className="saida-details__value">
+                    {detalheState.saida.usuarioResponsavelNome ||
+                      detalheState.saida.usuarioResponsavel ||
+                      detalheState.saida.usuarioResponsavelId ||
+                      'Não informado'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Cadastrado em</span>
+                  <p className="saida-details__value">
+                    {detalheState.saida.criadoEm ? formatDisplayDateTime(detalheState.saida.criadoEm) : '-'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Atualizado em</span>
+                  <p className="saida-details__value">
+                    {detalheState.saida.atualizadoEm ? formatDisplayDateTime(detalheState.saida.atualizadoEm) : '-'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Usuário edição</span>
+                  <p className="saida-details__value">
+                    {detalheState.saida.usuarioEdicao || detalheState.saida.usuarioEdicaoId || '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <footer className="saida-details__footer">
+              <button type="button" className="button button--ghost" onClick={handleCloseDetalhes}>
+                Fechar
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
       {cancelState.open ? (
         <div className="modal__overlay" role="dialog" aria-modal="true" onClick={closeCancelModal}>
           <div className="modal__content" onClick={(event) => event.stopPropagation()}>
@@ -383,9 +565,11 @@ function SaidasContent() {
             <div className="modal__body">
               <p>Informe um motivo para cancelamento:</p>
               <textarea
+                className="modal__textarea"
                 rows={3}
                 value={cancelState.motivo}
                 onChange={(e) => setCancelState((prev) => ({ ...prev, motivo: e.target.value }))}
+                placeholder="Descreva o motivo do cancelamento"
               />
               {cancelState.error ? <p className="feedback feedback--error">{cancelState.error}</p> : null}
             </div>
@@ -393,7 +577,12 @@ function SaidasContent() {
               <button type="button" className="button button--ghost" onClick={closeCancelModal} disabled={cancelState.isSubmitting}>
                 Fechar
               </button>
-              <button type="button" className="button button--danger" onClick={handleCancelSubmit} disabled={cancelState.isSubmitting}>
+              <button
+                type="button"
+                className="button button--danger"
+                onClick={handleCancelSubmit}
+                disabled={cancelState.isSubmitting || !cancelState.motivo.trim()}
+              >
                 {cancelState.isSubmitting ? 'Cancelando...' : 'Confirmar cancelamento'}
               </button>
             </footer>
@@ -411,3 +600,5 @@ export function SaidasPage() {
     </SaidasProvider>
   )
 }
+
+

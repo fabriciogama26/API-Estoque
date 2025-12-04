@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+﻿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import {
   montarEstoqueAtual,
   montarDashboard,
@@ -708,6 +708,30 @@ const buildDateWithCurrentTime = (valor) => {
   return base
 }
 
+const mergeDateWithExistingTime = (valorData, dataAnterior) => {
+  const raw = trim(valorData)
+  if (!raw) {
+    return null
+  }
+  let base = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(base.getTime())) {
+    const alternativa = new Date(raw)
+    if (Number.isNaN(alternativa.getTime())) {
+      return null
+    }
+    base = alternativa
+  }
+  if (dataAnterior instanceof Date && !Number.isNaN(dataAnterior.getTime())) {
+    base.setHours(
+      dataAnterior.getHours(),
+      dataAnterior.getMinutes(),
+      dataAnterior.getSeconds(),
+      dataAnterior.getMilliseconds()
+    )
+  }
+  return base
+}
+
 const buildMaterialResumo = (material) => {
   if (!material || typeof material !== 'object') {
     return ''
@@ -992,7 +1016,7 @@ const applyPessoaSearchFilters = (builder, like) => {
     `cargo.ilike.${like}`,
     `centro_custo.ilike.${like}`,
     `tipo_execucao.ilike.${like}`,
-    // Nomes dos usuários (colunas text), evitando aplicar ilike em UUID.
+    // Nomes dos usu├írios (colunas text), evitando aplicar ilike em UUID.
     `usuario_cadastro_nome.ilike.${like}`,
     `usuario_edicao_nome.ilike.${like}`,
   ]
@@ -1143,7 +1167,7 @@ async function ensureAcidenteLesoes(agenteNome, nomes) {
 
 function ensureSupabase() {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
+    throw new Error('Supabase n├úo configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
   }
 }
 
@@ -1270,7 +1294,7 @@ async function replaceMaterialRelationsWithFallback({
       if (!error || error.code !== '42703') {
         if (normalizedValues.length > 0) {
           console.warn(
-            'Supabase rejeitou IDs de vínculo de material.',
+            'Supabase rejeitou IDs de v├¡nculo de material.',
             {
               table,
               columnName,
@@ -1305,7 +1329,7 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
       materialId,
       columnCandidates: MATERIAL_COR_RELATION_ID_COLUMNS,
       values: idValues,
-      deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+      deleteMessage: 'Falha ao limpar v├¡nculos de cores do material.',
       insertMessage: 'Falha ao vincular cores ao material.',
     })
     idInserted = idValues.length > 0
@@ -1321,7 +1345,7 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
       materialId,
       columnCandidates: MATERIAL_COR_RELATION_TEXT_COLUMNS,
       values: nameValues,
-      deleteMessage: 'Falha ao limpar vínculos de cores do material.',
+      deleteMessage: 'Falha ao limpar v├¡nculos de cores do material.',
       insertMessage: 'Falha ao vincular cores ao material.',
       deleteFirst: false,
     })
@@ -1343,8 +1367,8 @@ async function replaceMaterialCaracteristicaVinculos(
       materialId,
       columnCandidates: MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS,
       values: idValues,
-      deleteMessage: 'Falha ao limpar vínculos de características do material.',
-      insertMessage: 'Falha ao vincular características ao material.',
+      deleteMessage: 'Falha ao limpar v├¡nculos de caracter├¡sticas do material.',
+      insertMessage: 'Falha ao vincular caracter├¡sticas ao material.',
     })
     idInserted = idValues.length > 0
   } catch (error) {
@@ -1359,8 +1383,8 @@ async function replaceMaterialCaracteristicaVinculos(
       materialId,
       columnCandidates: MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS,
       values: nameValues,
-      deleteMessage: 'Falha ao limpar vínculos de características do material.',
-      insertMessage: 'Falha ao vincular características ao material.',
+      deleteMessage: 'Falha ao limpar v├¡nculos de caracter├¡sticas do material.',
+      insertMessage: 'Falha ao vincular caracter├¡sticas ao material.',
       deleteFirst: false,
     })
   }
@@ -1617,8 +1641,9 @@ function mapMaterialRecord(record) {
     usuarioAtualizacaoNome,
     usuarioAtualizacaoUsername: usuarioAtualizacaoUsername || null,
     registradoPor: usuarioCadastroUsername || usuarioCadastroNome || usuarioCadastroId || '',
-    dataCadastro: record.dataCadastro ?? record.data_cadastro ?? null,
-    atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
+    dataCadastro: record.dataCadastro ?? record.data_cadastro ?? record.created_at ?? record.createdAt ?? null,
+    criadoEm: record.dataCadastro ?? record.data_cadastro ?? record.created_at ?? record.createdAt ?? null,
+    atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? record.updated_at ?? record.updatedAt ?? null,
   }
 }
 
@@ -1702,8 +1727,8 @@ function mapEntradaRecord(record) {
   if (!record) {
     return null
   }
-  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? record.centroCusto ?? null
-  const centroCustoRaw = record.centroCusto ?? ''
+  const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
+  const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? record.centroEstoque ?? ''
   const centroCustoId = normalizeUuid(centroEstoqueValor)
   const centroCustoNome =
     resolveTextValue(
@@ -1780,6 +1805,8 @@ function mapSaidaRecord(record) {
     materialId: record.materialId ?? record.material_id ?? null,
     pessoaId: record.pessoaId ?? record.pessoa_id ?? null,
     quantidade: toNumber(record.quantidade),
+    centroEstoqueId: record.centroEstoqueId ?? record.centro_estoque ?? null,
+    centroEstoque: resolveTextValue(record.centroEstoqueNome ?? record.centroEstoque ?? record.centro_estoque ?? ''),
     centroCustoId: record.centroCustoId ?? record.centro_custo ?? null,
     centroCusto: resolveTextValue(record.centroCustoNome ?? record.centroCusto ?? record.centro_custo ?? ''),
     centroServicoId: record.centroServicoId ?? record.centro_servico ?? null,
@@ -1797,6 +1824,9 @@ function mapSaidaRecord(record) {
     usuarioResponsavel: usuarioId ? usuarioId : usuarioTexto,
     usuarioResponsavelId: usuarioId,
     usuarioResponsavelNome: usuarioId ? '' : usuarioTexto,
+    criadoEm: record.criadoEm ?? record.created_at ?? record.createdAt ?? null,
+    atualizadoEm: record.atualizadoEm ?? record.updated_at ?? record.atualizado_em ?? null,
+    usuarioEdicao: record.usuarioEdicao ?? record.usuario_edicao ?? null,
   }
 }
 
@@ -1846,6 +1876,8 @@ async function buildSaidaSnapshot(saida) {
     fetchPessoaSnapshot(saida.pessoaId),
     resolveCentroCustoNome(saida.centroCustoId || saida.centroCusto, { tipo: 'custo' }),
   ])
+  const statusId = saida.statusId || (isUuidValue(saida.status) ? saida.status : null)
+  const statusNome = saida.statusNome || saida.status || ''
   return {
     saidaId: saida.id,
     pessoaId: saida.pessoaId,
@@ -1859,8 +1891,9 @@ async function buildSaidaSnapshot(saida) {
     centroCustoId: saida.centroCustoId || '',
     centroServico: saida.centroServico || pessoa?.centroServico || '',
     centroServicoId: saida.centroServicoId || '',
-    status: saida.status,
-    statusId: saida.statusId || '',
+    status: statusNome || statusId || '',
+    statusId: statusId || '',
+    statusNome: statusNome || statusId || '',
     dataEntrega: saida.dataEntrega,
     dataTroca: saida.dataTroca,
     usuarioResponsavel: saida.usuarioResponsavelNome || saida.usuarioResponsavel || '',
@@ -1877,6 +1910,45 @@ async function registrarSaidaHistoricoSupabase(saidaAtual, saidaAnterior = null,
       saidaAnterior ? buildSaidaSnapshot(saidaAnterior) : Promise.resolve(null),
     ])
     const snapshotAtual = { ...snapshotAtualBase, ...extras }
+
+    const normalizarValor = (campo, valor) => {
+      if (valor === undefined || valor === null) {
+        return null
+      }
+      if (campo === 'dataEntrega' || campo === 'dataTroca') {
+        const data = valor instanceof Date ? valor : new Date(valor)
+        if (Number.isNaN(data.getTime())) {
+          return valor
+        }
+        const iso = data.toISOString()
+        return iso.replace(/\.\d{3}Z$/, 'Z')
+      }
+      return valor
+    }
+
+    const camposComparacao = [
+      'materialResumo',
+      'pessoaNome',
+      'pessoaCargo',
+      'quantidade',
+      'status',
+      'centroCusto',
+      'centroServico',
+      'dataEntrega',
+      'dataTroca',
+    ]
+    const mudou = (campo) => {
+      if (!snapshotAnterior) {
+        return true
+      }
+      const antes = normalizarValor(campo, snapshotAnterior[campo])
+      const depois = normalizarValor(campo, snapshotAtual[campo])
+      return JSON.stringify(antes) !== JSON.stringify(depois)
+    }
+    const houveAlteracao = camposComparacao.some(mudou) || !snapshotAnterior
+    if (snapshotAnterior && !houveAlteracao) {
+      return
+    }
     const payload =
       snapshotAnterior && Object.keys(snapshotAnterior).length > 0
         ? { atual: snapshotAtual, anterior: snapshotAnterior }
@@ -2127,6 +2199,7 @@ async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
   if (!termoNormalizado) {
     return []
   }
+  const termoUuid = normalizeUuid(termoNormalizado)
   const limiteSeguro = Number.isFinite(Number(limit))
     ? Math.max(1, Math.min(Number(limit), 50))
     : 10
@@ -2146,16 +2219,17 @@ async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
     `coresTexto.ilike.${like}`,
     `caracteristicasTexto.ilike.${like}`,
   ]
-  const data = await execute(
-    supabase
-      .from(sourceTable)
-      .select(MATERIAL_SELECT_COLUMNS)
-      .or(filtros.join(','))
-      .order('nome', { ascending: true })
-      .order('fabricante', { ascending: true, nullsFirst: false })
-      .limit(limiteSeguro),
-    'Falha ao buscar materiais.'
-  )
+  let query = supabase.from(sourceTable).select(MATERIAL_SELECT_COLUMNS)
+  if (termoUuid) {
+    query = query.eq('id', termoUuid)
+  } else {
+    query = query.or(filtros.join(','))
+  }
+  if (options.centroEstoqueId && sourceTable === ENTRADAS_MATERIAIS_VIEW) {
+    query = query.eq('centro_estoque', options.centroEstoqueId)
+  }
+  query = query.order('nome', { ascending: true }).order('fabricante', { ascending: true, nullsFirst: false }).limit(limiteSeguro)
+  const data = await execute(query, 'Falha ao buscar materiais.')
   return (data ?? []).map(mapMaterialRecord)
 }
 
@@ -2201,7 +2275,7 @@ async function carregarCentrosEstoqueCatalogo() {
 async function carregarCentrosServico() {
   const data = await execute(
     supabase.from('centros_servico').select('id, nome').order('nome'),
-    'Falha ao listar centros de serviço.'
+    'Falha ao listar centros de servi├ºo.'
   )
   return normalizeDomainOptions(data ?? [])
 }
@@ -2226,7 +2300,7 @@ async function carregarEntradas(params = {}) {
   if (params.materialId) {
     query = query.eq('materialId', params.materialId)
   }
-  const centroFiltro = trim(params.centroCusto)
+  const centroFiltro = trim(params.centroEstoque || params.centroCusto)
   let centroFiltroTerm = ''
   if (centroFiltro) {
     if (isUuidValue(centroFiltro)) {
@@ -2299,7 +2373,7 @@ async function carregarStatusSaidaMap() {
     return statusSaidaCache
   }
   const registros = await execute(
-    supabase.from('status_saida').select('id, status'),
+    supabase.from('status_saida').select('id, status').eq('ativo', true),
     'Falha ao consultar status de saida.'
   )
   const mapaId = new Map()
@@ -2639,6 +2713,15 @@ async function carregarSaidas(params = {}) {
       : query.ilike('usuarioResponsavel', `%${registradoPor}%`)
   }
 
+  const centroEstoqueFiltro = trim(params.centroEstoque || params.centro_estoque)
+  if (centroEstoqueFiltro) {
+    if (isUuidValue(centroEstoqueFiltro)) {
+      query = query.eq('centro_estoque', centroEstoqueFiltro)
+    } else {
+      query = query.ilike('centro_estoque', `%${centroEstoqueFiltro}%`)
+    }
+  }
+
   const centroCustoFiltro = trim(params.centroCusto)
   if (centroCustoFiltro) {
     query = isUuidValue(centroCustoFiltro)
@@ -2732,20 +2815,31 @@ async function carregarAcidentes() {
   return (data ?? []).map(mapAcidenteRecord)
 }
 
-async function calcularSaldoMaterialAtual(materialId) {
+async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
   const [entradas, saidas] = await Promise.all([
-    execute(
-      supabase.from('entradas').select('materialId, quantidade, dataEntrada').eq('materialId', materialId),
-      'Falha ao consultar entradas.'
-    ),
-    execute(
-      supabase
+    (() => {
+      let query = supabase
+        .from('entradas')
+        .select('materialId, quantidade, dataEntrada, centro_estoque')
+      query = query.eq('materialId', materialId)
+      if (centroEstoqueId) {
+        query = query.eq('centro_estoque', centroEstoqueId)
+      }
+      return execute(query, 'Falha ao consultar entradas.')
+    })(),
+    (() => {
+      let query = supabase
         .from('saidas')
-        .select('materialId, quantidade, dataEntrega, status, status_rel:status_saida ( id, status )')
-        .eq('materialId', materialId),
-      'Falha ao consultar saidas.'
-    ),
+        .select(
+          'materialId, quantidade, dataEntrega, status, centro_estoque, centro_custo, status_rel:status_saida ( id, status )'
+        )
+        .eq('materialId', materialId)
+      if (centroEstoqueId) {
+        query = query.or(`centro_estoque.eq.${centroEstoqueId},centro_custo.eq.${centroEstoqueId}`)
+      }
+      return execute(query, 'Falha ao consultar saidas.')
+    })(),
   ])
 
   const entradasNormalizadas = (entradas ?? []).map(mapEntradaRecord)
@@ -2837,18 +2931,18 @@ export const api = {
         filtros.centroServicoId = await resolveReferenceId(
           'centros_servico',
           centroServico,
-          'Centro de serviço inválido para filtro.'
+          'Centro de servi├ºo inv├ílido para filtro.'
         )
       }
 
       const setor = trim(params.setor ?? '')
       if (setor && setor.toLowerCase() !== 'todos') {
-        filtros.setorId = await resolveReferenceId('setores', setor, 'Setor inválido para filtro.')
+        filtros.setorId = await resolveReferenceId('setores', setor, 'Setor inv├ílido para filtro.')
       }
 
       const cargo = trim(params.cargo ?? '')
       if (cargo && cargo.toLowerCase() !== 'todos') {
-        filtros.cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inválido para filtro.')
+        filtros.cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inv├ílido para filtro.')
       }
 
       const tipoExecucaoFiltro = trim(params.tipoExecucao ?? '')
@@ -2856,7 +2950,7 @@ export const api = {
         filtros.tipoExecucaoId = await resolveReferenceId(
           'tipo_execucao',
           tipoExecucaoFiltro.toUpperCase(),
-          'Tipo de execução inválido para filtro.'
+          'Tipo de execu├º├úo inv├ílido para filtro.'
         )
       }
 
@@ -2920,6 +3014,24 @@ export const api = {
         'Falha ao listar pessoas pelos ids informados.'
       )
       return (data ?? []).map(mapPessoaRecord)
+    },
+    async search(params = {}) {
+      const termo = trim(params.termo ?? params.q ?? params.query ?? '')
+      const limit = Number(params.limit ?? 10) || 10
+      if (!termo) {
+        return []
+      }
+      const like = `%${termo}%`
+      try {
+        const query = applyPessoaSearchFilters(buildPessoasViewQuery().order('nome'), like).limit(limit)
+        const data = await execute(query, 'Falha ao buscar pessoas.')
+        return (data ?? []).map(mapPessoaRecord)
+      } catch (error) {
+        console.warn('Busca remota de pessoas falhou, tentando fallback local.', error)
+        const todos = await execute(buildPessoasViewQuery().order('nome'), 'Falha ao listar pessoas.')
+        const lista = (todos ?? []).map(mapPessoaRecord)
+        return lista.filter((pessoa) => pessoaMatchesSearch(pessoa, termo)).slice(0, limit)
+      }
     },
     async resumo() {
       const data = await execute(
@@ -3226,7 +3338,14 @@ export const api = {
     async search(params = {}) {
       const termo = params?.termo ?? params?.q ?? params?.query ?? ''
       const limit = params?.limit ?? 10
-      return buscarMateriaisPorTermo(termo, limit)
+      const source = params?.centroEstoqueId ? ENTRADAS_MATERIAIS_VIEW : undefined
+      return buscarMateriaisPorTermo(termo, limit, { source, centroEstoqueId: params?.centroEstoqueId })
+    },
+    async estoqueAtual(materialId, centroEstoqueId = null) {
+      if (!materialId) {
+        throw new Error('Material invalido.')
+      }
+      return calcularSaldoMaterialAtual(materialId, centroEstoqueId)
     },
     async create(payload) {
       const dados = sanitizeMaterialPayload(payload)
@@ -3326,7 +3445,7 @@ export const api = {
     },
     async update(id, payload) {
       if (!id) {
-        throw new Error('Material inválido.')
+        throw new Error('Material inv├ílido.')
       }
       const atualLista = await execute(
         supabase
@@ -3381,7 +3500,7 @@ export const api = {
               historicoErro
             )
           } else {
-            throw mapSupabaseError(historicoErro, 'Falha ao registrar histórico do material.')
+            throw mapSupabaseError(historicoErro, 'Falha ao registrar hist├│rico do material.')
           }
         }
       }
@@ -3468,7 +3587,7 @@ export const api = {
           .select('*')
           .eq('materialId', id)
           .order('criadoEm', { ascending: false }),
-        'Falha ao obter histórico de preços.'
+        'Falha ao obter hist├│rico de pre├ºos.'
       )
       return (data ?? []).map((registro) => ({
         id: registro.id,
@@ -3533,7 +3652,7 @@ export const api = {
           .from('medidas_calcado')
           .select('id, numero_calcado')
           .order('numero_calcado', { ascending: true }),
-        'Falha ao listar medidas de calçado.',
+        'Falha ao listar medidas de cal├ºado.',
       )
       return (data ?? [])
         .map((item) => {
@@ -3690,6 +3809,7 @@ export const api = {
       const pessoaId = trim(payload.pessoaId)
       const materialId = trim(payload.materialId)
       const quantidade = toNumber(payload.quantidade, null)
+      const centroEstoqueIdInput = trim(payload.centroEstoqueId ?? payload.centroEstoque ?? '')
       const centroCustoIdInput = trim(payload.centroCustoId)
       const centroServicoIdInput = trim(payload.centroServicoId)
       const dataEntregaRaw = trim(payload.dataEntrega)
@@ -3713,11 +3833,15 @@ export const api = {
 
       const centroCustoIdFinal = centroCustoIdInput || pessoa?.centro_custo_id || null
       const centroServicoIdFinal = centroServicoIdInput || pessoa?.centro_servico_id || null
+      const centroEstoqueIdFinal = centroEstoqueIdInput || centroCustoIdFinal || null
+      if (!centroEstoqueIdFinal) {
+        throw new Error('Centro de estoque invalido.')
+      }
       if (!centroCustoIdFinal) {
-        throw new Error('Centro de custo inválido.')
+        throw new Error('Centro de custo invalido.')
       }
       if (!centroServicoIdFinal) {
-        throw new Error('Centro de serviço inválido.')
+        throw new Error('Centro de servico invalido.')
       }
 
       const material = await executeSingle(
@@ -3725,9 +3849,9 @@ export const api = {
         'Falha ao obter material.'
       )
 
-      const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId)
+      const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId, centroEstoqueIdFinal)
       if (quantidade > estoqueDisponivel) {
-        const error = new Error('Quantidade informada maior que o estoque disponível.')
+        const error = new Error('Quantidade informada maior que o estoque dispon├¡vel.')
         error.status = 400
         throw error
       }
@@ -3741,6 +3865,7 @@ export const api = {
             pessoaId,
             materialId,
             quantidade,
+            centro_estoque: centroEstoqueIdFinal,
             centro_custo: centroCustoIdFinal,
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
@@ -3771,6 +3896,7 @@ export const api = {
       const pessoaId = trim(payload.pessoaId ?? saidaAtual.pessoaId)
       const materialId = trim(payload.materialId ?? saidaAtual.materialId)
       const quantidade = toNumber(payload.quantidade, null)
+      const centroEstoqueEntrada = trim(payload.centroEstoqueId ?? payload.centroEstoque ?? '')
       const dataEntregaEntrada = trim(payload.dataEntrega ?? '')
       if (!pessoaId || !materialId || !quantidade || quantidade <= 0) {
         throw new Error('Preencha pessoa, material e quantidade (>0).')
@@ -3779,7 +3905,10 @@ export const api = {
         throw new Error('Informe a data de entrega.')
       }
       const dataEntregaDate = dataEntregaEntrada
-        ? buildDateWithCurrentTime(dataEntregaEntrada)
+        ? mergeDateWithExistingTime(
+            dataEntregaEntrada,
+            saidaAtual.dataEntrega ? new Date(saidaAtual.dataEntrega) : null
+          )
         : saidaAtual.dataEntrega
         ? new Date(saidaAtual.dataEntrega)
         : null
@@ -3789,6 +3918,7 @@ export const api = {
 
       let centroCustoIdFinal = trim(payload.centroCustoId ?? '') || saidaAtual.centroCustoId || null
       let centroServicoIdFinal = trim(payload.centroServicoId ?? '') || saidaAtual.centroServicoId || null
+      let centroEstoqueIdFinal = centroEstoqueEntrada || saidaAtual.centroEstoqueId || null
       if (!centroCustoIdFinal || !centroServicoIdFinal || pessoaId !== saidaAtual.pessoaId) {
         const pessoa = await executeSingle(
           supabase.from('pessoas').select('centro_servico_id, centro_custo_id').eq('id', pessoaId),
@@ -3797,11 +3927,17 @@ export const api = {
         centroCustoIdFinal = centroCustoIdFinal || pessoa?.centro_custo_id || null
         centroServicoIdFinal = centroServicoIdFinal || pessoa?.centro_servico_id || null
       }
+      if (!centroEstoqueIdFinal) {
+        centroEstoqueIdFinal = centroCustoIdFinal || null
+      }
+      if (!centroEstoqueIdFinal) {
+        throw new Error('Centro de estoque invalido.')
+      }
       if (!centroCustoIdFinal) {
-        throw new Error('Centro de custo inválido.')
+        throw new Error('Centro de custo invalido.')
       }
       if (!centroServicoIdFinal) {
-        throw new Error('Centro de serviço inválido.')
+        throw new Error('Centro de servico invalido.')
       }
 
       const material = await executeSingle(
@@ -3809,12 +3945,12 @@ export const api = {
         'Falha ao obter material.'
       )
 
-      const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId)
+      const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId, centroEstoqueIdFinal)
       const quantidadeAnterior = toNumber(saidaAtual.quantidade, 0)
       const estoqueConsiderado =
         materialId === saidaAtual.materialId ? estoqueDisponivel + quantidadeAnterior : estoqueDisponivel
       if (quantidade > estoqueConsiderado) {
-        const error = new Error('Quantidade informada maior que o estoque disponível.')
+        const error = new Error('Quantidade informada maior que o estoque dispon├¡vel.')
         error.status = 400
         throw error
       }
@@ -3833,6 +3969,7 @@ export const api = {
             pessoaId,
             materialId,
             quantidade,
+            centro_estoque: centroEstoqueIdFinal,
             centro_custo: centroCustoIdFinal,
             centro_servico: centroServicoIdFinal,
             dataEntrega: dataEntregaIso,
@@ -3925,6 +4062,19 @@ export const api = {
       const pessoasDetalhes = pessoaIds.length ? await carregarPessoasViewDetalhes(pessoaIds) : new Map()
       const pessoas = Array.from(pessoasDetalhes.values())
       return montarDashboard({ materiais, entradas, saidas, pessoas }, periodo)
+    },
+  },
+  statusSaida: {
+    async list() {
+      const data = await execute(
+        supabase.from('status_saida').select('id, status').eq('ativo', true).order('status', { ascending: true }),
+        'Falha ao listar status de saida.'
+      )
+      return (data ?? []).map((item) => ({
+        id: item.id,
+        status: item.status,
+        nome: item.status,
+      }))
     },
   },
   acidentes: {
@@ -4323,7 +4473,7 @@ export const api = {
       if (historicoRegistro) {
         await execute(
           supabase.from('acidente_historico').insert(historicoRegistro),
-          'Falha ao registrar histórico do acidente.'
+          'Falha ao registrar hist├│rico do acidente.'
         )
       }
       return mapAcidenteRecord(registro)

@@ -31,6 +31,8 @@ export const MATERIAIS_FILTER_DEFAULT = {
   fabricante: '',
   caracteristica: '',
   cor: '',
+  valorMin: '',
+  valorMax: '',
 }
 
 // Estado padrão do modal de histórico de movimentações

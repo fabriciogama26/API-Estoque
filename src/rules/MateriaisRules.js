@@ -356,6 +356,8 @@ const matchesFilter = (filterValue, ...candidates) => {
 
 export function filterMateriais(materiais, filters) {
   const termo = normalizeSearchValue(filters.termo)
+  const minValor = Number.isFinite(Number(filters.valorMin)) ? Number(filters.valorMin) : null
+  const maxValor = Number.isFinite(Number(filters.valorMax)) ? Number(filters.valorMax) : null
 
   return materiais.filter((material) => {
     if (filters.status === 'ativos' && material.ativo === false) {
@@ -418,6 +420,17 @@ export function filterMateriais(materiais, filters) {
       )
     ) {
       return false
+    }
+
+    if (minValor !== null || maxValor !== null) {
+      const valor = Number(material.valorUnitario)
+      const valido = !Number.isNaN(valor)
+      if (minValor !== null && (!valido || valor < minValor)) {
+        return false
+      }
+      if (maxValor !== null && (!valido || valor > maxValor)) {
+        return false
+      }
     }
 
     if (!termo) {

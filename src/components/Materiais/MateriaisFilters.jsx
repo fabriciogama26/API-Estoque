@@ -78,6 +78,30 @@ export function MateriaisFilters({
           <option value="inativos">Inativos</option>
         </select>
       </label>
+      <label className="field">
+        <span>Valor unitário (mín.)</span>
+        <input
+          type="number"
+          name="valorMin"
+          min="0"
+          step="0.01"
+          value={filters.valorMin}
+          onChange={onChange}
+          placeholder="Ex.: 10"
+        />
+      </label>
+      <label className="field">
+        <span>Valor unitário (máx.)</span>
+        <input
+          type="number"
+          name="valorMax"
+          min="0"
+          step="0.01"
+          value={filters.valorMax}
+          onChange={onChange}
+          placeholder="Ex.: 100"
+        />
+      </label>
       <div className="form__actions">
         <button type="submit" className="button button--ghost">Aplicar</button>
         <button type="button" className="button button--ghost" onClick={onClear}>
