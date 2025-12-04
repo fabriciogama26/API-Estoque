@@ -1,71 +1,57 @@
-Tela: Saidas de Materiais
+Tela: Saídas de Materiais
 
-Visao geral
+Visão geral
 
-Registrar, editar, consultar e cancelar saídas de EPI/materiais. Filtros por periodo, centro de servico, categoria, termo livre. Caminhos suportados: /saidas e /movimentacoes/saidas.
+Registrar, editar, consultar e cancelar saídas de EPI/materiais. Filtros por período, centros (estoque/custo/serviço), status e termo livre. Caminhos suportados: /saidas e /movimentacoes/saidas.
 
 Arquitetura (modular)
 
-- Hook useSaidasController + context (quando aplicado) para formulario, filtros, tabela e paginacao.
-- Servico: saidasService (listar/criar/atualizar/cancelar) com dataMode remoto/local.
-- Utils: saidasUtils para formatar e filtrar registros.
+- Hook useSaidasController + context para formulário, filtros, tabela, histórico e cancelamento.
+- Serviço: saidasService (listar/criar/atualizar/cancelar) com dataMode remoto/local.
+- Utils: saidasUtils para formatar/filtrar registros; rules para payloads/validações.
 - Erros: useErrorLogger('saidas') registra falhas em app_errors.
 
 Fluxos principais
 
-- Formulario: material, centro de servico, quantidade, valor, destino/pessoa e observacao; salvar ou editar; cancelar saida destaca botao em vermelho.
-- Filtros: periodo, centro de servico, categoria, termo livre; limpar restaura defaults.
-- Tabela: paginacao local; historico de alteracoes exibido quando fornecido pelo backend.
+- Formulário: pessoa, centro de estoque (filtra materiais), material, quantidade, datas; centros de custo/serviço preenchidos pela pessoa; cancelar saída com motivo obrigatório (modal).
+- Filtros: período, centros (estoque/serviço), status dinâmico, termo livre; limpar restaura defaults.
+- Tabela: colunas Pessoa, Material, Quantidade, Data entrega, Status, Registrado por, Cadastrado em; ações Ver (detalhes), Editar, Histórico, Cancelar.
+- Detalhes: modal em cartões (padrão acidentes) mostrando todos os campos e centros.
+- Histórico: modal no padrão “Histórico do acidente”, exibindo alterações campo a campo.
 
-Boas praticas
+Boas práticas
 
-- Evitar recarga quando filtros nao mudam; manter botoes sem flicker e loaders dentro dos blocos.
-- Exibir acao "Cancelar saida" com cor de atencao (vermelho) para evitar confusao.
+- Evitar recarga quando filtros não mudam; loaders locais.
+- Exibir ação "Cancelar saída" com cor de atenção e exigir motivo.
 
-Atualizacao 2025-12
+Atualização 2025-12
 
-- Tela modularizada com hooks/services/utils; logging de erros ativo; caminhos alternativos aceitos sem quebrar roteamento.
+- Tela modularizada com hooks/services/utils; detalhes e histórico padronizados; status dinâmico; logging ativo.
 
 ===========================================
-Mapa de Codigo (funcoes, hooks e constantes)
+Mapa de Código (funções, hooks e constantes)
 ===========================================
 
-Funcoes principais
+Funções principais
 ------------------
-- SaidasPage
-  - Tipo: componente de pagina React
-  - Caminho: src/pages/SaidasPage.jsx
-  - Responsavel por: orquestrar formulario, filtros, tabela e historico/cancelamento via controller/contexto.
-- useSaidasController
-  - Tipo: hook/controller
-  - Caminho: src/hooks/useSaidasController.js
-  - Responsavel por: estado do form, filtros, tabela, paginacao, submit/editar/cancelar saida.
-- SaidasContext (quando usado)
-  - Tipo: contexto
-  - Caminho: src/context/SaidasContext.jsx
-  - Responsavel por: compartilhar estado/handlers do controller com componentes de UI.
-- Componentes de UI (form, filtros, tabela, modal)
-  - Tipo: componentes React
-  - Caminho: src/components/Saidas/*
-  - Responsavel por: UI de filtros, formulario, tabela e historico/cancelamento consumindo o controller.
+- SaidasPage — componente de página (src/pages/SaidasPage.jsx); orquestra formulário, filtros, tabela, detalhes, histórico e cancelamento via controller/contexto.
+- useSaidasController — hook/controller (src/hooks/useSaidasController.js); estado do form, filtros, tabela, paginação, submit/editar/cancelar.
+- SaidasContext — contexto (src/context/SaidasContext.jsx); compartilha estado/handlers do controller.
+- Componentes de UI — (src/components/Saidas/*) filtros, formulário, tabela, histórico e modal de cancelamento.
 
-Constantes e configuracoes
+Constantes e configurações
 --------------------------
-- Defaults de formulario/filtro/historico
-  - Tipo: configuracoes
-  - Caminho: src/config/SaidasConfig.js (ou constantes no controller)
-  - Uso: estados iniciais do form, filtros e modal de historico/cancelamento.
+- Defaults de formulário/filtro/histórico — src/config/SaidasConfig.js (ou constantes no controller); estados iniciais do form, filtros e modais.
 
-Funcoes utilitarias relacionadas
+Funções utilitárias relacionadas
 --------------------------------
-- filterSaidas, montagem de payloads, formatadores
-  - Tipo: utilitarios/regras
-  - Caminho: src/utils/saidasUtils.js e src/rules/SaidasRules.js (quando presentes)
-  - Responsavel por: filtrar lista, formatar valores/datas e montar payloads para salvar/editar/cancelar.
+- filterSaidas, payloads, formatadores — src/utils/saidasUtils.js e src/rules/SaidasRules.js; filtrar lista, formatar valores/datas, montar payloads de salvar/editar/cancelar.
 
-Servicos e integracoes externas
+Serviços e integrações externas
 -------------------------------
-- saidasService
-  - Tipo: servico de API
-  - Caminho: src/services/saidasService.js
-  - Responsavel por: listar/criar/atualizar/cancelar saidas (Supabase ou modo local via dataClient).
+- saidasService — serviço de API (src/services/saidasService.js); listar/criar/atualizar/cancelar saídas (Supabase ou dataClient local).
+
+Ajuda contextual
+----------------
+- Botão 'Ajuda' no cabeçalho abre modal com passos/notas desta página.
+- Conteúdo em src/help/helpContent.json (chave 'saidas'); edite títulos/steps/notes e mídias (/public/help/saidas/*).

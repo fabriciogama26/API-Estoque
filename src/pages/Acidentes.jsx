@@ -14,6 +14,7 @@ import { usePartes } from '../hooks/usePartes.js'
 import { useAcidenteForm } from '../hooks/useAcidenteForm.js'
 import { AcidentesProvider, useAcidentesContext } from '../context/AcidentesContext.jsx'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 
 import '../styles/AcidentesPage.css'
 
@@ -125,6 +126,7 @@ function AcidentesPageContent() {
         icon={<AlertIcon size={28} />}
         title="Acidentes"
         subtitle="Registre acidentes de trabalho, filtre e acompanhe os indicadores."
+        actions={<HelpButton topic="acidentes" />}
       />
 
       <AcidentesForm

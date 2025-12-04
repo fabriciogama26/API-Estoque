@@ -6,6 +6,7 @@ import { PessoasTable } from '../components/Pessoas/PessoasTable.jsx'
 import { PessoasHistoryModal } from '../components/Pessoas/PessoasHistoryModal.jsx'
 import { PessoasResumoCards } from '../components/PessoasResumoCards.jsx'
 import { PessoasProvider, usePessoasContext } from '../context/PessoasContext.jsx'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 
 import '../styles/PessoasPage.css'
 
@@ -45,6 +46,7 @@ function PessoasContent() {
         icon={<PeopleIcon size={28} />}
         title="Pessoas"
         subtitle="Registre e atualize colaboradores com historico de edicoes."
+        actions={<HelpButton topic="pessoas" />}
       />
 
       <PessoasForm

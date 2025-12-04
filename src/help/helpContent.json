@@ -1,0 +1,302 @@
+{
+  "dashboard": {
+    "title": "Dashboard de estoque",
+    "summary": "Use esta tela para ver rapidamente movimentacao, valores e alertas de estoque.",
+    "steps": [
+      {
+        "title": "Aplicar filtros rapidos",
+        "description": "Defina periodo inicial/final ou um termo de busca e clique em Aplicar filtros para recalcular todos os graficos. Use Limpar filtros para voltar ao panorama completo.",
+        "mediaHint": "Area de filtros no topo com periodo e campo de busca."
+      },
+      {
+        "title": "Ler os cards de destaque",
+        "description": "Os cards mostram totais consolidados (movimentado, saldo e alertas). Passe o mouse no icone (i) para entender como cada indicador e calculado.",
+        "mediaHint": "Cards de resumo com valores e icones."
+      },
+      {
+        "title": "Interagir com os graficos",
+        "description": "Clique em uma barra ou fatia para filtrar o restante dos graficos pelo mesmo termo. Use o chip Limpar que aparece acima do grafico para remover o filtro.",
+        "mediaHint": "Grafico com tooltip e chip de filtro ativo."
+      },
+      {
+        "title": "Expandir graficos",
+        "description": "Para analisar um grafico com mais espaco, clique no botao de expandir (canto superior direito do card). Feche clicando fora ou no icone de fechar.",
+        "mediaHint": "Botao de expandir no cabecalho do card."
+      }
+    ],
+    "notes": [
+      "Os graficos respeitam os filtros aplicados; se algo parecer zerado, confirme o periodo.",
+      "O filtro por termo aceita trechos de nome de material, grupo ou pessoa."
+    ]
+  },
+  "dashboardAcidentes": {
+    "title": "Dashboard de acidentes",
+    "summary": "Monitore tendencia, tipos de acidente e distribuicoes para SST.",
+    "steps": [
+      {
+        "title": "Definir filtros iniciais",
+        "description": "Escolha periodo, unidade/centro de servico e demais filtros no bloco superior. Clique em Aplicar para recalcular os indicadores.",
+        "mediaHint": "Filtros do dashboard de acidentes."
+      },
+      {
+        "title": "Conferir indicadores chave",
+        "description": "Os cards exibem totais, taxas e comparativos. Use o texto de ajuda abaixo dos cards para saber como foi calculado.",
+        "mediaHint": "Cards de KPI da tela de acidentes."
+      },
+      {
+        "title": "Ler graficos com tooltips",
+        "description": "Use os botoes (i) nos titulos para ver o que cada grafico representa. Passe o mouse nos pontos/segmentos para ver valores detalhados.",
+        "mediaHint": "Grafico com tooltip e icone de info."
+      },
+      {
+        "title": "Abrir em tela cheia",
+        "description": "Clique no botao de expandir do grafico desejado. A visualizacao modal permite enxergar mais pontos sem poluicao visual.",
+        "mediaHint": "Modal de grafico expandido."
+      }
+    ],
+    "notes": [
+      "Filtros sao persistidos enquanto voce navega pelo dashboard.",
+      "Se nenhum dado aparecer, valide se o periodo contem registros de acidentes."
+    ]
+  },
+  "estoque": {
+    "title": "Estoque atual",
+    "summary": "Consulta do saldo por material, alertas de minimo e resumo financeiro.",
+    "steps": [
+      {
+        "title": "Filtrar materiais",
+        "description": "Use o formulario de filtros para buscar por nome, centro de estoque ou faixas de estoque. Clique em Aplicar ou Limpar para atualizar a lista.",
+        "mediaHint": "Filtros de estoque e botoes Aplicar/Limpar."
+      },
+      {
+        "title": "Monitorar alertas",
+        "description": "O bloco \"Alertas de estoque\" mostra itens abaixo do minimo. Ajuste o minimo diretamente na tabela se precisar recalibrar.",
+        "mediaHint": "Tabela de alertas com status vermelho/alarme."
+      },
+      {
+        "title": "Editar minimo na tabela",
+        "description": "Na lista principal, altere o valor de estoque minimo no campo inline e clique em salvar ao lado para registrar a nova meta.",
+        "mediaHint": "Campo editavel de minimo de estoque."
+      },
+      {
+        "title": "Usar paginacao",
+        "description": "Navegue pelas paginas no rodape da lista para ver mais itens. O total considera os filtros aplicados.",
+        "mediaHint": "Controles de pagina na parte inferior da lista."
+      }
+    ],
+    "notes": [
+      "O resumo financeiro abaixo dos alertas usa o valor unitario cadastrado no material.",
+      "Se um item nao mostrar centro de custo, revise o cadastro do material."
+    ]
+  },
+  "entradas": {
+    "title": "Entradas de estoque",
+    "summary": "Registro de novas entradas e consulta historica.",
+    "steps": [
+      {
+        "title": "Registrar nova entrada",
+        "description": "Busque o material pelo nome/ID, informe quantidade, centro de estoque e data. Clique em Registrar entrada ou Salvar alteracoes quando estiver editando.",
+        "mediaHint": "Formulario de cadastro de entradas com autocomplete."
+      },
+      {
+        "title": "Aplicar filtros do historico",
+        "description": "Filtre por usuario, centro de estoque ou periodo para listar somente as entradas relevantes. Use Limpar para remover todos os filtros.",
+        "mediaHint": "Filtros rapidos do historico de entradas."
+      },
+      {
+        "title": "Editar ou ver historico",
+        "description": "Na tabela, use o icone de lapis para editar e o relogio para abrir o historico daquela entrada.",
+        "mediaHint": "Acoes de edicao e historico na tabela."
+      },
+      {
+        "title": "Atualizar dados",
+        "description": "Clique em Atualizar no cabecalho da lista para recarregar dados e sugestoes de materiais.",
+        "mediaHint": "Botao Atualizar no topo da secao de historico."
+      }
+    ],
+    "notes": [
+      "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descricao.",
+      "Se nao houver centros de estoque configurados, o campo vira texto livre para nao travar o registro."
+    ]
+  },
+  "saidas": {
+    "title": "Saidas de estoque",
+    "summary": "Entrega de EPIs para pessoas, com rastreabilidade e cancelamento.",
+    "steps": [
+      {
+        "title": "Registrar saida",
+        "description": "Selecione a pessoa e o material pelo autocomplete, informe quantidade, centro de estoque e data. Salve para registrar a entrega.",
+        "mediaHint": "Formulario de cadastro de saidas com busca de pessoa e material."
+      },
+      {
+        "title": "Conferir saldo disponivel",
+        "description": "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberacoes acima do estoque.",
+        "mediaHint": "Bloco de saldo do material ao lado do formulario."
+      },
+      {
+        "title": "Editar ou cancelar",
+        "description": "Use o icone de lapis para editar registros recentes. O botao Cancelar abre um modal para registrar o motivo e bloquear a entrega.",
+        "mediaHint": "Acoes de edicao e cancelamento na tabela de saidas."
+      },
+      {
+        "title": "Filtrar e paginar",
+        "description": "Use filtros por pessoa, material, centro e status para encontrar uma saida especifica. Navegue pelas paginas no rodape.",
+        "mediaHint": "Filtros superiores e paginacao inferior do historico."
+      }
+    ],
+    "notes": [
+      "Saidas canceladas ficam marcadas e nao impactam o saldo.",
+      "O historico detalha quem registrou e quando a entrega foi alterada."
+    ]
+  },
+  "materiais": {
+    "title": "Cadastro de materiais / EPI",
+    "summary": "Cadastro centralizado de EPI com variacoes, caracteristicas e valor.",
+    "steps": [
+      {
+        "title": "Cadastrar ou editar material",
+        "description": "Preencha nome, grupo, valor unitario e CA (quando houver). Use o botao Salvar para novo cadastro ou para gravar alteracoes.",
+        "mediaHint": "Formulario principal de materiais."
+      },
+      {
+        "title": "Gerenciar variacoes e atributos",
+        "description": "Adicione caracteristicas, cores, fabricante e tamanho pelo autocomplete. Campos de lista aceitam multiplos itens.",
+        "mediaHint": "Campos de caracteristica, cor e tamanho."
+      },
+      {
+        "title": "Filtrar catalogo",
+        "description": "Filtre por grupo, tamanho, fabricante ou caracteristica para localizar itens cadastrados. Clique em Limpar para remover filtros.",
+        "mediaHint": "Bloco de filtros acima da tabela de materiais."
+      },
+      {
+        "title": "Historico e detalhes",
+        "description": "Na tabela use o relogio para ver historico de alteracoes e o olho para abrir o detalhamento completo do material.",
+        "mediaHint": "Acoes de historico e detalhes na tabela de materiais."
+      }
+    ],
+    "notes": [
+      "A edicao de um material reaproveita o mesmo formulario, mantendo os campos preenchidos.",
+      "Valor unitario e usado nos calculos de estoque e relatorios."
+    ]
+  },
+  "pessoas": {
+    "title": "Cadastro de pessoas",
+    "summary": "Registro de colaboradores com historico de edicoes e filtros.",
+    "steps": [
+      {
+        "title": "Cadastrar ou atualizar colaborador",
+        "description": "Informe nome, documento, centro de servico e cargo. Use Salvar para novo registro ou para concluir uma edicao.",
+        "mediaHint": "Formulario principal de pessoas."
+      },
+      {
+        "title": "Filtrar lista",
+        "description": "Busque por termo, centro de servico ou setor para limitar a tabela. O botao Limpar remove todos os filtros.",
+        "mediaHint": "Filtros e chips acima da tabela de pessoas."
+      },
+      {
+        "title": "Ler resumo rapido",
+        "description": "Os cards de resumo mostram quantidade por centro e setores mais frequentes conforme o filtro aplicado.",
+        "mediaHint": "Cards de resumo logo apos os filtros."
+      },
+      {
+        "title": "Ver historico de alteracoes",
+        "description": "Na tabela, clique em Historico para ver quem alterou dados do colaborador e quando.",
+        "mediaHint": "Modal de historico de pessoas."
+      }
+    ],
+    "notes": [
+      "O formulario permanece preenchido ao iniciar uma edicao para evitar retrabalho.",
+      "Use o botao Atualizar na tabela para forcar recarga de dados do servidor."
+    ]
+  },
+  "acidentes": {
+    "title": "Registro de acidentes",
+    "summary": "Cadastro completo de acidentes com filtros, historico e detalhes.",
+    "steps": [
+      {
+        "title": "Preencher dados do acidente",
+        "description": "Selecione colaborador, tipo de acidente, lesao e parte afetada. Campos obrigatorios estao marcados com *. Use Salvar para gravar.",
+        "mediaHint": "Formulario de cadastro de acidentes."
+      },
+      {
+        "title": "Relacionar local e agente",
+        "description": "Use os campos de local, centro de servico e agente causador para enriquecer indicadores de SST.",
+        "mediaHint": "Secao de local/agente dentro do formulario."
+      },
+      {
+        "title": "Filtrar registros",
+        "description": "Filtre por tipo, centro de servico ou agente para reduzir a tabela. Limpar remove todos os filtros aplicados.",
+        "mediaHint": "Bloco de filtros acima da lista de acidentes."
+      },
+      {
+        "title": "Consultar historico e detalhes",
+        "description": "Clique no relogio para ver historico de alteracoes ou no icone de visualizar para abrir os detalhes completos do acidente.",
+        "mediaHint": "Modal de detalhes do acidente."
+      }
+    ],
+    "notes": [
+      "Ao salvar um acidente, a lista e recarregada automaticamente.",
+      "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integracoes de cadastro base."
+    ]
+  },
+  "termoEpi": {
+    "title": "Termo de EPI",
+    "summary": "Gere e baixe o termo de responsabilidade de EPI para colaboradores.",
+    "steps": [
+      {
+        "title": "Preencher filtros de busca",
+        "description": "Informe matricula, nome ou um intervalo de datas de entrega. Nao e necessario preencher todos os campos.",
+        "mediaHint": "Formulario de filtros do termo."
+      },
+      {
+        "title": "Gerar documento",
+        "description": "Clique em Gerar termo para montar a pre-visualizacao. Use Limpar para reiniciar os campos.",
+        "mediaHint": "Botoes Gerar termo e Limpar."
+      },
+      {
+        "title": "Analise a pre-visualizacao",
+        "description": "Revise os dados do colaborador e dos itens entregues no iframe exibido. O badge indica se o documento veio do cache local ou do servidor.",
+        "mediaHint": "Iframe de pre-visualizacao do termo."
+      },
+      {
+        "title": "Baixar PDF",
+        "description": "Com a pre-visualizacao carregada, clique em Baixar PDF no cabecalho da secao para salvar o arquivo.",
+        "mediaHint": "Botao Baixar PDF acima do iframe."
+      }
+    ],
+    "notes": [
+      "Se nenhum HTML for retornado, revise os filtros ou gere novas entregas antes.",
+      "O download so habilita depois que o HTML estiver carregado."
+    ]
+  },
+  "configuracoes": {
+    "title": "Configuracoes da conta",
+    "summary": "Troca de senha e ajustes pessoais do usuario logado.",
+    "steps": [
+      {
+        "title": "Preencher dados",
+        "description": "Informe a senha atual e defina a nova senha com confirmacao. Todos os campos sao obrigatorios.",
+        "mediaHint": "Formulario de troca de senha."
+      },
+      {
+        "title": "Validar requisitos",
+        "description": "A nova senha precisa ter pelo menos 8 caracteres e combinar com o campo de confirmacao.",
+        "mediaHint": "Mensagem de feedback abaixo do formulario."
+      },
+      {
+        "title": "Salvar",
+        "description": "Clique em Salvar senha. A aplicacao reautentica com a senha atual para garantir seguranca.",
+        "mediaHint": "Botao Salvar e indicador de carregamento."
+      },
+      {
+        "title": "Resolver erros",
+        "description": "Mensagens em vermelho indicam erros de validacao ou falha na comunicacao com Supabase. Ajuste e tente novamente.",
+        "mediaHint": "Feedback de erro abaixo dos campos."
+      }
+    ],
+    "notes": [
+      "E preciso estar logado para trocar senha.",
+      "Nenhuma outra configuracao e alterada nesta tela; o foco e apenas credencial."
+    ]
+  }
+}

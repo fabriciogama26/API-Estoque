@@ -1,76 +1,59 @@
 Tela: Cadastro de Materiais (EPI)
 
-Visao geral
+Visão geral
 
-Cadastro e manutencao de materiais/EPI com fabricantes, grupos, cores, caracteristicas e historico de precos. Suporta modo Supabase e local.
+Cadastro e manutenção de materiais/EPI com fabricantes, grupos, cores, características, histórico de preços e histórico de edições. Suporta modo Supabase e local.
 
 Arquitetura (modular)
 
-- Hooks: useMateriaisController (formulario, filtros, tabela, paginacao), useMateriais (lista), useFabricantes/grupos/etc para catalogos.
-- Servicos: materiaisService (listar/criar/atualizar/historico), MaterialService (backend legacy), integra dataMode remoto/local.
-- Utils: MateriaisUtils (formatacao, parse de currency, sanitizacao), duplicidade com hashes na migration dedicada.
+- Hooks: useMateriaisController (form, filtros, lista, paginação, histórico), catálogos (grupos/itens/fabricantes/cores/características/medidas).
+- Serviços: materiaisService (listar/criar/atualizar, detalhes completos, histórico de preço), dataMode remoto/local.
+- Utils: MateriaisUtils (formatação/moeda, normalização de selects), selectionUtils; regras em MateriaisRules (payloads, validações, filtro).
 - Erros: useErrorLogger('materiais') envia falhas para app_errors.
 
 Fluxos principais
 
-- Formulario: dados basicos (nome/item, fabricante, grupo, numero especifico), medidas (calcado/vestimenta), CA, validade, valor unitario, estoque minimo, ativo.
-- Historico de preco: tabela/mensagem ao salvar com diffs (updateHistory) e timeline.
-- Filtros: termo livre, grupo, fabricante, ativo; limpar restaura defaults; paginacao local.
-- Acoes: editar, historico, ativar/desativar material; duplicidade prevenida por hash_base/hash_completo (fabricante+grupo+item+numeroEspecifico+caracteristicas).
+- Formulário: dados básicos (item/grupo/fabricante), medidas (calçado/vestimenta), CA, validade, valor unitário, estoque mínimo, ativo; prevenção de duplicidade via gatilho.
+- Lista: colunas Grupo, Material, Descrição, Valor unitário, Validade (dias), Fabricante, Registrado por, Cadastrado em; ações Ver (detalhes em cartões), Editar, Histórico.
+- Filtros: termo livre, grupo, tamanho/número, fabricante, características, cores, status e intervalo de valor unitário (mín/máx); limpar restaura defaults.
+- Detalhes: modal em cartões (padrão acidentes) com todos os campos, buscando o material completo por id.
+- Histórico: modal no padrão “Histórico do acidente”, exibindo edições campo a campo (usuário/data).
 
-Boas praticas
+Boas práticas
 
-- Sempre usar parse/format de currency via utils; validar campos numericos antes do submit.
-- Respeitar mensagens de duplicidade do gatilho; corrigir catalogos antes de forcar insert.
+- Sempre usar formatadores de moeda (MateriaisUtils); validar números antes do submit.
+- Priorizar consultas com projeção mínima na lista e buscar detalhes completos sob demanda.
+- Respeitar mensagens de duplicidade do gatilho; ajustar catálogos antes de forçar inserts.
 
-Atualizacao 2025-12
+Atualização 2025-12
 
-- Tela modularizada com hooks/services/utils; imports corrigidos (MateriaisUtils case-sensitive); logging de erros ativo.
+- Lista reordenada, filtro de valor unitário adicionado, detalhes/histórico padronizados, datas de cadastro mapeadas, botão de olho para detalhes.
 
 ===========================================
-Mapa de Codigo (funcoes, hooks e constantes)
+Mapa de Código (funções, hooks e constantes)
 ===========================================
 
-Funcoes principais
+Funções principais
 ------------------
-- MateriaisPage
-  - Tipo: componente de pagina React
-  - Caminho: src/pages/Materiais.jsx
-  - Responsavel por: orquestrar formulario, filtros, tabela e historico via MateriaisProvider.
-- useMateriaisController
-  - Tipo: hook/controller
-  - Caminho: src/hooks/useMateriaisController.js
-  - Responsavel por: estado do form, filtros, lista, paginacao, historico de preco, submit/editar e carregamento de catalogos.
-- MateriaisProvider / MateriaisContext
-  - Tipo: contexto
-  - Caminho: src/context/MateriaisContext.jsx
-  - Responsavel por: expor dados/handlers do controller para form, filtros, tabela e modal.
-- Componentes MateriaisForm/Filters/Table/HistoryModal
-  - Tipo: componentes de UI
-  - Caminho: src/components/Materiais/*
-  - Responsavel por: UI do cadastro, filtros, tabela e historico usando props do contexto.
+- MateriaisPage — componente de página (src/pages/Materiais.jsx); orquestra formulário, filtros, tabela, detalhes e histórico via MateriaisProvider.
+- useMateriaisController — hook/controller (src/hooks/useMateriaisController.js); estado do form, filtros, lista, histórico de preço, submit/editar, catálogos.
+- MateriaisProvider / MateriaisContext — contexto (src/context/MateriaisContext.jsx); expõe dados/handlers para form/filtros/tabela/modais.
+- Componentes MateriaisForm/Filters/Table/HistoryModal — UI do cadastro, filtros, tabela e históricos.
 
-Constantes e configuracoes
+Constantes e configurações
 --------------------------
-- MATERIAIS_FILTER_DEFAULT, HISTORY_MODAL_DEFAULT, createMateriaisFormDefault
-  - Tipo: configuracoes/initial state
-  - Caminho: src/config/MateriaisConfig.js
-  - Uso: estados iniciais de formulario, filtros e modal de historico.
+- createMateriaisFormDefault, MATERIAIS_FILTER_DEFAULT, HISTORY_MODAL_DEFAULT — src/config/MateriaisConfig.js; estados iniciais de formulário, filtros e modal de histórico.
 
-Funcoes utilitarias relacionadas
+Funções utilitárias relacionadas
 --------------------------------
-- validateMaterialForm, createMaterialPayload, updateMaterialPayload, filterMateriais, parseCaracteristicaEpi, sortMateriaisByNome
-  - Tipo: regras/validacao/filtro
-  - Caminho: src/rules/MateriaisRules.js
-  - Responsavel por: validar obrigatorios, montar payloads, filtrar lista e preparar edicao.
-- formatCurrency, formatCurrencyInput, findOptionByValue, normalizeSelectionList/Item/Key, selectionToArray
-  - Tipo: utilitarios de dados
-  - Caminho: src/utils/MateriaisUtils.js e src/utils/selectionUtils.js
-  - Responsavel por: normalizar selects, formatar valores e chaves para formularios/filtros/historico.
+- validateMaterialForm, create/updateMaterialPayload, filterMateriais (inclui faixa de valor), parseCaracteristicaEpi, sortMateriaisByNome — src/rules/MateriaisRules.js.
+- formatCurrency/formatCurrencyInput, findOptionByValue, normalizeSelectionList/Item/Key, selectionToArray — src/utils/MateriaisUtils.js e src/utils/selectionUtils.js.
 
-Servicos e integracoes externas
+Serviços e integrações externas
 -------------------------------
-- materiaisService
-  - Tipo: servico de API
-  - Caminho: src/services/materiaisService.js
-  - Responsavel por: listar/criar/atualizar materiais, historico de preco, catalogos (grupos, itens, fabricantes, cores, caracteristicas, calcados, tamanhos).
+- materiaisService — serviço de API (src/services/materiaisService.js); listar/criar/atualizar, detalhes completos (get), histórico de preço, catálogos (grupos, itens, fabricantes, cores, características, calçados, tamanhos).
+
+Ajuda contextual
+----------------
+- Botão 'Ajuda' no cabeçalho abre modal com passos/notas desta página.
+- Conteúdo em src/help/helpContent.json (chave 'materiais'); edite títulos/steps/notes e mídias (/public/help/materiais/*).

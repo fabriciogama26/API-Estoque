@@ -6,6 +6,7 @@ import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { SaidasHistoryModal } from '../components/Saidas/SaidasHistoryModal.jsx'
 import { SaidasProvider, useSaidasContext } from '../context/SaidasContext.jsx'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
 
 function SaidasContent() {
@@ -97,6 +98,7 @@ function SaidasContent() {
         icon={<ExitIcon size={28} />}
         title="Saídas"
         subtitle="Registre entregas de EPIs e acompanhe o histórico."
+        actions={<HelpButton topic="saidas" />}
       />
 
       <form className="card form" onSubmit={handleSubmit}>

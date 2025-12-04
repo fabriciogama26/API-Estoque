@@ -11,6 +11,7 @@ import { ChartAgentes } from '../components/charts/ChartAgentes.jsx'
 import { FiltrosDashboard } from '../components/FiltrosDashboard.jsx'
 import { DashboardAcidentesProvider, useDashboardAcidentesContext } from '../context/DashboardAcidentesContext.jsx'
 import { CHART_INFO_MESSAGES } from '../utils/dashboardAcidentesUtils.js'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 
 import '../styles/DashboardPage.css'
 
@@ -94,6 +95,7 @@ function DashboardAcidentesContent() {
         title="Dashboard de Acidentes"
         icon={<AlertIcon size={28} />}
         subtitle="Monitoramento de indicadores de SST com dados consolidados."
+        actions={<HelpButton topic="dashboardAcidentes" />}
       />
 
       <FiltrosDashboard

@@ -2,6 +2,7 @@ import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon } from '../components/icons.jsx'
 import { AutoResizeIframe } from '../components/AutoResizeIframe.jsx'
 import { useTermoEpi } from '../hooks/useTermoEpi.js'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/DocumentPreviewModal.css'
 
 export function TermosEpiPage() {
@@ -24,6 +25,7 @@ export function TermosEpiPage() {
         icon={<ChecklistIcon size={28} />}
         title="Termo de EPI"
         subtitle="Pesquise colaboradores e gere o termo de responsabilidade de EPI."
+        actions={<HelpButton topic="termoEpi" />}
       />
 
       <section className="card">

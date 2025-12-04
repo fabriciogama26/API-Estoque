@@ -5,6 +5,7 @@ import { EstoqueAlerts } from '../components/Estoque/Alerts/EstoqueAlerts.jsx'
 import { EstoqueSummary } from '../components/Estoque/Summary/EstoqueSummary.jsx'
 import { EstoqueList } from '../components/Estoque/List/EstoqueList.jsx'
 import { EstoqueProvider, useEstoqueContext } from '../context/EstoqueContext.jsx'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 
 import '../styles/EstoquePage.css'
 
@@ -54,6 +55,7 @@ function EstoquePageContent() {
         icon={<InventoryIcon size={28} />}
         title="Estoque atual"
         subtitle="Consulte saldo por material, valor total e alertas de estoque minimo."
+        actions={<HelpButton topic="estoque" />}
       />
 
       <EstoqueFilters

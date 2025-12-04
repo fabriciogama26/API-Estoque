@@ -22,6 +22,7 @@ import {
   Plus,
   Info,
   UserCircle,
+  LifeBuoy,
 } from 'lucide-react'
 
 const defaultSize = 18
@@ -53,3 +54,4 @@ export const ExpandIcon = (props) => <Maximize2 {...withDefaultProps(props)} />
 export const AddIcon = (props) => <Plus {...withDefaultProps(props)} />
 export const InfoIcon = (props) => <Info {...withDefaultProps(props)} />
 export const PersonIcon = (props) => <UserCircle {...withDefaultProps(props)} />
+export const HelpIcon = (props) => <LifeBuoy {...withDefaultProps(props)} />
