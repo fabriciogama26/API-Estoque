@@ -1,0 +1,543 @@
+{
+  "titulo": "Guia de agentes de acidente",
+  "resumo": "Use estes exemplos para preencher o campo Agente e o tipo correspondente no cadastro de acidentes.",
+  "agentes": [
+    {
+      "agente": "Agente Quimico",
+      "descricao": "Produtos ou atmosferas com substancias quimicas (solventes, poeiras, gases) que podem gerar queimaduras, corrosao ou intoxicacao.",
+      "tipos": [
+        {
+          "tipo": "Acidos e bases fortes",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        },
+        {
+          "tipo": "Solventes organicos",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        },
+        {
+          "tipo": "Poeiras e fumos quimicos",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        },
+        {
+          "tipo": "Gases toxicos",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        },
+        {
+          "tipo": "Produtos de limpeza agressivos",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        },
+        {
+          "tipo": "Metais pesados",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        },
+        {
+          "tipo": "Pesticidas e agrotoxicos",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        },
+        {
+          "tipo": "Outros agentes quimicos",
+          "lesoes": [
+            "Corrosao tecidual",
+            "Dermatite de contato",
+            "Edema pulmonar quimico",
+            "Intoxicacao aguda",
+            "Intoxicacao cronica",
+            "Irritacao cutanea",
+            "Lesao hepatica",
+            "Lesao ocular quimica",
+            "Lesao renal por exposicao prolongada",
+            "Lesao respiratoria por vapores toxicos",
+            "Necrose",
+            "Queimadura quimica",
+            "Sensibilizacao alergica"
+          ]
+        }
+      ]
+    },
+    {
+      "agente": "Agente Biologico",
+      "descricao": "Exposicao a virus, bacterias, parasitas ou materiais contaminados em atividades de limpeza, laboratorio ou manejo animal.",
+      "tipos": [
+        {
+          "tipo": "Virus, bacterias e parasitas",
+          "lesoes": [
+            "Brucelose",
+            "Leptospirose",
+            "Tuberculose",
+            "Hepatite infecciosa",
+            "Gastroenterite infecciosa",
+            "Meningite",
+            "Dermatites infecciosas",
+            "Doencas respiratorias infecciosas",
+            "Doencas sistemicas por agentes biologicos",
+            "Infeccoes oportunistas"
+          ]
+        },
+        {
+          "tipo": "Materiais biologicos contaminados",
+          "lesoes": [
+            "Brucelose",
+            "Leptospirose",
+            "Tuberculose",
+            "Hepatite infecciosa",
+            "Gastroenterite infecciosa",
+            "Meningite",
+            "Dermatites infecciosas",
+            "Doencas respiratorias infecciosas",
+            "Doencas sistemicas por agentes biologicos",
+            "Infeccoes oportunistas"
+          ]
+        },
+        {
+          "tipo": "Residuos biologicos",
+          "lesoes": [
+            "Brucelose",
+            "Leptospirose",
+            "Tuberculose",
+            "Hepatite infecciosa",
+            "Gastroenterite infecciosa",
+            "Meningite",
+            "Dermatites infecciosas",
+            "Doencas respiratorias infecciosas",
+            "Doencas sistemicas por agentes biologicos",
+            "Infeccoes oportunistas"
+          ]
+        },
+        {
+          "tipo": "Contato com animal infectado",
+          "lesoes": [
+            "Brucelose",
+            "Leptospirose",
+            "Tuberculose",
+            "Hepatite infecciosa",
+            "Gastroenterite infecciosa",
+            "Meningite",
+            "Dermatites infecciosas",
+            "Doencas respiratorias infecciosas",
+            "Doencas sistemicas por agentes biologicos",
+            "Infeccoes oportunistas"
+          ]
+        }
+      ]
+    },
+    {
+      "agente": "Agente Fisico",
+      "descricao": "Riscos de ruido, vibracao, temperaturas extremas, radiacao ou umidade que impactam audicao, pele, respiracao e sistema termico.",
+      "tipos": [
+        {
+          "tipo": "Ruido continuo ou de impacto",
+          "lesoes": [
+            "Queimadura por radiacao",
+            "Lesao por calor",
+            "Choque eletrico",
+            "Lesao por ruido",
+            "Barotrauma",
+            "Estresse termico",
+            "Hipotermia",
+            "Cansaco visual",
+            "Cefaleia por exposicao luminosa intensa",
+            "Disturbios do sono por vibracao ou ruido",
+            "Fadiga por vibracao",
+            "Lesao musculo-esqueletica por vibracao"
+          ]
+        },
+        {
+          "tipo": "Vibracao de maos e bracos",
+          "lesoes": [
+            "Queimadura por radiacao",
+            "Lesao por calor",
+            "Choque eletrico",
+            "Lesao por ruido",
+            "Barotrauma",
+            "Estresse termico",
+            "Hipotermia",
+            "Cansaco visual",
+            "Cefaleia por exposicao luminosa intensa",
+            "Disturbios do sono por vibracao ou ruido",
+            "Fadiga por vibracao",
+            "Lesao musculo-esqueletica por vibracao"
+          ]
+        },
+        {
+          "tipo": "Temperaturas extremas",
+          "lesoes": [
+            "Queimadura por radiacao",
+            "Lesao por calor",
+            "Choque eletrico",
+            "Lesao por ruido",
+            "Barotrauma",
+            "Estresse termico",
+            "Hipotermia",
+            "Cansaco visual",
+            "Cefaleia por exposicao luminosa intensa",
+            "Disturbios do sono por vibracao ou ruido",
+            "Fadiga por vibracao",
+            "Lesao musculo-esqueletica por vibracao"
+          ]
+        },
+        {
+          "tipo": "Radiacao ionizante ou nao ionizante",
+          "lesoes": [
+            "Queimadura por radiacao",
+            "Lesao por calor",
+            "Choque eletrico",
+            "Lesao por ruido",
+            "Barotrauma",
+            "Estresse termico",
+            "Hipotermia",
+            "Cansaco visual",
+            "Cefaleia por exposicao luminosa intensa",
+            "Disturbios do sono por vibracao ou ruido",
+            "Fadiga por vibracao",
+            "Lesao musculo-esqueletica por vibracao"
+          ]
+        },
+        {
+          "tipo": "Umidade excessiva",
+          "lesoes": [
+            "Queimadura por radiacao",
+            "Lesao por calor",
+            "Choque eletrico",
+            "Lesao por ruido",
+            "Barotrauma",
+            "Estresse termico",
+            "Hipotermia",
+            "Cansaco visual",
+            "Cefaleia por exposicao luminosa intensa",
+            "Disturbios do sono por vibracao ou ruido",
+            "Fadiga por vibracao",
+            "Lesao musculo-esqueletica por vibracao"
+          ]
+        }
+      ]
+    },
+    {
+      "agente": "Agente Mecanico / de Acidente",
+      "descricao": "Eventos com maquinas, ferramentas, superficies ou quedas que causam impactos, cortes, esmagamentos ou projecao de objetos.",
+      "tipos": [
+        {
+          "tipo": "Superficies irregulares e escorregadias",
+          "lesoes": [
+            "Escoriacao",
+            "Amputacao parcial ou total",
+            "Queda com impacto corporal",
+            "Contusoes",
+            "Fraturas",
+            "Luxacoes",
+            "Entorses",
+            "Lesoes por esmagamento",
+            "Lesoes cortocontusas",
+            "Perfurocortantes",
+            "Lesoes por impacto com objetos",
+            "Lesoes em coluna por impacto"
+          ]
+        },
+        {
+          "tipo": "Maquinas sem protecao adequada",
+          "lesoes": [
+            "Escoriacao",
+            "Amputacao parcial ou total",
+            "Queda com impacto corporal",
+            "Contusoes",
+            "Fraturas",
+            "Luxacoes",
+            "Entorses",
+            "Lesoes por esmagamento",
+            "Lesoes cortocontusas",
+            "Perfurocortantes",
+            "Lesoes por impacto com objetos",
+            "Lesoes em coluna por impacto"
+          ]
+        },
+        {
+          "tipo": "Ferramentas manuais e eletricas",
+          "lesoes": [
+            "Escoriacao",
+            "Amputacao parcial ou total",
+            "Queda com impacto corporal",
+            "Contusoes",
+            "Fraturas",
+            "Luxacoes",
+            "Entorses",
+            "Lesoes por esmagamento",
+            "Lesoes cortocontusas",
+            "Perfurocortantes",
+            "Lesoes por impacto com objetos",
+            "Lesoes em coluna por impacto"
+          ]
+        },
+        {
+          "tipo": "Quedas de mesmo nivel ou de altura",
+          "lesoes": [
+            "Escoriacao",
+            "Amputacao parcial ou total",
+            "Queda com impacto corporal",
+            "Contusoes",
+            "Fraturas",
+            "Luxacoes",
+            "Entorses",
+            "Lesoes por esmagamento",
+            "Lesoes cortocontusas",
+            "Perfurocortantes",
+            "Lesoes por impacto com objetos",
+            "Lesoes em coluna por impacto"
+          ]
+        },
+        {
+          "tipo": "Objetos projetados ou que caem",
+          "lesoes": [
+            "Escoriacao",
+            "Amputacao parcial ou total",
+            "Queda com impacto corporal",
+            "Contusoes",
+            "Fraturas",
+            "Luxacoes",
+            "Entorses",
+            "Lesoes por esmagamento",
+            "Lesoes cortocontusas",
+            "Perfurocortantes",
+            "Lesoes por impacto com objetos",
+            "Lesoes em coluna por impacto"
+          ]
+        }
+      ]
+    },
+    {
+      "agente": "Agente Ergonomico",
+      "descricao": "Condicoes de trabalho com postura inadequada, repeticao de movimentos, esforco fisico intenso ou ritmo elevado que geram DORT/LER.",
+      "tipos": [
+        {
+          "tipo": "Postura inadequada prolongada",
+          "lesoes": [
+            "Tenossinovite",
+            "Bursite",
+            "Cervicalgia",
+            "Sindrome do tunel do carpo",
+            "Lombalgia",
+            "DORT / LER",
+            "Cansaco extremo",
+            "Fadiga muscular",
+            "Disturbios do sono",
+            "Cefaleias tensionais"
+          ]
+        },
+        {
+          "tipo": "Repeticao de movimentos",
+          "lesoes": [
+            "Tenossinovite",
+            "Bursite",
+            "Cervicalgia",
+            "Sindrome do tunel do carpo",
+            "Lombalgia",
+            "DORT / LER",
+            "Cansaco extremo",
+            "Fadiga muscular",
+            "Disturbios do sono",
+            "Cefaleias tensionais"
+          ]
+        },
+        {
+          "tipo": "Esforco fisico intenso",
+          "lesoes": [
+            "Tenossinovite",
+            "Bursite",
+            "Cervicalgia",
+            "Sindrome do tunel do carpo",
+            "Lombalgia",
+            "DORT / LER",
+            "Cansaco extremo",
+            "Fadiga muscular",
+            "Disturbios do sono",
+            "Cefaleias tensionais"
+          ]
+        },
+        {
+          "tipo": "Ritmo de trabalho elevado",
+          "lesoes": [
+            "Tenossinovite",
+            "Bursite",
+            "Cervicalgia",
+            "Sindrome do tunel do carpo",
+            "Lombalgia",
+            "DORT / LER",
+            "Cansaco extremo",
+            "Fadiga muscular",
+            "Disturbios do sono",
+            "Cefaleias tensionais"
+          ]
+        },
+        {
+          "tipo": "Organizacao inadequada do trabalho",
+          "lesoes": [
+            "Tenossinovite",
+            "Bursite",
+            "Cervicalgia",
+            "Sindrome do tunel do carpo",
+            "Lombalgia",
+            "DORT / LER",
+            "Cansaco extremo",
+            "Fadiga muscular",
+            "Disturbios do sono",
+            "Cefaleias tensionais"
+          ]
+        }
+      ]
+    },
+    {
+      "agente": "Agente Psicosocial",
+      "descricao": "Fatores relacionais ou organizacionais como estresse, assedio, isolamento ou conflitos que afetam saude mental e bem-estar.",
+      "tipos": [
+        {
+          "tipo": "Estresse ocupacional",
+          "lesoes": [
+            "Disturbios cognitivos",
+            "Transtornos de ansiedade",
+            "Depressao",
+            "Disturbios do sono",
+            "Sindrome de burnout",
+            "Irritabilidade persistente",
+            "Cefaleias tensionais",
+            "Sintomas psicossomaticos"
+          ]
+        },
+        {
+          "tipo": "Assedio moral ou sexual",
+          "lesoes": [
+            "Disturbios cognitivos",
+            "Transtornos de ansiedade",
+            "Depressao",
+            "Disturbios do sono",
+            "Sindrome de burnout",
+            "Irritabilidade persistente",
+            "Cefaleias tensionais",
+            "Sintomas psicossomaticos"
+          ]
+        },
+        {
+          "tipo": "Isolamento social no trabalho",
+          "lesoes": [
+            "Disturbios cognitivos",
+            "Transtornos de ansiedade",
+            "Depressao",
+            "Disturbios do sono",
+            "Sindrome de burnout",
+            "Irritabilidade persistente",
+            "Cefaleias tensionais",
+            "Sintomas psicossomaticos"
+          ]
+        },
+        {
+          "tipo": "Conflitos interpessoais",
+          "lesoes": [
+            "Disturbios cognitivos",
+            "Transtornos de ansiedade",
+            "Depressao",
+            "Disturbios do sono",
+            "Sindrome de burnout",
+            "Irritabilidade persistente",
+            "Cefaleias tensionais",
+            "Sintomas psicossomaticos"
+          ]
+        }
+      ]
+    }
+  ]
+}

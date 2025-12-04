@@ -18,6 +18,7 @@ AplicaÃ§Ã£o completa para controle de EPIs, construÃ­da com React (Vite) e
 - **Termo de EPI:** tela modularizada (`useTermoEpi` + `termoEpiService`), preview/download com estados separados e logging de erros.
 - **Auth refatorado:** hooks `useLoginForm` e `useResetPassword` + `authService` e `errorLogService`; erros enviados para `app_errors`.
 - **Ajuda contextual:** cada pagina agora tem `HelpButton` que le textos de `src/help/helpContent.json` e exibe passos/notas em modal; guia rapido em `docs/help-usage.txt` mostra como editar conteudo e incluir imagens em `/public/help/<topico>/`.
+- **Ajuda de agentes (Acidentes):** o campo "Agente *" ganhou um icone proprio que abre `src/help/helpAcidentesAgentes.json` com resumo, descricao por agente e tipos/lesoes mais comuns.
 
 ## Novidades 2025-11
 
