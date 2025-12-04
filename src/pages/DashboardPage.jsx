@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+﻿import { useMemo } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import {
   DashboardIcon,
@@ -13,6 +13,7 @@ import {
   InfoIcon,
   PersonIcon,
 } from '../components/icons.jsx'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts/EntradasSaidasChart.jsx'
 import { EstoquePorMaterialChart } from '../components/charts/EstoqueCharts.jsx'
 import { EstoquePorCategoriaChart } from '../components/charts/EstoqueCategoriaChart.jsx'
@@ -190,7 +191,7 @@ function ChartsGrid() {
         ),
       },
       topCentros: {
-        title: 'Top centro de serviços',
+        title: 'Top centro de serviÃ§os',
         render: () => (
           <EstoquePorMaterialChart
             data={topCentrosServicoTop}
@@ -379,7 +380,7 @@ function ChartsGrid() {
             <div className="dashboard-card__title-group">
               <ChartInfoButton infoKey="topCentros" label="Informacoes sobre o grafico Top centro de servicos" />
               <h2 className="dashboard-card__title">
-                <DashboardIcon size={20} /> <span>Top centro de serviços</span>
+                <DashboardIcon size={20} /> <span>Top centro de serviÃ§os</span>
               </h2>
             </div>
             <div className="dashboard-card__actions">
@@ -387,7 +388,7 @@ function ChartsGrid() {
                 type="button"
                 className="dashboard-card__expand"
                 onClick={() => setExpandedChartId('topCentros')}
-                aria-label="Expandir grafico Top centro de serviços"
+                aria-label="Expandir grafico Top centro de serviÃ§os"
               >
                 <ExpandIcon size={16} />
               </button>
@@ -491,7 +492,8 @@ export function DashboardPage() {
         <PageHeader
           icon={<DashboardIcon size={28} />}
           title="Dashboard de Estoque"
-          subtitle="Monitore indicadores de movimentação e estoque para agir rapidamente."
+          subtitle="Monitore indicadores de movimentaÃ§Ã£o e estoque para agir rapidamente."
+          actions={<HelpButton topic="dashboard" />}
         />
         <FiltersForm />
         <Highlights />

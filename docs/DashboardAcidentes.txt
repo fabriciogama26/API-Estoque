@@ -116,3 +116,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/dashboardAcidentesApi.js
   - Responsavel por: buscar dados consolidados de acidentes (Supabase ou local via dataClient).
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'dashboardAcidentes'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/dashboardAcidentes/ e aponte no campo 'media' do passo (ex.: /help/dashboardAcidentes/exemplo.webp).
+

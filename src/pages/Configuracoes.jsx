@@ -3,6 +3,7 @@ import { Settings as SettingsIcon } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/ConfiguracoesPage.css'
 
 export function ConfiguracoesPage() {
@@ -14,6 +15,7 @@ export function ConfiguracoesPage() {
         icon={<SettingsIcon size={28} />}
         title="Configuracoes"
         subtitle="Gerencie sua conta e ajustes pessoais."
+        actions={<HelpButton topic="configuracoes" />}
       />
 
       <ChangePasswordSection user={user} />

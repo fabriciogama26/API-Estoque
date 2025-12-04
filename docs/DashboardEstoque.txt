@@ -113,3 +113,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/dashboardEstoqueApi.js
   - Responsavel por: buscar dados consolidados do dashboard (entradas/saidas, valores, rankings).
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'dashboard'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/dashboard/ e aponte no campo 'media' do passo (ex.: /help/dashboard/exemplo.webp).
+

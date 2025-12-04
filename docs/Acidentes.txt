@@ -161,3 +161,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/pessoasService.js
   - Responsavel por: listar pessoas (matricula/nome/cargo/centro/local) usadas no formulario de acidentes.
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'acidentes'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/acidentes/ e aponte no campo 'media' do passo (ex.: /help/acidentes/exemplo.webp).
+

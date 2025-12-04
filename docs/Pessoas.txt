@@ -74,3 +74,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/pessoasService.js
   - Responsavel por: listar/atualizar pessoas, obter historico e resumos (Supabase ou local via dataClient).
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'pessoas'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/pessoas/ e aponte no campo 'media' do passo (ex.: /help/pessoas/exemplo.webp).
+

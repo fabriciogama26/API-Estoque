@@ -118,3 +118,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/entradasService.js
   - Responsavel por: listar/criar/atualizar/cancelar entradas (Supabase ou modo local via dataClient).
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'entradas'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/entradas/ e aponte no campo 'media' do passo (ex.: /help/entradas/exemplo.webp).
+

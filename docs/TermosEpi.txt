@@ -66,3 +66,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/termoEpiService.js
   - Responsavel por: buscar contexto do termo (via dataClient/Supabase ou local) a partir de matricula/nome e periodo.
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'termoEpi'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/termoEpi/ e aponte no campo 'media' do passo (ex.: /help/termoEpi/exemplo.webp).
+

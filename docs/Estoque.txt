@@ -122,3 +122,10 @@ Servicos e integracoes externas
   - Caminho: src/services/entradasService.js, src/services/saidasService.js, src/services/materiaisService.js
   - Responsavel por: dados auxiliares para cards e alertas.
 - Integracao com `useErrorLogger('estoque')` para registrar erros criticos.
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'estoque'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/estoque/ e aponte no campo 'media' do passo (ex.: /help/estoque/exemplo.webp).
+

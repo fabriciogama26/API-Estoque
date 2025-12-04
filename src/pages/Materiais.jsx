@@ -9,6 +9,7 @@ import { MateriaisProvider, useMateriaisContext } from '../context/MateriaisCont
 import { formatDisplayDateTime } from '../utils/saidasUtils.js'
 import { formatCurrency } from '../utils/MateriaisUtils.js'
 import { getMaterial } from '../services/materiaisService.js'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
 
 function MateriaisContent() {
@@ -79,6 +80,7 @@ function MateriaisContent() {
         icon={<MaterialIcon size={28} />}
         title="Cadastro de EPI's"
         subtitle="Cadastre e edite materiais com rastreabilidade e historico de preco."
+        actions={<HelpButton topic="materiais" />}
       />
 
       <MateriaisForm

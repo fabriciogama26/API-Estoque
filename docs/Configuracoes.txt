@@ -38,3 +38,10 @@ Servicos e integracoes externas
   - Tipo: cliente Supabase e flag de configuracao
   - Caminho: src/services/supabaseClient.js
   - Responsavel por: executar signInWithPassword (reauth) e updateUser (troca de senha); validar se Supabase esta configurado antes de operar.
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpContent.json (chave 'configuracoes'); edite ali para ajustar titulos/steps/notes.
+- Para imagens, salve em public/help/configuracoes/ e aponte no campo 'media' do passo (ex.: /help/configuracoes/exemplo.webp).
+

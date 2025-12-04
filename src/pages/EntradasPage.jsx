@@ -5,6 +5,7 @@ import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { EntradasProvider, useEntradasContext } from '../context/EntradasContext.jsx'
 import { formatCurrency, formatDisplayDate, formatMaterialSummary } from '../utils/entradasUtils.js'
+import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
 
 function EntradasContent() {
@@ -54,6 +55,7 @@ function EntradasContent() {
         icon={<EntryIcon size={28} />}
         title="Entradas"
         subtitle="Registre novas entradas e mantenha rastreabilidade do estoque."
+        actions={<HelpButton topic="entradas" />}
       />
 
       <form className="card form" onSubmit={handleSubmit}>
