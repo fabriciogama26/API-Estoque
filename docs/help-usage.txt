@@ -18,7 +18,12 @@ Guia rapido do painel de ajuda
 - Como criar um novo topico/pagina
   1) Adicione a chave no src/help/helpContent.json com a estrutura completa (title, summary, steps, notes).
   2) Importe e use <HelpButton topic="suaChave" /> no cabecalho da pagina (prop actions do PageHeader).
-  3) Adicione imagens em public/help/suaChave/ se quiser ilustração.
+  3) Adicione imagens em public/help/suaChave/ se quiser ilustracao.
+
+- Como editar a ajuda do campo Agente (Cadastro de Acidentes)
+  - Arquivo: src/help/helpAcidentesAgentes.json.
+  - Campos: titulo, resumo e lista de agentes (cada um com descricao e tipos/lesoes).
+  - O icone ao lado de "Agente *" abre esse modal especifico; ajuste o texto no JSON para refletir o uso interno da empresa.
 
 - Dicas de formato
   - Mantenha texto ASCII simples para evitar problemas de codificacao.

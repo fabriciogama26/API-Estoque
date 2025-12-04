@@ -167,4 +167,5 @@ Ajuda contextual
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
 - Conteudo vem de src/help/helpContent.json (chave 'acidentes'); edite ali para ajustar titulos/steps/notes.
 - Para imagens, salve em public/help/acidentes/ e aponte no campo 'media' do passo (ex.: /help/acidentes/exemplo.webp).
+- O campo "Agente" tem um icone de informacao proprio que abre o help especifico em src/help/helpAcidentesAgentes.json (titulo, resumo, lista de agentes/tipos/lesoes).
 

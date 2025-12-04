@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AddIcon } from '../../icons.jsx'
 import { normalizeText, parseList } from '../../../utils/acidentesUtils.js'
+import { AgenteHelpButton } from './AgenteHelpButton.jsx'
 
 export function AcidentesFormAgentes({
   form,
@@ -161,12 +162,20 @@ export function AcidentesFormAgentes({
     (isLoadingTipos && noTiposDisponiveis) ||
     (noTiposDisponiveis && !currentTipos.length)
 
+  const agenteSelectId = 'acidente-agente-select'
+
   const content = (
     <>
-      <label className="field">
-        <span>Agente <span className="asterisco">*</span></span>
+      <div className="field">
+        <div className="field__label-row">
+          <label htmlFor={agenteSelectId} className="field__label-text field__label-text--strong">
+            Agente <span className="asterisco">*</span>
+          </label>
+          <AgenteHelpButton />
+        </div>
         <div className="multi-select">
           <select
+            id={agenteSelectId}
             name="agenteSelecionado"
             value={agenteSelecionado}
             onChange={(event) => setAgenteSelecionado(event.target.value)}
@@ -214,7 +223,7 @@ export function AcidentesFormAgentes({
             )}
           </div>
         </div>
-      </label>
+      </div>
 
       <label className="field">
         <span>Tipo <span className="asterisco">*</span></span>
