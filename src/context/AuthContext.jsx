@@ -159,14 +159,52 @@ export function AuthProvider({ children }) {
         throw new Error(error.message)
       }
 
-      const nextUser = parseSupabaseUser(data?.user)
-      setUser(nextUser)
-      if (nextUser) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
+      const supabaseUser = data?.user
+
+      // Verifica se o usuario esta ativo na tabela app_users
+      const { data: profile, error: profileError } = await supabase
+        .from('app_users')
+        .select('id, display_name, username, email, credential, page_permissions, ativo')
+        .eq('id', supabaseUser?.id)
+        .maybeSingle()
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        throw new Error(profileError.message || 'Falha ao validar status do usuario.')
+      }
+
+      if (profile && profile.ativo === false) {
+        // Bloqueia login de usuarios inativos
+        await supabase.auth.signOut()
+        setUser(null)
+        window.localStorage.removeItem(STORAGE_KEY)
+        throw new Error('Usuario inativo. Procure um administrador.')
+      }
+
+      const nextUser = parseSupabaseUser(supabaseUser)
+      const mergedMetadata = {
+        ...(nextUser?.metadata || {}),
+        ...(supabaseUser?.user_metadata || {}),
+        credential: profile?.credential ?? (nextUser?.metadata?.credential || null),
+        page_permissions: profile?.page_permissions ?? nextUser?.metadata?.page_permissions ?? [],
+        username: profile?.username ?? nextUser?.metadata?.username,
+        ativo: profile?.ativo ?? true,
+      }
+      const resolvedUser = nextUser
+        ? {
+            ...nextUser,
+            name: profile?.display_name || nextUser.name,
+            email: profile?.email || nextUser.email,
+            metadata: mergedMetadata,
+          }
+        : null
+
+      setUser(resolvedUser)
+      if (resolvedUser) {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
       } else {
         window.localStorage.removeItem(STORAGE_KEY)
       }
-      return nextUser
+      return resolvedUser
     },
     [hasSupabase, parseSupabaseUser]
   )

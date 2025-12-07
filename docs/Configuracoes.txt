@@ -1,47 +1,46 @@
 Tela: Configuracoes
 ===================
 
+Visao geral
+-----------
+- Pagina React: src/pages/Configuracoes.jsx.
+- Secoes exibidas: gerenciamento de credencial/paginas/status dos usuarios e reset de senha (admin).
+- Em modo local, a UI mostra apenas avisos (sem Supabase).
 
-===========================================
-Mapa de Codigo (funcoes, hooks e constantes)
-===========================================
+Componentes e funcoes
+---------------------
+- ConfiguracoesPage: monta header + PermissionsSection + AdminResetPasswordSection.
+- PermissionsSection:
+  - Carrega usuarios de app_users (exceto master), com fallback para o usuario atual se Supabase estiver indisponivel.
+  - Permite alterar credential, page_permissions e status (ativo/inativo).
+  - Salva em app_users e registra historico em app_users_credential_history (action update).
+  - Chama RPC sync_user_ban_with_status para alinhar auth.users.banned_until (bloqueio de login) ao status ativo/inativo.
+  - Modal CredentialsHistoryModal lista historico de credencial/paginas/status por usuario (acao update/password_reset).
+- AdminResetPasswordSection:
+  - Lista usuarios (exceto master) e envia reset de senha via supabase.auth.resetPasswordForEmail.
+  - Registra historico (action password_reset).
+- syncAuthUserBan(userId, isActive): helper no front que executa RPC sync_user_ban_with_status (Supabase) para manter banimento do Auth sincronizado com app_users. Falhas sao apenas logadas para nao travar a tela.
 
-Funcoes principais
-------------------
-- ConfiguracoesPage
-  - Tipo: componente de pagina React
-  - Caminho: src/pages/Configuracoes.jsx
-  - Responsavel por: exibir o header de configuracoes e renderizar a secao de troca de senha para o usuario logado.
-- ChangePasswordSection
-  - Tipo: componente de secao
-  - Caminho: src/pages/Configuracoes.jsx
-  - Responsavel por: controlar o formulario de troca de senha (estado local), validar campos e acionar Supabase para reautenticacao e atualizacao da senha.
-- handleChange
-  - Tipo: handler de formulario
-  - Caminho: src/pages/Configuracoes.jsx (ChangePasswordSection)
-  - Responsavel por: atualizar o estado do formulario de senha conforme o input.
-- handleSubmit
-  - Tipo: handler de submit
-  - Caminho: src/pages/Configuracoes.jsx (ChangePasswordSection)
-  - Responsavel por: validar configuracao do Supabase, checar tamanho e confirmacao da nova senha, reautenticar com senha atual e chamar supabase.auth.updateUser para salvar a nova senha.
+Fluxos principais
+-----------------
+- Edicao de permissoes:
+  - Seleciona usuario -> escolhe credencial -> alterna paginas -> alterna status (Ativo/Inativo) -> Salvar credencial.
+  - Em caso de erro, feedback tipo error; sucesso mostra success.
+- Historico:
+  - Botao de relogio abre modal; lista acoes (update/password_reset) com antes/depois de credencial, paginas e status.
+- Reset de senha (admin):
+  - Seleciona usuario com email -> Enviar reset de senha.
+  - Registra historico de password_reset.
 
-Constantes e configuracoes
---------------------------
-- Form state inicial ({ currentPassword, newPassword, confirmPassword })
-  - Tipo: objeto de estado inicial
-  - Caminho: src/pages/Configuracoes.jsx
-  - Uso: inicializar o formulario de troca de senha.
+Integracao com Supabase
+-----------------------
+- Leitura/escrita: tabelas app_users e app_users_credential_history.
+- RPC exigida: sync_user_ban_with_status(p_user_id uuid, p_active boolean) com SECURITY DEFINER e grants para anon/authenticated. Atualiza auth.users.banned_until para bloquear ou liberar login conforme ativo/inativo.
+- Em modo local ou sem Supabase, a tela usa apenas o usuario atual como fallback e nao grava nada remoto.
 
-Servicos e integracoes externas
--------------------------------
-- supabase / isSupabaseConfigured
-  - Tipo: cliente Supabase e flag de configuracao
-  - Caminho: src/services/supabaseClient.js
-  - Responsavel por: executar signInWithPassword (reauth) e updateUser (troca de senha); validar se Supabase esta configurado antes de operar.
-
-Ajuda contextual
-----------------
-- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
-- Conteudo vem de src/help/helpContent.json (chave 'configuracoes'); edite ali para ajustar titulos/steps/notes.
-- Para imagens, salve em public/help/configuracoes/ e aponte no campo 'media' do passo (ex.: /help/configuracoes/exemplo.webp).
+Notas de UX
+-----------
+- Master fica oculto da lista (nao editavel/resetavel).
+- Status toggles usam texto Ativo/Inativo e feedback textual.
+- Ajuda contextual: HelpButton top-right, conteudo na chave "configuracoes" de src/help/helpContent.json; assets em public/help/configuracoes/.
 

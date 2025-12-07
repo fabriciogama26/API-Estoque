@@ -19,7 +19,7 @@ AplicaÃ§Ã£o completa para controle de EPIs, construÃ­da com React (Vite) e
 - **Auth refatorado:** hooks `useLoginForm` e `useResetPassword` + `authService` e `errorLogService`; erros enviados para `app_errors`.
 - **Ajuda contextual:** cada pagina agora tem `HelpButton` que le textos de `src/help/helpContent.json` e exibe passos/notas em modal; guia rapido em `docs/help-usage.txt` mostra como editar conteudo e incluir imagens em `/public/help/<topico>/`.
 - **Ajuda de agentes (Acidentes):** o campo "Agente *" ganhou um icone proprio que abre `src/help/helpAcidentesAgentes.json` com resumo, descricao por agente e tipos/lesoes mais comuns.
-- **Credenciais e permissoes:** `app_users` agora tem `credential`, `page_permissions` e `ativo`. Perfis `master` (oculto para edicao/reset), `admin`, `estagiario`, `operador` e `visitante` filtram rotas/menu via `PermissionsProvider`/`ProtectedRoute`. Tela de Configuracoes traz toggles para status/paginas (duas colunas), dropdowns com username e oculta master, grava historico em `app_users_credential_history` (credencial, paginas, status e acoes `update`/`password_reset`) e permite reset de senha por admin. Policies RLS limitam insert/update/delete em `app_users` e insert no historico a admin/master (ou service_role). Documentacao em `docs/CredenciaisPermissoes.txt`.
+- **Credenciais e permissoes:** `app_users` agora tem `credential`, `page_permissions` e `ativo`. Perfis `master` (oculto para edicao/reset), `admin`, `estagiario`, `operador` e `visitante` filtram rotas/menu via `PermissionsProvider`/`ProtectedRoute`. Tela de Configuracoes traz toggles para status/paginas (duas colunas), dropdowns com username e oculta master, grava historico em `app_users_credential_history` (credencial, paginas, status e acoes `update`/`password_reset`) e permite reset de senha por admin. Login bloqueia usuarios com `ativo=false` e a tela sincroniza o status com `auth.users.banned_until` via RPC `sync_user_ban_with_status`. Policies RLS limitam insert/update/delete em `app_users` e insert no historico a admin/master (ou service_role). Documentacao em `docs/CredenciaisPermissoes.txt`.
 
 ## Novidades 2025-11
 
@@ -71,6 +71,25 @@ Crie um arquivo `.env.local` na raiz com as chaves necessÃ¡rias:
 | `VITE_TERMO_EPI_EMPRESA_*` | Metadados opcionais do termo de EPI (nome, documento, endereÃ§o, contato e URLs de logos). |
 
 > Para exibir corretamente o nome no cartÃ£o *Status do sistema*, mantenha a tabela `public.app_users` sincronizada com o Supabase Auth: crie um registro usando o mesmo UUID (`id`) retornado para o usuÃ¡rio e preencha `username`, `display_name` (e opcionalmente `email`). O componente busca esse dado automaticamente.
+
+### Sincronizacao de status (ativo/inativo)
+
+Crie a funcao RPC para manter `auth.users.banned_until` alinhado ao campo `ativo` do `app_users` quando a tela de Configuracoes salvar alteracoes:
+
+```sql
+create or replace function public.sync_user_ban_with_status(p_user_id uuid, p_active boolean)
+returns void language plpgsql security definer as $$
+begin
+  update auth.users
+     set banned_until = case when coalesce(p_active, true) = false then 'infinity'::timestamptz else null end
+   where id = p_user_id;
+end;
+$$;
+revoke all on function public.sync_user_ban_with_status(uuid, boolean) from public;
+grant execute on function public.sync_user_ban_with_status(uuid, boolean) to anon, authenticated;
+```
+
+A chamada ocorre no front (PermissionsSection) e falhas sao apenas logadas para nao travar a edicao.
 
 ### VariÃ¡veis de ambiente (funÃ§Ãµes opcionais)
 
