@@ -13,6 +13,7 @@ import { DashboardPage } from './pages/DashboardPage.jsx'
 import { DashboardAcidentes } from './pages/DashboardAcidentes.jsx'
 import { AcidentesPage } from './pages/Acidentes.jsx'
 import { TermosEpiPage } from './pages/TermosEpiPage.jsx'
+import { NoAccessPage } from './pages/NoAccessPage.jsx'
 import { ErrorBoundaryWithLogger } from './components/ErrorBoundary.jsx'
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
             </Route>
 
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
+            <Route path="sem-acesso" element={<NoAccessPage />} />
 
             {/* Movimenta��es de estoque (alias para manter rotas antigas e menu novo) */}
             <Route path="entradas" element={<EntradasPage />} />

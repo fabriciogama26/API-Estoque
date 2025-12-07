@@ -65,6 +65,12 @@ ul, ol {
   gap: 1.5rem;
 }
 
+.page-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-muted, #64748b);
+}
+
 /* Cabecalho de pagina */
 .page-header {
   display: flex;
