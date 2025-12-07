@@ -271,32 +271,43 @@
   },
   "configuracoes": {
     "title": "Configurações da conta",
-    "summary": "Troca de senha e ajustes pessoais do usuário logado.",
+    "summary": "Credenciais, páginas permitidas e ajustes de senha/envio de reset.",
     "steps": [
       {
-        "title": "Preencher dados",
-        "description": "Informe a senha atual e defina a nova senha com confirmação. Todos os campos são obrigatórios.",
-        "mediaHint": "Formulário de troca de senha."
+        "title": "Escolher usuário",
+        "description": "Selecione um usuário cadastrado em app_users (exceto master) para editar suas permissões.",
+        "mediaHint": "Dropdown de usuário."
       },
       {
-        "title": "Validar requisitos",
-        "description": "A nova senha precisa ter pelo menos 8 caracteres e combinar com o campo de confirmação.",
-        "mediaHint": "Mensagem de feedback abaixo do formulário."
+        "title": "Definir credencial e status",
+        "description": "Use os seletores para ajustar a credencial (admin/operador/visitante) e o status ativo/inativo. Apenas master/admin podem alterar.",
+        "mediaHint": "Seletores de credencial e switch de status."
       },
       {
-        "title": "Salvar",
-        "description": "Clique em Salvar senha. A aplicação reautentica com a senha atual para garantir segurança.",
-        "mediaHint": "Botão Salvar e indicador de carregamento."
+        "title": "Liberar ou bloquear páginas",
+        "description": "Ative/desative os toggles de cada página para definir o acesso. Se não houver lista salva, usamos o padrão da credencial.",
+        "mediaHint": "Toggles de páginas em duas colunas."
       },
       {
-        "title": "Resolver erros",
-        "description": "Mensagens em vermelho indicam erros de validação ou falha na comunicação com o Supabase. Ajuste e tente novamente.",
-        "mediaHint": "Feedback de erro abaixo dos campos."
+        "title": "Salvar alterações",
+        "description": "Clique em Salvar credencial para persistir as mudanças. O histórico registra credencial, páginas e status.",
+        "mediaHint": "Botão Salvar credencial."
+      },
+      {
+        "title": "Reset de senha (admin)",
+        "description": "Admins podem enviar o e-mail de redefinição para o usuário selecionado (exceto master). Em modo local fica indisponível.",
+        "mediaHint": "Botão de reset de senha."
+      },
+      {
+        "title": "Ver histórico",
+        "description": "Abra o histórico para ver quem alterou credencial/páginas/status ou disparou reset de senha.",
+        "mediaHint": "Botão de histórico de credenciais."
       }
     ],
     "notes": [
-      "É preciso estar logado para trocar senha.",
-      "Nenhuma outra configuração é alterada nesta tela; o foco é apenas credencial."
+      "Credencial master fica oculta para edição e reset.",
+      "Em modo local, reset de senha fica indisponível.",
+      "Se page_permissions estiver vazio, o padrão da credencial é aplicado nos toggles."
     ]
   }
 }

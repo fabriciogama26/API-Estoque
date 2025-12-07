@@ -19,6 +19,7 @@ AplicaÃ§Ã£o completa para controle de EPIs, construÃ­da com React (Vite) e
 - **Auth refatorado:** hooks `useLoginForm` e `useResetPassword` + `authService` e `errorLogService`; erros enviados para `app_errors`.
 - **Ajuda contextual:** cada pagina agora tem `HelpButton` que le textos de `src/help/helpContent.json` e exibe passos/notas em modal; guia rapido em `docs/help-usage.txt` mostra como editar conteudo e incluir imagens em `/public/help/<topico>/`.
 - **Ajuda de agentes (Acidentes):** o campo "Agente *" ganhou um icone proprio que abre `src/help/helpAcidentesAgentes.json` com resumo, descricao por agente e tipos/lesoes mais comuns.
+- **Credenciais e permissoes:** `app_users` agora tem `credential`, `page_permissions` e `ativo`. Perfis `master` (oculto para edicao/reset), `admin`, `estagiario`, `operador` e `visitante` filtram rotas/menu via `PermissionsProvider`/`ProtectedRoute`. Tela de Configuracoes traz toggles para status/paginas (duas colunas), dropdowns com username e oculta master, grava historico em `app_users_credential_history` (credencial, paginas, status e acoes `update`/`password_reset`) e permite reset de senha por admin. Policies RLS limitam insert/update/delete em `app_users` e insert no historico a admin/master (ou service_role). Documentacao em `docs/CredenciaisPermissoes.txt`.
 
 ## Novidades 2025-11
 

@@ -1,0 +1,111 @@
+Credenciais e Permissoes
+========================
+
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- PermissionsProvider
+  - Tipo: contexto React
+  - Caminho: src/context/PermissionsContext.jsx
+  - Responsavel por: carregar credential/page_permissions do Supabase (app_users), combinar com metadata do auth e resolver canAccessPath/allowedPaths.
+- ProtectedRoute
+  - Tipo: componente de rota
+  - Caminho: src/components/ProtectedRoute.jsx
+  - Responsavel por: validar autenticacao e permissao da rota corrente; redireciona para /sem-acesso quando bloqueado.
+- NavBar
+  - Tipo: componente de navegacao
+  - Caminho: src/components/NavBar.jsx
+  - Responsavel por: ocultar itens de menu conforme canAccessPath.
+- SystemStatus
+  - Tipo: widget de status lateral
+  - Caminho: src/components/SystemStatus.jsx
+  - Responsavel por: exibir nome e credencial (credentialLabel) e habilitar atalho para Configuracoes quando permitido.
+- NoAccessPage
+  - Tipo: componente de pagina
+  - Caminho: src/pages/NoAccessPage.jsx
+  - Responsavel por: exibir mensagem de acesso negado e link de retorno.
+- ConfiguracoesPage / PermissionsSection
+  - Tipo: componente de pagina/secao
+  - Caminho: src/pages/Configuracoes.jsx
+  - Responsavel por: listar usuarios (app_users), editar credential e page_permissions via Supabase e aplicar pills de paginas.
+
+Constantes e configuracoes
+--------------------------
+- PAGE_CATALOG
+  - Tipo: lista de paginas e caminhos
+  - Caminho: src/config/permissions.js
+  - Uso: mapa de ids -> rotas (ex.: dashboard, estoque, termo-epi, configuracoes).
+- DEFAULT_CREDENTIAL_PERMISSIONS
+  - Tipo: mapa de credencial -> lista de pageIds
+  - Caminho: src/config/permissions.js
+  - Uso: fallback quando page_permissions estiver vazio no banco.
+- CREDENTIAL_OPTIONS
+  - Tipo: lista de opcoes exibidas na UI
+  - Caminho: src/config/permissions.js
+  - Valores exibidos: admin, estagiario, operador, visitante (master fica oculto para edicao).
+
+Fluxo de dados
+--------------
+- Banco: tabela public.app_users (migration supabase/migrations/0062_add_app_users_credentials.sql) inclui colunas credential (text) e page_permissions (text[]).
+- Historico: tabela public.app_users_credential_history (migrations 0063/0064/0065) guarda quem alterou credential/page_permissions/status (antes/depois) e acao (`update` ou `password_reset`).
+- Carregamento: PermissionsProvider consulta app_users pelo id do usuario logado e mescla credential/page_permissions do banco com metadata do auth (fallback admin).
+- Guarda de rota: ProtectedRoute bloqueia quando canAccessPath retorna false para o pathname atual.
+- Navegacao: NavBar filtra itens por canAccessPath; SystemStatus habilita botao de configuracao com base em canAccessPath('/configuracoes').
+- Edicao: ConfiguracoesPage -> PermissionsSection permite selecionar usuario (oculta master no dropdown), trocar credential e marcar/destacar paginas (toggles) gravando em app_users.
+- Status: campo `ativo` pode ser alternado apenas por master/admin no bloco de credenciais.
+- Reset de senha (admin): ConfiguracoesPage -> AdminResetPasswordSection envia email de redefinicao via Supabase para usuarios selecionados (exceto credential master); indisponivel em modo local; registra acao `password_reset` no historico.
+
+Credenciais padrao
+------------------
+- master: sempre todas as paginas; nao aparece para edicao nem no reset de senha; tratado como admin para efeitos de acesso.
+- admin: todas as paginas.
+- estagiario: dashboards e termo; no-access.
+- operador: dashboards, estoque, entradas, saídas, cadastros, acidentes, termo, configuracoes, no-access.
+- visitante: dashboards e termo; no-access.
+
+Como adicionar novos valores em CREDENTIAL_OPTIONS
+--------------------------------------------------
+1) Definir o novo tipo e paginas padrao:
+   - Edite src/config/permissions.js.
+   - Inclua o novo objeto em CREDENTIAL_OPTIONS (ex.: { value: 'auditor', label: 'Auditor' }).
+   - Adicione a chave correspondente em DEFAULT_CREDENTIAL_PERMISSIONS apontando para os pageIds permitidos (use ids do PAGE_CATALOG).
+2) (Opcional) Ajustar rotulos/ajuda:
+   - Se quiser exibir outro label na UI, edite describeCredential em src/config/permissions.js para cobrir o novo valor.
+3) (Opcional) Políticas/RLS:
+   - A política de administrador usa credential='admin' para ler/atualizar app_users (migration 0062). Se o novo tipo precisar poderes de admin, atualize a política ou atribua admin/master aos usuarios que devem editar credenciais.
+4) Testar:
+   - Faça login com um usuario que tenha o novo credential no app_users.
+   - Verifique se o menu mostra apenas as paginas configuradas e se rotas bloqueadas redirecionam para /sem-acesso.
+
+UI de permissoes\n----------------\n- Paginas permitidas sao exibidas em toggles (switch) de duas colunas; cada chave libera/bloqueia o pageId correspondente.\n- Status (ativo/inativo) tambem e um switch; so master/admin podem alterar.\n- Reset de senha (admin) envia email pelo Supabase (exceto master) e grava acao no historico.\n- Dropdowns usam username como label principal; master nao aparece (exceto fallback em modo local/sem Supabase para evitar travamento da tela).
+
+Seguranca (RLS)
+---------------
+- `app_users`: leitura apenas para autenticados; insert/update/delete restritos a admin/master (ou service_role).
+- `app_users_credential_history`: leitura para autenticados; insert restrito a admin/master (ou service_role).
+
+PageIds disponiveis (PAGE_CATALOG)
+----------------------------------
+- dashboard -> ['/', '/dashboard']
+- dashboard-acidentes -> ['/dashboard/acidentes']
+- estoque -> ['/estoque']
+- entradas -> ['/entradas', '/movimentacoes/entradas']
+- saidas -> ['/saidas', '/movimentacoes/saidas']
+- cadastros-pessoas -> ['/cadastros/pessoas']
+- cadastros-materiais -> ['/cadastros/materiais']
+- acidentes-cadastro -> ['/acidentes/cadastro']
+- termo-epi -> ['/documentos/termo-epi', '/termos/epi']
+- configuracoes -> ['/configuracoes']
+- no-access -> ['/sem-acesso']
+
+Notas rapidas
+-------------
+- Valores em page_permissions (banco) prevalecem sobre o default da credencial quando nao estiverem vazios.
+- Em modo local (VITE_DATA_MODE=local), todos sao tratados como admin (sem bloqueio).
+- Se credential/page_permissions estiverem nulos, a migration ja normaliza para admin e lista vazia.
+
+

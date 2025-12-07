@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { PermissionsProvider } from './context/PermissionsContext.jsx'
 import './styles/variables.css'
 import './styles/base.css'
 import './styles/layout.css'
@@ -12,8 +13,10 @@ const root = document.getElementById('root')
 
 createRoot(root).render(
   <AuthProvider>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <PermissionsProvider>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </PermissionsProvider>
   </AuthProvider>
 )

@@ -134,7 +134,7 @@ export function SaidasHistoryModal({ state, onClose }) {
                       ) : (
                         changes.map((change) => (
                           <p key={`${item.id}-${change.label}`}>
-                            <strong>{change.label}:</strong> {change.before} -> {change.after}
+                            <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
                           </p>
                         ))
                       )}

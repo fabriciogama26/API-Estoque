@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { LogOut, Settings, UserCircle2 } from 'lucide-react'
+import { LogOut, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { dataClient as api } from '../services/dataClient.js'
 import { isLocalMode } from '../config/runtime.js'
+import { usePermissions } from '../context/PermissionsContext.jsx'
 import appInfo from '../../package.json?json'
 import '../styles/SystemStatus.css'
 
@@ -67,10 +68,11 @@ function useSystemHealth() {
 export function SystemStatus({ className = '' }) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { credentialLabel, canAccessPath } = usePermissions()
   const [userProfile, setUserProfile] = useState(null)
   const health = useSystemHealth()
   const { state, message } = health
-  const settingsDisabled = true
+  const settingsDisabled = !canAccessPath('/configuracoes')
 
   useEffect(() => {
     if (!user?.id || isLocalMode || !supabase) {
@@ -168,15 +170,10 @@ export function SystemStatus({ className = '' }) {
     state === 'online' ? 'Online' : state === 'offline' ? 'Offline' : 'Desconhecido'
   const indicatorTitle = message ? `${statusLabel} - ${message}` : statusLabel
 
-  const displayName =
-    userProfile?.display_name ||
-    userProfile?.username ||
-    user?.name ||
-    user?.metadata?.nome ||
-    user?.metadata?.display_name ||
-    user?.email ||
-    'Usuario'
-  const roleLabel = user?.role || user?.metadata?.cargo || 'Admin'
+  const username = userProfile?.username || 'Usuario'
+
+  const displayName = userProfile?.display_name || 'Usuario'
+
 
   const handleLogout = async () => {
     await logout()
@@ -184,10 +181,9 @@ export function SystemStatus({ className = '' }) {
   }
 
   const handleOpenSettings = () => {
-    if (settingsDisabled) {
-      return
+    if (!settingsDisabled) {
+      navigate('/configuracoes')
     }
-    navigate('/configuracoes')
   }
 
   return (
@@ -203,35 +199,30 @@ export function SystemStatus({ className = '' }) {
             </dd>
           </div>
           <div className="system-status__row">
-            <dt>Versao</dt>
+            <dt>Versão</dt>
             <dd>{version}</dd>
           </div>
         </dl>
       </section>
 
-      <section className="system-status__user" aria-label="Usuario logado">
-        <div className="system-status__user-info">
-          <div className="system-status__avatar" aria-hidden="true">
-            <UserCircle2 size={32} />
-          </div>
-          <div className="system-status__identity">
-            <p className="system-status__user-name" title={displayName}>
-              {displayName}
-            </p>
-            <p className="system-status__user-role" title={roleLabel}>
-              {roleLabel}
-            </p>
-          </div>
+      <section className="system-status__user" aria-label="Usuário logado">
+        <div className="system-status__identity">
+          <p className="system-status__user-name" title={username}>
+            {username}
+          </p>
+          <p className="system-status__user-role" title={displayName}>
+            {displayName}
+          </p>
         </div>
-        <div className="system-status__actions" role="group" aria-label="Acoes rapidas">
+        <div className="system-status__actions" role="group" aria-label="Ações rápidas">
           <button
             type="button"
             className="system-status__icon-button"
             onClick={handleOpenSettings}
-            aria-label="Abrir configuracoes"
+            aria-label="Abrir configurações"
             disabled={settingsDisabled}
             aria-disabled={settingsDisabled}
-            title="Configuracoes desativadas"
+            title="Configurações desativadas"
           >
             <Settings size={18} />
           </button>
@@ -248,3 +239,5 @@ export function SystemStatus({ className = '' }) {
     </div>
   )
 }
+
+

@@ -12,6 +12,7 @@ import {
   ChecklistIcon,
   ChevronIcon,
 } from './icons.jsx'
+import { usePermissions } from '../context/PermissionsContext.jsx'
 
 const navSections = [
   {
@@ -20,8 +21,8 @@ const navSections = [
     icon: BarsIcon,
     collapsible: false,
     items: [
-      { to: '/', label: 'Dashboard Estoque', icon: DashboardIcon },
-      { to: '/dashboard/acidentes', label: 'Dashboard Acidentes', icon: AlertIcon },
+      { to: '/', label: 'Dashboard Estoque', icon: DashboardIcon, pageId: 'dashboard' },
+      { to: '/dashboard/acidentes', label: 'Dashboard Acidentes', icon: AlertIcon, pageId: 'dashboard-acidentes' },
     ],
   },
   {
@@ -29,9 +30,9 @@ const navSections = [
     title: 'Estoque',
     icon: InventoryIcon,
     items: [
-      { to: '/estoque', label: 'Estoque Atual', icon: ChecklistIcon },
-      { to: '/movimentacoes/entradas', label: 'Entradas', icon: EntryIcon },
-      { to: '/movimentacoes/saidas', label: 'Saidas', icon: ExitIcon },
+      { to: '/estoque', label: 'Estoque Atual', icon: ChecklistIcon, pageId: 'estoque' },
+      { to: '/movimentacoes/entradas', label: 'Entradas', icon: EntryIcon, pageId: 'entradas' },
+      { to: '/movimentacoes/saidas', label: 'Saidas', icon: ExitIcon, pageId: 'saidas' },
     ],
   },
   {
@@ -39,7 +40,7 @@ const navSections = [
     title: 'Acidentes',
     icon: AlertIcon,
     items: [
-      { to: '/acidentes/cadastro', label: 'Cadastro de Acidentes', icon: ChecklistIcon },
+      { to: '/acidentes/cadastro', label: 'Cadastro de Acidentes', icon: ChecklistIcon, pageId: 'acidentes-cadastro' },
     ],
   },
   {
@@ -47,15 +48,15 @@ const navSections = [
     title: 'Cadastros',
     icon: PeopleIcon,
     items: [
-      { to: '/cadastros/pessoas', label: 'Pessoas', icon: PeopleIcon },
-      { to: '/cadastros/materiais', label: "EPI's", icon: MaterialIcon },
+      { to: '/cadastros/pessoas', label: 'Pessoas', icon: PeopleIcon, pageId: 'cadastros-pessoas' },
+      { to: '/cadastros/materiais', label: "EPI's", icon: MaterialIcon, pageId: 'cadastros-materiais' },
     ],
   },
   {
     id: 'termos',
     title: 'Termos',
     icon: ChecklistIcon,
-    items: [{ to: '/documentos/termo-epi', label: 'Termo de EPI', icon: ChecklistIcon }],
+    items: [{ to: '/documentos/termo-epi', label: 'Termo de EPI', icon: ChecklistIcon, pageId: 'termo-epi' }],
   },
 ]
 
@@ -64,6 +65,7 @@ const shouldOpenSection = (pathname, section) =>
 
 export function NavBar() {
   const location = useLocation()
+  const { canAccessPath } = usePermissions()
 
   const [openSections, setOpenSections] = useState(() =>
     navSections.reduce((acc, section) => {
@@ -101,6 +103,11 @@ export function NavBar() {
         const SectionIcon = section.icon
         const isOpen = openSections[section.id]
         const collapsible = section.collapsible !== false
+        const visibleItems = (section.items || []).filter((item) => canAccessPath(item.to))
+
+        if (!visibleItems.length) {
+          return null
+        }
 
         return (
           <div key={section.id} className="sidebar__section">
@@ -128,7 +135,7 @@ export function NavBar() {
 
             {(!collapsible || isOpen) && (
               <ul className="sidebar__list" id={`section-${section.id}`}>
-                {section.items?.map((item) => {
+                {visibleItems.map((item) => {
                   const Icon = item.icon
                   return (
                     <li key={item.to}>

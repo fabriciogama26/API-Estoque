@@ -121,10 +121,8 @@
   font-weight: 600;
   font-size: 0.95rem;
   color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 12rem;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .system-status__user-role {
@@ -133,6 +131,16 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.system-status__user-secondary {
+  font-size: 0.85rem;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
+  margin: 0;
 }
 
 /* Ações */
