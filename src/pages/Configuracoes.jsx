@@ -9,6 +9,20 @@ import { CREDENTIAL_OPTIONS, PAGE_CATALOG, resolveAllowedPageIds, describeCreden
 import { isLocalMode } from '../config/runtime.js'
 import '../styles/ConfiguracoesPage.css'
 
+// Sincroniza o status (ativo/inativo) com o auth.users via RPC (security definer no Supabase)
+async function syncAuthUserBan(userId, isActive) {
+  if (!userId || !supabase) {
+    return
+  }
+  const { error } = await supabase.rpc('sync_user_ban_with_status', {
+    p_user_id: userId,
+    p_active: isActive,
+  })
+  if (error) {
+    throw error
+  }
+}
+
 export function ConfiguracoesPage() {
   const { user } = useAuth()
 
@@ -186,6 +200,12 @@ function PermissionsSection({ currentUser }) {
 
       if (error) {
         throw error
+      }
+
+      try {
+        await syncAuthUserBan(selectedUser.id, isActive)
+      } catch (syncError) {
+        console.warn('Falha ao sincronizar banimento no auth.users', syncError)
       }
 
       try {
