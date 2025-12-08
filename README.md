@@ -21,6 +21,7 @@ AplicaÃ§Ã£o completa para controle de EPIs, construÃ­da com React (Vite) e
 - **Ajuda de agentes (Acidentes):** o campo "Agente *" ganhou um icone proprio que abre `src/help/helpAcidentesAgentes.json` com resumo, descricao por agente e tipos/lesoes mais comuns.
 - **Credenciais e permissoes:** `app_users` agora tem `credential`, `page_permissions` e `ativo`. Perfis `master` (oculto para edicao/reset), `admin`, `estagiario`, `operador` e `visitante` filtram rotas/menu via `PermissionsProvider`/`ProtectedRoute`. Tela de Configuracoes traz toggles para status/paginas (duas colunas), dropdowns com username e oculta master, grava historico em `app_users_credential_history` (credencial, paginas, status e acoes `update`/`password_reset`) e permite reset de senha por admin. Login bloqueia usuarios com `ativo=false` e a tela sincroniza o status com `auth.users.banned_until` via RPC `sync_user_ban_with_status`. Policies RLS limitam insert/update/delete em `app_users` e insert no historico a admin/master (ou service_role). Documentacao em `docs/CredenciaisPermissoes.txt`.
 - **UX de edicao em cadastros:** ao clicar em editar nas telas principais o formulario sobe automaticamente para o topo; em Entradas, o botao "Cancelar alteracao" reaparece ao lado do salvar e todos os formularios ganham titulo "Editando..." + borda/sombra amarela para deixar claro o modo de edicao.
+- **Busca por CA no Estoque:** a busca da tela Estoque atual agora tambem considera o CA (texto ou apenas digitos) ao filtrar materiais.
 
 ## Novidades 2025-11
 

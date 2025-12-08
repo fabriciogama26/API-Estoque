@@ -11,6 +11,8 @@ export const formatInteger = (value) => new Intl.NumberFormat('pt-BR').format(Nu
 
 export const normalizeTerm = (termo) => (termo ? termo.trim().toLowerCase() : '')
 
+const sanitizeDigits = (value) => String(value ?? '').replace(/\D/g, '')
+
 export const formatDateTimeValue = (value) => {
   if (!value) {
     return '-'
@@ -48,11 +50,20 @@ const matchesTerm = (material = {}, termoNormalizado = '') => {
     material.numeroVestimentaNome,
     material.id,
     material.materialId,
+    material.ca,
   ]
   if (Array.isArray(material.centrosCusto)) {
     camposTexto.push(material.centrosCusto.join(' '))
   }
-  return camposTexto.map((valor) => (valor ? String(valor).toLowerCase() : '')).some((texto) => texto.includes(termoNormalizado))
+  if (material.ca) {
+    const caSomenteDigitos = sanitizeDigits(material.ca)
+    if (caSomenteDigitos) {
+      camposTexto.push(caSomenteDigitos)
+    }
+  }
+  return camposTexto
+    .map((valor) => (valor ? String(valor).toLowerCase() : ''))
+    .some((texto) => texto.includes(termoNormalizado))
 }
 
 export const parsePeriodoRange = (inicio, fim) => {

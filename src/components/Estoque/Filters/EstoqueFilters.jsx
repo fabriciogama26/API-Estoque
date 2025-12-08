@@ -21,7 +21,7 @@ export function EstoqueFilters({
           name="termo"
           value={filters.termo}
           onChange={onChange}
-          placeholder="Buscar por material, fabricante ou ID"
+          placeholder="Buscar por material, fabricante, CA ou ID"
         />
       </label>
       <label className="field">
