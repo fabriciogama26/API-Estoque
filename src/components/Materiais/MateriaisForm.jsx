@@ -108,7 +108,7 @@ export function MateriaisForm({
   const [corSelecionada, setCorSelecionada] = useState('')
 
   return (
-    <form className={`form${editingMaterial ? ' form--editing' : ''}`} onSubmit={onSubmit}>
+    <form className={`card form${editingMaterial ? ' form--editing' : ''}`} onSubmit={onSubmit}>
       <div className="form__grid form__grid--two">
         <label className="field">
           <span>Grupo de material <span className="asterisco">*</span></span>

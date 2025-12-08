@@ -1,4 +1,5 @@
-import { Pencil, History as HistoryIcon, Eye } from 'lucide-react'
+import { Eye } from 'lucide-react'
+import { EditIcon, HistoryIcon } from '../icons.jsx'
 
 // Ações para cada material na tabela de materiais
 export function MateriaisActions({
@@ -18,14 +19,15 @@ export function MateriaisActions({
     <div className="materiais-data-table__actions">
       {onView ? (
         <button
-          type="button"
-          className="materiais-table-action-button"
-          onClick={() => onView(material)}
-          disabled={isSaving}
-          aria-label={`Ver detalhes de ${material.nome || material.nomeItemRelacionado || 'material'}`}
-        >
-          <Eye size={16} strokeWidth={1.8} />
-        </button>
+        type="button"
+        className="materiais-table-action-button"
+        onClick={() => onView(material)}
+        disabled={isSaving}
+        aria-label={`Ver detalhes de ${material.nome || material.nomeItemRelacionado || 'material'}`}
+        title="Ver detalhes"
+      >
+        <Eye size={16} strokeWidth={1.8} />
+      </button>
       ) : null}
       <button
         type="button"
@@ -33,8 +35,9 @@ export function MateriaisActions({
         onClick={() => onEdit(material)}
         disabled={isEditDisabled}
         aria-label={isEditDisabled ? 'Editando material' : `Editar ${material.nome}`}
+        title="Editar material"
       >
-        <Pencil size={16} strokeWidth={1.8} />
+        <EditIcon size={16} strokeWidth={1.8} />
       </button>
       <button
         type="button"
@@ -42,6 +45,7 @@ export function MateriaisActions({
         onClick={() => onHistory(material)}
         disabled={historyDisabled}
         aria-label={`Ver historico de precos de ${material.nome}`}
+        title="Historico de precos"
       >
         <HistoryIcon size={16} strokeWidth={1.8} />
       </button>

@@ -57,6 +57,7 @@ function MateriaisContent() {
     closeHistoryModal,
     startEdit,
     resetForm,
+    loadMateriais,
   } = useMateriaisContext()
 
   const handleOpenDetalhe = async (material) => {
@@ -133,6 +134,9 @@ function MateriaisContent() {
       <section className="card">
         <header className="card__header">
           <h2>Materiais cadastrados</h2>
+          <button type="button" className="button button--ghost" onClick={loadMateriais} disabled={isLoading}>
+            Atualizar
+          </button>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
         {!isLoading ? (

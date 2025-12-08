@@ -340,6 +340,13 @@ const tokenizeFilterValues = (value) => {
   return [String(value)]
 }
 
+const toNumberOrNull = (value) => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string' && value.trim() === '') return null
+  const numero = Number(value)
+  return Number.isFinite(numero) ? numero : null
+}
+
 const matchesFilter = (filterValue, ...candidates) => {
   const alvo = normalizeSearchValue(filterValue)
   if (!alvo) {
@@ -356,8 +363,8 @@ const matchesFilter = (filterValue, ...candidates) => {
 
 export function filterMateriais(materiais, filters) {
   const termo = normalizeSearchValue(filters.termo)
-  const minValor = Number.isFinite(Number(filters.valorMin)) ? Number(filters.valorMin) : null
-  const maxValor = Number.isFinite(Number(filters.valorMax)) ? Number(filters.valorMax) : null
+  const minValor = toNumberOrNull(filters.valorMin)
+  const maxValor = toNumberOrNull(filters.valorMax)
 
   return materiais.filter((material) => {
     if (filters.status === 'ativos' && material.ativo === false) {

@@ -1,4 +1,5 @@
-import { Eye, Pencil, History as HistoryIcon } from 'lucide-react'
+import { Eye } from 'lucide-react'
+import { EditIcon, HistoryIcon } from '../../icons.jsx'
 import {
   formatDateWithOptionalTime as formatDate,
   formatDateTimeFullPreserve,
@@ -57,8 +58,9 @@ export function AcidentesTableRow({
             onClick={() => onEdit(acidente)}
             disabled={disableEdit}
             aria-label={disableEdit ? 'Editando acidente' : `Editar ${acidente.nome}`}
+            title="Editar acidente"
           >
-            <Pencil size={16} strokeWidth={1.8} />
+            <EditIcon size={16} strokeWidth={1.8} />
           </button>
           {typeof onHistory === 'function' ? (
             <button
@@ -67,6 +69,7 @@ export function AcidentesTableRow({
               onClick={() => onHistory(acidente)}
               disabled={disableHistory}
               aria-label={`Ver historico de edicao de ${acidente.nome}`}
+              title="Historico do acidente"
             >
               <HistoryIcon size={16} strokeWidth={1.8} />
             </button>
