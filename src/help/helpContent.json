@@ -65,7 +65,7 @@
     "steps": [
       {
         "title": "Filtrar materiais",
-        "description": "Use o formulário de filtros para buscar por nome, centro de estoque ou faixas de estoque. Clique em Aplicar ou Limpar para atualizar a lista.",
+        "description": "Use o formulário de filtros para buscar por (nome, id ou CA), centro de estoque ou faixas de estoque. Clique em Aplicar ou Limpar para atualizar a lista.",
         "mediaHint": "Filtros de estoque e botões Aplicar/Limpar."
       },
       {
