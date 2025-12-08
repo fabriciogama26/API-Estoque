@@ -277,6 +277,9 @@ export function useSaidasController() {
 
   const startEditSaida = (saida) => {
     if (!saida) return
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
     setEditingSaida(saida)
     setForm({
       pessoaId: saida.pessoaId || '',

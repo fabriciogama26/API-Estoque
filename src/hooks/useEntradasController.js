@@ -219,6 +219,9 @@ export function useEntradasController() {
     if (!entrada) {
       return
     }
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
     const material = materiaisMap.get(entrada.materialId)
     setEditingEntrada(entrada)
     setForm({

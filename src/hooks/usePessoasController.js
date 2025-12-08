@@ -243,6 +243,9 @@ export function usePessoasController() {
   }
 
   const startEdit = (pessoa) => {
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
     setEditingPessoa(pessoa)
     setForm({
       nome: pessoa.nome || '',

@@ -36,6 +36,7 @@ Cadastro
   - Calcula valor total quando `valorUnitario` estiver disponivel.
 - Comportamento:
   - Ao concluir cadastro com sucesso, limpa o formulario e, quando aplicavel, limpa a selecao/autocomplete.
+  - Ao iniciar edicao de uma entrada, a pagina rola para o topo e exibe o botao "Cancelar alteracao" ao lado do salvar.
   - Erros de validacao sao exibidos em area de feedback acima dos botoes.
 
 Filtros, auto-complete e listagem
@@ -61,6 +62,7 @@ Filtros, auto-complete e listagem
   - Se a API nao retornar centros de estoque, o hook deriva opcoes a partir dos registros ja carregados.
 - Botoes:
   - "Atualizar" refaz a consulta com os filtros atuais.
+  - "Cancelar alteracao" sai do modo de edicao e reseta formulario/buscas quando um registro esta sendo editado.
   - Quando nao ha registros no filtro/periodo, exibe mensagem neutra em vez de tabela vazia quebrada.
 
 Boas praticas

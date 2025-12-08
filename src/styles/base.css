@@ -138,6 +138,12 @@ ul, ol {
   gap: 1.25rem;
 }
 
+.card--editing,
+.form--editing {
+  border-color: #f5d742;
+  box-shadow: 0 0 0 3px rgba(245, 215, 66, 0.6), 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
 /* Formulários inline */
 .form--inline {
   flex-direction: row;

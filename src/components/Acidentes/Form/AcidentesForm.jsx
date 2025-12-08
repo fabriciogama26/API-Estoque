@@ -116,7 +116,7 @@ export function AcidentesForm({
   const shouldDisableLocal = isLoadingLocais && localOptions.length === 0
 
   return (
-    <form className="form" onSubmit={onSubmit}>
+    <form className={`form${editingAcidente ? ' form--editing' : ''}`} onSubmit={onSubmit}>
       <div className="form__grid form__grid--two">
         <label className="field">
           <span>Matricula <span className="asterisco">*</span></span>
