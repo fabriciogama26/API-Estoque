@@ -55,7 +55,7 @@ export function PessoasForm({
   )
 
   return (
-    <form className="form" onSubmit={onSubmit}>
+    <form className={`form${editingPessoa ? ' form--editing' : ''}`} onSubmit={onSubmit}>
       <div className="form__grid">
         <label className="field">
           <span>Nome <span className="asterisco">*</span></span>

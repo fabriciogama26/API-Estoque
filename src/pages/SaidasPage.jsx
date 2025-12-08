@@ -101,8 +101,8 @@ function SaidasContent() {
         actions={<HelpButton topic="saidas" />}
       />
 
-      <form className="card form" onSubmit={handleSubmit}>
-        <h2>Registrar saída</h2>
+      <form className={`card form${editingSaida ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
+        <h2>{editingSaida ? 'Editando...' : 'Registrar saída'}</h2>
         <div className="form__grid form__grid--two">
           <label className="field autocomplete">
             <span>Pessoa*</span>

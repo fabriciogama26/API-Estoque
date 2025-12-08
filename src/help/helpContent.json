@@ -95,7 +95,7 @@
     "steps": [
       {
         "title": "Registrar nova entrada",
-        "description": "Busque o material pelo nome/ID, informe quantidade, centro de estoque e data. Clique em Registrar entrada ou Salvar alterações quando estiver editando.",
+        "description": "Busque o material pelo nome/ID, informe quantidade, centro de estoque e data. Clique em Registrar entrada ou Salvar alterações quando estiver editando (o card fica amarelo e o título vira “Editando...”); use Cancelar alteração para sair do modo de edição rapidamente.",
         "mediaHint": "Formulário de cadastro de entradas com autocomplete."
       },
       {
@@ -105,7 +105,7 @@
       },
       {
         "title": "Editar ou ver histórico",
-        "description": "Na tabela, use o ícone de lápis para editar e o relógio para abrir o histórico daquela entrada.",
+        "description": "Na tabela, clique no botão Editar (lápis) para editar (a tela sobe para o topo, o título muda para “Editando...” e o card fica com borda amarela, exibindo também o botão Cancelar alteração) e no botão de relógio para abrir o histórico daquela entrada.",
         "mediaHint": "Ações de edição e histórico na tabela."
       },
       {
@@ -125,7 +125,7 @@
     "steps": [
       {
         "title": "Registrar saída",
-        "description": "Selecione a pessoa e o material pelo autocomplete, informe quantidade, centro de estoque e data. Salve para registrar a entrega.",
+        "description": "Selecione a pessoa e o material pelo autocomplete, informe quantidade, centro de estoque e data. Ao editar, o card fica com borda amarela e o título mostra “Editando...”; salve para registrar ou atualizar a entrega.",
         "mediaHint": "Formulário de cadastro de saídas com busca de pessoa e material."
       },
       {
@@ -135,7 +135,7 @@
       },
       {
         "title": "Editar ou cancelar",
-        "description": "Use o ícone de lápis para editar registros recentes. O botão Cancelar abre um modal para registrar o motivo e bloquear a entrega.",
+        "description": "Use o botão Editar (lápis) para editar registros recentes (o formulário sobe, realça em amarelo e exibe o título “Editando...” junto ao Cancelar edição). O botão Cancelar abre um modal para registrar o motivo e bloquear a entrega.",
         "mediaHint": "Ações de edição e cancelamento na tabela de saídas."
       },
       {
@@ -155,7 +155,7 @@
     "steps": [
       {
         "title": "Cadastrar ou editar material",
-        "description": "Preencha nome, grupo, valor unitário e CA (quando houver). Use o botão Salvar para novo cadastro ou para gravar alterações.",
+        "description": "Preencha nome, grupo, valor unitário e CA (quando houver). Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para novo cadastro ou para gravar alterações.",
         "mediaHint": "Formulário principal de materiais."
       },
       {
@@ -170,7 +170,7 @@
       },
       {
         "title": "Histórico e detalhes",
-        "description": "Na tabela use o relógio para ver histórico de alterações e o olho para abrir o detalhamento completo do material.",
+        "description": "Na tabela use o botão de relógio para ver histórico de alterações e o botão com olho para abrir o detalhamento completo do material.",
         "mediaHint": "Ações de histórico e detalhes na tabela de materiais."
       }
     ],
@@ -185,7 +185,7 @@
     "steps": [
       {
         "title": "Cadastrar ou atualizar colaborador",
-        "description": "Informe nome, documento, centro de serviço e cargo. Use Salvar para novo registro ou para concluir uma edição.",
+        "description": "Informe nome, documento, centro de serviço e cargo. Ao editar, o formulário fica com borda amarela e o título mostra “Editando...” para indicar o modo de edição; use Salvar para novo registro ou para concluir a edição.",
         "mediaHint": "Formulário principal de pessoas."
       },
       {
@@ -200,7 +200,7 @@
       },
       {
         "title": "Ver histórico de alterações",
-        "description": "Na tabela, clique em Histórico para ver quem alterou dados do colaborador e quando.",
+        "description": "Na tabela, clique no botão de relógio (Histórico) para ver quem alterou dados do colaborador e quando.",
         "mediaHint": "Modal de histórico de pessoas."
       }
     ],
@@ -215,7 +215,7 @@
     "steps": [
       {
         "title": "Preencher dados do acidente",
-        "description": "Selecione colaborador, tipo de acidente, lesão e parte afetada. Campos obrigatórios estão marcados com *. Use Salvar para gravar.",
+        "description": "Selecione colaborador, tipo de acidente, lesão e parte afetada. Campos obrigatórios estão marcados com *. Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para gravar.",
         "mediaHint": "Formulário de cadastro de acidentes."
       },
       {
@@ -230,7 +230,7 @@
       },
       {
         "title": "Consultar histórico e detalhes",
-        "description": "Clique no relógio para ver histórico de alterações ou no ícone de visualizar para abrir os detalhes completos do acidente.",
+        "description": "Clique no botão de relógio para ver histórico de alterações ou no botão com olho para abrir os detalhes completos do acidente.",
         "mediaHint": "Modal de detalhes do acidente."
       }
     ],
@@ -275,7 +275,7 @@
     "steps": [
       {
         "title": "Escolher usuário",
-        "description": "Selecione um usuário cadastrado em app_users (exceto master) para editar suas permissões.",
+        "description": "Selecione um usuário cadastrado para editar suas permissões.",
         "mediaHint": "Dropdown de usuário."
       },
       {

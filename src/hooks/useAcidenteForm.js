@@ -335,6 +335,9 @@ export function useAcidenteForm({
 
   const startEdit = useCallback(
     (acidente) => {
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
       setEditingAcidente(acidente)
       const lesoesSelecionadas =
         Array.isArray(acidente.lesoes) && acidente.lesoes.length

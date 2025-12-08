@@ -43,6 +43,7 @@ function EntradasContent() {
     materialSearchError,
     hasCentrosCusto,
     isEditing,
+    cancelEdit,
     startEditEntrada,
     openHistory,
     historyState,
@@ -58,8 +59,8 @@ function EntradasContent() {
         actions={<HelpButton topic="entradas" />}
       />
 
-      <form className="card form" onSubmit={handleSubmit}>
-        <h2>Registrar entrada</h2>
+      <form className={`card form${isEditing ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
+        <h2>{isEditing ? 'Editando...' : 'Registrar entrada'}</h2>
         <div className="form__grid form__grid--two">
           <label className="field autocomplete">
             <span>Material*</span>
@@ -136,8 +137,13 @@ function EntradasContent() {
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
           <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? (isEditing ? 'Salvando...' : 'Registrando...') : isEditing ? 'Salvar alteracoes' : 'Registrar entrada'}
+            {isSaving ? (isEditing ? 'Salvando...' : 'Registrando...') : isEditing ? 'Salvar alterações' : 'Registrar entrada'}
           </button>
+          {isEditing ? (
+            <button type="button" className="button button--ghost" onClick={cancelEdit} disabled={isSaving}>
+              Cancelar edição
+            </button>
+          ) : null}
         </div>
       </form>
 
@@ -222,8 +228,8 @@ function EntradasContent() {
                   const total = valorUnitario * Number(entrada.quantidade ?? 0)
                   const centroCustoLabel = resolveCentroCustoLabel(entrada) || '-'
                   const materialResumo = material ? formatMaterialSummary(material) : 'Material removido'
-                  const materialIdLabel = material?.id || entrada.materialId || 'Nao informado'
-                  const descricaoMaterial = material?.descricao || 'Nao informado'
+                  const materialIdLabel = material?.id || entrada.materialId || 'Não informado'
+                  const descricaoMaterial = material?.descricao || 'Não informado'
                   return (
                     <tr key={entrada.id}>
                       <td>
@@ -252,7 +258,7 @@ function EntradasContent() {
                             className="materiais-table-action-button"
                             onClick={() => openHistory(entrada)}
                             aria-label={`Historico da entrada ${entrada.id}`}
-                            title="Historico da entrada"
+                            title="Histórico da entrada"
                           >
                             <HistoryIcon size={16} />
                           </button>
