@@ -26,6 +26,7 @@ Boas praticas
 Atualizacao 2025-12
 
 - Tela modularizada com hooks/services/utils; view pessoas_view inclui usuarioCadastroUsername e aliases legados para compatibilidade.
+- Botoes de acao padronizados (caneta/relógio) iguais aos de Entradas, com tooltips de editar e historico na tabela.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

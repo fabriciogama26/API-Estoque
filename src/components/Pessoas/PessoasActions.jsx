@@ -1,4 +1,5 @@
-import { Pencil, History as HistoryIcon } from 'lucide-react'
+import { History as HistoryIcon } from 'lucide-react'
+import { EditIcon } from '../icons.jsx'
 
 export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory, isHistoryLoading }) {
   const disableEdit = isEditing || isSaving
@@ -12,8 +13,9 @@ export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory,
         onClick={() => onEdit(pessoa)}
         disabled={disableEdit}
         aria-label={disableEdit ? 'Editando pessoa' : `Editar ${pessoa.nome}`}
+        title="Editar pessoa"
       >
-        <Pencil size={16} strokeWidth={1.8} />
+        <EditIcon size={16} strokeWidth={1.8} />
       </button>
       <button
         type="button"
@@ -21,6 +23,7 @@ export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory,
         onClick={() => onHistory(pessoa)}
         disabled={disableHistory}
         aria-label={`Ver historico de edicao de ${pessoa.nome}`}
+        title="Historico da pessoa"
       >
         <HistoryIcon size={16} strokeWidth={1.8} />
       </button>

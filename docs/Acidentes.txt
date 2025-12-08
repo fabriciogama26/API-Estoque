@@ -105,6 +105,7 @@ Atualizacao 2025-12
 - Tela refatorada para hooks, services e utils dedicados.
 - UI dividida em componentes (`AcidentesForm`, `AcidentesFilters`, `AcidentesTable`, `AcidentesHistoryModal`).
 - Tratamento de erros integrado com `useErrorLogger('acidentes')`.
+- Botoes de acao (editar/historico) padronizados com os mesmos icones e tooltips usados em Entradas/Materiais/Pessoas.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
