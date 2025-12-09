@@ -457,63 +457,7 @@ export function useEntradasController() {
     }
   }, [])
 
-  const normalizedSearchTerm = normalizeSearchValue(filters.termo)
-  const startTimestamp = filters.dataInicio ? Date.parse(`${filters.dataInicio}T00:00:00Z`) : null
-  const endTimestamp = filters.dataFim ? Date.parse(`${filters.dataFim}T23:59:59Z`) : null
-
-  const filteredEntradas = useMemo(
-    () =>
-      entradas.filter((entrada) => {
-        const dataEntrada = entrada.dataEntrada ? Date.parse(entrada.dataEntrada) : null
-        if (startTimestamp && (dataEntrada === null || dataEntrada < startTimestamp)) {
-          return false
-        }
-        if (endTimestamp && (dataEntrada === null || dataEntrada > endTimestamp)) {
-          return false
-        }
-        if (filters.registradoPor) {
-          const candidatos = [entrada.usuarioResponsavelId, entrada.usuarioResponsavel, entrada.usuarioResponsavelNome]
-            .map((valor) => (valor ? String(valor).trim() : ''))
-          if (!candidatos.includes(filters.registradoPor)) {
-            return false
-          }
-        }
-        if (filters.centroCusto) {
-          const entradaLabel = resolveCentroCustoLabel(entrada)
-          const normalizedFilter = normalizeSearchValue(filters.centroCusto)
-          const filterLabel =
-            centrosCustoMap.get(filters.centroCusto) ||
-            centrosCustoMap.get(normalizedFilter) ||
-            (!isLikelyUuid(filters.centroCusto) ? filters.centroCusto : '')
-          const matchesById = Boolean(entrada.centroCustoId) && entrada.centroCustoId === filters.centroCusto
-          const matchesByLabel =
-            Boolean(filterLabel) &&
-            normalizeSearchValue(entradaLabel || entrada.centroCusto || '') === normalizeSearchValue(filterLabel)
-          if (!matchesById && !matchesByLabel) {
-            return false
-          }
-        }
-        if (normalizedSearchTerm) {
-          const material = materiaisMap.get(entrada.materialId)
-          const resumo = normalizeSearchValue(material ? formatMaterialSummary(material) : '')
-          if (!resumo.includes(normalizedSearchTerm)) {
-            return false
-          }
-        }
-        return true
-      }),
-    [
-      entradas,
-      filters.registradoPor,
-      filters.centroCusto,
-      normalizedSearchTerm,
-      materiaisMap,
-      startTimestamp,
-      endTimestamp,
-      resolveCentroCustoLabel,
-      centrosCustoMap,
-    ],
-  )
+  const filteredEntradas = useMemo(() => entradas, [entradas])
 
   const paginatedEntradas = useMemo(() => {
     const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE

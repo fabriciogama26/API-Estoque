@@ -14,7 +14,7 @@ Arquitetura (modular)
 Fluxos principais
 
 - Formulário: pessoa, centro de estoque (filtra materiais), material, quantidade, datas; centros de custo/serviço preenchidos pela pessoa; cancelar saída com motivo obrigatório (modal).
-- Filtros: período, centros (estoque/serviço), status dinâmico, termo livre; limpar restaura defaults.
+- Filtros: período, centros (estoque/serviço), status dinâmico, termo livre; "Aplicar" consulta na API; limpar restaura defaults e recarrega a lista.
 - Tabela: colunas Pessoa, Material, Quantidade, Data entrega, Status, Registrado por, Cadastrado em; ações Ver (detalhes), Editar, Histórico, Cancelar.
 - Detalhes: modal em cartões (padrão acidentes) mostrando todos os campos e centros.
 - Histórico: modal no padrão “Histórico do acidente”, exibindo alterações campo a campo.

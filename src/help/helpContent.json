@@ -165,7 +165,7 @@
       },
       {
         "title": "Filtrar catálogo",
-        "description": "Filtre por grupo, tamanho, fabricante ou característica para localizar itens cadastrados. Clique em Limpar para remover filtros.",
+        "description": "Filtre por grupo, tamanho, fabricante ou característica para localizar itens cadastrados. Ajuste os campos e clique em Aplicar para atualizar a lista; use Limpar para remover filtros.",
         "mediaHint": "Bloco de filtros acima da tabela de materiais."
       },
       {
@@ -190,7 +190,7 @@
       },
       {
         "title": "Filtrar lista",
-        "description": "Busque por termo, centro de serviço ou setor para limitar a tabela. O botão Limpar remove todos os filtros.",
+        "description": "Busque por termo, centro de serviço ou setor e clique em Aplicar para atualizar a tabela. O botão Limpar remove todos os filtros.",
         "mediaHint": "Filtros e chips acima da tabela de pessoas."
       },
       {

@@ -55,8 +55,12 @@ export function PessoasForm({
   )
 
   return (
-    <form className={`form${editingPessoa ? ' form--editing' : ''}`} onSubmit={onSubmit}>
-      <div className="form__grid">
+    <section className="card">
+      <header className="card__header">
+        <h2>Cadastro de pessoa</h2>
+      </header>
+      <form className={`form${editingPessoa ? ' form--editing' : ''}`} onSubmit={onSubmit}>
+        <div className="form__grid">
         <label className="field">
           <span>Nome <span className="asterisco">*</span></span>
           <input name="nome" value={form.nome} onChange={onChange} required placeholder="Joao Silva" />
@@ -152,6 +156,7 @@ export function PessoasForm({
           </button>
         ) : null}
       </div>
-    </form>
+      </form>
+    </section>
   )
 }

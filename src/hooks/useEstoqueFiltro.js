@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  filterEstoqueItens,
-  parsePeriodoRange,
-  uniqueSorted,
-  formatDateTimeValue,
-  formatCurrency,
-  formatInteger,
-} from '../utils/estoqueUtils.js'
+import { uniqueSorted, formatDateTimeValue, formatCurrency, formatInteger } from '../utils/estoqueUtils.js'
 
 export const ALERTAS_PAGE_SIZE = 6
 export const ITENS_PAGE_SIZE = 10
@@ -16,25 +9,14 @@ export function useEstoqueFiltro(initialFilters, estoque) {
   const [alertasPage, setAlertasPage] = useState(1)
   const [itensPage, setItensPage] = useState(1)
 
-  const periodoFiltro = useMemo(
-    () => parsePeriodoRange(filters.periodoInicio, filters.periodoFim || filters.periodoInicio),
-    [filters.periodoInicio, filters.periodoFim],
-  )
-
   const centrosCustoDisponiveis = useMemo(
     () => uniqueSorted(estoque.itens.flatMap((item) => item.centrosCusto ?? [])),
     [estoque.itens],
   )
 
-  const itensFiltrados = useMemo(
-    () => filterEstoqueItens(estoque.itens, filters, periodoFiltro),
-    [estoque.itens, filters, periodoFiltro],
-  )
+  const itensFiltrados = useMemo(() => estoque.itens, [estoque.itens])
 
-  const alertasFiltrados = useMemo(
-    () => itensFiltrados.filter((item) => item.alerta),
-    [itensFiltrados],
-  )
+  const alertasFiltrados = useMemo(() => estoque.alertas ?? [], [estoque.alertas])
 
   const totalAlertasPages =
     alertasFiltrados.length > 0 ? Math.max(1, Math.ceil(alertasFiltrados.length / ALERTAS_PAGE_SIZE)) : 1
@@ -135,10 +117,6 @@ export function useEstoqueFiltro(initialFilters, estoque) {
   }, [totalAlertasPages])
 
   useEffect(() => {
-    setItensPage(1)
-  }, [filters.termo, filters.centroCusto, filters.periodoInicio, filters.periodoFim, filters.estoqueMinimo, filters.apenasAlertas])
-
-  useEffect(() => {
     setItensPage((prev) => {
       if (prev > totalItensPages) {
         return totalItensPages
@@ -171,7 +149,6 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     handleSubmit,
     handleClear,
     centrosCustoDisponiveis,
-    periodoFiltro,
     itensFiltrados,
     alertasFiltrados,
     alertasPage,

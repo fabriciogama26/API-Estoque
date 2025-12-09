@@ -12,6 +12,7 @@ import {
   extractCentrosServico,
   extractSetores,
   extractTiposExecucao,
+  filterPessoas,
   sortPessoasByNome,
   updatePessoaPayload,
 } from '../rules/PessoasRules.js'
@@ -131,7 +132,7 @@ export function usePessoasController() {
           const tipoExecucaoAtual =
             pessoa.tipoExecucao ?? fallback.tipoExecucao ?? (tipoExecucaoIdAtual ? tiposExecucaoMap.get(tipoExecucaoIdAtual) ?? '' : '')
 
-          return {
+          const pessoaNormalizada = {
             ...fallback,
             ...pessoa,
             centroServico: centroServicoAtual,
@@ -140,9 +141,13 @@ export function usePessoasController() {
             cargo: cargoTextoAtual,
             tipoExecucao: tipoExecucaoAtual,
           }
+
+          return pessoaNormalizada
         })
 
-        setPessoas(enrichedPessoas)
+        const filtrosAplicados = { ...PESSOAS_FILTER_DEFAULT, ...params }
+        const pessoasFiltradas = filterPessoas(enrichedPessoas, filtrosAplicados)
+        setPessoas(pessoasFiltradas)
       } catch (err) {
         setError(err.message)
         reportError(err, { area: 'pessoas_load' })

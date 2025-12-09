@@ -46,8 +46,8 @@ Filtros, auto-complete e listagem
   - Registrado por (usuario).
   - Centro de estoque/custo.
   - Faixa de datas.
-  - "Aplicar" chama `load(filters)` com os filtros atuais.
-  - "Limpar" restaura filtros padrao e recarrega a lista.
+  - "Aplicar" chama `load(filters)` (consulta na API); nao ha refiltro local a cada tecla.
+  - "Limpar" restaura filtros padrao e recarrega a lista a partir da API.
 - Auto-complete de materiais:
   - Dispara busca apos um minimo de caracteres (`MATERIAL_SEARCH_MIN_CHARS`).
   - Usa debounce (`MATERIAL_SEARCH_DEBOUNCE_MS`) para nao sobrecarregar a API.

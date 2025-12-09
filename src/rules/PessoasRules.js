@@ -91,7 +91,15 @@ export function filterPessoas(pessoas, filters) {
 }
 
 export function sortPessoasByNome(pessoas) {
-  return pessoas.slice().sort((a, b) => a.nome.localeCompare(b.nome))
+  const resolveNome = (pessoa) => (pessoa?.nome ?? '').toString()
+  return pessoas
+    .slice()
+    .sort((a, b) =>
+      resolveNome(a).localeCompare(resolveNome(b), 'pt-BR', {
+        sensitivity: 'base',
+        ignorePunctuation: true,
+      }),
+    )
 }
 
 export function extractCentrosServico(pessoas) {

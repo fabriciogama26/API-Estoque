@@ -58,34 +58,39 @@ function ChartContainer({ chartFilter, onClear, children }) {
 function FiltersForm() {
   const { filters, handleChange, handleSubmit, handleClear } = useDashboardEstoqueContext()
   return (
-    <form className="form form--inline" onSubmit={handleSubmit}>
-      <label className="field">
-        <span>Periodo inicial</span>
-        <input type="month" name="periodoInicio" value={filters.periodoInicio} onChange={handleChange} />
-      </label>
-      <label className="field">
-        <span>Periodo final</span>
-        <input
-          type="month"
-          name="periodoFim"
-          value={filters.periodoFim}
-          onChange={handleChange}
-          min={filters.periodoInicio || undefined}
-        />
-      </label>
-      <label className="field">
-        <span>Busca</span>
-        <input name="termo" value={filters.termo} onChange={handleChange} placeholder="ex: bota, 3M, luva" />
-      </label>
-      <div className="form__actions">
-        <button type="submit" className="button button--primary">
-          Aplicar filtros
-        </button>
-        <button type="button" className="button button--ghost" onClick={handleClear}>
-          Limpar filtros
-        </button>
-      </div>
-    </form>
+    <section className="card">
+      <header className="card__header">
+        <h2>Filtros</h2>
+      </header>
+      <form className="form form--inline" onSubmit={handleSubmit}>
+        <label className="field">
+          <span>Periodo inicial</span>
+          <input type="month" name="periodoInicio" value={filters.periodoInicio} onChange={handleChange} />
+        </label>
+        <label className="field">
+          <span>Periodo final</span>
+          <input
+            type="month"
+            name="periodoFim"
+            value={filters.periodoFim}
+            onChange={handleChange}
+            min={filters.periodoInicio || undefined}
+          />
+        </label>
+        <label className="field">
+          <span>Busca</span>
+          <input name="termo" value={filters.termo} onChange={handleChange} placeholder="ex: bota, 3M, luva" />
+        </label>
+        <div className="form__actions">
+          <button type="submit" className="button button--primary">
+            Aplicar filtros
+          </button>
+          <button type="button" className="button button--ghost" onClick={handleClear}>
+            Limpar filtros
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }
 

@@ -55,6 +55,8 @@ export function useMateriaisController() {
   const [form, setForm] = useState(() => createMateriaisFormDefault())
   const [filters, setFilters] = useState(() => ({ ...MATERIAIS_FILTER_DEFAULT }))
   const [materiais, setMateriais] = useState([])
+  const [materiaisBase, setMateriaisBase] = useState([])
+  const [materiaisFiltrados, setMateriaisFiltrados] = useState([])
   const [historyCache, setHistoryCache] = useState({})
   const [historyModal, setHistoryModal] = useState(() => ({ ...HISTORY_MODAL_DEFAULT }))
   const [isLoading, setIsLoading] = useState(false)
@@ -89,7 +91,10 @@ export function useMateriaisController() {
     setError(null)
     try {
       const items = await listMateriaisDetalhado()
-      setMateriais(items ?? [])
+      const lista = items ?? []
+      setMateriais(lista)
+      setMateriaisBase(lista)
+      setMateriaisFiltrados(filterMateriais(lista, MATERIAIS_FILTER_DEFAULT, { sort: sortMateriaisByNome }))
     } catch (err) {
       setError(err.message)
       reportError(err, { area: 'materiais_load' })
@@ -425,10 +430,13 @@ export function useMateriaisController() {
 
   const handleFilterSubmit = (event) => {
     event.preventDefault()
+    setMateriaisFiltrados(filterMateriais(materiaisBase, filters, { sort: sortMateriaisByNome }))
   }
 
   const handleFilterClear = () => {
-    setFilters({ ...MATERIAIS_FILTER_DEFAULT })
+    const defaults = { ...MATERIAIS_FILTER_DEFAULT }
+    setFilters(defaults)
+    setMateriaisFiltrados(filterMateriais(materiaisBase, defaults, { sort: sortMateriaisByNome }))
   }
 
   const resetForm = () => {
@@ -552,16 +560,13 @@ export function useMateriaisController() {
     })
   }
 
-  const materiaisFiltrados = useMemo(
-    () => filterMateriais(materiais, filters, { sort: sortMateriaisByNome }),
-    [materiais, filters],
-  )
   const materiaisOrdenados = useMemo(() => sortMateriaisByNome(materiaisFiltrados), [materiaisFiltrados])
 
   return {
     form,
     filters,
     materiais,
+    materiaisBase,
     materiaisOrdenados,
     historyCache,
     historyModal,
