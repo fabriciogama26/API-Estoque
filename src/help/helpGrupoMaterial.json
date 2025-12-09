@@ -1,0 +1,96 @@
+{
+  "titulo": "Guia de grupos de material",
+  "resumo": "Use estes exemplos para preencher os campos Grupo de material e Material no cadastro.",
+  "grupos": [
+    {
+      "grupo": "Vestimentas",
+      "descricao": "Roupas de proteção para tronco, braços e pernas usadas em operações e manutenção.",
+      "materiais": [
+        "Avental",
+        "Blusa",
+        "Calça",
+        "Camisa",
+        "Capa de chuva",
+        "Capote",
+        "Colete",
+        "Conjunto",
+        "Gandola",
+        "Jaleco",
+        "Macacão",
+        "Perneira",
+        "Touca"
+      ]
+    },
+    {
+      "grupo": "Calçados",
+      "descricao": "Calçados de segurança para proteger os pés contra impacto, quedas e escorregamentos.",
+      "materiais": [
+        "Bota",
+        "Botina",
+        "Coturno",
+        "Sapato",
+        "Tênis"
+      ]
+    },
+    {
+      "grupo": "Proteção das Mãos",
+      "descricao": "Luvas e cremes barreira para reduzir cortes, químicos ou contaminantes nas mãos.",
+      "materiais": [
+        "Creme barreira",
+        "Luva"
+      ]
+    },
+    {
+      "grupo": "Proteção da Cabeça e Face",
+      "descricao": "EPIs para proteger cabeça, rosto e olhos contra impacto, queda de objetos e respingos.",
+      "materiais": [
+        "Capacete",
+        "Carneira",
+        "Filtro de máscara",
+        "Máscara com filtro",
+        "Óculos de segurança",
+        "Protetor facial"
+      ]
+    },
+    {
+      "grupo": "Proteção Auditiva",
+      "descricao": "Protetores para reduzir exposição a ruído contínuo ou de impacto.",
+      "materiais": [
+        "Protetor auricular",
+        "Protetor auricular tipo concha"
+      ]
+    },
+    {
+      "grupo": "Proteção Respiratória",
+      "descricao": "Respiradores e filtros para poeiras, fumaças, gases ou vapores.",
+      "materiais": [
+        "Filtro de máscara",
+        "Máscara sem filtro",
+        "Respirador purificador de ar"
+      ]
+    },
+    {
+      "grupo": "Proteção contra Quedas",
+      "descricao": "Equipamentos para trabalho em altura e sistemas antiqueda.",
+      "materiais": [
+        "Cinto de segurança",
+        "Cordas de ancoragem",
+        "Talabarte",
+        "Trava-quedas"
+      ]
+    },
+    {
+      "grupo": "Acessórios",
+      "descricao": "Complementos e suportes para uso com outros EPIs ou organização.",
+      "materiais": [
+        "Apoio",
+        "Bolso de perna",
+        "Cone",
+        "Creme protetor",
+        "Fita",
+        "Mosquetão",
+        "Protetor de nuca"
+      ]
+    }
+  ]
+}

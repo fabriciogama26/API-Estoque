@@ -71,6 +71,11 @@ ul, ol {
   color: var(--color-muted, #64748b);
 }
 
+.asterisco {
+  color: var(--color-danger); /* mude aqui para a cor desejada */
+  font-weight: 600;
+}
+
 /* Cabecalho de pagina */
 .page-header {
   display: flex;

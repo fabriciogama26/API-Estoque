@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AddIcon } from '../icons.jsx'
+import { GrupoMaterialHelpButton } from './GrupoMaterialHelpButton.jsx'
 import {
   GRUPO_MATERIAL_CALCADO,
   GRUPO_MATERIAL_VESTIMENTA,
@@ -110,13 +111,19 @@ export function MateriaisForm({
   return (
     <section className="card">
       <header className="card__header">
-        <h2>Cadastro de EPI</h2>
+        <h2>Cadastro de Materiais</h2>
       </header>
       <form className={`form${editingMaterial ? ' form--editing' : ''}`} onSubmit={onSubmit}>
         <div className="form__grid form__grid--two">
-        <label className="field">
-          <span>Grupo de material <span className="asterisco">*</span></span>
+        <div className="field">
+          <div className="field__label-row">
+            <label className="field__label-text field__label-text--strong" htmlFor="grupoMaterialId">
+              Grupo de material <span className="asterisco">*</span>
+            </label>
+            <GrupoMaterialHelpButton />
+          </div>
           <select
+            id="grupoMaterialId"
             name="grupoMaterialId"
             value={form.grupoMaterialId || ''}
             onChange={onChange}
@@ -132,9 +139,9 @@ export function MateriaisForm({
               </option>
             ))}
           </select>
-        </label>
+        </div>
         <label className="field">
-          <span>EPI <span className="asterisco">*</span></span>
+          <span>Material <span className="asterisco">*</span></span>
           <select
             name="nome"
             value={form.nome || ''}
@@ -144,11 +151,11 @@ export function MateriaisForm({
           >
             <option value="">
               {isLoadingItems
-                ? 'Carregando EPIs...'
+                ? 'Carregando Material...'
                 : form.grupoMaterialId
                   ? itemOptions.length
-                    ? 'Selecione o EPI'
-                    : 'Nenhum EPI cadastrado para o grupo'
+                    ? 'Selecione o Material'
+                    : 'Nenhum Material cadastrado para o grupo'
                   : 'Selecione um grupo primeiro'}
             </option>
             {itemOptions.map((item) => (
@@ -229,7 +236,7 @@ export function MateriaisForm({
               ))}
             </ul>
           ) : (
-            <p className="field__helper">Adicione todas as características do EPI.</p>
+            <p className="field__helper">Adicione todas as características do material.</p>
           )}
           {caracteristicaError ? (
             <p className="feedback feedback--error">{caracteristicaError}</p>
@@ -258,7 +265,7 @@ export function MateriaisForm({
           />
         </label>
         <label className="field">
-          <span>Valor unitario <span className="asterisco">*</span></span>
+          <span>Valor unitário <span className="asterisco">*</span></span>
           <input
             name="valorUnitario"
             value={form.valorUnitario}
@@ -270,7 +277,7 @@ export function MateriaisForm({
         </label>
         <label className="field">
           <span>
-            Numero calçado {isCalcado ? <span className="asterisco">*</span> : null}
+            Número calçado {isCalcado ? <span className="asterisco">*</span> : null}
           </span>
           <select
             name="numeroCalcado"

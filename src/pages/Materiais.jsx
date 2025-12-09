@@ -79,7 +79,7 @@ function MateriaisContent() {
     <div className="stack">
       <PageHeader
         icon={<MaterialIcon size={28} />}
-        title="Cadastro de EPI's"
+        title="Cadastro de Materiais"
         subtitle="Cadastre e edite materiais com rastreabilidade e historico de preco."
         actions={<HelpButton topic="materiais" />}
       />
