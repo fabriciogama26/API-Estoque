@@ -15,7 +15,7 @@ Fluxos principais
 
 - Formulário: dados básicos (item/grupo/fabricante), medidas (calçado/vestimenta), CA, validade, valor unitário, estoque mínimo, ativo; prevenção de duplicidade via gatilho.
 - Lista: colunas Grupo, Material, Descrição, Valor unitário, Validade (dias), Fabricante, Registrado por, Cadastrado em; ações Ver (detalhes em cartões), Editar, Histórico.
-- Filtros: termo livre, grupo, tamanho/número, fabricante, características, cores, status e intervalo de valor unitário (mín/máx); limpar restaura defaults.
+- Filtros: termo livre, grupo, tamanho/número, fabricante, características, cores, status e intervalo de valor unitário (mín/máx); ajuste os campos e clique em Aplicar para recalcular (sem refiltro automático); limpar restaura defaults.
 - Detalhes: modal em cartões (padrão acidentes) com todos os campos, buscando o material completo por id.
 - Histórico: modal no padrão “Histórico do acidente”, exibindo edições campo a campo (usuário/data).
 

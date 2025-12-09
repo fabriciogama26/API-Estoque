@@ -28,8 +28,8 @@ Filtros
 - Termo de busca (nome do material, fabricante, centro).
 - Centro de estoque/servico.
 - Botoes:
-  - "Aplicar filtros" chama `load(filters)`.
-  - "Limpar filtros" restaura defaults e recarrega a visao padrao.
+  - "Aplicar filtros" consulta na API (sem refiltro local em memoria).
+  - "Limpar filtros" restaura defaults e recarrega a visao padrao a partir da API.
 
 Alertas
 -------

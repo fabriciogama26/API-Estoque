@@ -2985,7 +2985,7 @@ export const api = {
         if ((!registros || registros.length === 0) && !termo) {
           // Fallback direto na view caso o RPC esteja desatualizado ou sem dados.
           const fallbackDados = await execute(
-            supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT),
+            supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).order('nome', { ascending: true }),
             'Falha ao listar pessoas (fallback view).'
           )
           registros = (fallbackDados ?? []).map(mapPessoaRecord)

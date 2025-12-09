@@ -116,8 +116,12 @@ export function AcidentesForm({
   const shouldDisableLocal = isLoadingLocais && localOptions.length === 0
 
   return (
-    <form className={`form${editingAcidente ? ' form--editing' : ''}`} onSubmit={onSubmit}>
-      <div className="form__grid form__grid--two">
+    <section className="card">
+      <header className="card__header">
+        <h2>Cadastro de acidente</h2>
+      </header>
+      <form className={`form${editingAcidente ? ' form--editing' : ''}`} onSubmit={onSubmit}>
+        <div className="form__grid form__grid--two">
         <label className="field">
           <span>Matricula <span className="asterisco">*</span></span>
           <select
@@ -265,8 +269,8 @@ export function AcidentesForm({
         <label className="field field--full">
           <span>Observacao</span>
           <textarea
-            name="observacao"
-            value={form.observacao ?? ''}
+        name="observacao"
+        value={form.observacao ?? ''}
         onChange={onChange}
         placeholder="Detalhes adicionais do acidente"
         rows={3}
@@ -324,6 +328,7 @@ export function AcidentesForm({
           </button>
         ) : null}
       </div>
-    </form>
+      </form>
+    </section>
   )
 }

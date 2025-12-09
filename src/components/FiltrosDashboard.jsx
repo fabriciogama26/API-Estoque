@@ -30,112 +30,117 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
   const cargosOptions = buildOptionsWithCurrent(cargos, filters.cargo)
 
   return (
-    <form className={formClassName} onSubmit={onSubmit}>
-      <div className="form__grid form--filters__grid">
-        <label className="field">
-          <span>Periodo inicial</span>
-          <input
-            type="month"
-            name="periodoInicio"
-            value={filters.periodoInicio ?? ''}
-            onChange={onChange}
-            max={filters.periodoFim || undefined}
-          />
-        </label>
+    <section className="card">
+      <header className="card__header">
+        <h2>Filtros</h2>
+      </header>
+      <form className={formClassName} onSubmit={onSubmit}>
+        <div className="form__grid form--filters__grid">
+          <label className="field">
+            <span>Periodo inicial</span>
+            <input
+              type="month"
+              name="periodoInicio"
+              value={filters.periodoInicio ?? ''}
+              onChange={onChange}
+              max={filters.periodoFim || undefined}
+            />
+          </label>
 
-        <label className="field">
-          <span>Periodo final</span>
-          <input
-            type="month"
-            name="periodoFim"
-            value={filters.periodoFim ?? ''}
-            onChange={onChange}
-            min={filters.periodoInicio || undefined}
-          />
-        </label>
+          <label className="field">
+            <span>Periodo final</span>
+            <input
+              type="month"
+              name="periodoFim"
+              value={filters.periodoFim ?? ''}
+              onChange={onChange}
+              min={filters.periodoInicio || undefined}
+            />
+          </label>
 
-        <label className="field">
-          <span>Centro de servico</span>
-          <select name="centroServico" value={filters.centroServico ?? ''} onChange={onChange}>
-            <option value="">Todos</option>
-            {centrosServicoOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="field">
+            <span>Centro de servico</span>
+            <select name="centroServico" value={filters.centroServico ?? ''} onChange={onChange}>
+              <option value="">Todos</option>
+              {centrosServicoOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="field">
-          <span>Tipo</span>
-          <select name="tipo" value={filters.tipo ?? ''} onChange={onChange}>
-            <option value="">Todos</option>
-            {tiposOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="field">
+            <span>Tipo</span>
+            <select name="tipo" value={filters.tipo ?? ''} onChange={onChange}>
+              <option value="">Todos</option>
+              {tiposOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="field">
-          <span>Lesao</span>
-          <select name="lesao" value={filters.lesao ?? ''} onChange={onChange}>
-            <option value="">Todas</option>
-            {lesoesOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="field">
+            <span>Lesao</span>
+            <select name="lesao" value={filters.lesao ?? ''} onChange={onChange}>
+              <option value="">Todas</option>
+              {lesoesOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="field">
-          <span>Parte lesionada</span>
-          <select name="parteLesionada" value={filters.parteLesionada ?? ''} onChange={onChange}>
-            <option value="">Todas</option>
-            {partesLesionadasLista.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="field">
+            <span>Parte lesionada</span>
+            <select name="parteLesionada" value={filters.parteLesionada ?? ''} onChange={onChange}>
+              <option value="">Todas</option>
+              {partesLesionadasLista.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="field">
-          <span>Agente</span>
-          <select name="agente" value={filters.agente ?? ''} onChange={onChange}>
-            <option value="">Todos</option>
-            {agentesOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="field">
+            <span>Agente</span>
+            <select name="agente" value={filters.agente ?? ''} onChange={onChange}>
+              <option value="">Todos</option>
+              {agentesOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="field">
-          <span>Cargo</span>
-          <select name="cargo" value={filters.cargo ?? ''} onChange={onChange}>
-            <option value="">Todos</option>
-            {cargosOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+          <label className="field">
+            <span>Cargo</span>
+            <select name="cargo" value={filters.cargo ?? ''} onChange={onChange}>
+              <option value="">Todos</option>
+              {cargosOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-      <div className="form__actions">
-        <button type="submit" className="button button--primary">
-          Aplicar filtros
-        </button>
-        <button type="button" className="button button--ghost" onClick={onReset}>
-          Limpar filtros
-        </button>
-      </div>
-    </form>
+        <div className="form__actions">
+          <button type="submit" className="button button--primary">
+            Aplicar filtros
+          </button>
+          <button type="button" className="button button--ghost" onClick={onReset}>
+            Limpar filtros
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }
 
@@ -168,3 +173,4 @@ FiltrosDashboard.defaultProps = {
   options: undefined,
   className: undefined,
 }
+

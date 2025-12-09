@@ -584,59 +584,7 @@ export function useSaidasController() {
     })
   }, [saidas.length])
 
-  const normalizedSearchTerm = normalizeSearchValue(filters.termo)
-  const startTimestamp = filters.dataInicio ? Date.parse(`${filters.dataInicio}T00:00:00Z`) : null
-  const endTimestamp = filters.dataFim ? Date.parse(`${filters.dataFim}T23:59:59Z`) : null
-
-  const saidasFiltradas = useMemo(
-    () =>
-      saidas.filter((saida) => {
-        const dataEntrega = saida.dataEntrega ? Date.parse(saida.dataEntrega) : null
-        if (startTimestamp && (dataEntrega === null || dataEntrega < startTimestamp)) return false
-        if (endTimestamp && (dataEntrega === null || dataEntrega > endTimestamp)) return false
-        if (filters.registradoPor) {
-          const candidatos = [saida.usuarioResponsavelId, saida.usuarioResponsavel, saida.usuarioResponsavelNome]
-            .map((valor) => (valor ? String(valor).trim() : ''))
-          if (!candidatos.includes(filters.registradoPor)) return false
-        }
-        if (filters.centroCusto) {
-          const candidato = normalizeSearchValue(saida.centroCusto || saida.centroCustoId || '')
-          const filtro = normalizeSearchValue(filters.centroCusto)
-          if (!candidato.includes(filtro)) return false
-        }
-        if (filters.centroServico) {
-          const candidato = normalizeSearchValue(saida.centroServico || saida.centroServicoId || '')
-          const filtro = normalizeSearchValue(filters.centroServico)
-          if (!candidato.includes(filtro)) return false
-        }
-        if (filters.status) {
-          const statusLower = normalizeSearchValue(saida.status)
-          if (statusLower !== normalizeSearchValue(filters.status)) return false
-        }
-        if (normalizedSearchTerm) {
-          const pessoa = pessoas.find((p) => p.id === saida.pessoaId)
-          const pessoaResumo = normalizeSearchValue(pessoa ? formatPessoaSummary(pessoa) : '')
-          const material = materiais.find((m) => m.id === saida.materialId)
-          const materialResumo = normalizeSearchValue(material ? formatMaterialSummary(material) : '')
-          if (!pessoaResumo.includes(normalizedSearchTerm) && !materialResumo.includes(normalizedSearchTerm)) {
-            return false
-          }
-        }
-        return true
-      }),
-    [
-      saidas,
-      filters.registradoPor,
-      filters.centroCusto,
-      filters.centroServico,
-      filters.status,
-      normalizedSearchTerm,
-      pessoas,
-      materiais,
-      startTimestamp,
-      endTimestamp,
-    ],
-  )
+  const saidasFiltradas = useMemo(() => saidas, [saidas])
 
   const statusFilterOptions = useMemo(() => {
     const uniq = new Set(

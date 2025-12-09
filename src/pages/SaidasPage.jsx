@@ -101,9 +101,12 @@ function SaidasContent() {
         actions={<HelpButton topic="saidas" />}
       />
 
-      <form className={`card form${editingSaida ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
-        <h2>{editingSaida ? 'Editando...' : 'Registrar saída'}</h2>
-        <div className="form__grid form__grid--two">
+      <section className="card">
+        <header className="card__header">
+          <h2>{editingSaida ? 'Editando...' : 'Registrar saída'}</h2>
+        </header>
+        <form className={`form${editingSaida ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
+          <div className="form__grid form__grid--two">
           <label className="field autocomplete">
             <span>Pessoa*</span>
             <div className="autocomplete__control">
@@ -283,51 +286,64 @@ function SaidasContent() {
           ) : null}
         </div>
       </form>
+      </section>
 
-      <form className="form form--inline" onSubmit={handleFilterSubmit}>
-        <label className="field">
-          <span>Buscar</span>
-          <input name="termo" value={filters.termo} onChange={handleFilterChange} placeholder="Buscar por pessoa ou material" />
-        </label>
-        <label className="field">
-          <span>Registrado por</span>
-          <select name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange}>
-            <option value="">Todos</option>
-            {registradoPorFilterOptions.map((opt) => (
-              <option key={opt.id} value={opt.label}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Status</span>
-          <select name="status" value={filters.status} onChange={handleFilterChange}>
-            <option value="">Todos</option>
-            {statusOptions.map((opt) => (
-              <option key={opt.id} value={opt.label}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Data inicial</span>
-          <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
-        </label>
-        <label className="field">
-          <span>Data final</span>
-          <input type="date" name="dataFim" value={filters.dataFim} onChange={handleFilterChange} />
-        </label>
-        <div className="form__actions">
-          <button type="submit" className="button button--ghost">
-            Aplicar
-          </button>
-          <button type="button" className="button button--ghost" onClick={handleFilterClear}>
-            Limpar
-          </button>
-        </div>
-      </form>
+      
+      <section className="card">
+        <header className="card__header">
+          <h2>Filtros</h2>
+        </header>
+        <form className="form form--inline" onSubmit={handleFilterSubmit}>
+          <label className="field">
+            <span>Buscar</span>
+            <input
+              name="termo"
+              value={filters.termo}
+              onChange={handleFilterChange}
+              placeholder="Buscar por pessoa ou material"
+            />
+          </label>
+          <label className="field">
+            <span>Registrado por</span>
+            <select name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              {registradoPorFilterOptions.map((opt) => (
+                <option key={opt.id} value={opt.label}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Status</span>
+            <select name="status" value={filters.status} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              {statusOptions.map((opt) => (
+                <option key={opt.id} value={opt.label}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Data inicial</span>
+            <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
+          </label>
+          <label className="field">
+            <span>Data final</span>
+            <input type="date" name="dataFim" value={filters.dataFim} onChange={handleFilterChange} />
+          </label>
+          <div className="form__actions">
+            <button type="submit" className="button button--ghost">
+              Aplicar
+            </button>
+            <button type="button" className="button button--ghost" onClick={handleFilterClear}>
+              Limpar
+            </button>
+          </div>
+        </form>
+      </section>
+
 
       <section className="card">
         <header className="card__header">

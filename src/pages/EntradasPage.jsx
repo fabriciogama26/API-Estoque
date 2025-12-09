@@ -59,9 +59,12 @@ function EntradasContent() {
         actions={<HelpButton topic="entradas" />}
       />
 
-      <form className={`card form${isEditing ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
-        <h2>{isEditing ? 'Editando...' : 'Registrar entrada'}</h2>
-        <div className="form__grid form__grid--two">
+      <section className="card">
+        <header className="card__header">
+          <h2>{isEditing ? 'Editando...' : 'Registrar entrada'}</h2>
+        </header>
+        <form className={`form${isEditing ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
+          <div className="form__grid form__grid--two">
           <label className="field autocomplete">
             <span>Material*</span>
             <div className="autocomplete__control">
@@ -145,52 +148,58 @@ function EntradasContent() {
             </button>
           ) : null}
         </div>
-      </form>
+        </form>
+      </section>
 
-      <form className="form form--inline" onSubmit={handleFilterSubmit}>
-        <label className="field">
-          <span>Buscar</span>
-          <input name="termo" value={filters.termo} onChange={handleFilterChange} placeholder="Buscar por material" />
-        </label>
-        <label className="field">
-          <span>Registrado por</span>
-          <select name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange}>
-            <option value="">Todos</option>
-            {registeredOptions.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Centro de estoque</span>
-          <select name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange}>
-            <option value="">Todos</option>
-            {centroCustoFilterOptions.map((item) => (
-              <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
-                {item.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Data inicial</span>
-          <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
-        </label>
-        <label className="field">
-          <span>Data final</span>
-          <input type="date" name="dataFim" value={filters.dataFim} onChange={handleFilterChange} />
-        </label>
-        <div className="form__actions">
-          <button type="submit" className="button button--ghost">
-            Aplicar
-          </button>
-          <button type="button" className="button button--ghost" onClick={handleFilterClear}>
-            Limpar
-          </button>
-        </div>
-      </form>
+      <section className="card">
+        <header className="card__header">
+          <h2>Filtros</h2>
+        </header>
+        <form className="form form--inline" onSubmit={handleFilterSubmit}>
+          <label className="field">
+            <span>Buscar</span>
+            <input name="termo" value={filters.termo} onChange={handleFilterChange} placeholder="Buscar por material" />
+          </label>
+          <label className="field">
+            <span>Registrado por</span>
+            <select name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              {registeredOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Centro de estoque</span>
+            <select name="centroCusto" value={filters.centroCusto} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              {centroCustoFilterOptions.map((item) => (
+                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Data inicial</span>
+            <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
+          </label>
+          <label className="field">
+            <span>Data final</span>
+            <input type="date" name="dataFim" value={filters.dataFim} onChange={handleFilterChange} />
+          </label>
+          <div className="form__actions">
+            <button type="submit" className="button button--ghost">
+              Aplicar
+            </button>
+            <button type="button" className="button button--ghost" onClick={handleFilterClear}>
+              Limpar
+            </button>
+          </div>
+        </form>
+      </section>
 
       <section className="card">
         <header className="card__header">

@@ -108,8 +108,12 @@ export function MateriaisForm({
   const [corSelecionada, setCorSelecionada] = useState('')
 
   return (
-    <form className={`card form${editingMaterial ? ' form--editing' : ''}`} onSubmit={onSubmit}>
-      <div className="form__grid form__grid--two">
+    <section className="card">
+      <header className="card__header">
+        <h2>Cadastro de EPI</h2>
+      </header>
+      <form className={`form${editingMaterial ? ' form--editing' : ''}`} onSubmit={onSubmit}>
+        <div className="form__grid form__grid--two">
         <label className="field">
           <span>Grupo de material <span className="asterisco">*</span></span>
           <select
@@ -396,6 +400,7 @@ export function MateriaisForm({
           </button>
         ) : null}
       </div>
-    </form>
+      </form>
+    </section>
   )
 }
