@@ -1,4 +1,6 @@
 Tela: Saídas de Materiais
+- Conteúdo em src/help/helpContent.json (chave 'saidas'); edite títulos/steps/notes e mídias (/public/help/saidas/*).
+- Campos com * sao obrigatorios no formulario.
 
 Visão geral
 

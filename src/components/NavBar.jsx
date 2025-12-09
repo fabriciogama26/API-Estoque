@@ -49,7 +49,7 @@ const navSections = [
     icon: PeopleIcon,
     items: [
       { to: '/cadastros/pessoas', label: 'Pessoas', icon: PeopleIcon, pageId: 'cadastros-pessoas' },
-      { to: '/cadastros/materiais', label: "EPI's", icon: MaterialIcon, pageId: 'cadastros-materiais' },
+      { to: '/cadastros/materiais', label: "Materiais", icon: MaterialIcon, pageId: 'cadastros-materiais' },
     ],
   },
   {

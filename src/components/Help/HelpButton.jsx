@@ -44,6 +44,12 @@ function HelpDialog({ open, onClose, content, topic }) {
   const { title, summary, steps = [], notes = [], links = [] } = resolvedContent
   const hasContent = Boolean(content)
 
+  const requiredNote = 'Campos marcados com * são obrigatórios.'
+  const mergedNotes = Array.isArray(notes) ? [...notes] : []
+  if (!mergedNotes.includes(requiredNote)) {
+    mergedNotes.push(requiredNote)
+  }
+
   const handleOverlayClick = () => {
     onClose?.()
   }
@@ -129,11 +135,11 @@ function HelpDialog({ open, onClose, content, topic }) {
             <p className="feedback">Nenhum passo cadastrado para esta pagina.</p>
           )}
 
-          {notes.length ? (
+          {mergedNotes.length ? (
             <div className="help-notes">
               <h4>Notas rapidas</h4>
               <ul>
-                {notes.map((note, index) => (
+                {mergedNotes.map((note, index) => (
                   <li key={index}>{note}</li>
                 ))}
               </ul>

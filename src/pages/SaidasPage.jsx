@@ -108,7 +108,7 @@ function SaidasContent() {
         <form className={`form${editingSaida ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
           <div className="form__grid form__grid--two">
           <label className="field autocomplete">
-            <span>Pessoa*</span>
+            <span>Pessoa <span className="asterisco">*</span></span>
             <div className="autocomplete__control">
               <input
                 className="autocomplete__input"
@@ -153,7 +153,7 @@ function SaidasContent() {
           </label>
 
           <label className="field">
-            <span>Centro de estoque*</span>
+            <span>Centro de estoque <span className="asterisco">*</span></span>
             <select name="centroEstoqueId" value={form.centroEstoqueId} onChange={handleChange} required>
               <option value="">Selecione</option>
               {centrosEstoqueOptions.map((item) => (
@@ -165,7 +165,7 @@ function SaidasContent() {
           </label>
 
           <label className="field autocomplete">
-            <span>Material*</span>
+            <span>Material <span className="asterisco">*</span></span>
             <div className="autocomplete__control">
               <input
                 className="autocomplete__input"
@@ -211,7 +211,7 @@ function SaidasContent() {
           </label>
 
           <label className="field">
-            <span>Quantidade*</span>
+            <span>Quantidade <span className="asterisco">*</span></span>
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
           </label>
 
@@ -231,7 +231,7 @@ function SaidasContent() {
           </label>
 
           <label className="field">
-            <span>Centro de Custo*</span>
+            <span>Centro de Custo</span>
             <input
               name="centroCusto"
               value={form.centroCusto}
@@ -243,7 +243,7 @@ function SaidasContent() {
           </label>
 
           <label className="field">
-            <span>Centro de serviço*</span>
+            <span>Centro de serviço</span>
             <input
               name="centroServico"
               value={form.centroServico}
@@ -255,7 +255,7 @@ function SaidasContent() {
           </label>
 
           <label className="field">
-            <span>Data da entrega*</span>
+            <span>Data da entrega <span className="asterisco">*</span></span>
             <input type="date" name="dataEntrega" value={form.dataEntrega} onChange={handleChange} required />
           </label>
 

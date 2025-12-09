@@ -1,8 +1,10 @@
 Tela: Cadastro de Pessoas
 
-Visao geral
+- Campos com * sao obrigatorios no formulario.
 
-Cadastro/edicao de colaboradores (funcionarios, terceiros, estagiarios) com vinculo a centro de servico, centro de custo, setor, cargo e tipo de execucao. Filtros e historico de alteracoes.
+Visao geral
+-----------
+- Cadastro/edicao de colaboradores (funcionarios, terceiros, estagiarios) com vinculo a centro de servico, centro de custo, setor, cargo e tipo de execucao. Filtros e historico de alteracoes.
 
 Arquitetura (modular)
 

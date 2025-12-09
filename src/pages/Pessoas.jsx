@@ -86,16 +86,14 @@ function PessoasContent() {
           </button>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
-        {!isLoading ? (
-          <PessoasTable
-            pessoas={pessoasOrdenadas}
-            editingId={editingPessoa?.id ?? null}
-            isSaving={isSaving}
-            onEdit={startEdit}
-            onHistory={openHistory}
-            historyState={historyState}
-          />
-        ) : null}
+        <PessoasTable
+          pessoas={pessoasOrdenadas}
+          editingId={editingPessoa?.id ?? null}
+          isSaving={isSaving}
+          onEdit={startEdit}
+          onHistory={openHistory}
+          historyState={historyState}
+        />
       </section>
 
       <PessoasHistoryModal state={historyState} onClose={closeHistory} />

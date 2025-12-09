@@ -528,16 +528,33 @@ export function useMateriaisController() {
     }
     const grupoNome = materialAtualizado.grupoMaterialNome || materialAtualizado.grupoMaterial || ''
     const grupoAtual = normalizeSelectionItem({ id: materialAtualizado.grupoMaterialId, nome: grupoNome })
-    const isCalcado = isGrupo(grupoNome, GRUPO_MATERIAL_CALCADO)
-    const isVestimenta =
+    const isCalcadoGrupo = isGrupo(grupoNome, GRUPO_MATERIAL_CALCADO)
+    const hasCalcadoDados =
+      Boolean(materialAtualizado.numeroCalcado) || Boolean(materialAtualizado.numeroCalcadoNome)
+    const isCalcado = isCalcadoGrupo || hasCalcadoDados
+
+    const isVestimentaGrupo =
       isGrupo(grupoNome, GRUPO_MATERIAL_VESTIMENTA) || isGrupo(grupoNome, GRUPO_MATERIAL_PROTECAO_MAOS)
+    const hasVestimentaDados =
+      Boolean(materialAtualizado.numeroVestimenta) || Boolean(materialAtualizado.numeroVestimentaNome)
+    const isVestimenta = isVestimentaGrupo || hasVestimentaDados
     setMaterialGroups((prev) => normalizeSelectionWithCurrent(prev, grupoAtual))
     setMaterialItems((prev) => normalizeSelectionWithCurrent(prev, { id: materialAtualizado.nome, nome: materialAtualizado.materialItemNome || materialAtualizado.nome }))
     setFabricanteOptions((prev) =>
       normalizeSelectionWithCurrent(prev, { id: materialAtualizado.fabricante, nome: materialAtualizado.fabricanteNome }),
     )
-    setCalcadoOptions((prev) => normalizeSelectionWithCurrent(prev, { id: materialAtualizado.numeroCalcado, nome: materialAtualizado.numeroCalcadoNome }))
-    setTamanhoOptions((prev) => normalizeSelectionWithCurrent(prev, { id: materialAtualizado.numeroVestimenta, nome: materialAtualizado.numeroVestimentaNome }))
+    setCalcadoOptions((prev) =>
+      normalizeSelectionWithCurrent(prev, {
+        id: materialAtualizado.numeroCalcado ?? materialAtualizado.numeroCalcadoNome,
+        nome: materialAtualizado.numeroCalcadoNome ?? materialAtualizado.numeroCalcado ?? '',
+      }),
+    )
+    setTamanhoOptions((prev) =>
+      normalizeSelectionWithCurrent(prev, {
+        id: materialAtualizado.numeroVestimenta ?? materialAtualizado.numeroVestimentaNome,
+        nome: materialAtualizado.numeroVestimentaNome ?? materialAtualizado.numeroVestimenta ?? '',
+      }),
+    )
     const caracteristicaEpi = parseCaracteristicaEpi(materialAtualizado.caracteristicaEpi || materialAtualizado.caracteristicas)
     setForm({
       ...materialAtualizado,
@@ -552,10 +569,14 @@ export function useMateriaisController() {
       cores: materialAtualizado.cores || [],
       coresIds: (materialAtualizado.cores || []).map((item) => item.id).filter(Boolean),
       corMaterial: materialAtualizado.corMaterial || materialAtualizado.cores?.[0]?.nome || '',
-      numeroCalcado: isCalcado ? materialAtualizado.numeroCalcado : '',
-      numeroCalcadoNome: isCalcado ? materialAtualizado.numeroCalcadoNome : '',
-      numeroVestimenta: isVestimenta ? materialAtualizado.numeroVestimenta : '',
-      numeroVestimentaNome: isVestimenta ? materialAtualizado.numeroVestimentaNome : '',
+      numeroCalcado: isCalcado ? materialAtualizado.numeroCalcado ?? materialAtualizado.numeroCalcadoNome ?? '' : '',
+      numeroCalcadoNome: isCalcado ? materialAtualizado.numeroCalcadoNome ?? materialAtualizado.numeroCalcado ?? '' : '',
+      numeroVestimenta: isVestimenta
+        ? materialAtualizado.numeroVestimenta ?? materialAtualizado.numeroVestimentaNome ?? ''
+        : '',
+      numeroVestimentaNome: isVestimenta
+        ? materialAtualizado.numeroVestimentaNome ?? materialAtualizado.numeroVestimenta ?? ''
+        : '',
       valorUnitario: formatCurrency(materialAtualizado.valorUnitario ?? materialAtualizado.valorUnitarioHistorico ?? 0),
     })
   }

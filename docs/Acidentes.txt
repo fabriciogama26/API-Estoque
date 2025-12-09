@@ -1,6 +1,7 @@
 Tela: Cadastro de Acidentes
 ===========================
 
+- Campos com * sao obrigatorios no formulario.
 Visao geral
 -----------
 - Registrar, editar e consultar acidentes de trabalho vinculados a pessoas cadastradas (funcionarios, estagiarios, terceiros autorizados).

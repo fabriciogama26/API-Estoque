@@ -66,7 +66,7 @@ function EntradasContent() {
         <form className={`form${isEditing ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
           <div className="form__grid form__grid--two">
           <label className="field autocomplete">
-            <span>Material*</span>
+            <span>Material <span className="asterisco">*</span> </span>
             <div className="autocomplete__control">
               <input
                 className="autocomplete__input"
@@ -108,11 +108,11 @@ function EntradasContent() {
             </div>
           </label>
           <label className="field">
-            <span>Quantidade*</span>
+            <span>Quantidade <span className="asterisco">*</span></span>
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
           </label>
           <label className="field">
-            <span>Centro de estoque*</span>
+            <span>Centro de estoque <span className="asterisco">*</span></span>
             {hasCentrosCusto ? (
               <select name="centroCusto" value={form.centroCusto} onChange={handleChange} required>
                 <option value="">Selecione um centro de estoque</option>
@@ -133,7 +133,7 @@ function EntradasContent() {
             )}
           </label>
           <label className="field">
-            <span>Data da entrada*</span>
+            <span>Data da entrada <span className="asterisco">*</span></span>
             <input type="date" name="dataEntrada" value={form.dataEntrada} onChange={handleChange} required />
           </label>
         </div>
@@ -250,7 +250,7 @@ function EntradasContent() {
                       <td>{centroCustoLabel}</td>
                       <td>{formatCurrency(total)}</td>
                       <td>{formatDisplayDate(entrada.dataEntrada)}</td>
-                      <td>{entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Nao informado'}</td>
+                      <td>{entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Não informado'}</td>
                       <td>
                         <div className="table-actions materiais-data-table__actions">
                           <button

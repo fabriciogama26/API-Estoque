@@ -12,7 +12,6 @@ import {
   extractCentrosServico,
   extractSetores,
   extractTiposExecucao,
-  filterPessoas,
   sortPessoasByNome,
   updatePessoaPayload,
 } from '../rules/PessoasRules.js'
@@ -80,7 +79,7 @@ export function usePessoasController() {
   }, [reportError])
 
   const loadPessoas = useCallback(
-    async (params = filters, refreshOptions = false) => {
+    async (params = PESSOAS_FILTER_DEFAULT, refreshOptions = false) => {
       setIsLoading(true)
       setError(null)
       try {
@@ -145,9 +144,7 @@ export function usePessoasController() {
           return pessoaNormalizada
         })
 
-        const filtrosAplicados = { ...PESSOAS_FILTER_DEFAULT, ...params }
-        const pessoasFiltradas = filterPessoas(enrichedPessoas, filtrosAplicados)
-        setPessoas(pessoasFiltradas)
+        setPessoas(enrichedPessoas)
       } catch (err) {
         setError(err.message)
         reportError(err, { area: 'pessoas_load' })
@@ -155,7 +152,7 @@ export function usePessoasController() {
         setIsLoading(false)
       }
     },
-    [filters, pessoasOptions.length, refreshReferencias, reportError],
+    [pessoasOptions.length, refreshReferencias, reportError],
   )
 
   useEffect(() => {

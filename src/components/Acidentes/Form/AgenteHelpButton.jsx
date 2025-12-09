@@ -94,7 +94,6 @@ export function AgenteHelpButton() {
               <div className="help-title">
                 <p className="help-eyebrow">Ajuda do campo Agente</p>
                 <h3>{content.titulo}</h3>
-                {content.resumo ? <p className="help-summary">{content.resumo}</p> : null}
               </div>
               <button type="button" className="help-close" onClick={close} aria-label="Fechar ajuda de agente">
                 <span aria-hidden="true">&times;</span>

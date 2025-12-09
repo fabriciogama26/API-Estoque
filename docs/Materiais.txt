@@ -1,4 +1,6 @@
 Tela: Cadastro de Materiais (EPI)
+- Conteúdo em src/help/helpContent.json (chave 'materiais'); edite títulos/steps/notes e mídias (/public/help/materiais/*).
+- Campos com * sao obrigatorios no formulario.
 
 Visão geral
 

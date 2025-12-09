@@ -5,8 +5,8 @@ Visao geral
 -----------
 - Registra novas entradas de materiais no estoque.
 - Exibe historico paginado das movimentacoes de entrada.
-- Reutiliza catalogos de materiais para validar registros e calcular valores totais (quantidade × valor unitario).
-
+- Reutiliza catalogos de materiais para validar registros e calcular valores totais (quantidade ?- valor unitario).
+- Campos com * sao obrigatorios no formulario.
 Arquitetura
 -----------
 - Contexto:
