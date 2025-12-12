@@ -3,6 +3,7 @@ import '../styles/LoginPage.css'
 
 const logoSrc = '/logo2.png'
 
+
 const BadgeIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className="field__icon">
     <path
