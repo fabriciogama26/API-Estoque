@@ -153,6 +153,6 @@ export default withAuth(async (req, res, user) => {
 
     methodNotAllowed(res, ['GET', 'POST', 'PUT'])
   } catch (error) {
-    handleError(res, error)
+    handleError(res, error, 'Erro interno do servidor.', req)
   }
 })

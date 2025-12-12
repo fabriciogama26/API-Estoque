@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { logError } from './errorLogService.js'
 
 function assertSupabase() {
   if (!isSupabaseConfigured() || !supabase) {
@@ -51,7 +52,13 @@ export async function restoreResetSession() {
       return urlSessionData.session
     }
   } catch (urlError) {
-    console.warn('getSessionFromUrl falhou', urlError)
+    logError({
+      message: 'getSessionFromUrl falhou',
+      page: 'auth_service',
+      severity: 'warn',
+      context: { errorMessage: urlError?.message },
+      stack: urlError?.stack,
+    }).catch(() => {})
   }
 
   const currentUrl = new URL(window.location.href)

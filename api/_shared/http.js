@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream'
+import { logApiError } from './logger.js'
 
 export async function readJson(req) {
   if (req.body) {
@@ -49,12 +50,58 @@ export function createHttpError(status, message) {
   return error
 }
 
-export function handleError(res, error, fallbackMessage = 'Erro interno do servidor.') {
+function logServerError(error, req, fallbackMessage) {
+  const status = error?.status || 500
+  const path = req?.url || req?.originalUrl || null
+  const method = req?.method || null
+  const user =
+    req?.user?.id ||
+    req?.user?.email ||
+    req?.user?.phone ||
+    req?.user?.user_metadata?.nome ||
+    null
+
+  console.error('[API_ERROR]', {
+    status,
+    code: error?.code,
+    message: error?.message || fallbackMessage,
+    method,
+    path,
+    user,
+    stack: error?.stack,
+  })
+}
+
+export function handleError(res, error, fallbackMessage = 'Erro interno do servidor.', req = null) {
+  logServerError(error, req, fallbackMessage)
+
+  if (req) {
+    logApiError({
+      message: error?.message || fallbackMessage,
+      status: error?.status || 500,
+      code: error?.code,
+      method: req?.method,
+      path: req?.url || req?.originalUrl,
+      userId:
+        req?.user?.id ||
+        req?.user?.email ||
+        req?.user?.phone ||
+        req?.user?.user_metadata?.nome ||
+        null,
+      stack: error?.stack,
+      context: error?.context || null,
+    }).catch((logErr) => {
+      console.warn('[API_ERROR_LOG] Falha ao registrar erro no Supabase.', {
+        message: logErr?.message,
+      })
+    })
+  }
+
   if (error?.status) {
     sendError(res, error.status, error.message || fallbackMessage)
     return
   }
-  console.error(error)
+
   sendError(res, 500, fallbackMessage)
 }
 

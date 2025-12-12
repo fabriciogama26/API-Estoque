@@ -110,6 +110,18 @@ function mapSupabaseError(error, fallbackMessage = GENERIC_SUPABASE_ERROR) {
   const message = error.message || fallbackMessage
   const httpError = createHttpError(error.status || 500, message)
   httpError.code = error.code
+  httpError.details = error.details || null
+  httpError.hint = error.hint || null
+  httpError.table = error.table || null
+
+  console.error('[SUPABASE]', {
+    code: error?.code,
+    status: error?.status,
+    table: error?.table,
+    message: error?.message,
+    details: error?.details,
+    hint: error?.hint,
+  })
   return httpError
 }
 
@@ -2367,7 +2379,6 @@ export const CentrosCustoOperations = {
     return normalizeDomainOptions(normalizados)
   },
 }
-
 
 
 
