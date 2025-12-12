@@ -4,6 +4,7 @@ import { filterAcidentes } from '../rules/AcidentesRules.js'
 
 export function useAcidenteFiltro(acidentes = []) {
   const [filters, setFilters] = useState(() => ({ ...ACIDENTES_FILTER_DEFAULT }))
+  const [appliedFilters, setAppliedFilters] = useState(() => ({ ...ACIDENTES_FILTER_DEFAULT }))
 
   const handleFilterChange = (event) => {
     const { name, type } = event.target
@@ -15,25 +16,35 @@ export function useAcidenteFiltro(acidentes = []) {
       setFilters((prev) => ({ ...prev, centroServico: value, setor: value }))
       return
     }
+    if (type === 'checkbox') {
+      setFilters((prev) => ({ ...prev, [name]: value }))
+      setAppliedFilters((prev) => ({ ...prev, [name]: value }))
+      return
+    }
     setFilters((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleFilterSubmit = (event) => {
     event.preventDefault()
+    setAppliedFilters({ ...filters })
   }
 
   const handleFilterClear = () => {
-    setFilters({ ...ACIDENTES_FILTER_DEFAULT })
+    const defaults = { ...ACIDENTES_FILTER_DEFAULT }
+    setFilters(defaults)
+    setAppliedFilters(defaults)
   }
 
   const acidentesFiltrados = useMemo(
-    () => filterAcidentes(acidentes, filters),
-    [acidentes, filters],
+    () => filterAcidentes(acidentes, appliedFilters),
+    [acidentes, appliedFilters],
   )
 
   return {
     filters,
     setFilters,
+    appliedFilters,
+    setAppliedFilters,
     handleFilterChange,
     handleFilterSubmit,
     handleFilterClear,

@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { uniqueSorted, formatDateTimeValue, formatCurrency, formatInteger } from '../utils/estoqueUtils.js'
+import {
+  uniqueSorted,
+  formatDateTimeValue,
+  formatCurrency,
+  formatInteger,
+  filterEstoqueItens,
+  parsePeriodoRange,
+} from '../utils/estoqueUtils.js'
 
 export const ALERTAS_PAGE_SIZE = 6
 export const ITENS_PAGE_SIZE = 10
 
 export function useEstoqueFiltro(initialFilters, estoque) {
   const [filters, setFilters] = useState(initialFilters)
+  const [appliedFilters, setAppliedFilters] = useState(initialFilters)
   const [alertasPage, setAlertasPage] = useState(1)
   const [itensPage, setItensPage] = useState(1)
 
@@ -14,9 +22,34 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     [estoque.itens],
   )
 
-  const itensFiltrados = useMemo(() => estoque.itens, [estoque.itens])
+  const periodoFiltro = useMemo(
+    () => parsePeriodoRange(appliedFilters.periodoInicio, appliedFilters.periodoFim),
+    [appliedFilters.periodoInicio, appliedFilters.periodoFim],
+  )
 
-  const alertasFiltrados = useMemo(() => estoque.alertas ?? [], [estoque.alertas])
+  const itensFiltrados = useMemo(
+    () => filterEstoqueItens(estoque.itens, appliedFilters, periodoFiltro),
+    [estoque.itens, appliedFilters, periodoFiltro],
+  )
+
+  const alertasFiltrados = useMemo(
+    () =>
+      itensFiltrados
+        .filter((item) => item.alerta)
+        .map((item) => ({
+          materialId: item.materialId,
+          nome: item.nome,
+          resumo: item.resumo,
+          fabricante: item.fabricante,
+          estoqueAtual: item.estoqueAtual ?? item.quantidade ?? 0,
+          estoqueMinimo: item.estoqueMinimo,
+          deficitQuantidade: item.deficitQuantidade,
+          valorReposicao: item.valorReposicao,
+          centrosCusto: item.centrosCusto,
+          ultimaAtualizacao: item.ultimaAtualizacao,
+        })),
+    [itensFiltrados],
+  )
 
   const totalAlertasPages =
     alertasFiltrados.length > 0 ? Math.max(1, Math.ceil(alertasFiltrados.length / ALERTAS_PAGE_SIZE)) : 1
@@ -100,7 +133,11 @@ export function useEstoqueFiltro(initialFilters, estoque) {
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target
-    setFilters((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
+    const nextValue = type === 'checkbox' ? checked : value
+    setFilters((prev) => ({ ...prev, [name]: nextValue }))
+    if (type === 'checkbox') {
+      setAppliedFilters((prev) => ({ ...prev, [name]: nextValue }))
+    }
   }
 
   useEffect(() => {
@@ -128,15 +165,25 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     })
   }, [totalItensPages])
 
+  const applyDraftFilters = () => {
+    setAppliedFilters({ ...filters })
+  }
+
+  const resetFiltersState = () => {
+    setFilters({ ...initialFilters })
+    setAppliedFilters({ ...initialFilters })
+  }
+
   const handleSubmit = (event, loadFn) => {
     event.preventDefault()
+    applyDraftFilters()
     if (typeof loadFn === 'function') {
       loadFn({ ...filters })
     }
   }
 
   const handleClear = (loadFn) => {
-    setFilters({ ...initialFilters })
+    resetFiltersState()
     if (typeof loadFn === 'function') {
       loadFn({ ...initialFilters })
     }
@@ -148,6 +195,8 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     handleChange,
     handleSubmit,
     handleClear,
+    applyDraftFilters,
+    resetFiltersState,
     centrosCustoDisponiveis,
     itensFiltrados,
     alertasFiltrados,

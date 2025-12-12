@@ -1,0 +1,34 @@
+Captcha (hCaptcha) - Login e Redefinição de Senha
+=================================================
+
+Objetivo
+- Usar hCaptcha apenas na página de redefinição de senha; login não exige captcha.
+- Evitar dependência do Attack Protection do Supabase para o login.
+
+Componentes
+- Frontend (React): widget em `ResetPasswordPage.jsx` via `CaptchaGuard`.
+- Função Supabase: `supabase/functions/verify-captcha` valida o token no endpoint oficial.
+- Variáveis:
+  - Frontend: `VITE_HCAPTCHA_ENABLED`, `VITE_HCAPTCHA_SITEKEY` (sitekey público), `VITE_HCAPTCHA_VERIFY_URL` (URL da função verify-captcha).
+  - Função: `HCAPTCHA_SECRET` (secret privado do hCaptcha) e opcional `HCAPTCHA_SITEKEY`.
+
+Configuração do hCaptcha
+- Domains: cadastre hostnames sem protocolo. Produção: `proteg.vercel.app`. Dev: `localhost`, `127.0.0.1`.
+- Copie o sitekey (público) para `VITE_HCAPTCHA_SITEKEY`.
+- Copie o secret (privado) para o secret da função (`HCAPTCHA_SECRET`).
+
+Supabase
+- Deploy da função: `supabase functions deploy verify-captcha`.
+- Secrets da função: `supabase functions secrets set HCAPTCHA_SECRET=<secret> HCAPTCHA_SITEKEY=<sitekey>`.
+- Attack Protection (Auth): deixe desativado se não quiser captcha no login.
+
+Frontend (Vercel)
+- Definir envs: 
+  - `VITE_HCAPTCHA_ENABLED=true`
+  - `VITE_HCAPTCHA_SITEKEY=<sitekey>`
+  - `VITE_HCAPTCHA_VERIFY_URL=https://<projeto>.supabase.co/functions/v1/verify-captcha`
+- Redeploy após alterar envs.
+
+Uso
+- Login: não há captcha; se aparecer, verifique se o Attack Protection está ligado ou se o deploy usa build antiga.
+- Reset de senha: widget renderiza, envia token para `verify-captcha`. Se falhar, revise domínios/sitekey/secret ou a URL da função.

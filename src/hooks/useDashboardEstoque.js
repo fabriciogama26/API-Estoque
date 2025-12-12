@@ -18,6 +18,7 @@ import {
 
 export function useDashboardEstoque(onError) {
   const [filters, setFilters] = useState(initialDashboardEstoqueFilters)
+  const [appliedFilters, setAppliedFilters] = useState(initialDashboardEstoqueFilters)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [chartFilter, setChartFilter] = useState(null)
@@ -36,7 +37,7 @@ export function useDashboardEstoque(onError) {
   )
 
   const load = useCallback(
-    async (params = filters, { force = false } = {}) => {
+    async (params = appliedFilters, { force = false } = {}) => {
       const key = JSON.stringify(params || {})
       if (!force && lastKeyRef.current === key) {
         return
@@ -58,7 +59,7 @@ export function useDashboardEstoque(onError) {
         notifyError(err, { area: 'dashboard_estoque_load' })
       }
     },
-    [filters, notifyError],
+    [appliedFilters, notifyError],
   )
 
   useEffect(() => {
@@ -76,13 +77,19 @@ export function useDashboardEstoque(onError) {
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    load(filters, { force: true }).catch((err) => notifyError(err, { area: 'dashboard_estoque_filter_submit' }))
+    const next = { ...filters }
+    setAppliedFilters(next)
+    load(next, { force: true }).catch((err) =>
+      notifyError(err, { area: 'dashboard_estoque_filter_submit' })
+    )
   }
 
   const handleClear = () => {
-    setFilters(initialDashboardEstoqueFilters)
+    const defaults = { ...initialDashboardEstoqueFilters }
+    setFilters(defaults)
+    setAppliedFilters(defaults)
     setChartFilter(null)
-    load(initialDashboardEstoqueFilters, { force: true }).catch((err) =>
+    load(defaults, { force: true }).catch((err) =>
       notifyError(err, { area: 'dashboard_estoque_filter_clear' }),
     )
   }
@@ -92,7 +99,12 @@ export function useDashboardEstoque(onError) {
       const texto = value?.trim()
       if (!texto) return
       setChartFilter({ source, value: texto })
+      const nextFilters = { ...appliedFilters, termo: texto }
       setFilters((prev) => ({ ...prev, termo: texto }))
+      setAppliedFilters(nextFilters)
+      load(nextFilters, { force: true }).catch((err) =>
+        notifyError(err, { area: 'dashboard_estoque_chart_filter', source }),
+      )
     } catch (err) {
       notifyError(err, { area: 'dashboard_estoque_chart_filter' })
     }
@@ -100,10 +112,18 @@ export function useDashboardEstoque(onError) {
 
   const clearChartFilter = () => {
     setChartFilter(null)
+    const nextFilters = { ...appliedFilters, termo: '' }
     setFilters((prev) => ({ ...prev, termo: '' }))
+    setAppliedFilters(nextFilters)
+    load(nextFilters, { force: true }).catch((err) =>
+      notifyError(err, { area: 'dashboard_estoque_chart_filter_clear' })
+    )
   }
 
-  const termoNormalizado = useMemo(() => normalizarTermo(filters.termo), [filters.termo])
+  const termoNormalizado = useMemo(
+    () => normalizarTermo(appliedFilters.termo),
+    [appliedFilters.termo],
+  )
 
   const entradasDetalhadasFiltradas = useMemo(
     () => filtrarPorTermo(data?.entradasDetalhadas ?? [], termoNormalizado),

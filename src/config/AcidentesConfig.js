@@ -32,6 +32,7 @@ export const ACIDENTES_FILTER_DEFAULT = {
   setor: 'todos',
   agente: 'todos',
   lesao: 'todos',
+  parteLesionada: 'todos',
   apenasSesmt: false,
   apenasEsocial: false,
 }
