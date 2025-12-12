@@ -323,6 +323,7 @@ export function filterAcidentes(acidentes, filters) {
   const centroServicoFiltro = String(filters.centroServico ?? filters.setor ?? 'todos').toLowerCase()
   const apenasSesmt = Boolean(filters.apenasSesmt)
   const apenasEsocial = Boolean(filters.apenasEsocial)
+  const parteLesionadaFiltro = (filters.parteLesionada ?? 'todos').toLowerCase()
 
   return acidentes.filter((acidente) => {
     const tiposRegistro = collectTextList(acidente.tipos, acidente.tipo)
@@ -372,6 +373,25 @@ export function filterAcidentes(acidentes, filters) {
 
     if (apenasEsocial && !acidente.dataEsocial) {
       return false
+    }
+
+    if (parteLesionadaFiltro && parteLesionadaFiltro !== 'todos') {
+      const normalizarParte = (texto) =>
+        String(texto ?? '')
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+      const listaPartes =
+        Array.isArray(acidente.partesLesionadas) && acidente.partesLesionadas.length
+          ? acidente.partesLesionadas
+          : acidente.parteLesionada
+            ? [acidente.parteLesionada]
+            : []
+      const possuiParte = listaPartes.some((item) => normalizarParte(item) === normalizarParte(parteLesionadaFiltro))
+      if (!possuiParte) {
+        return false
+      }
     }
 
     if (!termo) {
@@ -427,3 +447,7 @@ export const extractCentrosServico = (acidentes) =>
   buildSortedUnique(acidentes, (item) => item.centroServico ?? item.setor)
 export const extractAgentes = (acidentes) =>
   buildSortedUnique(acidentes, (item) => collectTextList(item.agentes, item.agente))
+export const extractLesoes = (acidentes) =>
+  buildSortedUnique(acidentes, (item) => collectTextList(item.lesoes, item.lesao))
+export const extractPartesLesionadas = (acidentes) =>
+  buildSortedUnique(acidentes, (item) => collectTextList(item.partesLesionadas, item.parteLesionada))

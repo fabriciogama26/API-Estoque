@@ -119,7 +119,7 @@ export const filterEstoqueItens = (itens = [], filters = {}, periodoFiltro = {})
 
     if (aplicarEstoqueMinimo) {
       const minimoConfigurado = Number(item.estoqueMinimo ?? 0)
-      if (Number.isNaN(minimoConfigurado) || minimoConfigurado !== estoqueMinimoNumero) {
+      if (Number.isNaN(minimoConfigurado) || minimoConfigurado < estoqueMinimoNumero) {
         return false
       }
     }

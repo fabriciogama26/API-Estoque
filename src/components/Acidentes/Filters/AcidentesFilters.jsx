@@ -9,6 +9,8 @@ export function AcidentesFilters() {
     tiposFiltro: tipos,
     centrosServico,
     agentesFiltro: agentes,
+    lesoesFiltro: lesoes,
+    partesLesionadasFiltro: partesLesionadas,
   } = useAcidentesContext()
 
   const handleCheckboxChange = (name) => (event) => {
@@ -68,6 +70,28 @@ export function AcidentesFilters() {
             ))}
           </select>
         </label>
+        <label className="field">
+          <span>Lesoes</span>
+          <select name="lesao" value={filters.lesao} onChange={handleFilterChange}>
+            <option value="todos">Todas</option>
+            {lesoes.map((lesao) => (
+              <option key={lesao} value={lesao}>
+                {lesao}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Partes lesionadas</span>
+          <select name="parteLesionada" value={filters.parteLesionada} onChange={handleFilterChange}>
+            <option value="todos">Todas</option>
+            {partesLesionadas.map((parte) => (
+              <option key={parte} value={parte}>
+                {parte}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="acidentes-filter-pill">
           <input
             type="checkbox"
@@ -100,4 +124,3 @@ export function AcidentesFilters() {
     </section>
   )
 }
-

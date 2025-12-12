@@ -33,10 +33,11 @@ export function EstoqueProvider({ children }) {
   }
 
   const applyFilters = async () => {
+    filtroState.applyDraftFilters()
     await estoqueState.load({ ...filtroState.filters }, { force: true })
   }
   const resetFilters = async () => {
-    filtroState.setFilters({ ...INITIAL_FILTERS })
+    filtroState.resetFiltersState()
     await estoqueState.load({ ...INITIAL_FILTERS }, { force: true })
   }
 

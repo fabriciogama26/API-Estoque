@@ -7,7 +7,7 @@ Visao geral
 - Registrar, editar e consultar acidentes de trabalho vinculados a pessoas cadastradas (funcionarios, estagiarios, terceiros autorizados).
 - Usa catalogos de agentes, tipos de acidente, lesoes e partes lesionadas para padronizar os registros e permitir analises estatisticas.
 - Mantem historico de alteracoes por acidente (quem alterou, quando e o que foi modificado).
-- Possui filtros por termo livre, tipo, centro de servico e agente.
+- Possui filtros por termo livre, tipo, centro de servico, agente, lesoes, partes lesionadas e flags (SESMT / eSOCIAL).
 
 Escopo da tela
 --------------
@@ -69,9 +69,10 @@ Fluxos principais
    - O resultado pode ser cacheado por `acidente.id` para evitar chamadas repetidas.
 
 4) Filtros
-   - Formulario de filtros controla `filters` (termo, tipo, centro de servico, agente, etc.).
-   - "Aplicar" usa `filterAcidentes(acidentes, filters)` para gerar a lista filtrada.
-   - "Limpar" restaura `ACIDENTES_FILTER_DEFAULT` e recarrega a lista principal, se necessario.
+   - Formulario de filtros controla `filters` (termo, tipo, centro de servico, agente, lesao, parte lesionada).
+   - Campos de texto/select aplicam apenas ao clicar em **Aplicar** (estado de rascunho vs aplicado).
+   - Checkboxes "Apenas SESMT" e "Apenas eSOCIAL" sÇõo aplicados imediatamente.
+   - "Aplicar" usa `filterAcidentes(acidentes, filters)` para gerar a lista filtrada; "Limpar" restaura `ACIDENTES_FILTER_DEFAULT` e recarrega a lista principal, se necessario.
 
 5) Tabela e detalhes
    - Colunas exibidas: Nome, Matricula, Cargo, Data, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
@@ -129,7 +130,7 @@ Funcoes principais
 - useAcidenteFiltro
   - Tipo: hook de filtros
   - Caminho: src/hooks/useAcidenteFiltro.js
-  - Responsavel por: manter filters, handleFilterChange/Clear e gerar acidentesFiltrados com filterAcidentes.
+  - Responsavel por: manter filters/appliedFilters, handleFilterChange/Clear/Submit e gerar acidentesFiltrados com filterAcidentes (checkboxes aplicam imediatamente).
 - Componentes AcidentesForm / AcidentesFilters / AcidentesTable / AcidentesHistoryModal / AcidenteDetailsModal
   - Tipo: componentes de UI
   - Caminho: src/components/Acidentes/*
@@ -170,4 +171,3 @@ Ajuda contextual
 - Conteudo vem de src/help/helpContent.json (chave 'acidentes'); edite ali para ajustar titulos/steps/notes.
 - Para imagens, salve em public/help/acidentes/ e aponte no campo 'media' do passo (ex.: /help/acidentes/exemplo.webp).
 - O campo "Agente" tem um icone de informacao proprio que abre o help especifico em src/help/helpAcidentesAgentes.json (titulo, resumo, lista de agentes/tipos/lesoes).
-

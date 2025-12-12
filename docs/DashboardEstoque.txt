@@ -27,6 +27,7 @@ Filtros disponiveis
 -------------------
 - Periodo inicial/final (AAAA-MM).
 - Termo livre (nome do material, fabricante, categoria, centro, setor, pessoa).
+- Aplicacao sob demanda: periodo/termo sÇõo aplicados apenas ao clicar em **Aplicar filtros** (mantemos rascunho x aplicado).
 - Filtro contextual por grafico:
   - Clique em um grafico aplica `chartFilter` (ex.: filtrar por um centro ou categoria especifica).
   - Badge "Limpar filtro do grafico" aparece quando o filtro contextual esta ativo.
@@ -119,4 +120,3 @@ Ajuda contextual
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
 - Conteudo vem de src/help/helpContent.json (chave 'dashboard'); edite ali para ajustar titulos/steps/notes.
 - Para imagens, salve em public/help/dashboard/ e aponte no campo 'media' do passo (ex.: /help/dashboard/exemplo.webp).
-
