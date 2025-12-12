@@ -36,6 +36,9 @@ export function LoginPage() {
     handleCaptchaToken,
   } = useLoginForm()
 
+  const requiresRecoveryCaptcha =
+    securityConfig.captcha.enabled && securityConfig.captcha.requiredFlows.passwordRecovery
+
   return (
     <div className="login-auth login-auth--login">
       <form className="login-auth-card login-auth-card--neon" onSubmit={handleSubmit}>
@@ -82,12 +85,6 @@ export function LoginPage() {
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         {status ? <p className="feedback feedback--success">{status}</p> : null}
 
-        {securityConfig.captcha.enabled ? (
-          <div className="login-auth-card__captcha">
-            <CaptchaGuard onToken={handleCaptchaToken} disabled={isSubmitting || isRecovering} />
-          </div>
-        ) : null}
-
         <div className="login-auth-card__options">
           <button
             type="button"
@@ -98,6 +95,13 @@ export function LoginPage() {
             {isRecovering ? 'Enviando...' : 'Esqueceu a senha?'}
           </button>
         </div>
+
+        {requiresRecoveryCaptcha ? (
+          <div className="login-auth-card__captcha">
+            <p className="login-auth-card__caption">Resolva o captcha para enviar a recuperação de senha.</p>
+            <CaptchaGuard onToken={handleCaptchaToken} disabled={isSubmitting || isRecovering} />
+          </div>
+        ) : null}
 
         <button type="submit" className="button login-button--neon" disabled={isSubmitting}>
           {isSubmitting ? 'Entrando...' : 'Entrar'}

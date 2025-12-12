@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { logError } from '../services/errorLogService.js'
+import { securityConfig } from '../config/security.js'
 
 export function useLoginForm() {
   const { login, recoverPassword } = useAuth()
@@ -51,6 +52,13 @@ export function useLoginForm() {
     const email = form.username?.trim() ?? ''
     if (!email) {
       setError('Informe seu email para recuperar a senha.')
+      return
+    }
+
+    const requiresCaptcha =
+      securityConfig.captcha.enabled && securityConfig.captcha.requiredFlows.passwordRecovery
+    if (requiresCaptcha && !form.captchaToken) {
+      setError('Resolva o captcha para enviar a recuperação.')
       return
     }
 
