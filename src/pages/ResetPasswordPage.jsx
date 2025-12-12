@@ -1,4 +1,5 @@
 import { useResetPassword } from '../hooks/useResetPassword.js'
+import { securityConfig } from '../config/security.js'
 import '../styles/ResetPasswordPage.css'
 
 const logoSrc = '/logo2.png'
@@ -51,7 +52,7 @@ export function ResetPasswordPage() {
               name="newPassword"
               value={form.newPassword}
               onChange={handleChange}
-              minLength={8}
+              minLength={securityConfig.password.minLength}
               autoComplete="new-password"
               placeholder="Digite a nova senha"
               disabled={isFormDisabled}

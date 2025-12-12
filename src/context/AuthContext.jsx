@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
+import { sendPasswordRecovery } from '../services/authService.js'
 
 const STORAGE_KEY = 'api-estoque-auth'
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
@@ -11,7 +12,7 @@ const LOCAL_AUTH = {
   name: (import.meta.env.VITE_LOCAL_DISPLAY_NAME || 'Administrador Local').trim(),
 }
 
-const AuthContext = createContext(null)
+export const AuthContext = createContext(null)
 
 function buildLocalUser(identifier) {
   const username = identifier || LOCAL_AUTH.username || 'admin'
@@ -212,7 +213,7 @@ export function AuthProvider({ children }) {
   )
 
   const recoverPassword = useCallback(
-    async (email) => {
+    async ({ email, captchaToken }) => {
       const identifier = (email || '').trim()
 
       if (!identifier) {
@@ -233,15 +234,7 @@ export function AuthProvider({ children }) {
       const redirectTo =
         typeof rawRedirect === 'string' && rawRedirect.trim().length > 0 ? rawRedirect.trim() : undefined
 
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        identifier,
-        redirectTo ? { redirectTo } : undefined
-      )
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
+      await sendPasswordRecovery(identifier, redirectTo, captchaToken)
       return true
     },
     [hasSupabase]

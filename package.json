@@ -13,6 +13,7 @@
     "release:major": "npm version major"
   },
   "dependencies": {
+    "@hcaptcha/react-hcaptcha": "^1.17.1",
     "@supabase/supabase-js": "^2.75.1",
     "lucide-react": "^0.544.0",
     "prop-types": "^15.8.1",

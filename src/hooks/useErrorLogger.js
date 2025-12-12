@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useContext } from 'react'
 import { logError } from '../services/errorLogService.js'
-import { useAuth } from '../context/AuthContext.jsx'
+import { AuthContext } from '../context/AuthContext.jsx'
 import { isLocalMode } from '../config/runtime.js'
 
 export function useErrorLogger(page) {
-  const { user } = useAuth()
+  const authCtx = useContext(AuthContext)
+  const user = authCtx?.user ?? null
 
   const logger = useMemo(
     () => ({

@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
+import { verifyCaptchaOrThrow } from './captchaService.js'
+import { validatePasswordOrThrow } from './passwordPolicyService.js'
 
 function assertSupabase() {
   if (!isSupabaseConfigured() || !supabase) {
@@ -7,12 +9,14 @@ function assertSupabase() {
   }
 }
 
-export async function sendPasswordRecovery(email, redirectTo) {
+export async function sendPasswordRecovery(email, redirectTo, captchaToken) {
   assertSupabase()
   const identifier = (email || '').trim()
   if (!identifier) {
     throw new Error('Informe o email utilizado no login para recuperar a senha.')
   }
+
+  await verifyCaptchaOrThrow(captchaToken)
 
   const options = redirectTo ? { redirectTo } : undefined
   const { error } = await supabase.auth.resetPasswordForEmail(identifier, options)
@@ -24,6 +28,7 @@ export async function sendPasswordRecovery(email, redirectTo) {
 
 export async function updatePassword(newPassword) {
   assertSupabase()
+  await validatePasswordOrThrow(newPassword)
   const { error } = await supabase.auth.updateUser({ password: newPassword })
   if (error) {
     throw new Error(error.message)
