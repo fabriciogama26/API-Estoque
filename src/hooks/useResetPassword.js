@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { restoreResetSession, updatePassword } from '../services/authService.js'
 import { isSupabaseConfigured, supabase } from '../services/supabaseClient.js'
 import { logError } from '../services/errorLogService.js'
+import { validatePasswordOrThrow } from '../services/passwordPolicyService.js'
 
 export function useResetPassword() {
   const navigate = useNavigate()
@@ -12,6 +13,7 @@ export function useResetPassword() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [sessionError, setSessionError] = useState(null)
   const [isReady, setIsReady] = useState(false)
+  const [userEmail, setUserEmail] = useState(null)
 
   useEffect(() => {
     const ensureSession = async () => {
@@ -22,7 +24,8 @@ export function useResetPassword() {
       }
 
       try {
-        await restoreResetSession()
+        const session = await restoreResetSession()
+        setUserEmail(session?.user?.email || null)
         setIsReady(true)
       } catch (err) {
         setSessionError(err.message || 'Nao foi possivel validar o link de redefinicao.')
@@ -60,18 +63,14 @@ export function useResetPassword() {
       return
     }
 
-    if (!form.newPassword || form.newPassword.length < 8) {
-      setStatus({ type: 'error', message: 'A senha deve ter pelo menos 8 caracteres.' })
-      return
-    }
-
-    if (form.newPassword !== form.confirmPassword) {
-      setStatus({ type: 'error', message: 'A confirmacao precisa ser igual a nova senha.' })
-      return
-    }
-
     setIsSubmitting(true)
     try {
+      await validatePasswordOrThrow(form.newPassword, { email: userEmail })
+
+      if (form.newPassword !== form.confirmPassword) {
+        throw new Error('A confirmacao precisa ser igual a nova senha.')
+      }
+
       await updatePassword(form.newPassword)
       setStatus({ type: 'success', message: 'Senha atualizada! Redirecionando para o login...' })
       setForm({ newPassword: '', confirmPassword: '' })
