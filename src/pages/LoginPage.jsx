@@ -1,6 +1,4 @@
 import { useLoginForm } from '../hooks/useLoginForm.js'
-import { CaptchaGuard } from '../components/CaptchaGuard.jsx'
-import { securityConfig } from '../config/security.js'
 import '../styles/LoginPage.css'
 
 const logoSrc = '/logo2.png'
@@ -33,11 +31,7 @@ export function LoginPage() {
     handleChange,
     handleSubmit,
     handlePasswordRecovery,
-    handleCaptchaToken,
   } = useLoginForm()
-
-  const requiresRecoveryCaptcha =
-    securityConfig.captcha.enabled && securityConfig.captcha.requiredFlows.passwordRecovery
 
   return (
     <div className="login-auth login-auth--login">
@@ -95,13 +89,6 @@ export function LoginPage() {
             {isRecovering ? 'Enviando...' : 'Esqueceu a senha?'}
           </button>
         </div>
-
-        {requiresRecoveryCaptcha ? (
-          <div className="login-auth-card__captcha">
-            <p className="login-auth-card__caption">Resolva o captcha para enviar a recuperação de senha.</p>
-            <CaptchaGuard onToken={handleCaptchaToken} disabled={isSubmitting || isRecovering} />
-          </div>
-        ) : null}
 
         <button type="submit" className="button login-button--neon" disabled={isSubmitting}>
           {isSubmitting ? 'Entrando...' : 'Entrar'}

@@ -2,14 +2,13 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { logError } from '../services/errorLogService.js'
-import { securityConfig } from '../config/security.js'
 
 export function useLoginForm() {
   const { login, recoverPassword } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [form, setForm] = useState({ username: '', password: '', captchaToken: '' })
+  const [form, setForm] = useState({ username: '', password: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [status, setStatus] = useState(null)
@@ -55,16 +54,9 @@ export function useLoginForm() {
       return
     }
 
-    const requiresCaptcha =
-      securityConfig.captcha.enabled && securityConfig.captcha.requiredFlows.passwordRecovery
-    if (requiresCaptcha && !form.captchaToken) {
-      setError('Resolva o captcha para enviar a recuperação.')
-      return
-    }
-
     setIsRecovering(true)
     try {
-      await recoverPassword({ email, captchaToken: form.captchaToken })
+      await recoverPassword(email)
       setStatus('Enviamos um link de recuperacao para o seu email.')
     } catch (err) {
       setError(err.message)
@@ -79,10 +71,6 @@ export function useLoginForm() {
     }
   }
 
-  const handleCaptchaToken = (token) => {
-    setForm((prev) => ({ ...prev, captchaToken: token || '' }))
-  }
-
   return {
     form,
     isSubmitting,
@@ -92,6 +80,5 @@ export function useLoginForm() {
     handleChange,
     handleSubmit,
     handlePasswordRecovery,
-    handleCaptchaToken,
   }
 }
