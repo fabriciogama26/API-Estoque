@@ -1,9 +1,8 @@
 import { useLoginForm } from '../hooks/useLoginForm.js'
-import { CaptchaGuard } from '../components/CaptchaGuard.jsx'
-import { securityConfig } from '../config/security.js'
 import '../styles/LoginPage.css'
 
 const logoSrc = '/logo2.png'
+
 
 const BadgeIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className="field__icon">
@@ -33,7 +32,6 @@ export function LoginPage() {
     handleChange,
     handleSubmit,
     handlePasswordRecovery,
-    handleCaptchaToken,
   } = useLoginForm()
 
   return (
@@ -81,12 +79,6 @@ export function LoginPage() {
 
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         {status ? <p className="feedback feedback--success">{status}</p> : null}
-
-        {securityConfig.captcha.enabled ? (
-          <div className="login-auth-card__captcha">
-            <CaptchaGuard onToken={handleCaptchaToken} disabled={isSubmitting || isRecovering} />
-          </div>
-        ) : null}
 
         <div className="login-auth-card__options">
           <button

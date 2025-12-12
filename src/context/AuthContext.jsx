@@ -213,7 +213,7 @@ export function AuthProvider({ children }) {
   )
 
   const recoverPassword = useCallback(
-    async ({ email, captchaToken }) => {
+    async (email) => {
       const identifier = (email || '').trim()
 
       if (!identifier) {
@@ -234,7 +234,7 @@ export function AuthProvider({ children }) {
       const redirectTo =
         typeof rawRedirect === 'string' && rawRedirect.trim().length > 0 ? rawRedirect.trim() : undefined
 
-      await sendPasswordRecovery(identifier, redirectTo, captchaToken)
+      await sendPasswordRecovery(identifier, redirectTo)
       return true
     },
     [hasSupabase]

@@ -13,6 +13,7 @@ export function useResetPassword() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [sessionError, setSessionError] = useState(null)
   const [isReady, setIsReady] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
   const [userEmail, setUserEmail] = useState(null)
 
   useEffect(() => {
@@ -49,6 +50,10 @@ export function useResetPassword() {
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
+  const handleCaptchaToken = (token) => {
+    setCaptchaToken(token || '')
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setStatus(null)
@@ -65,6 +70,12 @@ export function useResetPassword() {
 
     setIsSubmitting(true)
     try {
+      if (securityConfig.captcha.enabled && securityConfig.captcha.requiredFlows.passwordRecovery) {
+        if (!captchaToken) {
+          throw new Error('Resolva o captcha antes de salvar a nova senha.')
+        }
+      }
+
       await validatePasswordOrThrow(form.newPassword, { email: userEmail })
 
       if (form.newPassword !== form.confirmPassword) {
@@ -109,5 +120,6 @@ export function useResetPassword() {
     isFormDisabled,
     handleChange,
     handleSubmit,
+    handleCaptchaToken,
   }
 }

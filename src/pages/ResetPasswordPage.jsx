@@ -1,5 +1,6 @@
 import { useResetPassword } from '../hooks/useResetPassword.js'
 import { securityConfig } from '../config/security.js'
+import { CaptchaGuard } from '../components/CaptchaGuard.jsx'
 import '../styles/ResetPasswordPage.css'
 
 const logoSrc = '/logo2.png'
@@ -14,6 +15,7 @@ export function ResetPasswordPage() {
     isFormDisabled,
     handleChange,
     handleSubmit,
+    handleCaptchaToken,
   } = useResetPassword()
 
   return (
@@ -75,6 +77,13 @@ export function ResetPasswordPage() {
           </label>
 
           {status ? <p className={`feedback feedback--${status.type}`}>{status.message}</p> : null}
+
+          {securityConfig.captcha.enabled && securityConfig.captcha.requiredFlows.passwordRecovery ? (
+            <div className="reset-captcha">
+              <p className="reset-hint">Resolva o captcha para confirmar a troca de senha.</p>
+              <CaptchaGuard onToken={handleCaptchaToken} disabled={isSubmitting || isFormDisabled} />
+            </div>
+          ) : null}
 
           <div className="reset-actions">
             <button

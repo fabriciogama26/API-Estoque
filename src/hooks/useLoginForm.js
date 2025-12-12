@@ -8,7 +8,7 @@ export function useLoginForm() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [form, setForm] = useState({ username: '', password: '', captchaToken: '' })
+  const [form, setForm] = useState({ username: '', password: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [status, setStatus] = useState(null)
@@ -56,7 +56,7 @@ export function useLoginForm() {
 
     setIsRecovering(true)
     try {
-      await recoverPassword({ email, captchaToken: form.captchaToken })
+      await recoverPassword(email)
       setStatus('Enviamos um link de recuperacao para o seu email.')
     } catch (err) {
       setError(err.message)
@@ -71,10 +71,6 @@ export function useLoginForm() {
     }
   }
 
-  const handleCaptchaToken = (token) => {
-    setForm((prev) => ({ ...prev, captchaToken: token || '' }))
-  }
-
   return {
     form,
     isSubmitting,
@@ -84,6 +80,5 @@ export function useLoginForm() {
     handleChange,
     handleSubmit,
     handlePasswordRecovery,
-    handleCaptchaToken,
   }
 }
