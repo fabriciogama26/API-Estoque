@@ -8,11 +8,13 @@ import {
   resolveAllowedPaths,
 } from '../config/permissions.js'
 import { useAuth } from './AuthContext.jsx'
+import { useErrorLogger } from '../hooks/useErrorLogger.js'
 
 const PermissionsContext = createContext(null)
 
 export function PermissionsProvider({ children }) {
   const { user, isAuthenticated } = useAuth()
+  const { reportError } = useErrorLogger('permissions')
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(
     () => isAuthenticated && !isLocalMode && isSupabaseConfigured() && Boolean(supabase)
@@ -53,7 +55,7 @@ export function PermissionsProvider({ children }) {
 
       setProfile(data || null)
     } catch (err) {
-      console.warn('Falha ao carregar perfil do usuario para permissoes.', err)
+      reportError(err, { stage: 'load_permissions_profile', userId: user?.id })
       setProfile(null)
       setError(err)
     } finally {

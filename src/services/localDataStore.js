@@ -1,5 +1,6 @@
 import seedData from '../data/local-seed.json'
 import { LOCAL_DATA_STORAGE_KEY } from '../config/runtime.js'
+import { logError } from './errorLogService.js'
 
 const STATE_VERSION = 1
 
@@ -278,7 +279,13 @@ function readFromStorage() {
     }
     return normalizeState(parsed)
   } catch (error) {
-    console.warn('Falha ao ler armazenamento local. Recriando dados.', error)
+    logError({
+      message: 'Falha ao ler armazenamento local. Recriando dados.',
+      page: 'local_data_store',
+      severity: 'warn',
+      context: { errorMessage: error?.message },
+      stack: error?.stack,
+    }).catch(() => {})
     return null
   }
 }
@@ -303,7 +310,13 @@ function persist(state) {
   try {
     window.localStorage.setItem(LOCAL_DATA_STORAGE_KEY, JSON.stringify(state))
   } catch (error) {
-    console.warn('Falha ao salvar dados locais.', error)
+    logError({
+      message: 'Falha ao salvar dados locais.',
+      page: 'local_data_store',
+      severity: 'warn',
+      context: { errorMessage: error?.message },
+      stack: error?.stack,
+    }).catch(() => {})
   }
 }
 

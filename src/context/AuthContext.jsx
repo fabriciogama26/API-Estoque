@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
+import { useErrorLogger } from '../hooks/useErrorLogger.js'
 
 const STORAGE_KEY = 'api-estoque-auth'
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
@@ -30,6 +31,7 @@ function buildLocalUser(identifier) {
 
 export function AuthProvider({ children }) {
   const hasSupabase = !isLocalMode && isSupabaseConfigured()
+  const { reportError } = useErrorLogger('auth')
 
   const parseSupabaseUser = useCallback((user) => {
     if (!user) {
@@ -64,7 +66,7 @@ export function AuthProvider({ children }) {
         return JSON.parse(raw)
       }
     } catch (error) {
-      console.error('Failed to parse auth storage', error)
+      reportError(error, { stage: 'parse_storage' })
     }
     return null
   })
@@ -74,7 +76,7 @@ export function AuthProvider({ children }) {
       if (isLocalMode) {
         return () => {}
       }
-      console.warn('Supabase nao configurado. Autenticacao desativada.')
+      reportError(new Error('Supabase nao configurado. Autenticacao desativada.'), { stage: 'init' })
       return () => {}
     }
 
@@ -86,7 +88,7 @@ export function AuthProvider({ children }) {
         return
       }
       if (sessionError) {
-        console.warn('Nao foi possivel obter sessao do Supabase', sessionError)
+        reportError(sessionError, { stage: 'get_session' })
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
         return
@@ -124,7 +126,7 @@ export function AuthProvider({ children }) {
       active = false
       listener?.subscription?.unsubscribe?.()
     }
-  }, [hasSupabase, parseSupabaseUser])
+  }, [hasSupabase, parseSupabaseUser, reportError])
 
   const login = useCallback(
     async ({ username, password }) => {
@@ -272,7 +274,7 @@ export function AuthProvider({ children }) {
       try {
         await logout()
       } catch (error) {
-        console.error('Falha ao encerrar sessão por inatividade', error)
+        reportError(error, { stage: 'logout_inactivity' })
       } finally {
         window.location.href = '/login'
       }

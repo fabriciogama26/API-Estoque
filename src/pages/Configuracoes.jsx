@@ -7,6 +7,7 @@ import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { usePermissions } from '../context/PermissionsContext.jsx'
 import { CREDENTIAL_OPTIONS, PAGE_CATALOG, resolveAllowedPageIds, describeCredential } from '../config/permissions.js'
 import { isLocalMode } from '../config/runtime.js'
+import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import '../styles/ConfiguracoesPage.css'
 
 // Sincroniza o status (ativo/inativo) com o auth.users via RPC (security definer no Supabase)
@@ -43,6 +44,7 @@ export function ConfiguracoesPage() {
 
 function PermissionsSection({ currentUser }) {
   const { isAdmin, credential, allowedPageIds, refresh } = usePermissions()
+  const { reportError } = useErrorLogger('configuracoes_permissoes')
   const [users, setUsers] = useState([])
   const [selectedUserId, setSelectedUserId] = useState(null)
   const [draftCredential, setDraftCredential] = useState('')
@@ -205,7 +207,7 @@ function PermissionsSection({ currentUser }) {
       try {
         await syncAuthUserBan(selectedUser.id, isActive)
       } catch (syncError) {
-        console.warn('Falha ao sincronizar banimento no auth.users', syncError)
+        reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
       }
 
       try {
@@ -231,7 +233,7 @@ function PermissionsSection({ currentUser }) {
           after_active: isActive,
         })
       } catch (historyError) {
-        console.warn('Nao foi possivel registrar historico de credencial.', historyError)
+        reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
       }
 
       setFeedback({ type: 'success', message: 'Credencial atualizada com sucesso.' })
@@ -465,6 +467,7 @@ function PermissionsSection({ currentUser }) {
 function AdminResetPasswordSection() {
   const { isAdmin } = usePermissions()
   const { user: currentUser } = useAuth()
+  const { reportError } = useErrorLogger('configuracoes_reset')
   const [users, setUsers] = useState([])
   const [selectedUserId, setSelectedUserId] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -510,7 +513,7 @@ function AdminResetPasswordSection() {
         setSelectedUserId(lista[0].id)
       }
     } catch (err) {
-      console.warn('Falha ao carregar usuarios para reset de senha.', err)
+      reportError(err, { stage: 'load_users_reset' })
       const lista = []
       addFallbackUser(lista)
       setUsers(lista)
@@ -582,7 +585,7 @@ function AdminResetPasswordSection() {
           after_active: selectedUser.ativo !== false,
         })
       } catch (historyErr) {
-        console.warn('Falha ao registrar historico de reset de senha.', historyErr)
+        reportError(historyErr, { stage: 'history_reset', userId: selectedUser.id })
       }
     } catch (err) {
       setFeedback({ type: 'error', message: err.message || 'Falha ao enviar reset de senha.' })

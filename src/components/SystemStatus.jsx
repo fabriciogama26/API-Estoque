@@ -6,12 +6,13 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { dataClient as api } from '../services/dataClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { usePermissions } from '../context/PermissionsContext.jsx'
+import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import appInfo from '../../package.json?json'
 import '../styles/SystemStatus.css'
 
 const CHECK_INTERVAL = 3 * 60 * 1000 // 3 minutos
 
-function useSystemHealth() {
+function useSystemHealth(reportError) {
   const [status, setStatus] = useState({
     state: 'unknown',
     message: 'Verificando...',
@@ -22,7 +23,7 @@ function useSystemHealth() {
     try {
       await api.health()
     } catch (err) {
-      console.warn('Falha ao verificar status da API', err)
+      reportError?.(err, { stage: 'api_health' })
       setStatus({
         state: 'offline',
         message: err.message || 'API indisponivel',
@@ -44,7 +45,7 @@ function useSystemHealth() {
         }
         message = 'API e Supabase online'
       } catch (err) {
-        console.warn('Falha ao verificar status do Supabase', err)
+        reportError?.(err, { stage: 'supabase_health' })
         message = `API online; Supabase indisponivel: ${err.message || 'Offline'}`
       }
     }
@@ -54,7 +55,7 @@ function useSystemHealth() {
       message,
       timestamp: new Date(),
     })
-  }, [])
+  }, [reportError])
 
   useEffect(() => {
     check()
@@ -70,7 +71,8 @@ export function SystemStatus({ className = '' }) {
   const { user, logout } = useAuth()
   const { credentialLabel, canAccessPath } = usePermissions()
   const [userProfile, setUserProfile] = useState(null)
-  const health = useSystemHealth()
+  const { reportError } = useErrorLogger('system_status')
+  const health = useSystemHealth(reportError)
   const { state, message } = health
   const settingsDisabled = !canAccessPath('/configuracoes')
 
@@ -141,7 +143,7 @@ export function SystemStatus({ className = '' }) {
 
         setUserProfile(resolvedProfile)
       } catch (err) {
-        console.warn('Falha ao carregar perfil do usuario', err)
+        reportError(err, { stage: 'load_user_profile', userId: user?.id })
         if (active) {
           setUserProfile(null)
         }
@@ -153,7 +155,7 @@ export function SystemStatus({ className = '' }) {
     return () => {
       active = false
     }
-  }, [user?.id])
+  }, [reportError, user?.id])
 
   const version = useMemo(() => {
     const value = import.meta.env.VITE_APP_VERSION || appInfo.version || '0.0.0'
@@ -239,5 +241,3 @@ export function SystemStatus({ className = '' }) {
     </div>
   )
 }
-
-

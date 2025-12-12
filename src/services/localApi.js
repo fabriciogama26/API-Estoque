@@ -14,6 +14,7 @@ import {
   extractSetores,
   extractTiposExecucao,
 } from '../rules/PessoasRules.js'
+import { logError } from './errorLogService.js'
 
 const nowIso = () => new Date().toISOString()
 
@@ -304,7 +305,13 @@ const normalizeHistoryValue = (value) => {
           try {
             return JSON.stringify(item)
           } catch (error) {
-            console.warn('Falha ao serializar valor de histórico (local).', error)
+            logError({
+              message: 'Falha ao serializar valor de historico (local).',
+              page: 'local_api',
+              severity: 'warn',
+              context: { errorMessage: error?.message },
+              stack: error?.stack,
+            }).catch(() => {})
             return ''
           }
         }
@@ -320,7 +327,13 @@ const normalizeHistoryValue = (value) => {
     try {
       return JSON.stringify(value)
     } catch (error) {
-      console.warn('Falha ao serializar valor de histórico (local).', error)
+      logError({
+        message: 'Falha ao serializar valor de historico (local).',
+        page: 'local_api',
+        severity: 'warn',
+        context: { errorMessage: error?.message },
+        stack: error?.stack,
+      }).catch(() => {})
       return ''
     }
   }
@@ -2864,7 +2877,6 @@ const localApi = {
 }
 
 export { localApi }
-
 
 
 

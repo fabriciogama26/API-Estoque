@@ -21,9 +21,10 @@ export function withAuth(handler) {
         }
       }
 
+      req.user = user
       await handler(req, res, user)
     } catch (error) {
-      handleError(res, error)
+      handleError(res, error, 'Erro interno do servidor.', req)
     }
   }
 }

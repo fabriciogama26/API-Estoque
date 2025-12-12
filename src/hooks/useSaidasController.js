@@ -134,7 +134,7 @@ export function useSaidasController() {
             const extras = await listPessoasByIds(pessoaIds)
             setPessoas(mergePessoasList(pessoasData ?? [], extras ?? []))
           } catch (extraErr) {
-            console.warn('Falha ao obter pessoas adicionais.', extraErr)
+            reportError(extraErr, { area: 'saidas_load_pessoas_extra', pessoaIds })
             setPessoas(pessoasData ?? [])
           }
         } else {

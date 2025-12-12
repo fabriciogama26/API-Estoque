@@ -1,4 +1,5 @@
-﻿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { logError } from './errorLogService.js'
 import {
   montarEstoqueAtual,
   montarDashboard,
@@ -9,6 +10,20 @@ import {
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
 
 const GENERIC_ERROR = 'Falha ao comunicar com o Supabase.'
+
+const reportClientError = (message, error, context = {}, severity = 'warn') => {
+  console.warn(message, error)
+  logError({
+    message,
+    stack: error?.stack,
+    page: 'api_service',
+    severity,
+    context: {
+      ...context,
+      errorMessage: error?.message,
+    },
+  }).catch(() => {})
+}
 
 const trim = (value) => {
   if (value === undefined || value === null) {
@@ -800,7 +815,7 @@ async function resolveCentroCustoNome(valor, { tipo = 'estoque' } = {}) {
     )
     return resolveTextValue(registro?.almox ?? '') || raw
   } catch (error) {
-    console.warn('Nao foi possivel resolver centro de estoque.', error)
+    reportClientError('Nao foi possivel resolver centro de estoque.', error, { valor: raw, tipo })
     return raw
   }
 }
@@ -816,7 +831,7 @@ async function fetchMaterialSnapshot(materialId) {
     )
     return registro ? mapMaterialRecord(registro) : null
   } catch (error) {
-    console.warn('Nao foi possivel resolver material.', error)
+    reportClientError('Nao foi possivel resolver material.', error, { materialId })
     return null
   }
 }
@@ -835,7 +850,7 @@ async function carregarMateriaisPorIds(ids = []) {
       (registros ?? []).map((material) => [material.id, mapMaterialRecord(material)]).filter(([id]) => Boolean(id))
     )
   } catch (error) {
-    console.warn('Nao foi possivel carregar materiais por ids.', error)
+    reportClientError('Nao foi possivel carregar materiais por ids.', error, { ids: selecionados })
     return new Map()
   }
 }
@@ -864,7 +879,7 @@ async function fetchPessoaSnapshot(pessoaId) {
       centroCusto: resolveTextValue(registro.centro_custo ?? ''),
     }
   } catch (error) {
-    console.warn('Nao foi possivel resolver pessoa.', error)
+    reportClientError('Nao foi possivel resolver pessoa.', error, { pessoaId })
     return null
   }
 }
@@ -916,7 +931,9 @@ async function registrarEntradaHistoricoSupabase(entradaAtual, entradaAnterior =
       'Falha ao registrar historico da entrada.'
     )
   } catch (error) {
-    console.warn('Nao foi possivel registrar historico da entrada.', error)
+    reportClientError('Nao foi possivel registrar historico da entrada.', error, {
+      entradaId: entradaAtual?.id,
+    })
   }
 }
 
@@ -942,7 +959,7 @@ async function ensureAcidentePartes(nomes) {
       'Falha ao salvar partes lesionadas.',
     )
   } catch (error) {
-    console.warn('Nao foi possivel upsert partes lesionadas.', error)
+    reportClientError('Nao foi possivel upsert partes lesionadas.', error, { nomes: lista })
   }
   return lista
 }
@@ -1086,7 +1103,9 @@ async function resolveAgenteId(agenteNome) {
         return encontrado.id
       }
     } catch (catalogError) {
-      console.warn('Falha ao carregar catalogo de agentes.', catalogError)
+      reportClientError('Falha ao carregar catalogo de agentes.', catalogError, {
+        stage: 'load_agente_catalog',
+      })
     }
     return null
   }
@@ -1126,14 +1145,19 @@ async function resolveAgenteId(agenteNome) {
               catalogo.lista.push({ id, nome: nomeCatalogo, ordem: null })
             }
           } catch (cacheError) {
-            console.warn('Falha ao atualizar cache de agentes.', cacheError)
+            reportClientError('Falha ao atualizar cache de agentes.', cacheError, {
+              stage: 'update_agente_cache',
+            })
           }
         }
       }
       return id
     }
   } catch (lookupError) {
-    console.warn('Nao foi possivel localizar agente para lesoes.', lookupError)
+    reportClientError('Nao foi possivel localizar agente para lesoes.', lookupError, {
+      stage: 'lookup_agente',
+      agenteNome: nome,
+    })
   }
   return null
 }
@@ -1160,7 +1184,11 @@ async function ensureAcidenteLesoes(agenteNome, nomes) {
       'Falha ao salvar lesoes.',
     )
   } catch (error) {
-    console.warn('Nao foi possivel upsert lesoes.', error)
+    reportClientError('Nao foi possivel upsert lesoes.', error, {
+      stage: 'upsert_lesoes',
+      agenteId,
+      nomes: lista,
+    })
   }
   return lista
 }
@@ -1293,15 +1321,11 @@ async function replaceMaterialRelationsWithFallback({
     } catch (error) {
       if (!error || error.code !== '42703') {
         if (normalizedValues.length > 0) {
-          console.warn(
-            'Supabase rejeitou IDs de v├¡nculo de material.',
-            {
-              table,
-              columnName,
-              values: normalizedValues,
-            },
-            error
-          )
+          reportClientError('Supabase rejeitou IDs de vínculo de material.', error, {
+            table,
+            columnName,
+            values: normalizedValues,
+          })
         }
         throw error
       }
@@ -1444,11 +1468,11 @@ async function resolveUsuarioResponsavel() {
     return 'anonimo'
   }
   const meta = user.user_metadata || {}
-  const metaNome =
-    meta.username ||
-    meta.display_name ||
-    meta.full_name ||
-    meta.name ||
+    const metaNome =
+      meta.username ||
+      meta.display_name ||
+      meta.full_name ||
+      meta.name ||
     ''
 
   if (user.id) {
@@ -1466,7 +1490,9 @@ async function resolveUsuarioResponsavel() {
         return nomeDb
       }
     } catch (error) {
-      console.warn('Nao foi possivel resolver usuario por app_users.', error)
+      reportClientError('Nao foi possivel resolver usuario por app_users.', error, {
+        userId: user.id,
+      })
     }
   }
 
@@ -1964,7 +1990,9 @@ async function registrarSaidaHistoricoSupabase(saidaAtual, saidaAnterior = null,
       'Falha ao registrar historico da saida.'
     )
   } catch (error) {
-    console.warn('Nao foi possivel registrar historico da saida.', error)
+    reportClientError('Nao foi possivel registrar historico da saida.', error, {
+      saidaId: saidaAtual?.id,
+    })
   }
 }
 
@@ -2254,7 +2282,7 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
     )
     return (registros ?? []).map((item) => item?.id).filter(Boolean)
   } catch (error) {
-    console.warn('Falha ao filtrar centros de estoque por nome.', error)
+    reportClientError('Falha ao filtrar centros de estoque por nome.', error, { termo })
     return []
   }
 }
@@ -2435,7 +2463,7 @@ async function preencherUsuariosResponsaveis(registros) {
       }
     })
   } catch (error) {
-    console.warn('Falha ao resolver usuarios responsaveis.', error)
+    reportClientError('Falha ao resolver usuarios responsaveis.', error, { ids })
     return registros.map((entrada) => ({
       ...entrada,
       usuarioResponsavelNome: entrada.usuarioResponsavel,
@@ -2491,7 +2519,7 @@ async function preencherStatusSaida(registros = []) {
       }
     })
   } catch (error) {
-    console.warn('Falha ao resolver status das saidas.', error)
+    reportClientError('Falha ao resolver status das saidas.', error)
     return registros
   }
 }
@@ -2568,7 +2596,7 @@ async function preencherCentrosEstoque(registros = []) {
         }
     })
   } catch (error) {
-    console.warn('Falha ao resolver centros de estoque.', error)
+    reportClientError('Falha ao resolver centros de estoque.', error, { ids })
     return registros
   }
 }
@@ -2612,7 +2640,7 @@ async function preencherCentrosCustoSaidas(registros = []) {
       }
     })
   } catch (error) {
-    console.warn('Falha ao resolver centros de custo.', error)
+    reportClientError('Falha ao resolver centros de custo.', error, { ids })
     return registros
   }
 }
@@ -2680,7 +2708,9 @@ async function preencherCentrosServicoSaidas(registros = []) {
       }
     })
   } catch (error) {
-    console.warn('Nao foi possivel resolver centros de servico das saidas.', error)
+    reportClientError('Nao foi possivel resolver centros de servico das saidas.', error, {
+      pessoaIds,
+    })
     return registros
   }
 }
@@ -2995,9 +3025,10 @@ export const api = {
         if (!termo) {
           throw error
         }
-        console.warn(
+        reportClientError(
           'Erro ao aplicar filtro remoto por termo em pessoas, usando filtro local.',
-          error
+          error,
+          { termo }
         )
         const fallbackData = await execute(buildQuery(), 'Falha ao listar pessoas.')
         const registros = (fallbackData ?? []).map(mapPessoaRecord)
@@ -3027,7 +3058,10 @@ export const api = {
         const data = await execute(query, 'Falha ao buscar pessoas.')
         return (data ?? []).map(mapPessoaRecord)
       } catch (error) {
-        console.warn('Busca remota de pessoas falhou, tentando fallback local.', error)
+        reportClientError('Busca remota de pessoas falhou, tentando fallback local.', error, {
+          termo,
+          limit,
+        })
         const todos = await execute(buildPessoasViewQuery().order('nome'), 'Falha ao listar pessoas.')
         const lista = (todos ?? []).map(mapPessoaRecord)
         return lista.filter((pessoa) => pessoaMatchesSearch(pessoa, termo)).slice(0, limit)
@@ -3426,10 +3460,14 @@ export const api = {
               .delete()
               .eq('id', materialCriadoId)
             if (cleanupError) {
-              console.error('Falha ao remover material apos erro de vinculo.', cleanupError)
+              reportClientError('Falha ao remover material apos erro de vinculo.', cleanupError, {
+                materialId: materialCriadoId,
+              }, 'error')
             }
           } catch (cleanupError) {
-            console.error('Falha ao limpar material apos erro de vinculo.', cleanupError)
+            reportClientError('Falha ao limpar material apos erro de vinculo.', cleanupError, {
+              materialId: materialCriadoId,
+            }, 'error')
           }
         }
         throw error
@@ -3495,9 +3533,10 @@ export const api = {
             mensagemErro.includes('row-level security') ||
             mensagemErro.includes('row level security')
           if (isRlsViolation) {
-            console.warn(
+            reportClientError(
               'Registro de historico do material ignorado devido a politica de RLS.',
-              historicoErro
+              historicoErro,
+              { materialId: id, camposAlterados: camposAlterados.length }
             )
           } else {
             throw mapSupabaseError(historicoErro, 'Falha ao registrar hist├│rico do material.')
@@ -4088,7 +4127,9 @@ export const api = {
           .map((item) => ({ id: item.id ?? null, nome: item.nome }))
           .filter((item) => Boolean(item?.nome))
       } catch (catalogoError) {
-        console.warn('Falha ao carregar agentes do cache, tentando consulta direta.', catalogoError)
+        reportClientError('Falha ao carregar agentes do cache, tentando consulta direta.', catalogoError, {
+          stage: 'agents_cache_fallback',
+        })
       }
       const data = await execute(
         supabase
@@ -4514,7 +4555,11 @@ export const api = {
               ])
           )
         } catch (usuarioError) {
-          console.warn('Nao foi possivel resolver nomes dos usuarios do historico de acidentes.', usuarioError)
+          reportClientError(
+            'Nao foi possivel resolver nomes dos usuarios do historico de acidentes.',
+            usuarioError,
+            { ids: responsaveisIds }
+          )
         }
       }
       return registros.map((item) => {
@@ -4796,7 +4841,7 @@ async function carregarPessoasViewDetalhes(ids) {
     })
     return mapa
   } catch (error) {
-    console.warn('Nao foi possivel usar pessoas_view como fallback.', error)
+    reportClientError('Nao foi possivel usar pessoas_view como fallback.', error, { ids: selecionados })
     return new Map()
   }
 }
