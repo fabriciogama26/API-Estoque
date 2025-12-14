@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import {
   validateAcidenteForm,
@@ -13,11 +13,21 @@ import {
   extractAgenteNome,
 } from '../utils/acidentesUtils.js'
 import {
+  formatPessoaDetail,
+  formatPessoaSummary,
+  normalizeSearchValue,
+  pessoaMatchesTerm,
+  PESSOA_SEARCH_DEBOUNCE_MS,
+  PESSOA_SEARCH_MAX_RESULTS,
+  PESSOA_SEARCH_MIN_CHARS,
+} from '../utils/saidasUtils.js'
+import {
   createAcidente,
   updateAcidente,
   listLesoesPorAgente,
   listTiposPorAgente,
 } from '../services/acidentesService.js'
+import { searchPessoas } from '../services/pessoasService.js'
 import { ACIDENTES_FORM_DEFAULT } from '../config/AcidentesConfig.js'
 
 export function useAcidenteForm({
@@ -41,6 +51,14 @@ export function useAcidenteForm({
   const [lesaoOpcoes, setLesaoOpcoes] = useState([])
   const [lesoesError, setLesoesError] = useState(null)
   const [isLoadingLesoes, setIsLoadingLesoes] = useState(false)
+
+  const [pessoaSearchValue, setPessoaSearchValue] = useState('')
+  const [pessoaSuggestions, setPessoaSuggestions] = useState([])
+  const [pessoaDropdownOpen, setPessoaDropdownOpen] = useState(false)
+  const [isSearchingPessoas, setIsSearchingPessoas] = useState(false)
+  const [pessoaSearchError, setPessoaSearchError] = useState(null)
+  const pessoaSearchTimeoutRef = useRef(null)
+  const pessoaBlurTimeoutRef = useRef(null)
 
   const pessoasPorMatricula = useMemo(() => {
     const map = new Map()
@@ -85,6 +103,96 @@ export function useAcidenteForm({
       return locais.find((item) => normalizar(item) === alvoNormalizado) ?? ''
     },
     [locais],
+  )
+
+  const dedupePessoas = useCallback((lista = []) => {
+    const mapa = new Map()
+    ;(Array.isArray(lista) ? lista : []).forEach((pessoa) => {
+      const chave = pessoa?.id ?? pessoa?.matricula ?? pessoa?.nome
+      if (!chave) {
+        return
+      }
+      const id = String(chave)
+      if (!mapa.has(id)) {
+        mapa.set(id, pessoa)
+      }
+    })
+    return Array.from(mapa.values())
+  }, [])
+
+  const fallbackPessoaSearch = useCallback(
+    (term) => {
+      const normalized = normalizeSearchValue(term)
+      if (!normalized) return []
+      return pessoas.filter((pessoa) => pessoaMatchesTerm(pessoa, normalized)).slice(0, PESSOA_SEARCH_MAX_RESULTS)
+    },
+    [pessoas],
+  )
+
+  const clearPessoaSelection = useCallback(() => {
+    setForm((prev) => ({
+      ...prev,
+      matricula: '',
+      nome: '',
+      cargo: '',
+      centroServico: '',
+      setor: '',
+      local: '',
+    }))
+    setPessoaSearchValue('')
+    setPessoaSuggestions([])
+    setPessoaDropdownOpen(false)
+    setPessoaSearchError(null)
+  }, [])
+
+  const applyPessoaToForm = useCallback(
+    (pessoa) => {
+      if (!pessoa) {
+        return
+      }
+      setForm((prev) => {
+        const next = { ...prev }
+        const matricula =
+          pessoa?.matricula !== undefined && pessoa?.matricula !== null ? String(pessoa.matricula) : ''
+        next.matricula = matricula
+        next.nome = pessoa?.nome ?? ''
+        next.cargo = pessoa?.cargo ?? ''
+        const centroServico = pessoa?.centroServico ?? pessoa?.setor ?? ''
+        next.centroServico = centroServico
+        next.setor = centroServico
+        const localBase = pessoa?.local ?? centroServico
+        next.local = resolveLocalDisponivel(localBase)
+        return next
+      })
+      const resumo = formatPessoaSummary(pessoa)
+      const detalhe = formatPessoaDetail(pessoa)
+      const label = resumo || [pessoa?.matricula, pessoa?.nome].filter(Boolean).join(' - ') || detalhe || ''
+      setPessoaSearchValue(label)
+      setPessoaSuggestions([])
+      setPessoaDropdownOpen(false)
+      setPessoaSearchError(null)
+    },
+    [resolveLocalDisponivel],
+  )
+
+  const selectPessoaPorMatricula = useCallback(
+    (matricula) => {
+      const pessoa = pessoasPorMatricula.get(matricula)
+      if (pessoa) {
+        applyPessoaToForm(pessoa)
+        return
+      }
+      setForm((prev) => ({
+        ...prev,
+        matricula,
+        nome: '',
+        cargo: '',
+        centroServico: '',
+        setor: '',
+        local: '',
+      }))
+    },
+    [applyPessoaToForm, pessoasPorMatricula],
   )
 
   const agenteSelecionadoInfo = useMemo(() => {
@@ -196,7 +304,14 @@ export function useAcidenteForm({
     setTipoOpcoes([])
     setTiposError(null)
     setIsLoadingTipos(false)
+    setLesaoOpcoes([])
     setLesoesError(null)
+    setIsLoadingLesoes(false)
+    setPessoaSearchValue('')
+    setPessoaSuggestions([])
+    setPessoaDropdownOpen(false)
+    setPessoaSearchError(null)
+    setIsSearchingPessoas(false)
   }, [])
 
   const handleFormChange = useCallback(
@@ -207,26 +322,7 @@ export function useAcidenteForm({
           ? event.target.checked
           : event.target.value
       if (name === 'matricula') {
-        setForm((prev) => {
-          const next = { ...prev, matricula: value }
-          const pessoa = pessoasPorMatricula.get(value)
-          if (pessoa) {
-            next.nome = pessoa.nome ?? ''
-            next.cargo = pessoa.cargo ?? ''
-            const centroServico = pessoa.centroServico ?? pessoa.setor ?? pessoa.local ?? ''
-            next.centroServico = centroServico
-            next.setor = centroServico
-            const localBase = pessoa.local ?? centroServico
-            next.local = resolveLocalDisponivel(localBase)
-          } else if (!value) {
-            next.nome = ''
-            next.cargo = ''
-            next.centroServico = ''
-            next.setor = ''
-            next.local = ''
-          }
-          return next
-        })
+        selectPessoaPorMatricula(value)
         return
       }
       if (name === 'agentes') {
@@ -330,8 +426,49 @@ export function useAcidenteForm({
       }
       setForm((prev) => ({ ...prev, [name]: value }))
     },
-    [pessoasPorMatricula, resolveLocalDisponivel],
+    [selectPessoaPorMatricula, resolveLocalDisponivel],
   )
+
+  const handlePessoaInputChange = useCallback((event) => {
+    const value = event.target.value
+    setPessoaSearchValue(value)
+    setPessoaSearchError(null)
+    setForm((prev) => ({
+      ...prev,
+      matricula: '',
+      nome: '',
+      cargo: '',
+      centroServico: '',
+      setor: '',
+      local: '',
+    }))
+    if (value.trim().length >= PESSOA_SEARCH_MIN_CHARS) {
+      setPessoaDropdownOpen(true)
+    } else {
+      setPessoaDropdownOpen(false)
+      setPessoaSuggestions([])
+    }
+  }, [])
+
+  const handlePessoaSelect = useCallback(
+    (pessoa) => {
+      if (!pessoa) return
+      applyPessoaToForm(pessoa)
+    },
+    [applyPessoaToForm],
+  )
+
+  const handlePessoaFocus = useCallback(() => {
+    if (!form.matricula && pessoaSearchValue.trim().length >= PESSOA_SEARCH_MIN_CHARS) {
+      setPessoaDropdownOpen(true)
+    }
+  }, [form.matricula, pessoaSearchValue])
+
+  const handlePessoaBlur = useCallback(() => {
+    pessoaBlurTimeoutRef.current = setTimeout(() => {
+      setPessoaDropdownOpen(false)
+    }, 120)
+  }, [])
 
   const startEdit = useCallback(
     (acidente) => {
@@ -380,11 +517,69 @@ export function useAcidenteForm({
         sesmt: Boolean(acidente.sesmt),
         dataSesmt: acidente.dataSesmt || '',
       })
+      const pessoaSelecionada =
+        pessoasPorMatricula.get(String(acidente.matricula ?? '').trim()) ?? null
+      const resumoPessoa = pessoaSelecionada ? formatPessoaSummary(pessoaSelecionada) : ''
+      const fallbackLabel = resumoPessoa || [acidente.nome, acidente.matricula].filter(Boolean).join(' - ')
+      setPessoaSearchValue(fallbackLabel)
+      setPessoaSuggestions([])
+      setPessoaDropdownOpen(false)
+      setPessoaSearchError(null)
+      setIsSearchingPessoas(false)
       setTipoOpcoes([])
       setTiposError(null)
     },
-    [resolveLocalDisponivel],
+    [pessoasPorMatricula, resolveLocalDisponivel],
   )
+
+  useEffect(() => {
+    if (pessoaSearchTimeoutRef.current) {
+      clearTimeout(pessoaSearchTimeoutRef.current)
+      pessoaSearchTimeoutRef.current = null
+    }
+    const termo = pessoaSearchValue.trim()
+    if (form.matricula || termo.length < PESSOA_SEARCH_MIN_CHARS) {
+      setPessoaSuggestions([])
+      setIsSearchingPessoas(false)
+      setPessoaSearchError(null)
+      setPessoaDropdownOpen(false)
+      return
+    }
+    let cancelado = false
+    setIsSearchingPessoas(true)
+    pessoaSearchTimeoutRef.current = setTimeout(async () => {
+      setPessoaSearchError(null)
+      try {
+        let resultados = []
+        if (searchPessoas) {
+          resultados = await searchPessoas({ termo, limit: PESSOA_SEARCH_MAX_RESULTS })
+        } else {
+          resultados = fallbackPessoaSearch(termo)
+        }
+        if (!cancelado) {
+          setPessoaSuggestions(dedupePessoas(resultados ?? []))
+          setPessoaDropdownOpen(true)
+        }
+      } catch (err) {
+        if (!cancelado) {
+          setPessoaSearchError(err.message || 'Falha ao buscar pessoas.')
+          setPessoaSuggestions([])
+          setPessoaDropdownOpen(true)
+        }
+      } finally {
+        if (!cancelado) {
+          setIsSearchingPessoas(false)
+        }
+      }
+    }, PESSOA_SEARCH_DEBOUNCE_MS)
+    return () => {
+      cancelado = true
+      if (pessoaSearchTimeoutRef.current) {
+        clearTimeout(pessoaSearchTimeoutRef.current)
+        pessoaSearchTimeoutRef.current = null
+      }
+    }
+  }, [pessoaSearchValue, form.matricula, fallbackPessoaSearch, dedupePessoas])
 
   const cancelEdit = useCallback(() => {
     resetForm()
@@ -428,6 +623,17 @@ export function useAcidenteForm({
     [editingAcidente, form, onError, onSaved, resetForm, user],
   )
 
+  useEffect(() => {
+    return () => {
+      if (pessoaBlurTimeoutRef.current) {
+        clearTimeout(pessoaBlurTimeoutRef.current)
+      }
+      if (pessoaSearchTimeoutRef.current) {
+        clearTimeout(pessoaSearchTimeoutRef.current)
+      }
+    }
+  }, [])
+
   return {
     form,
     setForm,
@@ -446,5 +652,15 @@ export function useAcidenteForm({
     lesoesError,
     isLoadingLesoes,
     centrosServicoPessoas,
+    pessoaSearchValue,
+    pessoaSuggestions,
+    pessoaDropdownOpen,
+    isSearchingPessoas,
+    pessoaSearchError,
+    handlePessoaInputChange,
+    handlePessoaSelect,
+    handlePessoaFocus,
+    handlePessoaBlur,
+    clearPessoaSelection,
   }
 }
