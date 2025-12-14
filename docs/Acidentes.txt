@@ -35,8 +35,8 @@ Arquitetura (modular)
 Campos principais do formulario
 -------------------------------
 - Identificacao da pessoa:
-  - Matricula (obrigatorio) – campo chave; ao informar, preenche automaticamente nome, cargo, centro de servico e local.
-  - Nome, Cargo, Centro de servico, Setor, Local – derivados da pessoa, com possibilidade de ajuste conforme permissao.
+  - Matricula (obrigatorio) - agora autocomplete: ao digitar matricula ou nome, abre sugestoes; ao selecionar, preenche automaticamente nome, cargo, centro de servico e local. Botao "x" limpa a selecao.
+  - Nome, Cargo, Centro de servico, Setor, Local - derivados da pessoa, com possibilidade de ajuste conforme permissao.
 - Dados do acidente:
   - Data/hora do acidente (obrigatorio) exibida como "Data do Acidente" e com captura de hora.
   - Dias perdidos e Dias debitados (obrigatorios quando aplicavel, armazenados como numero, exibidos como texto).
@@ -52,7 +52,7 @@ Campos principais do formulario
 Fluxos principais
 -----------------
 1) Cadastro/edicao
-   - Usuario seleciona uma matricula existente; sistema preenche dados da pessoa.
+   - Usuario digita matricula ou nome; autocomplete exibe sugestoes e, ao selecionar, preenche dados da pessoa.
    - Preenche campos obrigatorios: matricula, data, dias perdidos/debitados, HHT, centro de servico, local, agente(s), tipo(s), lesao(oes), parte(s) lesionada(s).
    - Campos auxiliares: CAT, observacao, CID, flags de lancamento (eSocial/SESMT).
    - Botao alterna entre "Registrar acidente" (novo) e "Salvar alteracoes" (edicao).
@@ -81,6 +81,7 @@ Fluxos principais
 Carregamento de dados
 ---------------------
 - Pessoas, locais, agentes, tipos, lesoes e partes sao carregados em paralelo, cada catalogo com seu proprio `isLoading` e `error`.
+- Campo Matricula usa busca com debounce (searchPessoas quando disponivel, fallback local), exibe feedback de carregamento/erro no dropdown e so abre sugestoes quando nao ha matricula ja selecionada.
 - A lista principal `useAcidentes` atualiza apos:
   - Criar ou editar um acidente.
   - Acionar o botao "Atualizar".

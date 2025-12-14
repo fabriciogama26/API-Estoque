@@ -70,6 +70,16 @@ function AcidentesPageContent() {
     lesoesError,
     isLoadingLesoes,
     centrosServicoPessoas,
+    pessoaSearchValue,
+    pessoaSuggestions,
+    pessoaDropdownOpen,
+    isSearchingPessoas,
+    pessoaSearchError,
+    handlePessoaInputChange,
+    handlePessoaSelect,
+    handlePessoaFocus,
+    handlePessoaBlur,
+    clearPessoaSelection,
   } = useAcidenteForm({
     pessoas,
     locais,
@@ -137,7 +147,6 @@ function AcidentesPageContent() {
         editingAcidente={editingAcidente}
         onCancel={cancelEdit}
         error={formError}
-        pessoas={pessoas}
         pessoasError={pessoasError}
         isLoadingPessoas={isLoadingPessoas}
         locais={locais}
@@ -156,6 +165,16 @@ function AcidentesPageContent() {
         partesError={partesError}
         isLoadingPartes={isLoadingPartes}
         centrosServico={centrosServicoPessoas}
+        pessoaSearchValue={pessoaSearchValue}
+        pessoaSuggestions={pessoaSuggestions}
+        pessoaDropdownOpen={pessoaDropdownOpen}
+        isSearchingPessoas={isSearchingPessoas}
+        pessoaSearchError={pessoaSearchError}
+        onPessoaInputChange={handlePessoaInputChange}
+        onPessoaSelect={handlePessoaSelect}
+        onPessoaFocus={handlePessoaFocus}
+        onPessoaBlur={handlePessoaBlur}
+        onPessoaClear={clearPessoaSelection}
       />
 
       <AcidentesFilters

@@ -497,7 +497,7 @@ export function DashboardPage() {
         <PageHeader
           icon={<DashboardIcon size={28} />}
           title="Dashboard de Estoque"
-          subtitle="Monitore indicadores de movimentaÃ§Ã£o e estoque para agir rapidamente."
+          subtitle="Monitore indicadores de movimentação e estoque para agir rapidamente."
           actions={<HelpButton topic="dashboard" />}
         />
         <FiltersForm />
