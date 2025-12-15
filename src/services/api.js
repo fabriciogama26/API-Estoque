@@ -8,6 +8,7 @@ import {
   calcularSaldoMaterial,
 } from '../lib/estoque.js'
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
+import { resolveEffectiveAppUser } from './effectiveUserService.js'
 
 const GENERIC_ERROR = 'Falha ao comunicar com o Supabase.'
 
@@ -1497,23 +1498,17 @@ async function resolveUsuarioResponsavel() {
     return 'anonimo'
   }
   const meta = user.user_metadata || {}
-    const metaNome =
-      meta.username ||
-      meta.display_name ||
-      meta.full_name ||
-      meta.name ||
-    ''
+  const metaNome =
+    meta.username || meta.display_name || meta.full_name || meta.name || ''
 
   if (user.id) {
     try {
-      const usuarioDb = await execute(
-        supabase.from('app_users').select('display_name, username, email').eq('id', user.id).limit(1).single(),
-        'Falha ao resolver usuario.'
-      )
+      const effective = await resolveEffectiveAppUser(user.id)
+      const profile = effective?.dependentProfile || effective?.profile
       const nomeDb =
-        resolveTextValue(usuarioDb?.username) ||
-        resolveTextValue(usuarioDb?.display_name) ||
-        resolveTextValue(usuarioDb?.email) ||
+        resolveTextValue(profile?.username) ||
+        resolveTextValue(profile?.display_name) ||
+        resolveTextValue(profile?.email) ||
         ''
       if (nomeDb) {
         return nomeDb
@@ -1533,7 +1528,19 @@ async function resolveUsuarioId() {
   ensureSupabase()
   const { data } = await supabase.auth.getSession()
   const user = data?.session?.user
-  return user?.id ?? null
+  if (!user?.id) {
+    return null
+  }
+  try {
+    const effective = await resolveEffectiveAppUser(user.id)
+    if (effective?.active === false) {
+      throw new Error('Usuario inativo. Procure um administrador.')
+    }
+    return effective?.appUserId || user.id
+  } catch (error) {
+    reportClientError('Falha ao resolver usuario efetivo.', error, { userId: user.id })
+    throw error
+  }
 }
 
 async function resolveUsuarioIdOrThrow() {

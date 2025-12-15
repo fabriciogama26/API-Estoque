@@ -51,3 +51,13 @@ Atualizacao 2025-11
 --------------------
 - Acrescentei itens para verificar a presenca de `fabricante_nome` e `centro_servico` legiveis nas views utilizadas pelo dashboard.
 - Recomendei revisar indices nas colunas usadas pelos filtros clicaveis para manter as agregacoes responsivas.
+Atualizacao 2025-12 (credenciais/dependentes)
+-------------------------------------------
+- app_credentials_catalog deve existir com seeds (admin/master/operador/estagiario/visitante); RLS: leitura para authenticated/service_role e escrita apenas service_role.
+- app_users.credential e app_users_dependentes.credential sao UUID com FK para o catalogo; dependentes herdam do titular quando credential estiver vazia.
+- app_users_credential_history referencia o catalogo (before/after) com RLS para authenticated/service_role.
+- Evite policies que consultam app_users dentro da propria policy (previne recursao); prefira claims no JWT ou service_role para administradores.
+Atualizacao 2025-12 (configuracoes/dependentes)
+--------------------------------------------
+- Check de RLS: autocomplete deve ler app_users e app_users_dependentes (policies para authenticated/service_role) e master deve aparecer para admin/master.
+- Conferir seeds do catalogo de credenciais e FKs UUID em app_users/app_users_dependentes/app_users_credential_history.

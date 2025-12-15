@@ -8,6 +8,7 @@ import { usePermissions } from '../context/PermissionsContext.jsx'
 import { CREDENTIAL_OPTIONS, PAGE_CATALOG, resolveAllowedPageIds, describeCredential } from '../config/permissions.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
+import { mapCredentialUuidToText, mapCredentialTextToUuid } from '../services/effectiveUserService.js'
 import '../styles/ConfiguracoesPage.css'
 
 // Sincroniza o status (ativo/inativo) com o auth.users via RPC (security definer no Supabase)
@@ -22,6 +23,78 @@ async function syncAuthUserBan(userId, isActive) {
   if (error) {
     throw error
   }
+}
+
+async function searchAllUsers(term) {
+  if (!isSupabaseConfigured() || !supabase) {
+    return []
+  }
+  const q = (term || '').trim()
+  if (q.length < 2) {
+    return []
+  }
+  const filtros = [`username.ilike.%${q}%`, `display_name.ilike.%${q}%`, `email.ilike.%${q}%`]
+  const [usersResult, depsResult] = await Promise.all([
+    supabase
+      .from('app_users')
+      .select('id, display_name, username, email, credential, page_permissions, ativo')
+      .or(filtros.join(',')),
+    supabase
+      .from('app_users_dependentes')
+      .select(
+        `
+        id,
+        auth_user_id,
+        owner_app_user_id,
+        username,
+        display_name,
+        email,
+        credential,
+        page_permissions,
+        ativo,
+        owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, display_name, username, email, credential, page_permissions, ativo)
+      `
+      )
+      .or(filtros.join(',')),
+  ])
+
+  const resultados = []
+  const currentUserCredential = (await mapCredentialUuidToText((await supabase.auth.getSession())?.data?.session?.user?.id)) || ''
+  const isCurrentMaster = (currentUserCredential || '').toLowerCase() === 'master'
+
+  for (const user of usersResult.data || []) {
+    const credText = await mapCredentialUuidToText(user.credential)
+    if (!isCurrentMaster && (credText || '').toLowerCase() === 'master') {
+      continue
+    }
+    resultados.push({
+      id: user.id,
+      label: user.username || user.display_name || user.email || user.id,
+      credential: credText || 'admin',
+      credentialId: user.credential,
+      page_permissions: user.page_permissions,
+      ativo: user.ativo,
+    })
+  }
+
+  for (const dep of depsResult.data || []) {
+    const credText = await mapCredentialUuidToText(dep.credential)
+    const ownerCred = await mapCredentialUuidToText(dep.owner?.credential)
+    const resolved = (credText || ownerCred || 'admin').toLowerCase()
+    if (!isCurrentMaster && resolved === 'master') {
+      continue
+    }
+    resultados.push({
+      id: dep.auth_user_id,
+      label: dep.username || dep.display_name || dep.email || dep.auth_user_id,
+      credential: credText || ownerCred || 'admin',
+      credentialId: dep.credential || dep.owner?.credential,
+      page_permissions: dep.page_permissions?.length ? dep.page_permissions : dep.owner?.page_permissions || [],
+      ativo: dep.ativo,
+    })
+  }
+
+  return resultados
 }
 
 export function ConfiguracoesPage() {
@@ -56,6 +129,10 @@ function PermissionsSection({ currentUser }) {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(null)
   const [historyItems, setHistoryItems] = useState([])
+  const [userSearch, setUserSearch] = useState('')
+  const [userSuggestions, setUserSuggestions] = useState([])
+  const [userSearchLoading, setUserSearchLoading] = useState(false)
+  const [userSearchError, setUserSearchError] = useState(null)
 
   const pageOptions = useMemo(
     () => PAGE_CATALOG.filter((page) => !['no-access', 'configuracoes'].includes(page.id)),
@@ -69,6 +146,15 @@ function PermissionsSection({ currentUser }) {
   const appliedPages = draftPages.length
     ? draftPages
     : resolveAllowedPageIds(draftCredential || selectedUser?.credential || credential)
+
+  const credentialOptions = useMemo(() => {
+    const base = CREDENTIAL_OPTIONS
+    const isMasterUser = (currentUser?.metadata?.credential || '').toLowerCase() === 'master'
+    if (isMasterUser) {
+      return [{ value: 'master', label: 'Master' }, ...base]
+    }
+    return base
+  }, [currentUser?.metadata?.credential])
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) {
@@ -110,17 +196,74 @@ function PermissionsSection({ currentUser }) {
     setIsLoading(true)
     setFeedback(null)
     try {
-      const { data, error } = await supabase
-        .from('app_users')
-        .select('id, display_name, username, email, credential, page_permissions, ativo')
-        .order('display_name', { ascending: true })
-      if (error) {
-        throw error
+      const [usersResult, depsResult] = await Promise.all([
+        supabase
+          .from('app_users')
+          .select('id, display_name, username, email, credential, page_permissions, ativo')
+          .order('display_name', { ascending: true }),
+        supabase
+          .from('app_users_dependentes')
+          .select(
+            `
+            id,
+            auth_user_id,
+            owner_app_user_id,
+            username,
+            display_name,
+            email,
+            credential,
+            page_permissions,
+            ativo,
+            owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, display_name, username, email, credential, page_permissions, ativo)
+          `
+          )
+          .order('display_name', { ascending: true }),
+      ])
+      if (usersResult.error) {
+        throw usersResult.error
       }
-      const lista = (data || []).filter((usuario) => {
-        const cred = (usuario.credential || '').toLowerCase()
-        return cred !== 'master'
-      })
+      if (depsResult.error) {
+        throw depsResult.error
+      }
+      const listaMap = new Map()
+      const isCurrentMaster = (currentUser?.metadata?.credential || '').toLowerCase() === 'master'
+      for (const usuario of usersResult.data || []) {
+        const credText = await mapCredentialUuidToText(usuario.credential)
+        const credLower = (credText || '').toLowerCase()
+        if (!isCurrentMaster && credLower === 'master') {
+          continue
+        }
+        listaMap.set(usuario.id, {
+          ...usuario,
+          type: 'owner',
+          dependent_id: null,
+          owner_app_user_id: usuario.id,
+          credential: credText || 'admin',
+        })
+      }
+      for (const dep of depsResult.data || []) {
+        const credText = await mapCredentialUuidToText(dep.credential)
+        const ownerCred = await mapCredentialUuidToText(dep.owner?.credential)
+        const resolvedCred = (credText || ownerCred || 'admin').toLowerCase()
+        if (!isCurrentMaster && resolvedCred === 'master') {
+          continue
+        }
+        listaMap.set(dep.auth_user_id, {
+          id: dep.auth_user_id, // id do auth.user dependente
+          dependent_id: dep.id,
+          type: 'dependent',
+          display_name: dep.display_name || dep.owner?.display_name,
+          username: dep.username || dep.owner?.username || dep.auth_user_id,
+          email: dep.email || dep.owner?.email || '',
+          owner_app_user_id: dep.owner_app_user_id,
+          credential: credText || ownerCred || 'admin',
+          page_permissions: dep.page_permissions?.length
+            ? dep.page_permissions
+            : dep.owner?.page_permissions || [],
+          ativo: dep.ativo,
+        })
+      }
+      const lista = Array.from(listaMap.values())
       if (!lista.length) {
         addFallbackUser(lista, true)
       }
@@ -151,7 +294,7 @@ function PermissionsSection({ currentUser }) {
     if (!selectedUser) {
       return
     }
-    const cred = selectedUser.credential || 'admin'
+    const cred = (selectedUser.credential || 'admin').toLowerCase()
     const paginasSalvas = Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : []
     const paginasIniciais = paginasSalvas.length ? paginasSalvas : resolveAllowedPageIds(cred)
     setDraftCredential(cred)
@@ -176,6 +319,40 @@ function PermissionsSection({ currentUser }) {
     setDraftPages(resolveAllowedPageIds(value))
   }
 
+  const handleUserSearchChange = async (value) => {
+    setUserSearch(value)
+    setUserSearchLoading(true)
+    setUserSearchError(null)
+    try {
+      const results = await searchAllUsers(value)
+      setUserSuggestions(results)
+    } catch (err) {
+      setUserSearchError(err.message || 'Falha ao buscar usuarios.')
+    } finally {
+      setUserSearchLoading(false)
+    }
+  }
+
+  const handleUserSelect = (userOption) => {
+    setSelectedUserId(userOption.id)
+    setUserSearch(userOption.label)
+    setUserSuggestions([])
+    // garante que o usuario selecionado esteja na lista para hydration da UI
+    setUsers((prev) => {
+      const exists = prev.some((u) => u.id === userOption.id)
+      if (exists) return prev
+      return prev.concat({
+        id: userOption.id,
+        display_name: userOption.label,
+        username: userOption.label,
+        email: '',
+        credential: userOption.credential,
+        page_permissions: userOption.page_permissions,
+        ativo: userOption.ativo,
+      })
+    })
+  }
+
   const handleSave = async () => {
     if (!selectedUser) {
       return
@@ -186,54 +363,95 @@ function PermissionsSection({ currentUser }) {
     }
     const beforeCredential = selectedUser.credential || 'admin'
     const beforePages = Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : []
-    const beforeActive = selectedUser.ativo !== false
     setIsLoading(true)
     setFeedback(null)
     try {
-      const { error } = await supabase
-        .from('app_users')
-        .update({
-          credential: draftCredential || 'admin',
-          page_permissions: appliedPages,
-          ativo: isActive,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', selectedUser.id)
+      const credentialUuid = await mapCredentialTextToUuid(draftCredential || 'admin')
+      if (selectedUser.type === 'dependent') {
+        const { error } = await supabase
+          .from('app_users_dependentes')
+          .update({
+            credential: credentialUuid,
+            page_permissions: appliedPages,
+            ativo: isActive,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', selectedUser.dependent_id)
+        if (error) {
+          throw error
+        }
+        try {
+          await syncAuthUserBan(selectedUser.id, isActive)
+        } catch (syncError) {
+          reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
+        }
+        try {
+          await supabase.from('app_users_credential_history').insert({
+            user_id: selectedUser.owner_app_user_id || selectedUser.id,
+            user_username:
+              selectedUser.username ||
+              selectedUser.display_name ||
+              selectedUser.email ||
+              selectedUser.id,
+            changed_by: currentUser?.id || null,
+            changed_by_username:
+              currentUser?.metadata?.username ||
+              currentUser?.name ||
+              currentUser?.email ||
+              'Sistema',
+            action: 'update',
+            before_credential: beforeCredential,
+            after_credential: draftCredential || 'admin',
+            before_pages: beforePages,
+            after_pages: appliedPages,
+          })
+        } catch (historyError) {
+          reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
+        }
+      } else {
+        const { error } = await supabase
+          .from('app_users')
+          .update({
+            credential: credentialUuid,
+            page_permissions: appliedPages,
+            ativo: isActive,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', selectedUser.id)
 
-      if (error) {
-        throw error
-      }
+        if (error) {
+          throw error
+        }
 
-      try {
-        await syncAuthUserBan(selectedUser.id, isActive)
-      } catch (syncError) {
-        reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
-      }
+        try {
+          await syncAuthUserBan(selectedUser.id, isActive)
+        } catch (syncError) {
+          reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
+        }
 
-      try {
-        await supabase.from('app_users_credential_history').insert({
-          user_id: selectedUser.id,
-          user_username:
-            selectedUser.username ||
-            selectedUser.display_name ||
-            selectedUser.email ||
-            selectedUser.id,
-          changed_by: currentUser?.id || null,
-          changed_by_username:
-            currentUser?.metadata?.username ||
-            currentUser?.name ||
-            currentUser?.email ||
-            'Sistema',
+        try {
+          await supabase.from('app_users_credential_history').insert({
+            user_id: selectedUser.id,
+            user_username:
+              selectedUser.username ||
+              selectedUser.display_name ||
+              selectedUser.email ||
+              selectedUser.id,
+            changed_by: currentUser?.id || null,
+            changed_by_username:
+              currentUser?.metadata?.username ||
+              currentUser?.name ||
+              currentUser?.email ||
+              'Sistema',
           action: 'update',
           before_credential: beforeCredential,
           after_credential: draftCredential || 'admin',
           before_pages: beforePages,
           after_pages: appliedPages,
-          before_active: beforeActive,
-          after_active: isActive,
         })
       } catch (historyError) {
         reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
+      }
       }
 
       setFeedback({ type: 'success', message: 'Credencial atualizada com sucesso.' })
@@ -275,7 +493,7 @@ function PermissionsSection({ currentUser }) {
       const { data, error } = await supabase
         .from('app_users_credential_history')
         .select(
-          'id, user_username, changed_by_username, action, before_credential, after_credential, before_pages, after_pages, before_active, after_active, created_at'
+          'id, user_username, changed_by_username, action, before_credential, after_credential, before_pages, after_pages, created_at'
         )
         .eq('user_id', selectedUserId)
         .order('created_at', { ascending: false })
@@ -355,19 +573,31 @@ function PermissionsSection({ currentUser }) {
       </header>
 
       <div className="form form--inline">
-        <label className="field">
+        <label className="field autocomplete">
           <span>Usuario</span>
-          <select value={selectedUserId || ''} onChange={(e) => setSelectedUserId(e.target.value)} disabled={isLoading || !users.length}>
-            {!users.length ? <option>Sem usuarios</option> : null}
-            {users.map((usuario) => (
-              <option key={usuario.id} value={usuario.id}>
-                {usuario.username ||
-                  usuario.display_name ||
-                  usuario.email ||
-                  usuario.id}
-              </option>
-            ))}
-          </select>
+          <div className="autocomplete__control">
+            <input
+              className="autocomplete__input"
+              value={userSearch}
+              onChange={(e) => handleUserSearchChange(e.target.value)}
+              placeholder={isLoading ? 'Carregando...' : 'Digite nome/email/username'}
+              disabled={isLoading}
+            />
+            {userSuggestions.length > 0 && (
+              <ul className="autocomplete__list">
+                {userSuggestions.map((option) => (
+                  <li
+                    key={option.id}
+                    className="autocomplete__item"
+                    onMouseDown={() => handleUserSelect(option)}
+                  >
+                    {option.label} {option.credential ? `(${describeCredential(option.credential)})` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {userSearchError ? <span className="feedback feedback--error">{userSearchError}</span> : null}
         </label>
 
         <label className="field">
@@ -377,7 +607,7 @@ function PermissionsSection({ currentUser }) {
             onChange={(e) => handleCredentialChange(e.target.value)}
             disabled={isLoading || !selectedUser}
           >
-            {CREDENTIAL_OPTIONS.map((option) => (
+            {credentialOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -444,9 +674,6 @@ function PermissionsSection({ currentUser }) {
       {feedback ? <p className={`feedback feedback--${feedback.type}`}>{feedback.message}</p> : null}
 
       <div className="form__actions">
-        <button type="button" className="button button--ghost" onClick={handleReset} disabled={isLoading || !selectedUser}>
-          Restaurar padrao
-        </button>
         <button type="button" className="button button--primary" onClick={handleSave} disabled={isLoading || !selectedUser}>
           {isLoading ? 'Salvando...' : 'Salvar credencial'}
         </button>
@@ -472,8 +699,12 @@ function AdminResetPasswordSection() {
   const [selectedUserId, setSelectedUserId] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [feedback, setFeedback] = useState(null)
+  const [userSearch, setUserSearch] = useState('')
+  const [userSuggestions, setUserSuggestions] = useState([])
+  const [userSearchLoading, setUserSearchLoading] = useState(false)
+  const [userSearchError, setUserSearchError] = useState(null)
 
- const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async () => {
     const addFallbackUser = (lista) => {
       if (currentUser?.id) {
         lista.push({
@@ -507,7 +738,11 @@ function AdminResetPasswordSection() {
       if (error) {
         throw error
       }
-      const lista = (data || []).filter((usuario) => (usuario.credential || '').toLowerCase() !== 'master')
+      const lista = []
+      for (const usuario of data || []) {
+        const credText = await mapCredentialUuidToText(usuario.credential)
+        lista.push({ ...usuario, credential: credText || 'admin' })
+      }
       setUsers(lista)
       if (!selectedUserId && lista.length) {
         setSelectedUserId(lista[0].id)
@@ -581,8 +816,6 @@ function AdminResetPasswordSection() {
           after_credential: selectedUser.credential || 'admin',
           before_pages: Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : [],
           after_pages: Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : [],
-          before_active: selectedUser.ativo !== false,
-          after_active: selectedUser.ativo !== false,
         })
       } catch (historyErr) {
         reportError(historyErr, { stage: 'history_reset', userId: selectedUser.id })
@@ -592,6 +825,39 @@ function AdminResetPasswordSection() {
     } finally {
       setIsSending(false)
     }
+  }
+
+  const handleUserSearchChange = async (value) => {
+    setUserSearch(value)
+    setUserSearchLoading(true)
+    setUserSearchError(null)
+    try {
+      const results = await searchAllUsers(value)
+      setUserSuggestions(results)
+    } catch (err) {
+      setUserSearchError(err.message || 'Falha ao buscar usuarios.')
+    } finally {
+      setUserSearchLoading(false)
+    }
+  }
+
+  const handleUserSelect = (option) => {
+    setSelectedUserId(option.id)
+    setUserSearch(option.label)
+    setUserSuggestions([])
+    setUsers((prev) => {
+      const exists = prev.some((u) => u.id === option.id)
+      if (exists) return prev
+      return prev.concat({
+        id: option.id,
+        username: option.label,
+        display_name: option.label,
+        email: '',
+        credential: option.credential,
+        page_permissions: option.page_permissions,
+        ativo: option.ativo,
+      })
+    })
   }
 
   if (isLocalMode) {
@@ -622,20 +888,31 @@ function AdminResetPasswordSection() {
       </header>
 
       <div className="form form--inline">
-        <label className="field">
+        <label className="field autocomplete">
           <span>Usuario</span>
-          <select
-            value={selectedUserId || ''}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-            disabled={isSending || !users.length}
-          >
-            {!users.length ? <option>Sem usuarios</option> : null}
-            {users.map((usuario) => (
-              <option key={usuario.id} value={usuario.id}>
-                {usuario.username || usuario.display_name || usuario.email || usuario.id}
-              </option>
-            ))}
-          </select>
+          <div className="autocomplete__control">
+            <input
+              className="autocomplete__input"
+              value={userSearch}
+              onChange={(e) => handleUserSearchChange(e.target.value)}
+              placeholder={isSending ? 'Carregando...' : 'Digite nome/email/username'}
+              disabled={isSending}
+            />
+            {userSuggestions.length > 0 && (
+              <ul className="autocomplete__list">
+                {userSuggestions.map((option) => (
+                  <li
+                    key={option.id}
+                    className="autocomplete__item"
+                    onMouseDown={() => handleUserSelect(option)}
+                  >
+                    {option.label} {option.credential ? `(${describeCredential(option.credential)})` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {userSearchError ? <span className="feedback feedback--error">{userSearchError}</span> : null}
         </label>
       </div>
 
@@ -655,7 +932,6 @@ function CredentialsHistoryModal({ open, onClose, isLoading, error, items, resol
     return null
   }
 
-  const statusLabel = (value) => (value === false ? 'Inativo' : 'Ativo')
   const actionLabel = (value) => {
     if ((value || '').toLowerCase() === 'password_reset') {
       return 'Reset de senha'
@@ -691,9 +967,6 @@ function CredentialsHistoryModal({ open, onClose, isLoading, error, items, resol
                 </div>
                 <p>
                   <strong>Credencial:</strong> {item.before_credential || 'admin'} → {item.after_credential || 'admin'}
-                </p>
-                <p>
-                  <strong>Status:</strong> {statusLabel(item.before_active)} → {statusLabel(item.after_active)}
                 </p>
                 <div className="cred-history__badges">
                   <span className="cred-history__badge">

@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import { sendPasswordRecovery } from '../services/authService.js'
+import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../services/effectiveUserService.js'
 
 const STORAGE_KEY = 'api-estoque-auth'
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
@@ -57,6 +58,65 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  const buildResolvedUser = useCallback(
+    async (supabaseUser) => {
+      const parsed = parseSupabaseUser(supabaseUser)
+      if (!parsed) {
+        return { user: null, effective: null }
+      }
+
+      if (isLocalMode || !hasSupabase || !supabase) {
+        return { user: parsed, effective: null }
+      }
+
+      try {
+        const effective = await resolveEffectiveAppUser(parsed.id)
+        if (!effective) {
+          return { user: parsed, effective: null }
+        }
+
+        const profile = effective.profile || null
+        const dependentProfile = effective.dependentProfile || null
+
+        const resolvedName =
+          dependentProfile?.display_name ||
+          profile?.display_name ||
+          parsed.metadata?.nome ||
+          parsed.metadata?.username ||
+          parsed.name
+        const resolvedEmail = dependentProfile?.email || profile?.email || parsed.email
+        const resolvedUsername = dependentProfile?.username || profile?.username || parsed.metadata?.username
+
+        const mergedMetadata = {
+          ...(parsed.metadata || {}),
+          credential: effective.credential ?? parsed.metadata?.credential ?? null,
+          page_permissions:
+            Array.isArray(effective?.pagePermissions) && effective.pagePermissions.length
+              ? effective.pagePermissions
+              : parsed.metadata?.page_permissions || [],
+          username: resolvedUsername || parsed.metadata?.username,
+          app_user_id: effective.appUserId || profile?.id || parsed.id,
+          dependent_of: effective.isDependent ? effective.appUserId : null,
+          dependent_active: effective.dependentActive,
+          owner_active: effective.ownerActive,
+        }
+
+        const resolvedUser = {
+          ...parsed,
+          name: resolvedName || parsed.name,
+          email: resolvedEmail || parsed.email,
+          metadata: mergedMetadata,
+        }
+
+        return { user: resolvedUser, effective }
+      } catch (error) {
+        reportError(error, { stage: 'resolve_effective_user', userId: parsed?.id })
+        throw error
+      }
+    },
+    [hasSupabase, parseSupabaseUser, reportError]
+  )
+
   const [user, setUser] = useState(() => {
     if (typeof window === 'undefined') {
       return null
@@ -102,11 +162,23 @@ export function AuthProvider({ children }) {
         return
       }
 
-      const nextUser = parseSupabaseUser(session.user)
-      setUser(nextUser)
-      if (nextUser) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
-      } else {
+      try {
+        const { user: resolvedUser, effective } = await buildResolvedUser(session.user)
+        if (effective?.active === false) {
+          await supabase.auth.signOut()
+          setUser(null)
+          window.localStorage.removeItem(STORAGE_KEY)
+          return
+        }
+        setUser(resolvedUser)
+        if (resolvedUser) {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
+        } else {
+          window.localStorage.removeItem(STORAGE_KEY)
+        }
+      } catch (error) {
+        reportError(error, { stage: 'sync_user_profile' })
+        setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
       }
     }
@@ -114,20 +186,41 @@ export function AuthProvider({ children }) {
     syncUser()
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const current = parseSupabaseUser(session?.user)
-      setUser(current)
-      if (current) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(current))
-      } else {
-        window.localStorage.removeItem(STORAGE_KEY)
+      const applySessionUser = async () => {
+        const currentSessionUser = session?.user
+        if (!currentSessionUser) {
+          setUser(null)
+          window.localStorage.removeItem(STORAGE_KEY)
+          return
+        }
+        try {
+          const { user: resolvedUser, effective } = await buildResolvedUser(currentSessionUser)
+          if (effective?.active === false) {
+            await supabase.auth.signOut()
+            setUser(null)
+            window.localStorage.removeItem(STORAGE_KEY)
+            return
+          }
+          setUser(resolvedUser)
+          if (resolvedUser) {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
+          } else {
+            window.localStorage.removeItem(STORAGE_KEY)
+          }
+        } catch (error) {
+          reportError(error, { stage: 'auth_state_change' })
+          setUser(null)
+          window.localStorage.removeItem(STORAGE_KEY)
+        }
       }
+      applySessionUser()
     })
 
     return () => {
       active = false
       listener?.subscription?.unsubscribe?.()
     }
-  }, [hasSupabase, parseSupabaseUser, reportError])
+  }, [buildResolvedUser, hasSupabase, reportError])
 
   const login = useCallback(
     async ({ username, password }) => {
@@ -164,42 +257,14 @@ export function AuthProvider({ children }) {
 
       const supabaseUser = data?.user
 
-      // Verifica se o usuario esta ativo na tabela app_users
-      const { data: profile, error: profileError } = await supabase
-        .from('app_users')
-        .select('id, display_name, username, email, credential, page_permissions, ativo')
-        .eq('id', supabaseUser?.id)
-        .maybeSingle()
+      const { user: resolvedUser, effective } = await buildResolvedUser(supabaseUser)
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        throw new Error(profileError.message || 'Falha ao validar status do usuario.')
-      }
-
-      if (profile && profile.ativo === false) {
-        // Bloqueia login de usuarios inativos
+      if (effective?.active === false) {
         await supabase.auth.signOut()
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
         throw new Error('Usuario inativo. Procure um administrador.')
       }
-
-      const nextUser = parseSupabaseUser(supabaseUser)
-      const mergedMetadata = {
-        ...(nextUser?.metadata || {}),
-        ...(supabaseUser?.user_metadata || {}),
-        credential: profile?.credential ?? (nextUser?.metadata?.credential || null),
-        page_permissions: profile?.page_permissions ?? nextUser?.metadata?.page_permissions ?? [],
-        username: profile?.username ?? nextUser?.metadata?.username,
-        ativo: profile?.ativo ?? true,
-      }
-      const resolvedUser = nextUser
-        ? {
-            ...nextUser,
-            name: profile?.display_name || nextUser.name,
-            email: profile?.email || nextUser.email,
-            metadata: mergedMetadata,
-          }
-        : null
 
       setUser(resolvedUser)
       if (resolvedUser) {
@@ -209,7 +274,7 @@ export function AuthProvider({ children }) {
       }
       return resolvedUser
     },
-    [hasSupabase, parseSupabaseUser]
+    [buildResolvedUser, hasSupabase]
   )
 
   const recoverPassword = useCallback(
@@ -244,6 +309,7 @@ export function AuthProvider({ children }) {
     if (!isLocalMode && hasSupabase && supabase) {
       await supabase.auth.signOut()
     }
+    invalidateEffectiveAppUserCache()
     setUser(null)
     window.localStorage.removeItem(STORAGE_KEY)
   }, [hasSupabase])

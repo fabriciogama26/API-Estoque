@@ -31,3 +31,12 @@ Atualizacao 2025-11
 --------------------
 - Esclareci que `api.estoque.dashboard` passou a consultar `saidas.centro_servico` e `materiais.fabricanteNome`; confirme que as RLS existentes permitem leitura agregada desses campos.
 - Inclui recomendacao para adicionar testes de RLS cobrindo a rota `dashboard` quando novos filtros clicaveis forem expostos para perfis restritos.
+Atualizacao 2025-12 (RLS)
+-------------------------
+- Use (select auth.role()) e (select auth.uid()) nas policies para evitar alerta auth_rls_initplan.
+- Evite recursao: nao consulte app_users dentro das policies de app_users; prefira claims no JWT ou service_role para operacoes administrativas.
+- Remova roles extras (anon/authenticator/cli/dashboard_user) das policies; mantenha so authenticated/service_role salvo excecoes documentadas.
+Atualizacao 2025-12 (dependentes/configuracoes)
+---------------------------------------------
+- Configuracoes: autocomplete traz app_users e app_users_dependentes; master visivel para admin/master.
+- Policies: preferir authenticated/service_role; avoid recursao (use claims ou service_role).

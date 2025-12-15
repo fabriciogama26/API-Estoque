@@ -4,43 +4,44 @@ Tela: Configuracoes
 Visao geral
 -----------
 - Pagina React: src/pages/Configuracoes.jsx.
-- Secoes exibidas: gerenciamento de credencial/paginas/status dos usuarios e reset de senha (admin).
+- Secoes exibidas: gerenciamento de credencial/paginas/status de titulares/dependentes e reset de senha (admin/master).
 - Em modo local, a UI mostra apenas avisos (sem Supabase).
 
 Componentes e funcoes
 ---------------------
 - ConfiguracoesPage: monta header + PermissionsSection + AdminResetPasswordSection.
 - PermissionsSection:
-  - Carrega usuarios de app_users (exceto master), com fallback para o usuario atual se Supabase estiver indisponivel.
-  - Permite alterar credential, page_permissions e status (ativo/inativo).
-  - Salva em app_users e registra historico em app_users_credential_history (action update).
+  - Busca titulares em app_users e dependentes em app_users_dependentes via autocomplete; filtra credenciais por nivel (level em app_credentials_catalog). Master enxerga tudo; demais so veem niveis <= ao seu (master nao aparece para admin).
+  - Permite alterar credential (FK UUID para app_credentials_catalog), page_permissions e status (ativo/inativo) de titulares ou dependentes.
+  - Salva em app_users ou app_users_dependentes conforme o tipo e registra historico em app_users_credential_history (action update) para ambos.
   - Chama RPC sync_user_ban_with_status para alinhar auth.users.banned_until (bloqueio de login) ao status ativo/inativo.
-  - Modal CredentialsHistoryModal lista historico de credencial/paginas/status por usuario (acao update/password_reset).
+  - Modal CredentialsHistoryModal lista historico de credencial/paginas (acao update/password_reset) baseado no catalogo.
 - AdminResetPasswordSection:
-  - Lista usuarios (exceto master) e envia reset de senha via supabase.auth.resetPasswordForEmail.
-  - Registra historico (action password_reset).
+  - Autocomplete de usuario/dependente (app_users + app_users_dependentes) e envio de reset via supabase.auth.resetPasswordForEmail.
+  - Registra historico (action password_reset) para o alvo escolhido.
 - syncAuthUserBan(userId, isActive): helper no front que executa RPC sync_user_ban_with_status (Supabase) para manter banimento do Auth sincronizado com app_users. Falhas sao apenas logadas para nao travar a tela.
 
 Fluxos principais
 -----------------
 - Edicao de permissoes:
-  - Seleciona usuario -> escolhe credencial -> alterna paginas -> alterna status (Ativo/Inativo) -> Salvar credencial.
+  - Buscar usuario/dependente -> escolher credencial (limitada ao seu nivel) -> alternar paginas -> alternar status (Ativo/Inativo) -> Salvar credencial.
   - Em caso de erro, feedback tipo error; sucesso mostra success.
 - Historico:
   - Botao de relogio abre modal; lista acoes (update/password_reset) com antes/depois de credencial, paginas e status.
-- Reset de senha (admin):
-  - Seleciona usuario com email -> Enviar reset de senha.
+- Reset de senha (admin/master):
+  - Buscar usuario/dependente com email -> Enviar reset de senha (indisponivel no modo local).
   - Registra historico de password_reset.
 
 Integracao com Supabase
 -----------------------
-- Leitura/escrita: tabelas app_users e app_users_credential_history.
+- Leitura/escrita: tabelas app_users, app_users_dependentes, app_users_credential_history; catalogo em app_credentials_catalog com coluna level (hierarquia).
+- Policies recomendadas: leitura/edicao permitidas somente quando level do alvo <= level do usuario logado; service_role liberado para tudo.
 - RPC exigida: sync_user_ban_with_status(p_user_id uuid, p_active boolean) com SECURITY DEFINER e grants para anon/authenticated. Atualiza auth.users.banned_until para bloquear ou liberar login conforme ativo/inativo.
 - Em modo local ou sem Supabase, a tela usa apenas o usuario atual como fallback e nao grava nada remoto.
 
 Notas de UX
 -----------
-- Master fica oculto da lista (nao editavel/resetavel).
+- Busca autocomplete substitui dropdown; retorna titulares e dependentes pelo id do auth; filtra opcoes de credencial por level.
+- Master aparece somente quando o usuario logado e master; admins nao veem/alteram master.
 - Status toggles usam texto Ativo/Inativo e feedback textual.
 - Ajuda contextual: HelpButton top-right, conteudo na chave "configuracoes" de src/help/helpContent.json; assets em public/help/configuracoes/.
-
