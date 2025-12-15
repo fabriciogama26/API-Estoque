@@ -21,6 +21,13 @@ const formatValue = (value) => {
   return String(value)
 }
 
+const resolveStatusLabel = (snapshot) => {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return 'Nao informado'
+  }
+  return snapshot.statusNome || snapshot.status || snapshot.statusId || 'Nao informado'
+}
+
 const buildChanges = (currentSnapshot, previousSnapshot) => {
   if (!previousSnapshot) {
     return []
@@ -31,14 +38,15 @@ const buildChanges = (currentSnapshot, previousSnapshot) => {
     { key: 'quantidade', label: 'Quantidade' },
     { key: 'centroCusto', label: 'Centro de estoque' },
     { key: 'dataEntrada', label: 'Data da entrada' },
+    { key: 'statusNome', label: 'Status', formatter: resolveStatusLabel },
   ]
   const prev = previousSnapshot || {}
   return fields
-    .map(({ key, label }) => {
-      const before = prev[key]
-      const after = currentSnapshot[key]
-      const normalizedBefore = formatValue(before)
-      const normalizedAfter = formatValue(after)
+    .map(({ key, label, formatter }) => {
+      const before = formatter ? formatter(prev) : prev[key]
+      const after = formatter ? formatter(currentSnapshot) : currentSnapshot[key]
+      const normalizedBefore = formatter ? before : formatValue(before)
+      const normalizedAfter = formatter ? after : formatValue(after)
       if (normalizedBefore === normalizedAfter) {
         return null
       }

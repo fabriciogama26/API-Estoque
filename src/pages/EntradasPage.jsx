@@ -1,10 +1,13 @@
+import { useState } from 'react'
+import { Eye } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { EntryIcon, EditIcon, HistoryIcon } from '../components/icons.jsx'
+import { EntryIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
 import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModal.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { EntradasProvider, useEntradasContext } from '../context/EntradasContext.jsx'
 import { formatCurrency, formatDisplayDate, formatMaterialSummary } from '../utils/entradasUtils.js'
+import { formatDisplayDateTime } from '../utils/saidasUtils.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
 
@@ -18,6 +21,7 @@ function EntradasContent() {
     registeredOptions,
     centroCustoFilterOptions,
     resolveCentroCustoLabel,
+    statusOptions,
     isSaving,
     isLoading,
     error,
@@ -48,7 +52,51 @@ function EntradasContent() {
     openHistory,
     historyState,
     closeHistory,
+    cancelState,
+    openCancelModal,
+    closeCancelModal,
+    handleCancelSubmit,
+    isEntradaCancelada,
+    setCancelState,
   } = useEntradasContext()
+
+  const [detalheEntrada, setDetalheEntrada] = useState(null)
+
+  const handleOpenDetalhes = (entrada) => {
+    if (!entrada) {
+      return
+    }
+    setDetalheEntrada(entrada)
+  }
+
+  const handleCloseDetalhes = () => {
+    setDetalheEntrada(null)
+  }
+
+  const detalheMaterial = detalheEntrada ? materiaisMap.get(detalheEntrada.materialId) : null
+  const detalheCentroCustoLabel = detalheEntrada
+    ? resolveCentroCustoLabel(detalheEntrada) || detalheEntrada.centroCusto || '-'
+    : '-'
+  const detalheCadastradoEm =
+    detalheEntrada?.criadoEm ||
+    detalheEntrada?.created_at ||
+    detalheEntrada?.createdAt ||
+    detalheEntrada?.dataEntrada ||
+    ''
+  const detalheRegistradoPor =
+    detalheEntrada?.usuarioResponsavelNome ||
+    detalheEntrada?.usuarioResponsavel ||
+    detalheEntrada?.usuarioResponsavelId ||
+    ''
+  const detalheValorUnitario = Number(detalheMaterial?.valorUnitario ?? 0)
+  const detalheValorTotal = detalheValorUnitario * Number(detalheEntrada?.quantidade ?? 0)
+  const detalheMaterialResumo = detalheMaterial ? formatMaterialSummary(detalheMaterial) : ''
+  const detalheMaterialId = detalheMaterial?.id || detalheEntrada?.materialId || ''
+  const detalheDescricaoMaterial = detalheMaterial?.descricao || 'Nao informado'
+  const detalheStatusLabel = detalheEntrada?.statusNome || detalheEntrada?.status || 'Nao informado'
+  const detalheAtualizadoEm = detalheEntrada?.atualizadoEm || detalheEntrada?.atualizado_em || ''
+  const detalheUsuarioEdicao =
+    detalheEntrada?.usuarioEdicaoNome || detalheEntrada?.usuarioEdicao || detalheEntrada?.usuarioEdicaoId || ''
 
   return (
     <div className="stack">
@@ -183,6 +231,17 @@ function EntradasContent() {
             </select>
           </label>
           <label className="field">
+            <span>Status</span>
+            <select name="status" value={filters.status} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              {statusOptions.map((item) => (
+                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
             <span>Data inicial</span>
             <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
           </label>
@@ -220,57 +279,93 @@ function EntradasContent() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Centro de estoque</th>
                   <th>Material</th>
                   <th>Descricao</th>
                   <th>Quantidade</th>
-                  <th>Centro de estoque</th>
-                  <th>Valor total</th>
-                  <th>Data</th>
+                  <th>Status</th>
                   <th>Registrado por</th>
+                  <th>Cadastrado em</th>
                   <th>Acoes</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedEntradas.map((entrada) => {
                   const material = materiaisMap.get(entrada.materialId)
-                  const valorUnitario = Number(material?.valorUnitario ?? 0)
-                  const total = valorUnitario * Number(entrada.quantidade ?? 0)
                   const centroCustoLabel = resolveCentroCustoLabel(entrada) || '-'
                   const materialResumo = material ? formatMaterialSummary(material) : 'Material removido'
                   const materialIdLabel = material?.id || entrada.materialId || 'Não informado'
                   const descricaoMaterial = material?.descricao || 'Não informado'
+                  const registradoPor =
+                    entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || entrada.usuarioResponsavelId || 'Nao informado'
+                  const cadastradoEm =
+                    entrada.criadoEm || entrada.created_at || entrada.createdAt || entrada.dataEntrada || entrada.data_entrada
+                  const cadastradoEmLabel = cadastradoEm ? formatDisplayDateTime(cadastradoEm) : 'Nao informado'
+                  const statusLabel = entrada.statusNome || entrada.status || 'Nao informado'
                   return (
-                    <tr key={entrada.id}>
+                    <tr key={entrada.id} className={isEntradaCancelada(entrada) ? 'data-table__row--muted' : ''}>
+                      <td>{centroCustoLabel}</td>
                       <td>
                         <strong>{materialResumo}</strong>
                         <p className="data-table__muted">ID: {materialIdLabel}</p>
                       </td>
                       <td>{descricaoMaterial}</td>
                       <td>{entrada.quantidade}</td>
-                      <td>{centroCustoLabel}</td>
-                      <td>{formatCurrency(total)}</td>
-                      <td>{formatDisplayDate(entrada.dataEntrada)}</td>
-                      <td>{entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Não informado'}</td>
+                      <td>{statusLabel}</td>
+                      <td>{registradoPor}</td>
+                      <td>{cadastradoEmLabel}</td>
                       <td>
                         <div className="table-actions materiais-data-table__actions">
                           <button
                             type="button"
                             className="materiais-table-action-button"
-                            onClick={() => startEditEntrada(entrada)}
-                            aria-label={`Editar entrada ${entrada.id}`}
-                            title="Editar entrada"
+                            onClick={() => handleOpenDetalhes(entrada)}
+                            aria-label={`Ver detalhes da entrada ${entrada.id}`}
+                            title="Ver detalhes"
                           >
-                            <EditIcon size={16} />
+                            <Eye size={16} strokeWidth={1.8} />
                           </button>
-                          <button
-                            type="button"
-                            className="materiais-table-action-button"
-                            onClick={() => openHistory(entrada)}
-                            aria-label={`Historico da entrada ${entrada.id}`}
-                            title="Histórico da entrada"
-                          >
-                            <HistoryIcon size={16} />
-                          </button>
+                          {!isEntradaCancelada(entrada) ? (
+                            <>
+                              <button
+                                type="button"
+                                className="materiais-table-action-button"
+                                onClick={() => startEditEntrada(entrada)}
+                                aria-label={`Editar entrada ${entrada.id}`}
+                                title="Editar entrada"
+                              >
+                                <EditIcon size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                className="materiais-table-action-button"
+                                onClick={() => openHistory(entrada)}
+                                aria-label={`Historico da entrada ${entrada.id}`}
+                                title="Histórico da entrada"
+                              >
+                                <HistoryIcon size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                className="materiais-table-action-button materiais-table-action-button--danger"
+                                onClick={() => openCancelModal(entrada)}
+                                aria-label={`Cancelar entrada ${entrada.id}`}
+                                title="Cancelar entrada"
+                              >
+                                <CancelIcon size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="materiais-table-action-button"
+                              onClick={() => openHistory(entrada)}
+                              aria-label={`Historico da entrada ${entrada.id}`}
+                              title="Histórico da entrada"
+                            >
+                              <HistoryIcon size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -287,6 +382,139 @@ function EntradasContent() {
           onPageChange={setCurrentPage}
         />
       </section>
+      {detalheEntrada ? (
+        <div className="saida-details__overlay" role="dialog" aria-modal="true" onClick={handleCloseDetalhes}>
+          <div className="saida-details__modal" onClick={(event) => event.stopPropagation()}>
+            <header className="saida-details__header">
+              <div>
+                <p className="saida-details__eyebrow">ID da entrada</p>
+                <h3 className="saida-details__title">{detalheEntrada.id || 'ID nao informado'}</h3>
+              </div>
+              <button
+                type="button"
+                className="saida-details__close"
+                onClick={handleCloseDetalhes}
+                aria-label="Fechar detalhes da entrada"
+              >
+                <CancelIcon size={18} />
+              </button>
+            </header>
+
+            <div className="saida-details__section">
+              <h4 className="saida-details__section-title">Dados principais</h4>
+              <div className="saida-details__grid">
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Material</span>
+                  <p className="saida-details__value">{detalheMaterialResumo || detalheMaterialId || 'Material removido'}</p>
+                  <p className="data-table__muted">ID: {detalheMaterialId || 'Nao informado'}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Descricao</span>
+                  <p className="saida-details__value">{detalheDescricaoMaterial}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Quantidade</span>
+                  <p className="saida-details__value">{detalheEntrada.quantidade ?? '-'}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Centro de estoque</span>
+                  <p className="saida-details__value">{detalheCentroCustoLabel}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Data da entrada</span>
+                  <p className="saida-details__value">{formatDisplayDate(detalheEntrada.dataEntrada)}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Status</span>
+                  <p className="saida-details__value">{detalheStatusLabel}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="saida-details__section">
+              <h4 className="saida-details__section-title">Valores</h4>
+              <div className="saida-details__grid">
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Valor unitario</span>
+                  <p className="saida-details__value">{formatCurrency(detalheValorUnitario)}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Valor total</span>
+                  <p className="saida-details__value">{formatCurrency(detalheValorTotal)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="saida-details__section">
+              <h4 className="saida-details__section-title">Registro</h4>
+              <div className="saida-details__grid">
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Registrado por</span>
+                  <p className="saida-details__value">{detalheRegistradoPor || 'Nao informado'}</p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Cadastrado em</span>
+                  <p className="saida-details__value">
+                    {detalheCadastradoEm ? formatDisplayDateTime(detalheCadastradoEm) : 'Nao informado'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Atualizado em</span>
+                  <p className="saida-details__value">
+                    {detalheAtualizadoEm ? formatDisplayDateTime(detalheAtualizadoEm) : 'Nao informado'}
+                  </p>
+                </div>
+                <div className="saida-details__item">
+                  <span className="saida-details__label">Usuário edição</span>
+                  <p className="saida-details__value">{detalheUsuarioEdicao || 'Nao informado'}</p>
+                </div>
+              </div>
+            </div>
+
+            <footer className="saida-details__footer">
+              <button type="button" className="button button--ghost" onClick={handleCloseDetalhes}>
+                Fechar
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+      {cancelState.open ? (
+        <div className="modal__overlay" role="dialog" aria-modal="true" onClick={closeCancelModal}>
+          <div className="modal__content" onClick={(event) => event.stopPropagation()}>
+            <header className="modal__header">
+              <h3>Cancelar entrada</h3>
+              <button type="button" className="modal__close" onClick={closeCancelModal} aria-label="Fechar">
+                <CancelIcon size={18} />
+              </button>
+            </header>
+            <div className="modal__body">
+              <p>Informe um motivo para cancelamento:</p>
+              <textarea
+                className="modal__textarea"
+                rows={3}
+                value={cancelState.motivo}
+                onChange={(e) => setCancelState((prev) => ({ ...prev, motivo: e.target.value }))}
+                placeholder="Descreva o motivo do cancelamento"
+              />
+              {cancelState.error ? <p className="feedback feedback--error">{cancelState.error}</p> : null}
+            </div>
+            <footer className="modal__footer">
+              <button type="button" className="button button--ghost" onClick={closeCancelModal} disabled={cancelState.isSubmitting}>
+                Fechar
+              </button>
+              <button
+                type="button"
+                className="button button--danger"
+                onClick={handleCancelSubmit}
+                disabled={cancelState.isSubmitting || !cancelState.motivo.trim()}
+              >
+                {cancelState.isSubmitting ? 'Cancelando...' : 'Confirmar cancelamento'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
       <EntradasHistoryModal state={historyState} onClose={closeHistory} />
     </div>
   )

@@ -6,6 +6,7 @@ import {
   MATERIAL_SEARCH_DEBOUNCE_MS,
   MATERIAL_SEARCH_MAX_RESULTS,
   MATERIAL_SEARCH_MIN_CHARS,
+  STATUS_CANCELADO_NOME,
   buildEntradasQuery,
   formatDateToInput,
   formatMaterialSummary,
@@ -18,10 +19,12 @@ import {
 } from '../utils/entradasUtils.js'
 import {
   createEntrada,
+  cancelEntrada,
   getEntradaHistory,
   listCentrosEstoque,
   listEntradas,
   listMateriais,
+  listStatusEntrada,
   searchMateriais,
   updateEntrada,
 } from '../services/entradasService.js'
@@ -34,12 +37,21 @@ const HISTORY_INITIAL = {
   error: null,
 }
 
+const CANCEL_INITIAL = {
+  open: false,
+  entrada: null,
+  motivo: '',
+  isSubmitting: false,
+  error: null,
+}
+
 export function useEntradasController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('entradas')
   const [materiais, setMateriais] = useState([])
   const [entradas, setEntradas] = useState([])
   const [centrosCusto, setCentrosCusto] = useState([])
+  const [statusOptions, setStatusOptions] = useState([])
   const [editingEntrada, setEditingEntrada] = useState(null)
   const [form, setForm] = useState(initialEntradaForm)
   const [filters, setFilters] = useState(initialEntradaFilters)
@@ -55,6 +67,7 @@ export function useEntradasController() {
   const materialSearchTimeoutRef = useRef(null)
   const materialBlurTimeoutRef = useRef(null)
   const [historyState, setHistoryState] = useState({ ...HISTORY_INITIAL })
+  const [cancelState, setCancelState] = useState({ ...CANCEL_INITIAL })
 
   const load = useCallback(
     async (params = filters, { resetPage = false, refreshCatalogs = false } = {}) => {
@@ -66,9 +79,11 @@ export function useEntradasController() {
       try {
         const shouldReloadMateriais = refreshCatalogs || materiais.length === 0
         const shouldReloadCentros = refreshCatalogs || centrosCusto.length === 0
-        const [materiaisData, centrosData, entradasData] = await Promise.all([
+        const shouldReloadStatus = refreshCatalogs || statusOptions.length === 0
+        const [materiaisData, centrosData, statusData, entradasData] = await Promise.all([
           shouldReloadMateriais ? listMateriais() : Promise.resolve(null),
           shouldReloadCentros ? listCentrosEstoque() : Promise.resolve(null),
+          shouldReloadStatus ? listStatusEntrada() : Promise.resolve(null),
           listEntradas(buildEntradasQuery(params)),
         ])
         if (materiaisData) {
@@ -76,6 +91,13 @@ export function useEntradasController() {
         }
         if (centrosData) {
           setCentrosCusto(normalizeCentroCustoOptions(centrosData ?? []))
+        }
+        if (statusData) {
+          const normalizados = (statusData ?? []).map((item) => ({
+            id: item.id,
+            nome: item.nome || item.status || '',
+          }))
+          setStatusOptions(normalizados)
         }
         setEntradas(entradasData ?? [])
         if (!centrosData) {
@@ -275,6 +297,28 @@ export function useEntradasController() {
     setHistoryState({ ...HISTORY_INITIAL })
   }
 
+  const openCancelModal = (entrada) => {
+    if (!entrada) return
+    setCancelState({ ...CANCEL_INITIAL, open: true, entrada })
+  }
+
+  const closeCancelModal = () => {
+    setCancelState({ ...CANCEL_INITIAL })
+  }
+
+  const handleCancelSubmit = async () => {
+    if (!cancelState.entrada?.id) return
+    setCancelState((prev) => ({ ...prev, isSubmitting: true, error: null }))
+    try {
+      await cancelEntrada(cancelState.entrada.id, cancelState.motivo)
+      closeCancelModal()
+      await load(filters, { resetPage: false })
+    } catch (err) {
+      setCancelState((prev) => ({ ...prev, isSubmitting: false, error: err.message || 'Falha ao cancelar.' }))
+      reportError(err, { area: 'entradas_cancel', entradaId: cancelState.entrada.id })
+    }
+  }
+
   const materiaisMap = useMemo(() => {
     const map = new Map()
     materiais.forEach((item) => {
@@ -472,6 +516,13 @@ export function useEntradasController() {
   const hasCentrosCusto = centrosCusto.length > 0
   const isEditing = Boolean(editingEntrada)
 
+  const isEntradaCancelada = useCallback((entrada) => {
+    if (!entrada) return false
+    const status = (entrada.statusNome || entrada.status || '').toString().trim().toUpperCase()
+    const id = (entrada.statusId || '').toString().trim().toUpperCase()
+    return status === STATUS_CANCELADO_NOME || id === STATUS_CANCELADO_NOME
+  }, [])
+
   return {
     form,
     filters,
@@ -482,6 +533,7 @@ export function useEntradasController() {
     registeredOptions,
     centroCustoFilterOptions,
     resolveCentroCustoLabel,
+    statusOptions,
     isSaving,
     isLoading,
     error,
@@ -489,6 +541,7 @@ export function useEntradasController() {
     setCurrentPage,
     filteredEntradas,
     paginatedEntradas,
+    statusOptions,
     load,
     handleChange,
     handleSubmit,
@@ -513,5 +566,11 @@ export function useEntradasController() {
     historyState,
     hasCentrosCusto,
     isEditing,
+    cancelState,
+    openCancelModal,
+    closeCancelModal,
+    handleCancelSubmit,
+    isEntradaCancelada,
+    setCancelState,
   }
 }

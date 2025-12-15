@@ -100,13 +100,13 @@
       },
       {
         "title": "Aplicar filtros do histórico",
-        "description": "Use o campo Busca para digitar parte do nome, descrição ou ID do material (ou do usuário que registrou) e combine com centro de estoque e período para refinar o histórico. Use Limpar para remover todos os filtros.",
-        "mediaHint": "Filtros rápidos do histórico de entradas."
+        "description": "Use o campo Busca para digitar parte do nome, descrição ou ID do material (ou do usuário que registrou) e combine com centro de estoque, status e período para refinar o histórico. Use Limpar para remover todos os filtros.",
+        "mediaHint": "Filtros rápidos do histórico de entradas (inclui status)."
       },
       {
-        "title": "Editar ou ver histórico",
-        "description": "Na tabela, clique no botão Editar (lápis) para editar (a tela sobe para o topo, o título muda para “Editando...” e o card fica com borda amarela, exibindo também o botão Cancelar alteração) e no botão de relógio para abrir o histórico daquela entrada.",
-        "mediaHint": "Ações de edição e histórico na tabela."
+        "title": "Editar, ver histórico ou cancelar",
+        "description": "Na tabela, use os ícones para cada entrada: olho (detalhes), lápis (editar), relógio (histórico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e não exibem os botões de edição/cancelamento.",
+        "mediaHint": "Ícones de detalhes, edição, histórico e cancelamento na linha."
       },
       {
         "title": "Atualizar dados",
@@ -116,7 +116,9 @@
     ],
     "notes": [
       "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descrição.",
-      "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro."
+      "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro.",
+      "Status e usuário de edição aparecem em detalhes e histórico; cancelamentos são registrados.",
+      "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrão)."
     ]
   },
   "saidas": {

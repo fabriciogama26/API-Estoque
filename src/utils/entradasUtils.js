@@ -1,6 +1,7 @@
 export const MATERIAL_SEARCH_MIN_CHARS = 2
 export const MATERIAL_SEARCH_MAX_RESULTS = 10
 export const MATERIAL_SEARCH_DEBOUNCE_MS = 250
+export const STATUS_CANCELADO_NOME = 'CANCELADO'
 
 export const initialEntradaForm = {
   materialId: '',
@@ -15,6 +16,7 @@ export const initialEntradaFilters = {
   centroCusto: '',
   dataInicio: '',
   dataFim: '',
+  status: '',
 }
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -155,6 +157,10 @@ export const buildEntradasQuery = (filters) => {
   const registradoPor = filters.registradoPor?.trim()
   if (registradoPor) {
     query.registradoPor = registradoPor
+  }
+  const status = filters.status?.trim()
+  if (status) {
+    query.status = status
   }
   if (filters.dataInicio) {
     query.dataInicio = filters.dataInicio
