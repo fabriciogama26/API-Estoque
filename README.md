@@ -8,6 +8,7 @@ AplicaÇõÇœo React para gestÇœo de EPIs e estoque integrada ao Supabase, co
 - Materiais (EPI) carrega a lista e recalcula os filtros apenas ao clicar em **Aplicar**; nao filtra a cada tecla.
 - Acidentes: campos de texto/select aplicam apenas com **Aplicar**; checkboxes (Apenas SESMT / eSOCIAL) sao imediatos. Filtros adicionais para Lesoes e Partes lesionadas estao disponiveis.
 - Cadastro de Acidentes: campo Matricula agora e autocomplete (busca por matricula ou nome, sugere resultados e preenche nome/cargo/centro/local ao selecionar), igual ao campo Pessoa na tela de Registrar saida.
+- Saidas: autocomplete de Material aceita nome/descricao/ID/CA (centro de estoque obrigatório), mostra CA na lista e o campo "Em estoque" ficou destacado (sem linha extra de saldo/min/valor).
 - Ajuda contextual disponivel em cada pagina (botao **Ajuda**) e em `docs/` para fluxos detalhados.
 - Campos marcados com `*` sao obrigatorios em todos os formularios.
 
@@ -22,5 +23,4 @@ Para detalhes completos de cada tela, consulte a pasta `docs/` e `src/help/helpC
 - Backend: logs vão para `api_errors` via `logApiError` (`api/_shared/logger.js`). `src/app.js` gera `requestId`, registra erros no middleware global e só loga requisições lentas (>= `SLOW_REQUEST_THRESHOLD_MS`, padrão 2000 ms) que não sejam 5xx. `handleError` (`api/_shared/http.js`) envia method/path/status/user/stack/context para o Supabase.
 - Frontend: erros vão para `app_errors` via `useErrorLogger`/`logError`/`reportClientError` (contexts, serviços, controllers, SystemStatus). `ErrorBoundaryWithLogger` em `src/App.jsx` captura erros de renderização.
 - Variáveis úteis: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ENV`/`SERVICE_NAME`, `SLOW_REQUEST_THRESHOLD_MS`. Consulte `docs/error-handling.txt` para detalhes.
-
 
