@@ -5,7 +5,7 @@
     "steps": [
       {
         "title": "Aplicar filtros rápidos",
-        "description": "Defina período inicial/final ou um termo de busca e clique em Aplicar filtros para recalcular todos os gráficos. Use Limpar filtros para voltar ao panorama completo.",
+        "description": "No campo Busca digite parte do nome de material, grupo ou pessoa e combine com período inicial/final; clique em Aplicar filtros para recalcular todos os gráficos. Use Limpar filtros para voltar ao panorama completo.",
         "mediaHint": "Área de filtros no topo com período e campo de busca."
       },
       {
@@ -26,7 +26,7 @@
     ],
     "notes": [
       "Os gráficos respeitam os filtros aplicados; se algo parecer zerado, confirme o período.",
-      "O filtro por termo aceita trechos de nome de material, grupo ou pessoa."
+      "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam."
     ]
   },
   "dashboardAcidentes": {
@@ -35,7 +35,7 @@
     "steps": [
       {
         "title": "Definir filtros iniciais",
-        "description": "Escolha período, unidade/centro de serviço e demais filtros no bloco superior. Clique em Aplicar para recalcular os indicadores.",
+        "description": "No campo Busca digite pessoa, agente ou local (trechos do nome/matrícula também funcionam) e combine com período e unidade/centro de serviço. Clique em Aplicar para recalcular os indicadores.",
         "mediaHint": "Filtros do dashboard de acidentes."
       },
       {
@@ -65,7 +65,7 @@
     "steps": [
       {
         "title": "Filtrar materiais",
-        "description": "Use o formulário de filtros para buscar por (nome, id ou CA), centro de estoque ou faixas de estoque. Clique em Aplicar ou Limpar para atualizar a lista.",
+        "description": "No campo Busca digite parte do nome, descrição, ID ou CA do material para reduzir a tabela; combine com centro de estoque e faixas de saldo. Clique em Aplicar para refinar ou em Limpar para remover todos os filtros.",
         "mediaHint": "Filtros de estoque e botões Aplicar/Limpar."
       },
       {
@@ -95,18 +95,18 @@
     "steps": [
       {
         "title": "Registrar nova entrada",
-        "description": "Busque o material pelo nome/ID, informe quantidade, centro de estoque e data. Clique em Registrar entrada ou Salvar alterações quando estiver editando (o card fica amarelo e o título vira “Editando...”); use Cancelar alteração para sair do modo de edição rapidamente.",
+        "description": "Use o campo de busca para localizar o material por nome ou ID, escolha a sugestão correta e preencha quantidade, centro de estoque e data. Confira os valores e clique em Registrar entrada para salvar; o formulário limpa e o histórico é atualizado.",
         "mediaHint": "Formulário de cadastro de entradas com autocomplete."
       },
       {
         "title": "Aplicar filtros do histórico",
-        "description": "Filtre por usuário, centro de estoque ou período para listar somente as entradas relevantes. Use Limpar para remover todos os filtros.",
-        "mediaHint": "Filtros rápidos do histórico de entradas."
+        "description": "Use o campo Busca para digitar parte do nome, descrição ou ID do material (ou do usuário que registrou) e combine com centro de estoque, status e período para refinar o histórico. Use Limpar para remover todos os filtros.",
+        "mediaHint": "Filtros rápidos do histórico de entradas (inclui status)."
       },
       {
-        "title": "Editar ou ver histórico",
-        "description": "Na tabela, clique no botão Editar (lápis) para editar (a tela sobe para o topo, o título muda para “Editando...” e o card fica com borda amarela, exibindo também o botão Cancelar alteração) e no botão de relógio para abrir o histórico daquela entrada.",
-        "mediaHint": "Ações de edição e histórico na tabela."
+        "title": "Editar, ver histórico ou cancelar",
+        "description": "Na tabela, use os ícones para cada entrada: olho (detalhes), lápis (editar), relógio (histórico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e não exibem os botões de edição/cancelamento.",
+        "mediaHint": "Ícones de detalhes, edição, histórico e cancelamento na linha."
       },
       {
         "title": "Atualizar dados",
@@ -116,7 +116,9 @@
     ],
     "notes": [
       "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descrição.",
-      "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro."
+      "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro.",
+      "Status e usuário de edição aparecem em detalhes e histórico; cancelamentos são registrados.",
+      "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrão)."
     ]
   },
   "saidas": {
@@ -125,7 +127,7 @@
     "steps": [
       {
         "title": "Registrar saída",
-        "description": "Selecione a pessoa e o material pelo autocomplete, informe quantidade, centro de estoque e data. Ao editar, o card fica com borda amarela e o título mostra “Editando...”; salve para registrar ou atualizar a entrega.",
+        "description": "No campo de busca, digite o nome ou matrícula para achar a pessoa e selecione o material pelo autocomplete. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saída para gravar a entrega.",
         "mediaHint": "Formulário de cadastro de saídas com busca de pessoa e material."
       },
       {
@@ -135,12 +137,12 @@
       },
       {
         "title": "Editar ou cancelar",
-        "description": "Use o botão Editar (lápis) para editar registros recentes (o formulário sobe, realça em amarelo e exibe o título “Editando...” junto ao Cancelar edição). O botão Cancelar abre um modal para registrar o motivo e bloquear a entrega.",
+        "description": "Clique em Editar para carregar o registro no formulário: ele sobe para o topo, fica amarelo e mostra “Editando...”. Ajuste os campos necessários e clique em Salvar alterações para gravar; se desistir antes de salvar, use Cancelar edição para voltar ao modo de cadastro.",
         "mediaHint": "Ações de edição e cancelamento na tabela de saídas."
       },
       {
         "title": "Filtrar e paginar",
-        "description": "Use filtros por pessoa, material, centro e status para encontrar uma saída específica. Navegue pelas páginas no rodapé.",
+        "description": "No campo Busca digite o nome ou matrícula da pessoa, ou nome/descrição/ID do material ou CA, para trazer apenas as saídas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessário e navegue pelas páginas no rodapé.",
         "mediaHint": "Filtros superiores e paginação inferior do histórico."
       }
     ],
@@ -165,7 +167,7 @@
       },
       {
         "title": "Filtrar catálogo",
-        "description": "Filtre por grupo, tamanho, fabricante ou característica para localizar itens cadastrados. Ajuste os campos e clique em Aplicar para atualizar a lista; use Limpar para remover filtros.",
+        "description": "Digite no campo Busca parte do nome, descrição, ID ou CA para filtrar rapidamente o catálogo; refine por grupo, tamanho, fabricante ou característica e clique em Aplicar. Limpar remove todos os filtros.",
         "mediaHint": "Bloco de filtros acima da tabela de materiais."
       },
       {
@@ -190,7 +192,7 @@
       },
       {
         "title": "Filtrar lista",
-        "description": "Busque por termo, centro de serviço ou setor e clique em Aplicar para atualizar a tabela. O botão Limpar remove todos os filtros.",
+        "description": "No campo Busca digite nome ou matrícula para filtrar a tabela de pessoas; termos parciais funcionam. Combine com centro de serviço ou setor e clique em Aplicar. O botão Limpar remove todos os filtros.",
         "mediaHint": "Filtros e chips acima da tabela de pessoas."
       },
       {
@@ -225,7 +227,7 @@
       },
       {
         "title": "Filtrar registros",
-        "description": "Filtre por tipo, centro de serviço ou agente para reduzir a tabela. Limpar remove todos os filtros aplicados.",
+        "description": "Use o campo Busca para digitar pessoa (nome/matrícula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de serviço ou agente e clique em Aplicar. Limpar zera todos os filtros.",
         "mediaHint": "Bloco de filtros acima da lista de acidentes."
       },
       {
@@ -245,7 +247,7 @@
     "steps": [
       {
         "title": "Preencher filtros de busca",
-        "description": "Informe matrícula, nome ou um intervalo de datas de entrega. Não é necessário preencher todos os campos.",
+        "description": "No campo Busca informe matrícula ou nome do colaborador (parcial ou completo) e, se quiser, complete com intervalo de datas de entrega. Não é necessário preencher todos os campos.",
         "mediaHint": "Formulário de filtros do termo."
       },
       {

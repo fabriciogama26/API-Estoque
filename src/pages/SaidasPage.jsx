@@ -202,7 +202,10 @@ function SaidasContent() {
                       onClick={() => handleMaterialSelect(item)}
                     >
                       <span className="autocomplete__primary">{formatMaterialSummary(item)}</span>
-                      <span className="autocomplete__secondary">ID: {item.nomeId || item.id}</span>
+                      <span className="autocomplete__secondary">
+                        ID: {item.nomeId || item.id}
+                        {item.ca ? ` | CA: ${item.ca}` : ''}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -215,7 +218,7 @@ function SaidasContent() {
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
           </label>
 
-          <label className="field">
+          <label className="field field--accent">
             <span>Em estoque</span>
             <input
               value={
@@ -261,12 +264,6 @@ function SaidasContent() {
 
           {materialEstoqueLoading ? <p className="feedback">Consultando estoque...</p> : null}
           {materialEstoqueError ? <p className="feedback feedback--error">{materialEstoqueError}</p> : null}
-          {materialEstoque ? (
-            <p className="feedback">
-              Saldo atual: {materialEstoque.quantidade ?? 0} | Min: {materialEstoque.estoqueMinimo ?? 0} | Valor unit.:{' '}
-              {formatCurrency(materialEstoque.valorUnitario ?? 0)}
-            </p>
-          ) : null}
         </div>
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="form__actions">
@@ -618,5 +615,3 @@ export function SaidasPage() {
     </SaidasProvider>
   )
 }
-
-

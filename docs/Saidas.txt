@@ -4,7 +4,7 @@ Tela: Saídas de Materiais
 
 Visão geral
 
-Registrar, editar, consultar e cancelar saídas de EPI/materiais. Filtros por período, centros (estoque/custo/serviço), status e termo livre. Caminhos suportados: /saidas e /movimentacoes/saidas.
+Registrar, editar, consultar e cancelar saídas de EPI/materiais. Busca de material aceita nome, descrição, ID ou CA; filtros por período, centros (estoque/custo/serviço), status e termo livre. Caminhos suportados: /saidas e /movimentacoes/saidas.
 
 Arquitetura (modular)
 
@@ -15,8 +15,8 @@ Arquitetura (modular)
 
 Fluxos principais
 
-- Formulário: pessoa, centro de estoque (filtra materiais), material, quantidade, datas; centros de custo/serviço preenchidos pela pessoa; cancelar saída com motivo obrigatório (modal).
-- Filtros: período, centros (estoque/serviço), status dinâmico, termo livre; "Aplicar" consulta na API; limpar restaura defaults e recarrega a lista.
+- Formulário: pessoa, centro de estoque (filtra materiais), material (autocomplete por nome/ID/descrição/CA), quantidade, datas; centros de custo/serviço preenchidos pela pessoa; campo "Em estoque" destacado (sem linha de resumo abaixo); cancelar saída com motivo obrigatório (modal).
+- Filtros: período, centros (estoque/serviço), status dinâmico, termo livre (nome/matrícula de pessoa ou nome/descrição/ID/CA de material); "Aplicar" consulta na API; limpar restaura defaults e recarrega a lista.
 - Tabela: colunas Pessoa, Material, Quantidade, Data entrega, Status, Registrado por, Cadastrado em; ações Ver (detalhes), Editar, Histórico, Cancelar.
 - Detalhes: modal em cartões (padrão acidentes) mostrando todos os campos e centros.
 - Histórico: modal no padrão “Histórico do acidente”, exibindo alterações campo a campo.
@@ -28,7 +28,7 @@ Boas práticas
 
 Atualização 2025-12
 
-- Tela modularizada com hooks/services/utils; detalhes e histórico padronizados; status dinâmico; logging ativo.
+- Tela modularizada com hooks/services/utils; detalhes e histórico padronizados; status dinâmico; logging ativo; autocomplete de material aceita CA; campo "Em estoque" destacado e sem linha extra de saldo/min/valor.
 
 ===========================================
 Mapa de Código (funções, hooks e constantes)

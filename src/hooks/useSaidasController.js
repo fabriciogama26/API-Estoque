@@ -456,6 +456,7 @@ export function useSaidasController() {
       materialSearchTimeoutRef.current = null
     }
     const termo = materialSearchValue.trim()
+    const termoNormalizado = normalizeSearchValue(termo)
     if (!form.centroEstoqueId) {
       setMaterialSuggestions([])
       setIsSearchingMaterials(false)
@@ -481,12 +482,17 @@ export function useSaidasController() {
             termo,
             limit: MATERIAL_SEARCH_MAX_RESULTS,
             centroEstoqueId: form.centroEstoqueId,
+            ca: termo,
           })
         } else {
           resultados = fallbackMaterialSearch(termo)
         }
         if (!cancelled) {
-          setMaterialSuggestions(dedupeMateriais(resultados ?? []))
+          const itens =
+            (!resultados || resultados.length === 0) && termoNormalizado
+              ? fallbackMaterialSearch(termo)
+              : resultados
+          setMaterialSuggestions(dedupeMateriais(itens ?? []))
           setMaterialDropdownOpen(true)
         }
       } catch (err) {

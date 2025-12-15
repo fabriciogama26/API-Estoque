@@ -888,9 +888,28 @@ async function buildEntradaSnapshot(entrada) {
   if (!entrada) {
     return null
   }
-  const [material, centroNome] = await Promise.all([
+  const resolveStatusEntradaNome = async (alvo) => {
+    if (!alvo || typeof alvo !== 'object') {
+      return ''
+    }
+    const statusKey = (alvo.statusId || alvo.status || '').toString().trim()
+    const raw = alvo.statusNome || alvo.status || ''
+    if (!statusKey) {
+      return raw
+    }
+    try {
+      const cache = await carregarStatusEntradaMap()
+      return cache?.byId?.get(statusKey) || raw
+    } catch (error) {
+      reportClientError('Falha ao resolver status da entrada (snapshot).', error, { entradaId: alvo.id, statusKey })
+      return raw
+    }
+  }
+
+  const [material, centroNome, statusNome] = await Promise.all([
     fetchMaterialSnapshot(entrada.materialId),
     resolveCentroCustoNome(entrada.centroCustoId || entrada.centroCusto),
+    resolveStatusEntradaNome(entrada),
   ])
   return {
     entradaId: entrada.id,
@@ -904,10 +923,17 @@ async function buildEntradaSnapshot(entrada) {
     usuarioResponsavel: entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || '',
     usuarioResponsavelNome: entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || '',
     valorUnitario: material?.valorUnitario ?? null,
+    status: entrada.status || '',
+    statusNome: statusNome || entrada.statusNome || entrada.status || '',
+    statusId: entrada.statusId || null,
+    atualizadoEm: entrada.atualizadoEm || entrada.atualizado_em || null,
+    usuarioEdicao: entrada.usuarioEdicaoNome || entrada.usuarioEdicao || '',
+    usuarioEdicaoNome: entrada.usuarioEdicaoNome || entrada.usuarioEdicao || '',
+    usuarioEdicaoId: entrada.usuarioEdicaoId || null,
   }
 }
 
-async function registrarEntradaHistoricoSupabase(entradaAtual, entradaAnterior = null) {
+async function registrarEntradaHistoricoSupabase(entradaAtual, entradaAnterior = null, meta = null) {
   if (!entradaAtual || !entradaAtual.id) {
     return
   }
@@ -920,6 +946,9 @@ async function registrarEntradaHistoricoSupabase(entradaAtual, entradaAnterior =
       snapshotAnterior && Object.keys(snapshotAnterior).length > 0
         ? { atual: snapshotAtual, anterior: snapshotAnterior }
         : { atual: snapshotAtual }
+    if (meta && typeof meta === 'object' && Object.keys(meta).length > 0) {
+      payload.meta = meta
+    }
     await execute(
       supabase.from('entrada_historico').insert({
         id: randomId(),
@@ -1767,6 +1796,12 @@ function mapEntradaRecord(record) {
   const usuarioRaw = record.usuarioResponsavel ?? record.usuario_responsavel ?? ''
   const usuarioId = isUuidValue(usuarioRaw) ? usuarioRaw : null
   const usuarioTexto = resolveTextValue(usuarioRaw)
+  const statusRaw = record.status ?? record.status_entrada ?? ''
+  const statusId = isUuidValue(statusRaw) ? statusRaw : null
+  const statusNome = resolveTextValue(record.statusNome ?? record.status_nome ?? '')
+  const usuarioEdicaoRaw = record.usuarioEdicao ?? record.usuario_edicao ?? ''
+  const usuarioEdicaoId = isUuidValue(usuarioEdicaoRaw) ? usuarioEdicaoRaw : null
+  const usuarioEdicaoNome = resolveTextValue(usuarioEdicaoRaw)
   return {
     id: record.id,
     materialId: record.materialId ?? record.material_id ?? null,
@@ -1777,6 +1812,13 @@ function mapEntradaRecord(record) {
     usuarioResponsavelId: usuarioId,
     usuarioResponsavel: usuarioId ? usuarioId : usuarioTexto,
     usuarioResponsavelNome: usuarioId ? '' : usuarioTexto,
+    statusId: statusId || null,
+    status: statusNome || statusRaw,
+    statusNome: statusNome || (statusId ? '' : statusRaw),
+    atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
+    usuarioEdicaoId: usuarioEdicaoId,
+    usuarioEdicao: usuarioEdicaoId ? usuarioEdicaoId : usuarioEdicaoNome,
+    usuarioEdicaoNome: usuarioEdicaoId ? '' : usuarioEdicaoNome,
   }
 }
 
@@ -2348,6 +2390,19 @@ async function carregarEntradas(params = {}) {
       ? query.eq('usuarioResponsavel', registradoPor)
       : query.ilike('usuarioResponsavel', `%${registradoPor}%`)
   }
+  const statusFiltro = trim(params.status)
+  if (statusFiltro) {
+    if (isUuidValue(statusFiltro)) {
+      query = query.eq('status', statusFiltro)
+    } else {
+      const statusId = await resolveStatusEntradaIdByName(statusFiltro)
+      if (statusId) {
+        query = query.eq('status', statusId)
+      } else {
+        query = query.ilike('status', `%${statusFiltro}%`)
+      }
+    }
+  }
 
   const dataInicioIso = toStartOfDayUtcIso(params.dataInicio)
   const dataFimIso = toEndOfDayUtcIso(params.dataFim)
@@ -2364,6 +2419,7 @@ async function carregarEntradas(params = {}) {
   let registros = (data ?? []).map(mapEntradaRecord)
   registros = await preencherUsuariosResponsaveis(registros)
   registros = await preencherCentrosEstoque(registros)
+  registros = await preencherStatusEntrada(registros)
   if (centroFiltroTerm) {
     registros = registros.filter((entrada) =>
       normalizeSearchTerm(entrada?.centroCusto).includes(centroFiltroTerm)
@@ -2427,12 +2483,18 @@ async function carregarStatusSaidaMap() {
 
 async function preencherUsuariosResponsaveis(registros) {
   const ids = Array.from(
-    new Set(registros.map((entrada) => entrada.usuarioResponsavelId).filter(Boolean))
+    new Set(
+      registros
+        .map((entrada) => [entrada.usuarioResponsavelId, entrada.usuarioEdicaoId])
+        .flat()
+        .filter(Boolean)
+    )
   )
   if (!ids.length) {
     return registros.map((entrada) => ({
       ...entrada,
       usuarioResponsavelNome: entrada.usuarioResponsavel,
+      usuarioEdicaoNome: entrada.usuarioEdicao,
     }))
   }
   try {
@@ -2456,10 +2518,16 @@ async function preencherUsuariosResponsaveis(registros) {
         entrada.usuarioResponsavelId && mapa.has(entrada.usuarioResponsavelId)
           ? mapa.get(entrada.usuarioResponsavelId)
           : entrada.usuarioResponsavel
+      const nomeEdicao =
+        entrada.usuarioEdicaoId && mapa.has(entrada.usuarioEdicaoId)
+          ? mapa.get(entrada.usuarioEdicaoId)
+          : entrada.usuarioEdicao
       return {
         ...entrada,
         usuarioResponsavelNome: nome || '',
         usuarioResponsavel: nome || entrada.usuarioResponsavel,
+        usuarioEdicaoNome: nomeEdicao || '',
+        usuarioEdicao: nomeEdicao || entrada.usuarioEdicao,
       }
     })
   } catch (error) {
@@ -2467,6 +2535,7 @@ async function preencherUsuariosResponsaveis(registros) {
     return registros.map((entrada) => ({
       ...entrada,
       usuarioResponsavelNome: entrada.usuarioResponsavel,
+      usuarioEdicaoNome: entrada.usuarioEdicao,
     }))
   }
 }
@@ -2475,6 +2544,9 @@ const STATUS_SAIDA_CACHE_TTL = 5 * 60 * 1000
 let statusSaidaCache = null
 let statusSaidaCacheTimestamp = 0
 const statusCanceladoIds = new Set()
+const STATUS_ENTRADA_CACHE_TTL = 5 * 60 * 1000
+let statusEntradaCache = null
+let statusEntradaCacheTimestamp = 0
 
 const normalizeStatusKey = (nome) => (nome ? nome.toString().trim().toUpperCase() : '')
 
@@ -2520,6 +2592,89 @@ async function preencherStatusSaida(registros = []) {
     })
   } catch (error) {
     reportClientError('Falha ao resolver status das saidas.', error)
+    return registros
+  }
+}
+
+async function carregarStatusEntradaMap() {
+  const agora = Date.now()
+  if (statusEntradaCache && agora - statusEntradaCacheTimestamp < STATUS_ENTRADA_CACHE_TTL) {
+    return statusEntradaCache
+  }
+  const registros = await execute(
+    supabase.from('status_entrada').select('id, status').eq('ativo', true),
+    'Falha ao consultar status de entrada.',
+  )
+  const mapaId = new Map()
+  const mapaNome = new Map()
+  ;(registros ?? []).forEach((registro) => {
+    if (!registro?.id) {
+      return
+    }
+    const nome = resolveTextValue(registro.status ?? '')
+    mapaId.set(registro.id, nome)
+    const chave = normalizeStatusKey(nome)
+    if (chave) {
+      mapaNome.set(chave, registro.id)
+    }
+  })
+  statusEntradaCache = { byId: mapaId, byName: mapaNome }
+  statusEntradaCacheTimestamp = agora
+  return statusEntradaCache
+}
+
+async function resolveStatusEntradaIdByName(nome) {
+  const chave = normalizeStatusKey(nome)
+  if (!chave) {
+    return null
+  }
+  const cache = await carregarStatusEntradaMap()
+  const mapa = cache?.byName
+  if (!mapa || mapa.size === 0) {
+    return null
+  }
+  return mapa.get(chave) || null
+}
+
+async function preencherStatusEntrada(registros = []) {
+  if (!Array.isArray(registros) || registros.length === 0) {
+    return registros ?? []
+  }
+  const precisaResolver = registros.some((entrada) => {
+    if (entrada?.statusId && isUuidValue(entrada.statusId)) {
+      return true
+    }
+    return entrada?.status && isUuidValue(entrada.status)
+  })
+  if (!precisaResolver) {
+    return registros
+  }
+  try {
+    const cache = await carregarStatusEntradaMap()
+    const mapa = cache?.byId
+    if (!mapa || mapa.size === 0) {
+      return registros
+    }
+    return registros.map((entrada) => {
+      if (!entrada) {
+        return entrada
+      }
+      const lookupId =
+        (entrada.statusId && isUuidValue(entrada.statusId) ? entrada.statusId : null) ||
+        (entrada.status && isUuidValue(entrada.status) ? entrada.status : null)
+      if (!lookupId) {
+        return entrada
+      }
+      const label = mapa.get(lookupId) || entrada.status
+      return {
+        ...entrada,
+        statusId: lookupId,
+        status: label || lookupId,
+        statusNome: label || lookupId,
+      }
+    })
+  } catch (error) {
+    reportClientError('Falha ao resolver status de entrada.', error)
     return registros
   }
 }
@@ -3808,6 +3963,8 @@ export const api = {
             centro_estoque: dados.centroCusto,
             dataEntrada: dados.dataEntrada,
             usuarioResponsavel: usuarioId,
+            usuario_edicao: usuarioId,
+            atualizado_em: new Date().toISOString(),
           })
           .eq('id', id)
           .select(),
@@ -3816,6 +3973,45 @@ export const api = {
       const entradaNormalizada = mapEntradaRecord(registro)
       await registrarEntradaHistoricoSupabase(entradaNormalizada, entradaAnterior)
       return entradaNormalizada
+    },
+    async cancel(id, payload = {}) {
+      if (!id) {
+        throw new Error('Entrada invalida.')
+      }
+      const motivo = trim(payload.motivo ?? payload.motivoCancelamento ?? '')
+      const entradaAtualRegistro = await executeMaybeSingle(
+        supabase.from('entradas').select('*').eq('id', id),
+        'Falha ao obter entrada.'
+      )
+      if (!entradaAtualRegistro) {
+        throw new Error('Entrada nao encontrada.')
+      }
+      const entradaAtual = mapEntradaRecord(entradaAtualRegistro)
+      const usuarioId = await resolveUsuarioIdOrThrow()
+      const statusCanceladoId = (await resolveStatusEntradaIdByName(STATUS_CANCELADO_NOME)) || null
+      const statusValor = statusCanceladoId || STATUS_CANCELADO_NOME
+      const registro = await executeSingle(
+        supabase
+          .from('entradas')
+          .update({
+            status: statusValor,
+            usuarioResponsavel: usuarioId,
+            usuario_edicao: usuarioId,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .select(),
+        'Falha ao cancelar entrada.'
+      )
+      let entradaAtualizada = mapEntradaRecord(registro)
+      entradaAtualizada.status = entradaAtualizada.status || STATUS_CANCELADO_NOME
+      entradaAtualizada = (await preencherStatusEntrada([entradaAtualizada]))[0] ?? entradaAtualizada
+      entradaAtualizada.statusMotivo = motivo
+      await registrarEntradaHistoricoSupabase(entradaAtualizada, entradaAtual, {
+        status: STATUS_CANCELADO_NOME,
+        motivoCancelamento: motivo,
+      })
+      return entradaAtualizada
     },
     async history(id) {
       if (!id) {
@@ -4108,6 +4304,19 @@ export const api = {
       const data = await execute(
         supabase.from('status_saida').select('id, status').eq('ativo', true).order('status', { ascending: true }),
         'Falha ao listar status de saida.'
+      )
+      return (data ?? []).map((item) => ({
+        id: item.id,
+        status: item.status,
+        nome: item.status,
+      }))
+    },
+  },
+  statusEntrada: {
+    async list() {
+      const data = await execute(
+        supabase.from('status_entrada').select('id, status').eq('ativo', true).order('status', { ascending: true }),
+        'Falha ao listar status de entrada.'
       )
       return (data ?? []).map((item) => ({
         id: item.id,

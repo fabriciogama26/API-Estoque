@@ -238,6 +238,26 @@ ul, ol {
   height: 1.2rem;
 }
 
+.field--accent {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(22, 163, 74, 0.05));
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.12);
+}
+
+.field--accent > span {
+  color: var(--color-primary-dark);
+  font-weight: 700;
+}
+
+.field--accent input {
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  background: #fff;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
 
 .field input:focus,
 .field select:focus,

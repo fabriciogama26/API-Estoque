@@ -197,6 +197,13 @@ const mapLocalEntradaRecord = (entrada) => {
         ? entrada.usuarioResponsavel.trim()
         : null,
     usuarioResponsavelNome: entrada.usuarioResponsavel ?? '',
+    status: entrada.status ?? 'registrado',
+    statusId: UUID_REGEX.test(entrada.status ?? '') ? entrada.status : null,
+    statusNome: entrada.status ?? 'registrado',
+    atualizadoEm: entrada.atualizadoEm ?? null,
+    usuarioEdicao: entrada.usuarioEdicao ?? '',
+    usuarioEdicaoId: entrada.usuarioEdicaoId ?? null,
+    usuarioEdicaoNome: entrada.usuarioEdicao ?? '',
   }
 }
 
@@ -1402,12 +1409,16 @@ const validateMaterialPayload = (payload) => {
 
 const sanitizeEntradaPayload = (payload = {}) => {
   const dataEntrada = toDateOnlyIso(payload.dataEntrada)
+  const statusRaw = payload.status
+  const statusValue =
+    statusRaw === undefined ? undefined : trim(statusRaw) || 'registrado'
   return {
     materialId: trim(payload.materialId),
     quantidade: Number(payload.quantidade ?? 0),
     centroCusto: trim(payload.centroCusto),
     dataEntrada,
     usuarioResponsavel: trim(payload.usuarioResponsavel) || 'sistema',
+    status: statusValue,
   }
 }
 
@@ -1683,6 +1694,7 @@ function filterLocalEntradas(entradas, params = {}, state) {
   const termo = normalizeSearchTerm(params.termo)
   const materialId = trim(params.materialId || '')
   const centroCusto = normalizeSearchTerm(params.centroCusto)
+  const status = normalizeSearchTerm(params.status)
   const inicio = toStartOfDay(params.dataInicio)
   const fim = toEndOfDay(params.dataFim)
 
@@ -1695,6 +1707,13 @@ function filterLocalEntradas(entradas, params = {}, state) {
 
     if (centroCusto && normalizeSearchTerm(entrada.centroCusto) !== centroCusto) {
       return false
+    }
+
+    if (status) {
+      const statusEntrada = normalizeSearchTerm(entrada.status)
+      if (statusEntrada !== status) {
+        return false
+      }
     }
 
     if (inicio || fim) {
@@ -1964,6 +1983,14 @@ const localApi = {
         const historico = Array.isArray(pessoa.historicoEdicao) ? pessoa.historicoEdicao.slice() : []
         return sortByDateDesc(normalizePessoaHistory(historico), 'dataEdicao')
       })
+    },
+  },
+  statusEntrada: {
+    async list() {
+      return [
+        { id: '82f86834-5b97-4bf0-9801-1372b6d1bd37', status: 'REGISTRADO', nome: 'REGISTRADO', ativo: true },
+        { id: 'c5f5d4e8-8c1f-4c8d-bf52-918c0b9fbde3', status: 'CANCELADO', nome: 'CANCELADO', ativo: true },
+      ]
     },
   },
   materiais: {
@@ -2257,14 +2284,15 @@ const localApi = {
 
       return writeState((state) => {
         const material = state.materiais.find((item) => item.id === dados.materialId)
-        if (!material) {
-          throw createError(404, 'Material nao encontrado.')
-        }
+      if (!material) {
+        throw createError(404, 'Material nao encontrado.')
+      }
 
-        const entrada = {
-          id: randomId(),
-          ...dados,
-        }
+      const entrada = {
+        id: randomId(),
+        ...dados,
+        status: dados.status || 'registrado',
+      }
         state.entradas.push(entrada)
         const snapshot = mapLocalEntradaRecord(entrada)
         state.entradaHistorico = Array.isArray(state.entradaHistorico) ? state.entradaHistorico : []
@@ -2299,6 +2327,13 @@ const localApi = {
         const atualizada = {
           ...state.entradas[index],
           ...dados,
+          status: dados.status ?? state.entradas[index].status ?? 'registrado',
+          atualizadoEm: nowIso(),
+          usuarioEdicao: dados.usuarioResponsavel || state.entradas[index].usuarioResponsavel || 'sistema',
+          usuarioEdicaoId:
+            typeof dados.usuarioResponsavel === 'string' && UUID_REGEX.test(dados.usuarioResponsavel.trim())
+              ? dados.usuarioResponsavel.trim()
+              : state.entradas[index].usuarioResponsavelId || null,
         }
         state.entradas[index] = atualizada
         const snapshotAtual = mapLocalEntradaRecord(atualizada)
@@ -2310,6 +2345,39 @@ const localApi = {
           criadoEm: nowIso(),
           usuario: snapshotAtual.usuarioResponsavel || 'sistema',
           snapshot: { atual: snapshotAtual, anterior },
+        })
+        return snapshotAtual
+      })
+    },
+    async cancel(id, motivo) {
+      if (!id) {
+        throw createError(400, 'ID da entrada obrigatorio.')
+      }
+      return writeState((state) => {
+        const index = state.entradas.findIndex((item) => item.id === id)
+        if (index === -1) {
+          throw createError(404, 'Entrada nao encontrada.')
+        }
+        const anterior = mapLocalEntradaRecord(state.entradas[index])
+        const atualizado = {
+          ...state.entradas[index],
+          status: 'cancelado',
+          usuarioResponsavel: anterior.usuarioResponsavel || 'sistema',
+          usuarioEdicao: anterior.usuarioResponsavel || 'sistema',
+          usuarioEdicaoId: anterior.usuarioResponsavelId || null,
+          atualizadoEm: nowIso(),
+        }
+        state.entradas[index] = atualizado
+        const snapshotAtual = mapLocalEntradaRecord(atualizado)
+        state.entradaHistorico = Array.isArray(state.entradaHistorico) ? state.entradaHistorico : []
+        state.entradaHistorico.push({
+          id: randomId(),
+          entradaId: atualizado.id,
+          materialId: atualizado.materialId,
+          criadoEm: nowIso(),
+          usuario: snapshotAtual.usuarioResponsavel || 'sistema',
+          snapshot: { atual: snapshotAtual, anterior },
+          motivoCancelamento: trim(motivo) || null,
         })
         return snapshotAtual
       })
@@ -2877,6 +2945,3 @@ const localApi = {
 }
 
 export { localApi }
-
-
-
