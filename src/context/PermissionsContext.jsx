@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
+import { resolveEffectiveAppUser } from '../services/effectiveUserService.js'
+import { mapCredentialUuidToText } from '../services/effectiveUserService.js'
 import { isLocalMode } from '../config/runtime.js'
 import {
   canAccessPath as canAccessPathHelper,
@@ -43,17 +45,18 @@ export function PermissionsProvider({ children }) {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: queryError } = await supabase
-        .from('app_users')
-        .select('id, display_name, username, email, credential, page_permissions')
-        .eq('id', user.id)
-        .maybeSingle()
+      const effective = await resolveEffectiveAppUser(user.id, { forceRefresh: true })
+      const profileData = effective?.profile
+        ? {
+            ...effective.profile,
+            credential_text: effective.profile.credential_text ?? (await mapCredentialUuidToText(effective.profile.credential)),
+            app_user_id: effective.appUserId || effective.profile.id,
+            dependent_profile: effective.dependentProfile || null,
+            is_dependent: effective.isDependent || false,
+          }
+        : null
 
-      if (queryError && queryError.code !== 'PGRST116') {
-        throw queryError
-      }
-
-      setProfile(data || null)
+      setProfile(profileData)
     } catch (err) {
       reportError(err, { stage: 'load_permissions_profile', userId: user?.id })
       setProfile(null)
@@ -61,7 +64,7 @@ export function PermissionsProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, user?.id])
+  }, [isAuthenticated, reportError, user?.id])
 
   useEffect(() => {
     loadProfile()
@@ -71,8 +74,8 @@ export function PermissionsProvider({ children }) {
     if (isLocalMode) {
       return 'master'
     }
-    return profile?.credential || credentialFromMetadata || 'admin'
-  }, [credentialFromMetadata, profile?.credential])
+    return profile?.credential_text || credentialFromMetadata || 'admin'
+  }, [credentialFromMetadata, profile?.credential_text])
 
   const explicitPageIds = useMemo(() => {
     const fromProfile = Array.isArray(profile?.page_permissions) ? profile.page_permissions : []

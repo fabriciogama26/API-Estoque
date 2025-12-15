@@ -29,3 +29,10 @@ Para detalhes completos de cada tela, consulte a pasta `docs/` e `src/help/helpC
 - Backend: logs vão para `api_errors` via `logApiError` (`api/_shared/logger.js`). `src/app.js` gera `requestId`, registra erros no middleware global e só loga requisições lentas (>= `SLOW_REQUEST_THRESHOLD_MS`, padrão 2000 ms) que não sejam 5xx. `handleError` (`api/_shared/http.js`) envia method/path/status/user/stack/context para o Supabase.
 - Frontend: erros vão para `app_errors` via `useErrorLogger`/`logError`/`reportClientError` (contexts, serviços, controllers, SystemStatus). `ErrorBoundaryWithLogger` em `src/App.jsx` captura erros de renderização.
 - Variáveis úteis: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ENV`/`SERVICE_NAME`, `SLOW_REQUEST_THRESHOLD_MS`. Consulte `docs/error-handling.txt` para detalhes.
+### Novo modelo de credenciais/dependentes (Supabase)
+- app_credentials_catalog usa id UUID + id_text e agora tem coluna `level` (hierarquia: master>admin>operador>estagiario>visitante); policies de leitura/escrita usam `level <= level_do_usuario` e service_role segue liberado.
+- app_users.credential e app_users_dependentes.credential usam o UUID do catalogo; dependentes herdam do titular quando vazio.
+- app_users_credential_history registra before/after de credential/pages/action para titulares **e dependentes**; RLS apenas para authenticated/service_role.
+- Policies de RLS foram simplificadas (sem recursao) e consideram o level da credencial para ocultar master quando o usuario logado nao for master.
+- Rode as migrations recentes (0063/0068/0069/0070) no Supabase (supabase db push) antes de usar o frontend.
+- Tela de Configuracoes: autocomplete busca titulares e dependentes; master enxerga/edita tudo, admins veem apenas niveis <= admin; botao Restaurar padrao removido; reset de senha continua no bloco admin/master.
