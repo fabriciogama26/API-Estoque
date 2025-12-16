@@ -316,7 +316,7 @@ function SaidasContent() {
             <select name="status" value={filters.status} onChange={handleFilterChange}>
               <option value="">Todos</option>
               {statusOptions.map((opt) => (
-                <option key={opt.id} value={opt.label}>
+                <option key={opt.id ?? opt.label} value={opt.id ?? opt.label}>
                   {opt.label}
                 </option>
               ))}

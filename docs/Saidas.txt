@@ -16,7 +16,7 @@ Arquitetura (modular)
 Fluxos principais
 
 - Formulário: pessoa, centro de estoque (filtra materiais), material (autocomplete por nome/ID/descrição/CA), quantidade, datas; centros de custo/serviço preenchidos pela pessoa; campo "Em estoque" destacado (sem linha de resumo abaixo); cancelar saída com motivo obrigatório (modal).
-- Filtros: período, centros (estoque/serviço), status dinâmico, termo livre (nome/matrícula de pessoa ou nome/descrição/ID/CA de material); "Aplicar" consulta na API; limpar restaura defaults e recarrega a lista.
+- Filtros: período, centros (estoque/serviço), status dinâmico resolvido por id do catálogo status_saida (aceita nome se id não vier), termo livre (nome/matrícula de pessoa ou nome/descrição/ID/CA de material); "Aplicar" consulta na API; limpar restaura defaults e recarrega a lista.
 - Tabela: colunas Pessoa, Material, Quantidade, Data entrega, Status, Registrado por, Cadastrado em; ações Ver (detalhes), Editar, Histórico, Cancelar.
 - Detalhes: modal em cartões (padrão acidentes) mostrando todos os campos e centros.
 - Histórico: modal no padrão “Histórico do acidente”, exibindo alterações campo a campo.
@@ -29,6 +29,7 @@ Boas práticas
 Atualização 2025-12
 
 - Tela modularizada com hooks/services/utils; detalhes e histórico padronizados; status dinâmico; logging ativo; autocomplete de material aceita CA; campo "Em estoque" destacado e sem linha extra de saldo/min/valor.
+- Filtro de Status envia UUID quando disponível e o backend resolve nome/UUID; evita erro "invalid input syntax for type uuid" quando a coluna status guarda IDs.
 
 ===========================================
 Mapa de Código (funções, hooks e constantes)

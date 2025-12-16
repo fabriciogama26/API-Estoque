@@ -593,14 +593,17 @@ export function useSaidasController() {
   const saidasFiltradas = useMemo(() => saidas, [saidas])
 
   const statusFilterOptions = useMemo(() => {
-    const uniq = new Set(
-      saidas
-        .map((s) => (s.statusNome || s.status || '').toString().trim())
-        .filter(Boolean)
-    )
-    return Array.from(uniq)
-      .map((label) => ({ id: label, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+    const mapa = new Map()
+    saidas.forEach((saida) => {
+      const label = (saida?.statusNome || saida?.status || '').toString().trim()
+      if (!label) return
+      const id = (saida?.statusId || '').toString().trim() || label
+      const chave = id || label
+      if (!mapa.has(chave)) {
+        mapa.set(chave, { id, label })
+      }
+    })
+    return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   }, [saidas])
 
   const centroEstoqueFilterOptions = useMemo(() => {
