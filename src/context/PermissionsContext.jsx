@@ -46,6 +46,8 @@ export function PermissionsProvider({ children }) {
     setError(null)
     try {
       const effective = await resolveEffectiveAppUser(user.id, { forceRefresh: true })
+      const effectiveCredential = effective?.credential || null
+      const effectivePages = Array.isArray(effective?.pagePermissions) ? effective.pagePermissions : []
       const profileData = effective?.profile
         ? {
             ...effective.profile,
@@ -53,6 +55,8 @@ export function PermissionsProvider({ children }) {
             app_user_id: effective.appUserId || effective.profile.id,
             dependent_profile: effective.dependentProfile || null,
             is_dependent: effective.isDependent || false,
+            effective_credential: effectiveCredential,
+            effective_page_permissions: effectivePages,
           }
         : null
 
@@ -74,14 +78,21 @@ export function PermissionsProvider({ children }) {
     if (isLocalMode) {
       return 'master'
     }
+    // Quando for dependente, prioriza a credencial efetiva (dependente > titular)
+    if (profile?.effective_credential) {
+      return profile.effective_credential
+    }
     return profile?.credential_text || credentialFromMetadata || 'admin'
-  }, [credentialFromMetadata, profile?.credential_text])
+  }, [credentialFromMetadata, profile?.credential_text, profile?.effective_credential])
 
   const explicitPageIds = useMemo(() => {
+    const fromEffective = Array.isArray(profile?.effective_page_permissions)
+      ? profile.effective_page_permissions
+      : []
     const fromProfile = Array.isArray(profile?.page_permissions) ? profile.page_permissions : []
     const fromMetadata = Array.isArray(pagePermissionsFromMetadata) ? pagePermissionsFromMetadata : []
-    return fromProfile.length ? fromProfile : fromMetadata
-  }, [profile?.page_permissions, pagePermissionsFromMetadata])
+    return fromEffective.length ? fromEffective : fromProfile.length ? fromProfile : fromMetadata
+  }, [pagePermissionsFromMetadata, profile?.effective_page_permissions, profile?.page_permissions])
 
   const allowedPageIds = useMemo(
     () => (isLocalMode ? resolveAllowedPageIds('master') : resolveAllowedPageIds(credential, explicitPageIds)),

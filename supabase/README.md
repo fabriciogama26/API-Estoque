@@ -45,6 +45,11 @@ supabase/
 
 As migrations foram escritas para serem idempotentes sempre que possível. Mesmo assim, mantenha o versionamento da CLI em dia para garantir a execução na ordem correta. A tabela `public.app_users` foi simplificada: o `id` agora coincide com o UUID de `auth.users` (com FKs e RLS ajustados) e campos extras (`email`, `ativo`) foram adicionados para suportar o cartão *Status do sistema*.
 
+### Atualizações recentes (performance)
+- `0072_add_missing_fk_indexes`: cobre FKs sinalizadas pelo lint 0001 (sem _fkcov_ duplicado).
+- `0073_fix_performance_warnings`: remove _fkcov_* redundantes, cria `app_users_credential_fkey_idx` e consolida as policies de `app_credentials_catalog` (SELECT para authenticated; ALL para service_role).
+- Avisos restantes do linter são apenas `unused_index` (INFO). Veja `performance.md` para decidir se algum pode ser dropado.
+
 ## Como aplicar localmente
 
 1. Faça login na CLI: `supabase login` e informe o access token da sua conta.
