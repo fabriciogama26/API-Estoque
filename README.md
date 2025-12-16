@@ -8,7 +8,7 @@ AplicaÇõÇœo React para gestÇœo de EPIs e estoque integrada ao Supabase, co
 - Materiais (EPI) carrega a lista e recalcula os filtros apenas ao clicar em **Aplicar**; nao filtra a cada tecla.
 - Acidentes: campos de texto/select aplicam apenas com **Aplicar**; checkboxes (Apenas SESMT / eSOCIAL) sao imediatos. Filtros adicionais para Lesoes e Partes lesionadas estao disponiveis.
 - Cadastro de Acidentes: campo Matricula agora e autocomplete (busca por matricula ou nome, sugere resultados e preenche nome/cargo/centro/local ao selecionar), igual ao campo Pessoa na tela de Registrar saida.
-- Saidas: autocomplete de Material aceita nome/descricao/ID/CA (centro de estoque obrigatório), mostra CA na lista e o campo "Em estoque" ficou destacado (sem linha extra de saldo/min/valor).
+- Saidas: autocomplete de Material aceita nome/descricao/ID/CA (centro de estoque obrigatório), mostra CA na lista e o campo "Em estoque" ficou destacado (sem linha extra de saldo/min/valor); filtro de Status envia o id do status_saida quando disponível e o backend aceita nome/UUID (evita erro "invalid input syntax for type uuid").
 - Ajuda contextual disponivel em cada pagina (botao **Ajuda**) e em `docs/` para fluxos detalhados.
 - Campos marcados com `*` sao obrigatorios em todos os formularios.
 

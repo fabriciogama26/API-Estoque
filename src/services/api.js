@@ -2891,10 +2891,20 @@ async function carregarSaidas(params = {}) {
   }
   const statusFiltro = trim(params.status)
   if (statusFiltro) {
+    let statusId = null
     if (isUuidValue(statusFiltro)) {
-      query = query.eq('status', statusFiltro)
+      statusId = statusFiltro
     } else {
-      query = query.eq('status', statusFiltro)
+      try {
+        statusId = await resolveStatusSaidaIdByName(statusFiltro)
+      } catch (error) {
+        reportClientError('Falha ao resolver status de saida para filtro.', error, { statusFiltro })
+      }
+    }
+    if (statusId) {
+      query = query.eq('status', statusId)
+    } else {
+      query = query.ilike('status_rel.status', `%${statusFiltro}%`)
     }
   }
 
