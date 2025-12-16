@@ -9,7 +9,7 @@ Mapa de Codigo (funcoes, hooks e constantes)
 - NavBar (src/components/NavBar.jsx): oculta itens de menu conforme canAccessPath.
 - SystemStatus (src/components/SystemStatus.jsx): mostra nome/credencial e atalho para Configuracoes.
 - NoAccessPage (src/pages/NoAccessPage.jsx): pagina de acesso negado.
-- ConfiguracoesPage / PermissionsSection (src/pages/Configuracoes.jsx): lista titulares + dependentes, edita credential/page_permissions/status e abre historico.
+- ConfiguracoesPage / PermissionsSection (src/pages/Configuracoes.jsx): lista titulares + dependentes, edita credential/page_permissions/status e abre historico (usa target_auth_user_id e owner_app_user_id para dependentes).
 - AdminResetPasswordSection (src/pages/Configuracoes.jsx): envia reset de senha para titulares ou dependentes.
 
 Constantes e configuracoes
@@ -21,7 +21,7 @@ Constantes e configuracoes
 Fluxo de dados
 --------------
 - Banco: app_users (titulares) e app_users_dependentes (dependentes) usam credential UUID com FK para app_credentials_catalog (id + id_text + level) e page_permissions (text[]).
-- Historico: app_users_credential_history (migrations 0063/0068/0070) guarda before/after de credential/page_permissions e acao (`update` ou `password_reset`) para titulares **e dependentes**.
+- Historico: app_users_credential_history (migrations 0063/0068/0070/0074) guarda before/after de credential/page_permissions, acao (`update` ou `password_reset`), target_auth_user_id (login titular/dependente) e owner_app_user_id/target_dependent_id para dependentes.
 - Carregamento: PermissionsProvider resolve usuario efetivo (heranca de titular para dependente) e mescla com metadata do auth; modo local cai em admin.
 - Navegacao: ProtectedRoute bloqueia quando canAccessPath = false; NavBar filtra itens; SystemStatus usa canAccessPath('/configuracoes').
 - Edicao: Configuracoes usa autocomplete (app_users + app_users_dependentes), filtra credenciais por level (admin nao ve master), salva em app_users ou app_users_dependentes e registra historico; sincroniza banimento via RPC sync_user_ban_with_status.

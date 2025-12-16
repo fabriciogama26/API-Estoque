@@ -14,6 +14,13 @@ AplicaÇõÇœo React para gestÇœo de EPIs e estoque integrada ao Supabase, co
 
 Para detalhes completos de cada tela, consulte a pasta `docs/` e `src/help/helpContent.json`.
 
+### Migrations recentes (Supabase)
+- `0072_add_missing_fk_indexes`: cobre as FKs sinalizadas pelo lint 0001 e evita criação duplicada de _fkcov_.
+- `0073_fix_performance_warnings`: remove indices _fkcov_* redundantes, cria o índice faltante `app_users_credential_fkey_idx` e consolida policies de `app_credentials_catalog` (SELECT para authenticated; ALL para service_role).
+- `0074_add_auth_target_to_credential_history`: adiciona target_auth_user_id (login titular ou dependente) e campos auxiliares para relacionar históricos de dependentes ao titular.
+- Rode `supabase db push` no projeto remoto ou `supabase db reset` no stack local para aplicar.
+- Warnings atuais do linter são apenas `unused_index` (INFO). Veja `performance.md` para decidir se dropa.
+
 ### MigraÇõÇœo nova (status/entradas)
 - Criada a tabela `status_entrada` (ids fixos para `REGISTRADO` e `CANCELADO`) e adicionadas as colunas `status`, `usuario_edicao`, `atualizado_em` em `entradas` com FK/default.
 - Rode as migraÇõÇœes do Supabase: `supabase db push` (ou o comando do seu pipeline). Em dev local, `supabase db reset --schema public` também aplica tudo.
@@ -32,7 +39,7 @@ Para detalhes completos de cada tela, consulte a pasta `docs/` e `src/help/helpC
 ### Novo modelo de credenciais/dependentes (Supabase)
 - app_credentials_catalog usa id UUID + id_text e agora tem coluna `level` (hierarquia: master>admin>operador>estagiario>visitante); policies de leitura/escrita usam `level <= level_do_usuario` e service_role segue liberado.
 - app_users.credential e app_users_dependentes.credential usam o UUID do catalogo; dependentes herdam do titular quando vazio.
-- app_users_credential_history registra before/after de credential/pages/action para titulares **e dependentes**; RLS apenas para authenticated/service_role.
+- app_users_credential_history registra before/after de credential/pages/action para titulares **e dependentes**; inclui target_auth_user_id (login do alvo) e owner_app_user_id/target_dependent_id para dependentes; RLS apenas para authenticated/service_role.
 - Policies de RLS foram simplificadas (sem recursao) e consideram o level da credencial para ocultar master quando o usuario logado nao for master.
 - Rode as migrations recentes (0063/0068/0069/0070) no Supabase (supabase db push) antes de usar o frontend.
 - Tela de Configuracoes: autocomplete busca titulares e dependentes; master enxerga/edita tudo, admins veem apenas niveis <= admin; botao Restaurar padrao removido; reset de senha continua no bloco admin/master.

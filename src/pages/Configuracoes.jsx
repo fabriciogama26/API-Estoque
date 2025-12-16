@@ -69,11 +69,15 @@ async function searchAllUsers(term) {
     }
     resultados.push({
       id: user.id,
+      type: 'owner',
       label: user.username || user.display_name || user.email || user.id,
       credential: credText || 'admin',
       credentialId: user.credential,
       page_permissions: user.page_permissions,
       ativo: user.ativo,
+      owner_app_user_id: user.id,
+      dependent_id: null,
+      email: user.email || '',
     })
   }
 
@@ -86,11 +90,15 @@ async function searchAllUsers(term) {
     }
     resultados.push({
       id: dep.auth_user_id,
+      type: 'dependent',
       label: dep.username || dep.display_name || dep.email || dep.auth_user_id,
       credential: credText || ownerCred || 'admin',
       credentialId: dep.credential || dep.owner?.credential,
       page_permissions: dep.page_permissions?.length ? dep.page_permissions : dep.owner?.page_permissions || [],
       ativo: dep.ativo,
+      owner_app_user_id: dep.owner_app_user_id,
+      dependent_id: dep.id,
+      email: dep.email || dep.owner?.email || '',
     })
   }
 
@@ -177,6 +185,9 @@ function PermissionsSection({ currentUser }) {
           credential: cred,
           page_permissions: currentUser.metadata?.page_permissions || [],
           ativo: true,
+          type: 'owner',
+          owner_app_user_id: currentUser.id,
+          dependent_id: null,
         })
       }
     }
@@ -349,6 +360,9 @@ function PermissionsSection({ currentUser }) {
         credential: userOption.credential,
         page_permissions: userOption.page_permissions,
         ativo: userOption.ativo,
+        type: userOption.type || 'owner',
+        owner_app_user_id: userOption.owner_app_user_id || userOption.id,
+        dependent_id: userOption.dependent_id || null,
       })
     })
   }
@@ -388,6 +402,9 @@ function PermissionsSection({ currentUser }) {
         try {
           await supabase.from('app_users_credential_history').insert({
             user_id: selectedUser.owner_app_user_id || selectedUser.id,
+            target_auth_user_id: selectedUser.id,
+            owner_app_user_id: selectedUser.owner_app_user_id || null,
+            target_dependent_id: selectedUser.dependent_id || null,
             user_username:
               selectedUser.username ||
               selectedUser.display_name ||
@@ -432,6 +449,9 @@ function PermissionsSection({ currentUser }) {
         try {
           await supabase.from('app_users_credential_history').insert({
             user_id: selectedUser.id,
+            target_auth_user_id: selectedUser.id,
+            owner_app_user_id: null,
+            target_dependent_id: null,
             user_username:
               selectedUser.username ||
               selectedUser.display_name ||
@@ -443,15 +463,15 @@ function PermissionsSection({ currentUser }) {
               currentUser?.name ||
               currentUser?.email ||
               'Sistema',
-          action: 'update',
-          before_credential: beforeCredential,
-          after_credential: draftCredential || 'admin',
-          before_pages: beforePages,
-          after_pages: appliedPages,
-        })
-      } catch (historyError) {
-        reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
-      }
+            action: 'update',
+            before_credential: beforeCredential,
+            after_credential: draftCredential || 'admin',
+            before_pages: beforePages,
+            after_pages: appliedPages,
+          })
+        } catch (historyError) {
+          reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
+        }
       }
 
       setFeedback({ type: 'success', message: 'Credencial atualizada com sucesso.' })
@@ -468,8 +488,8 @@ function PermissionsSection({ currentUser }) {
 
   const handleReset = () => {
     const cred = draftCredential || 'admin'
-      setDraftPages(resolveAllowedPageIds(cred))
-    }
+    setDraftPages(resolveAllowedPageIds(cred))
+  }
 
   const resolvePageLabel = useCallback(
     (pageId) => pageOptions.find((page) => page.id === pageId)?.label || pageId,
@@ -495,7 +515,7 @@ function PermissionsSection({ currentUser }) {
         .select(
           'id, user_username, changed_by_username, action, before_credential, after_credential, before_pages, after_pages, created_at'
         )
-        .eq('user_id', selectedUserId)
+        .or(`target_auth_user_id.eq.${selectedUserId},user_id.eq.${selectedUserId}`)
         .order('created_at', { ascending: false })
       if (error) {
         throw error
@@ -715,6 +735,9 @@ function AdminResetPasswordSection() {
           credential: (currentUser.metadata?.credential || currentUser.role || 'admin').toLowerCase(),
           page_permissions: currentUser.metadata?.page_permissions || [],
           ativo: true,
+          type: 'owner',
+          owner_app_user_id: currentUser.id,
+          dependent_id: null,
         })
       }
     }
@@ -741,7 +764,13 @@ function AdminResetPasswordSection() {
       const lista = []
       for (const usuario of data || []) {
         const credText = await mapCredentialUuidToText(usuario.credential)
-        lista.push({ ...usuario, credential: credText || 'admin' })
+        lista.push({
+          ...usuario,
+          credential: credText || 'admin',
+          type: 'owner',
+          owner_app_user_id: usuario.id,
+          dependent_id: null,
+        })
       }
       setUsers(lista)
       if (!selectedUserId && lista.length) {
@@ -805,8 +834,12 @@ function AdminResetPasswordSection() {
 
       // Historico de reset
       try {
+        const userIdForHistory = selectedUser.owner_app_user_id || selectedUser.id
         await supabase.from('app_users_credential_history').insert({
-          user_id: selectedUser.id,
+          user_id: userIdForHistory,
+          target_auth_user_id: selectedUser.id,
+          owner_app_user_id: selectedUser.owner_app_user_id || null,
+          target_dependent_id: selectedUser.dependent_id || null,
           user_username:
             selectedUser.username || selectedUser.display_name || selectedUser.email || selectedUser.id,
           changed_by: null,
@@ -852,10 +885,13 @@ function AdminResetPasswordSection() {
         id: option.id,
         username: option.label,
         display_name: option.label,
-        email: '',
+        email: option.email || '',
         credential: option.credential,
         page_permissions: option.page_permissions,
         ativo: option.ativo,
+        type: option.type || 'owner',
+        owner_app_user_id: option.owner_app_user_id || option.id,
+        dependent_id: option.dependent_id || null,
       })
     })
   }
