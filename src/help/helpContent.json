@@ -183,32 +183,38 @@
                   },
     "pessoas":  {
                     "title":  "Cadastro de pessoas",
-                    "summary":  "Registro de colaboradores com histÃ³rico de ediÃ§Ãµes e filtros.",
+                    "summary":  "Registro de colaboradores com data de admissao obrigatoria, demissao opcional e historico.",
                     "steps":  [
                                   {
                                       "title":  "Cadastrar ou atualizar colaborador",
-                                      "description":  "Informe nome, documento, centro de serviÃ§o e cargo. Ao editar, o formulÃ¡rio fica com borda amarela e o tÃ­tulo mostra â€œEditando...â€ para indicar o modo de ediÃ§Ã£o; use Salvar para novo registro ou para concluir a ediÃ§Ã£o.",
-                                      "mediaHint":  "FormulÃ¡rio principal de pessoas."
+                                      "description":  "Preencha nome, matricula, centro de servico, setor, cargo e DATA DE ADMISSAO (obrigatoria, dd/MM/yyyy). Ao editar, o formulario fica destacado; use Salvar para concluir.",
+                                      "mediaHint":  "Formulario principal de pessoas."
+                                  },
+                                  {
+                                      "title":  "Registrar demissÃ£o / status",
+                                      "description":  "Para desligar, marque como inativo e informe a DATA DE DEMISSAO (opcional). Reativar pede confirmacao.",
+                                      "mediaHint":  "Campos de status e datas no formulario."
                                   },
                                   {
                                       "title":  "Filtrar lista",
-                                      "description":  "No campo Busca digite nome ou matrÃ­cula para filtrar a tabela de pessoas; termos parciais funcionam. Combine com centro de serviÃ§o ou setor e clique em Aplicar. O botÃ£o Limpar remove todos os filtros.",
+                                      "description":  "No campo Busca digite nome ou matricula (parcial) e combine com centro de servico ou setor; clique em Aplicar. Limpar remove todos os filtros.",
                                       "mediaHint":  "Filtros e chips acima da tabela de pessoas."
                                   },
                                   {
-                                      "title":  "Ler resumo rÃ¡pido",
+                                      "title":  "Ler resumo rapido",
                                       "description":  "Os cards de resumo mostram quantidade por centro e setores mais frequentes conforme o filtro aplicado.",
                                       "mediaHint":  "Cards de resumo logo apÃ³s os filtros."
                                   },
                                   {
-                                      "title":  "Ver histÃ³rico de alteraÃ§Ãµes",
-                                      "description":  "Na tabela, clique no botÃ£o de relÃ³gio (HistÃ³rico) para ver quem alterou dados do colaborador e quando.",
-                                      "mediaHint":  "Modal de histÃ³rico de pessoas."
+                                      "title":  "Ver historico de alteracoes",
+                                      "description":  "Na tabela, clique no botao de relogio (Historico) para ver quem alterou dados do colaborador e quando.",
+                                      "mediaHint":  "Modal de historico de pessoas."
                                   }
                               ],
                     "notes":  [
-                                  "O formulÃ¡rio permanece preenchido ao iniciar uma ediÃ§Ã£o para evitar retrabalho.",
-                                  "Use o botÃ£o Atualizar na tabela para forÃ§ar recarga de dados do servidor."
+                                  "DATA DE ADMISSAO e obrigatoria; DATA DE DEMISSAO e opcional. Formato aceito: dd/MM/yyyy.",
+                                  "Inativar recomenda preencher a data de demissao; reativar pede confirmacao e registra no historico.",
+                                  "Use o botao Atualizar na tabela para recarregar dados do servidor."
                               ]
                 },
     "acidentes":  {

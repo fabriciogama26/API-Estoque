@@ -6,6 +6,7 @@ export const PESSOAS_FORM_DEFAULT = {
   cargo: '',
   local: '',
   dataAdmissao: '',
+  dataDemissao: '',
   tipoExecucao: '',
   ativo: true,
 }

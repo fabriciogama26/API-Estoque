@@ -257,6 +257,7 @@ export function usePessoasController() {
       setor: pessoa.setor ?? '',
       cargo: pessoa.cargo || '',
       dataAdmissao: formatDateInputValue(pessoa.dataAdmissao),
+      dataDemissao: formatDateInputValue(pessoa.dataDemissao),
       tipoExecucao: pessoa.tipoExecucao || '',
       ativo: pessoa.ativo !== false,
     })

@@ -1,0 +1,127 @@
+Desligamento em massa (Pessoas)
+===============================
+
+Objetivo
+--------
+Permitir marcar colaboradores como desligados (ou reativados) em massa, a partir de uma planilha XLSX, registrando:
+- Atualizacao na tabela public.pessoas (ativo e dataDemissao)
+- Auditoria na tabela public.pessoas_historico (usuario_responsavel = usuario logado)
+
+
+Formato da planilha (XLSX)
+--------------------------
+Colunas obrigatorias (cabecalho na 1a linha):
+- matricula (obrigatoria)
+- ativo (obrigatoria) -> true / false
+
+Coluna opcional:
+- data_demissao (opcional) -> dd/MM/yyyy
+
+Observacoes importantes:
+- O arquivo deve ser .xlsx (nao CSV).
+- O Excel pode transformar matriculas com zeros a esquerda (ex.: "0001") em "1".
+  Recomendacao: formatar a coluna "matricula" como TEXTO no Excel antes de preencher.
+  O import tambem tenta localizar a pessoa usando a matricula com e sem zeros a esquerda.
+- A data pode vir do Excel como texto (dd/MM/yyyy), como numero (serial do Excel) ou como Date.
+
+
+Como usar (passo a passo)
+-------------------------
+1) Abra a tela de Cadastro de Pessoas.
+2) Clique no botao "Desligamento" para abrir o modal "Desligamento em massa".
+3) (Opcional) Clique em "Baixar modelo (.xlsx)" para baixar o template correto.
+4) Preencha a planilha seguindo as regras do formato.
+5) Selecione o arquivo XLSX (drag-and-drop ou clique para selecionar).
+6) Clique em "Importar planilha".
+7) Ao final, o modal mostra:
+   - quantos registros foram processados
+   - quantos foram importados
+   - quantos tiveram erro
+   - (se houver) um exemplo de erro e a opcao de baixar relatorio CSV
+
+
+Regras de importacao
+--------------------
+- matricula obrigatoria:
+  - Se estiver vazia: erro na coluna matricula.
+  - Se nao existir no banco: erro "inexistente (<valor>)".
+- ativo obrigatoria:
+  - Aceita apenas true/false (case-insensitive).
+- data_demissao opcional:
+  - Se vier vazia: permitido.
+  - Se vier preenchida e for invalida: erro na coluna data_demissao.
+
+Impacto no banco:
+- Se ativo = false:
+  - public.pessoas.ativo = false
+  - public.pessoas.dataDemissao = <data> (ou null se vier vazio)
+- Se ativo = true:
+  - public.pessoas.ativo = true
+  - public.pessoas.dataDemissao = <data> (ou null)
+
+
+Mapa do fluxo (frontend -> Supabase)
+------------------------------------
+UI (Modal)
+- src/components/Pessoas/PessoasDesligamentoModal.jsx
+  - recebe o arquivo XLSX e chama o service de importacao
+
+Service (frontend)
+- src/services/api.js
+  - api.pessoas.importDesligamentoPlanilha(file)
+    1) Faz upload do XLSX no Storage (bucket "imports")
+       path: desligamento/<uuid>-<nome-do-arquivo>.xlsx
+    2) Chama a Edge Function "desligamento-import" com body JSON:
+       { "path": "<path-do-arquivo-no-bucket>" }
+
+Edge Function (Supabase)
+- supabase/functions/desligamento-import/index.ts
+  - Valida o usuario logado via JWT (Authorization Bearer)
+  - Faz download do arquivo XLSX no Storage (bucket "imports")
+  - Le a planilha e valida cada linha
+  - Atualiza public.pessoas (upsert por id) e registra public.pessoas_historico
+  - (Se houver erros) gera um CSV com as linhas invalidas
+  - Remove o arquivo XLSX enviado (best-effort), para nao acumular no Storage
+
+Template (baixar modelo)
+- supabase/functions/desligamento-template/index.ts
+  - Retorna um XLSX com as colunas e um exemplo.
+
+
+Permissoes e seguranca
+----------------------
+- O usuario deve estar autenticado para baixar modelo e importar.
+- A tela de Pessoas deve ser protegida por permissao no frontend (PermissionsProvider/ProtectedRoute).
+- Recomendacao: validar permissao tambem na Edge Function (defesa em profundidade),
+  garantindo que apenas usuarios com acesso a pagina "cadastros-pessoas" consigam executar.
+
+
+Relatorio de erros (CSV)
+------------------------
+Quando houver erros, a Edge Function retorna:
+- errorsUrl: URL assinada para baixar o CSV (se configurado)
+- firstError: primeira linha de erro
+- errorSamples: amostras de erros
+
+Formato do CSV:
+linha,coluna,motivo
+
+
+Problemas comuns (checklist)
+----------------------------
+- "Body precisa ser JSON: { path: string }"
+  - O frontend ainda esta chamando a function com FormData.
+  - Ajuste o botao "Importar planilha" para: upload no Storage + invoke com { path }.
+
+- "Bucket not found"
+  - O bucket "imports" nao existe no projeto Supabase.
+  - Rode a migration `supabase/migrations/0077_fix_imports_bucket.sql` no projeto remoto.
+
+- "Falha ao baixar arquivo"
+  - O path enviado nao existe no bucket ou o upload falhou.
+  - Confirme o path exibido e verifique no Storage > Buckets > imports.
+
+- Matricula existe, mas aparece como inexistente
+  - Verifique se a planilha esta com a coluna "matricula" como numero (zeros a esquerda perdidos).
+  - Formate como TEXTO e tente novamente.
+

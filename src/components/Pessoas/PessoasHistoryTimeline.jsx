@@ -7,6 +7,7 @@ const FIELD_LABELS = {
   setor: 'Setor',
   cargo: 'Cargo',
   dataAdmissao: 'Data de admissao',
+  dataDemissao: 'Data de demissao',
   tipoExecucao: 'Tipo Execucao',
   ativo: 'Status',
 }
@@ -23,6 +24,9 @@ function formatValue(campo, valor) {
     return 'Ativo'
   }
   if (campo === 'dataAdmissao') {
+    return valor ? formatDate(valor) : '-'
+  }
+  if (campo === 'dataDemissao') {
     return valor ? formatDate(valor) : '-'
   }
   if (valor === undefined || valor === null || valor === '') {

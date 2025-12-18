@@ -7,6 +7,7 @@ export function PessoasForm({
   onCancel,
   error,
   options = {},
+  onOpenDesligamento = () => {},
 }) {
   const normalizeValue = (valor) => (typeof valor === 'string' ? valor.trim() : '')
 
@@ -108,11 +109,22 @@ export function PessoasForm({
           </select>
         </label>
         <label className="field">
-          <span>Data de admissao</span>
+          <span>Data de admissao <span className="asterisco">*</span></span>
           <input
             type="date"
             name="dataAdmissao"
             value={form.dataAdmissao}
+            onChange={onChange}
+            placeholder="2025-01-01"
+            required
+          />
+        </label>
+        <label className="field">
+          <span>Data de demissao</span>
+          <input
+            type="date"
+            name="dataDemissao"
+            value={form.dataDemissao}
             onChange={onChange}
             placeholder="2025-01-01"
           />
@@ -146,15 +158,20 @@ export function PessoasForm({
         </div>
       ) : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
-      <div className="form__actions">
-        <button type="submit" className="button button--primary" disabled={isSaving}>
-          {isSaving ? 'Salvando...' : editingPessoa ? 'Salvar alteracoes' : 'Salvar pessoa'}
-        </button>
-        {editingPessoa ? (
-          <button type="button" className="button button--ghost" onClick={onCancel} disabled={isSaving}>
-            Cancelar edicao
+      <div className="form__actions form__actions--split">
+        <div className="form__actions-group">
+          <button type="submit" className="button button--primary" disabled={isSaving}>
+            {isSaving ? 'Salvando...' : editingPessoa ? 'Salvar alteracoes' : 'Salvar pessoa'}
           </button>
-        ) : null}
+          {editingPessoa ? (
+            <button type="button" className="button button--ghost" onClick={onCancel} disabled={isSaving}>
+              Cancelar edicao
+            </button>
+          ) : null}
+        </div>
+        <button type="button" className="button button--ghost" onClick={onOpenDesligamento}>
+          Desligamento
+        </button>
       </div>
       </form>
     </section>
