@@ -27,7 +27,7 @@ export function EstoqueProvider({ children }) {
   const filtroState = useEstoqueFiltro(INITIAL_FILTERS, estoqueState.estoque)
 
   const handleMinStockSave = async (item) => {
-    await estoqueState.handleMinStockSave(item, filtroState.filters, (err, ctx) =>
+    return await estoqueState.handleMinStockSave(item, filtroState.filters, (err, ctx) =>
       reportError(err, { area: 'salvar_estoque_minimo', ...ctx }),
     )
   }

@@ -31,6 +31,10 @@ Cadastro
   - Quantidade (minimo 1, valor numerico).
   - Centro de estoque/servico (ou equivalente).
   - Data da entrada.
+- Ordem recomendada (UI):
+  - Primeiro selecione o Centro de estoque (*).
+  - O campo Material (*) so fica disponivel apos selecionar o Centro de estoque.
+  - Ao trocar o Centro de estoque, o Material e limpo e deve ser selecionado novamente.
 - Payload:
   - Inclui `usuarioResponsavel` (usuario autenticado).
   - Calcula valor total quando `valorUnitario` estiver disponivel.
@@ -70,6 +74,15 @@ Boas praticas
 - Manter catalogo de materiais com fabricante e valor unitario sempre preenchidos para garantir historico financeiro consistente.
 - Em modo local, `localApi.entradas.*` deve replicar campos como `materialId`, `dataEntrada`, `quantidade`, `centroCusto`, `usuarioResponsavel`.
 - Utilizar filtros de data para recortes especificos antes de gerar relatorios externos.
+
+Atalhos (vindo do Estoque atual)
+-------------------------------
+- A tela de Entradas pode ser aberta com parametros na URL para pre-preencher o formulario:
+  - `?materialId=<id-do-material>`
+  - `?centroCusto=<centro>` (ou `?centroEstoque=<centro>`)
+- Quando o campo "Centro de estoque" for um select, a tela tenta casar o texto do centro com as opcoes carregadas e selecionar automaticamente.
+- Se nao houver centros configurados (campo texto livre), o valor e preenchido diretamente.
+ - Mesmo com atalho, o Material so e selecionado automaticamente quando o Centro de estoque ja estiver definido.
 
 Atualizacao 2025-12
 -------------------

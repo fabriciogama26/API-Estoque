@@ -21,6 +21,13 @@ Fluxos principais
 - Detalhes: modal em cartões (padrão acidentes) mostrando todos os campos e centros.
 - Histórico: modal no padrão “Histórico do acidente”, exibindo alterações campo a campo.
 
+Atalhos (vindo do Estoque atual)
+-------------------------------
+- A tela de Saídas pode ser aberta com parâmetros na URL para pré-preencher o formulário:
+  - `?centroEstoque=<nome-ou-id>` (obrigatório para habilitar o campo de material)
+  - `?materialId=<id-do-material>`
+- A tela primeiro seleciona o Centro de estoque e, em seguida, seleciona o Material automaticamente quando possível.
+
 Boas práticas
 
 - Evitar recarga quando filtros não mudam; loaders locais.

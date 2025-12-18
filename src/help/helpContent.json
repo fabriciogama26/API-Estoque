@@ -1,41 +1,41 @@
-﻿{
+{
     "dashboard":  {
                       "title":  "Dashboard de estoque",
-                      "summary":  "Use esta tela para ver rapidamente movimentaÃ§Ã£o, valores e alertas de estoque.",
+                      "summary":  "Use esta tela para ver rapidamente movimentação, valores e alertas de estoque.",
                       "steps":  [
                                     {
-                                        "title":  "Aplicar filtros rÃ¡pidos",
-                                        "description":  "No campo Busca digite parte do nome de material, grupo ou pessoa e combine com perÃ­odo inicial/final; clique em Aplicar filtros para recalcular todos os grÃ¡ficos. Use Limpar filtros para voltar ao panorama completo.",
-                                        "mediaHint":  "Ãrea de filtros no topo com perÃ­odo e campo de busca."
+                                        "title":  "Aplicar filtros rápidos",
+                                        "description":  "No campo Busca digite parte do nome de material, grupo ou pessoa e combine com período inicial/final; clique em Aplicar filtros para recalcular todos os gráficos. Use Limpar filtros para voltar ao panorama completo.",
+                                        "mediaHint":  "Área de filtros no topo com período e campo de busca."
                                     },
                                     {
                                         "title":  "Ler os cards de destaque",
-                                        "description":  "Os cards mostram totais consolidados (movimentado, saldo e alertas). Passe o mouse no Ã­cone (i) para entender como cada indicador Ã© calculado.",
-                                        "mediaHint":  "Cards de resumo com valores e Ã­cones."
+                                        "description":  "Os cards mostram totais consolidados (movimentado, saldo e alertas). Passe o mouse no ícone (i) para entender como cada indicador é calculado.",
+                                        "mediaHint":  "Cards de resumo com valores e ícones."
                                     },
                                     {
-                                        "title":  "Interagir com os grÃ¡ficos",
-                                        "description":  "Clique em uma barra ou fatia para filtrar o restante dos grÃ¡ficos pelo mesmo termo. Use o chip Limpar que aparece acima do grÃ¡fico para remover o filtro.",
-                                        "mediaHint":  "GrÃ¡fico com tooltip e chip de filtro ativo."
+                                        "title":  "Interagir com os gráficos",
+                                        "description":  "Clique em uma barra ou fatia para filtrar o restante dos gráficos pelo mesmo termo. Use o chip Limpar que aparece acima do gráfico para remover o filtro.",
+                                        "mediaHint":  "Gráfico com tooltip e chip de filtro ativo."
                                     },
                                     {
-                                        "title":  "Expandir grÃ¡ficos",
-                                        "description":  "Para analisar um grÃ¡fico com mais espaÃ§o, clique no botÃ£o de expandir (canto superior direito do card). Feche clicando fora ou no Ã­cone de fechar.",
-                                        "mediaHint":  "BotÃ£o de expandir no cabeÃ§alho do card."
+                                        "title":  "Expandir gráficos",
+                                        "description":  "Para analisar um gráfico com mais espaço, clique no botão de expandir (canto superior direito do card). Feche clicando fora ou no ícone de fechar.",
+                                        "mediaHint":  "Botão de expandir no cabeçalho do card."
                                     }
                                 ],
                       "notes":  [
-                                    "Os grÃ¡ficos respeitam os filtros aplicados; se algo parecer zerado, confirme o perÃ­odo.",
+                                    "Os gráficos respeitam os filtros aplicados; se algo parecer zerado, confirme o período.",
                                     "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam."
                                 ]
                   },
     "dashboardAcidentes":  {
                                "title":  "Dashboard de acidentes",
-                               "summary":  "Monitore tendÃªncia, tipos de acidente e distribuiÃ§Ãµes para SST.",
+                               "summary":  "Monitore tendência, tipos de acidente e distribuições para SST.",
                                "steps":  [
                                              {
                                                  "title":  "Definir filtros iniciais",
-                                                 "description":  "No campo Busca digite pessoa, agente ou local (trechos do nome/matrÃ­cula tambÃ©m funcionam) e combine com perÃ­odo e unidade/centro de serviÃ§o. Clique em Aplicar para recalcular os indicadores.",
+                                                 "description":  "No campo Busca digite pessoa, agente ou local (trechos do nome/matrícula também funcionam) e combine com período e unidade/centro de serviço. Clique em Aplicar para recalcular os indicadores.",
                                                  "mediaHint":  "Filtros do dashboard de acidentes."
                                              },
                                              {
@@ -44,141 +44,149 @@
                                                  "mediaHint":  "Cards de KPI da tela de acidentes."
                                              },
                                              {
-                                                 "title":  "Ler grÃ¡ficos com tooltips",
-                                                 "description":  "Use os botÃµes (i) nos tÃ­tulos para ver o que cada grÃ¡fico representa. Passe o mouse nos pontos/segmentos para ver valores detalhados.",
-                                                 "mediaHint":  "GrÃ¡fico com tooltip e Ã­cone de info."
+                                                 "title":  "Ler gráficos com tooltips",
+                                                 "description":  "Use os botões (i) nos títulos para ver o que cada gráfico representa. Passe o mouse nos pontos/segmentos para ver valores detalhados.",
+                                                 "mediaHint":  "Gráfico com tooltip e ícone de info."
                                              },
                                              {
                                                  "title":  "Abrir em tela cheia",
-                                                 "description":  "Clique no botÃ£o de expandir do grÃ¡fico desejado. A visualizaÃ§Ã£o modal permite enxergar mais pontos sem poluiÃ§Ã£o visual.",
-                                                 "mediaHint":  "Modal de grÃ¡fico expandido."
+                                                 "description":  "Clique no botão de expandir do gráfico desejado. A visualização modal permite enxergar mais pontos sem poluição visual.",
+                                                 "mediaHint":  "Modal de gráfico expandido."
                                              }
                                          ],
                                "notes":  [
-                                             "Filtros sÃ£o persistidos enquanto vocÃª navega pelo dashboard.",
-                                             "Se nenhum dado aparecer, valide se o perÃ­odo contÃ©m registros de acidentes."
+                                             "Filtros são persistidos enquanto você navega pelo dashboard.",
+                                             "Se nenhum dado aparecer, valide se o período contém registros de acidentes."
                                          ]
                            },
     "estoque":  {
                     "title":  "Estoque atual",
-                    "summary":  "Consulta do saldo por material, alertas de mÃ­nimo e resumo financeiro.",
+                    "summary":  "Consulta do saldo por material, alertas de estoque mínimo, ações rápidas e resumo financeiro.",
                     "steps":  [
                                   {
                                       "title":  "Filtrar materiais",
-                                      "description":  "No campo Busca digite parte do nome, descriÃ§Ã£o, ID ou CA do material para reduzir a tabela; combine com centro de estoque e faixas de saldo. Clique em Aplicar para refinar ou em Limpar para remover todos os filtros.",
-                                      "mediaHint":  "Filtros de estoque e botÃµes Aplicar/Limpar."
+                                      "description":  "No campo Busca digite parte do nome, descrição, ID, cor ou CA do material para reduzir a lista; combine com centro de estoque e faixas de saldo. Clique em Aplicar para refinar ou em Limpar para remover todos os filtros.",
+                                      "mediaHint":  "Filtros de estoque e botões Aplicar/Limpar."
                                   },
                                   {
                                       "title":  "Monitorar alertas",
-                                      "description":  "O bloco \"Alertas de estoque\" mostra itens abaixo do mÃ­nimo. Ajuste o mÃ­nimo diretamente na tabela se precisar recalibrar.",
+                                      "description":  "O bloco \"Alertas de estoque\" mostra itens abaixo do mínimo e o valor estimado para reposição. Use a lista principal para revisar e ajustar os materiais críticos.",
                                       "mediaHint":  "Tabela de alertas com status vermelho/alarme."
                                   },
                                   {
-                                      "title":  "Editar mÃ­nimo na tabela",
-                                      "description":  "Na lista principal, altere o valor de estoque mÃ­nimo no campo inline e clique em salvar ao lado para registrar a nova meta.",
-                                      "mediaHint":  "Campo editÃ¡vel de mÃ­nimo de estoque."
+                                      "title":  "Ações por material",
+                                      "description":  "Em cada material, use o grupo \"Ações\": Entrada (abrir cadastro de entrada), Saída (abrir cadastro de saída) e o botão para alterar o mínimo.",
+                                      "mediaHint":  "Botões circulares de ações (Entrada, Saída e Alterar mínimo)."
                                   },
                                   {
-                                      "title":  "Usar paginaÃ§Ã£o",
-                                      "description":  "Navegue pelas pÃ¡ginas no rodapÃ© da lista para ver mais itens. O total considera os filtros aplicados.",
-                                      "mediaHint":  "Controles de pÃ¡gina na parte inferior da lista."
+                                      "title":  "Alterar estoque mínimo",
+                                      "description":  "Clique em Alterar mínimo para abrir uma janela de edição. Informe o novo valor e confirme em Salvar. O sistema recarrega os dados após salvar.",
+                                      "mediaHint":  "Modal de alteração do estoque mínimo com botões Cancelar/Salvar."
+                                  },
+                                  {
+                                      "title":  "Usar paginação",
+                                      "description":  "Navegue pelas páginas no rodapé da lista para ver mais itens. O total considera os filtros aplicados.",
+                                      "mediaHint":  "Controles de página na parte inferior da lista."
                                   }
                               ],
                     "notes":  [
-                                  "O resumo financeiro abaixo dos alertas usa o valor unitÃ¡rio cadastrado no material.",
-                                  "Se um item nÃ£o mostrar centro de custo, revise o cadastro do material."
+                                  "O resumo financeiro abaixo dos alertas usa o valor unitário cadastrado no material.",
+                                  "Se um item não mostrar centro de estoque, revise as movimentações (entradas/saídas) do material.",
+                                  "Atalho: ao clicar em Entrada/Saída a partir do Estoque atual, o sistema tenta preencher automaticamente o Centro de estoque e o Material."
                               ]
                 },
     "entradas":  {
                      "title":  "Entradas de estoque",
-                     "summary":  "Registro de novas entradas e consulta histÃ³rica.",
+                     "summary":  "Registro de novas entradas e consulta histórica.",
                      "steps":  [
+                                    {
+                                        "title":  "Registrar nova entrada",
+                                        "description":  "Primeiro selecione o Centro de estoque (*). O campo Material só é liberado após escolher o centro. Em seguida, use o autocomplete para buscar e selecionar o material por nome ou ID. Preencha quantidade e data e clique em Registrar entrada para salvar. Dica: ao acessar a tela pelo Estoque atual, Centro de estoque e Material podem vir pré-preenchidos.",
+                                        "mediaHint":  "Formulário de cadastro de entradas: Centro de estoque, Material (habilita após selecionar o centro), Quantidade e Data."
+                                    },
                                    {
-                                       "title":  "Registrar nova entrada",
-                                       "description":  "Use o campo de busca para localizar o material por nome ou ID, escolha a sugestÃ£o correta e preencha quantidade, centro de estoque e data. Confira os valores e clique em Registrar entrada para salvar; o formulÃ¡rio limpa e o histÃ³rico Ã© atualizado.",
-                                       "mediaHint":  "FormulÃ¡rio de cadastro de entradas com autocomplete."
+                                       "title":  "Aplicar filtros do histórico",
+                                       "description":  "Use o campo Busca para digitar parte do nome, descrição ou ID do material (ou do usuário que registrou) e combine com centro de estoque, status e período para refinar o histórico. Use Limpar para remover todos os filtros.",
+                                       "mediaHint":  "Filtros rápidos do histórico de entradas (inclui status)."
                                    },
                                    {
-                                       "title":  "Aplicar filtros do histÃ³rico",
-                                       "description":  "Use o campo Busca para digitar parte do nome, descriÃ§Ã£o ou ID do material (ou do usuÃ¡rio que registrou) e combine com centro de estoque, status e perÃ­odo para refinar o histÃ³rico. Use Limpar para remover todos os filtros.",
-                                       "mediaHint":  "Filtros rÃ¡pidos do histÃ³rico de entradas (inclui status)."
-                                   },
-                                   {
-                                       "title":  "Editar, ver histÃ³rico ou cancelar",
-                                       "description":  "Na tabela, use os Ã­cones para cada entrada: olho (detalhes), lÃ¡pis (editar), relÃ³gio (histÃ³rico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e nÃ£o exibem os botÃµes de ediÃ§Ã£o/cancelamento.",
-                                       "mediaHint":  "Ãcones de detalhes, ediÃ§Ã£o, histÃ³rico e cancelamento na linha."
+                                       "title":  "Editar, ver histórico ou cancelar",
+                                       "description":  "Na tabela, use os ícones para cada entrada: olho (detalhes), lápis (editar), relógio (histórico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e não exibem os botões de edição/cancelamento.",
+                                       "mediaHint":  "Ícones de detalhes, edição, histórico e cancelamento na linha."
                                    },
                                    {
                                        "title":  "Atualizar dados",
-                                       "description":  "Clique em Atualizar no cabeÃ§alho da lista para recarregar dados e sugestÃµes de materiais.",
-                                       "mediaHint":  "BotÃ£o Atualizar no topo da seÃ§Ã£o de histÃ³rico."
+                                       "description":  "Clique em Atualizar no cabeçalho da lista para recarregar dados e sugestões de materiais.",
+                                       "mediaHint":  "Botão Atualizar no topo da seção de histórico."
                                    }
                                ],
-                     "notes":  [
-                                   "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descriÃ§Ã£o.",
-                                   "Se nÃ£o houver centros de estoque configurados, o campo vira texto livre para nÃ£o travar o registro.",
-                                   "Status e usuÃ¡rio de ediÃ§Ã£o aparecem em detalhes e histÃ³rico; cancelamentos sÃ£o registrados.",
-                                   "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrÃ£o)."
-                               ]
-                 },
+                      "notes":  [
+                                    "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descrição.",
+                                    "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro.",
+                                    "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já preenchidos.",
+                                    "Status e usuário de edição aparecem em detalhes e histórico; cancelamentos são registrados.",
+                                    "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrão)."
+                                ]
+                  },
     "saidas":  {
-                   "title":  "SaÃ­das de estoque",
+                   "title":  "Saídas de estoque",
                    "summary":  "Entrega de EPIs para pessoas, com rastreabilidade e cancelamento.",
                    "steps":  [
                                  {
-                                     "title":  "Registrar saÃ­da",
-                                     "description":  "No campo de busca, digite o nome ou matrÃ­cula para achar a pessoa e selecione o material pelo autocomplete. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saÃ­da para gravar a entrega.",
-                                     "mediaHint":  "FormulÃ¡rio de cadastro de saÃ­das com busca de pessoa e material."
+                                     "title":  "Registrar saída",
+                                     "description":  "No campo de busca, digite o nome ou matrícula para achar a pessoa e selecione o material pelo autocomplete. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saída para gravar a entrega.",
+                                     "mediaHint":  "Formulário de cadastro de saídas com busca de pessoa e material."
                                  },
                                  {
-                                     "title":  "Conferir saldo disponÃ­vel",
-                                     "description":  "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberaÃ§Ãµes acima do estoque.",
-                                     "mediaHint":  "Bloco de saldo do material ao lado do formulÃ¡rio."
+                                     "title":  "Conferir saldo disponível",
+                                     "description":  "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberações acima do estoque.",
+                                     "mediaHint":  "Bloco de saldo do material ao lado do formulário."
                                  },
                                  {
                                      "title":  "Editar ou cancelar",
-                                     "description":  "Clique em Editar para carregar o registro no formulÃ¡rio: ele sobe para o topo, fica amarelo e mostra â€œEditando...â€. Ajuste os campos necessÃ¡rios e clique em Salvar alteraÃ§Ãµes para gravar; se desistir antes de salvar, use Cancelar ediÃ§Ã£o para voltar ao modo de cadastro.",
-                                     "mediaHint":  "AÃ§Ãµes de ediÃ§Ã£o e cancelamento na tabela de saÃ­das."
+                                     "description":  "Clique em Editar para carregar o registro no formulário: ele sobe para o topo, fica amarelo e mostra “Editando...”. Ajuste os campos necessários e clique em Salvar alterações para gravar; se desistir antes de salvar, use Cancelar edição para voltar ao modo de cadastro.",
+                                     "mediaHint":  "Ações de edição e cancelamento na tabela de saídas."
                                  },
                                  {
                                      "title":  "Filtrar e paginar",
-                                     "description":  "No campo Busca digite o nome ou matrÃ­cula da pessoa, ou nome/descriÃ§Ã£o/ID do material ou CA, para trazer apenas as saÃ­das relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessÃ¡rio e navegue pelas pÃ¡ginas no rodapÃ©.",
-                                     "mediaHint":  "Filtros superiores e paginaÃ§Ã£o inferior do histÃ³rico."
+                                     "description":  "No campo Busca digite o nome ou matrícula da pessoa, ou nome/descrição/ID do material ou CA, para trazer apenas as saídas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessário e navegue pelas páginas no rodapé.",
+                                     "mediaHint":  "Filtros superiores e paginação inferior do histórico."
                                  }
                              ],
-                   "notes":  [
-                                 "SaÃ­das canceladas ficam marcadas e nÃ£o impactam o saldo.",
-                                 "O histÃ³rico detalha quem registrou e quando a entrega foi alterada."
-                             ]
-               },
+                    "notes":  [
+                                  "Saídas canceladas ficam marcadas e não impactam o saldo.",
+                                  "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já selecionados.",
+                                  "O histórico detalha quem registrou e quando a entrega foi alterada."
+                              ]
+                },
     "materiais":  {
                       "title":  "Cadastro de materiais / EPI",
-                      "summary":  "Cadastro centralizado de EPI com variaÃ§Ãµes, caracterÃ­sticas e valor.",
+                      "summary":  "Cadastro centralizado de EPI com variações, características e valor.",
                       "steps":  [
                                     {
                                         "title":  "Cadastrar ou editar material",
-                                        "description":  "Preencha nome, grupo, valor unitÃ¡rio e CA (quando houver). Ao editar, o tÃ­tulo muda para â€œEditando...â€ e o card fica destacado em amarelo; use Salvar para novo cadastro ou para gravar alteraÃ§Ãµes.",
-                                        "mediaHint":  "FormulÃ¡rio principal de materiais."
+                                        "description":  "Preencha nome, grupo, valor unitário e CA (quando houver). Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para novo cadastro ou para gravar alterações.",
+                                        "mediaHint":  "Formulário principal de materiais."
                                     },
                                     {
-                                        "title":  "Gerenciar variaÃ§Ãµes e atributos",
-                                        "description":  "Adicione caracterÃ­sticas, cores, fabricante e tamanho pelo autocomplete. Campos de lista aceitam mÃºltiplos itens.",
-                                        "mediaHint":  "Campos de caracterÃ­stica, cor e tamanho."
+                                        "title":  "Gerenciar variações e atributos",
+                                        "description":  "Adicione características, cores, fabricante e tamanho pelo autocomplete. Campos de lista aceitam múltiplos itens.",
+                                        "mediaHint":  "Campos de característica, cor e tamanho."
                                     },
                                     {
-                                        "title":  "Filtrar catÃ¡logo",
-                                        "description":  "Digite no campo Busca parte do nome, descriÃ§Ã£o, ID ou CA para filtrar rapidamente o catÃ¡logo; refine por grupo, tamanho, fabricante ou caracterÃ­stica e clique em Aplicar. Limpar remove todos os filtros.",
+                                        "title":  "Filtrar catálogo",
+                                        "description":  "Digite no campo Busca parte do nome, descrição, ID ou CA para filtrar rapidamente o catálogo; refine por grupo, tamanho, fabricante ou característica e clique em Aplicar. Limpar remove todos os filtros.",
                                         "mediaHint":  "Bloco de filtros acima da tabela de materiais."
                                     },
                                     {
-                                        "title":  "HistÃ³rico e detalhes",
-                                        "description":  "Na tabela use o botÃ£o de relÃ³gio para ver histÃ³rico de alteraÃ§Ãµes e o botÃ£o com olho para abrir o detalhamento completo do material.",
-                                        "mediaHint":  "AÃ§Ãµes de histÃ³rico e detalhes na tabela de materiais."
+                                        "title":  "Histórico e detalhes",
+                                        "description":  "Na tabela use o botão de relógio para ver histórico de alterações e o botão com olho para abrir o detalhamento completo do material.",
+                                        "mediaHint":  "Ações de histórico e detalhes na tabela de materiais."
                                     }
                                 ],
                       "notes":  [
-                                    "A ediÃ§Ã£o de um material reaproveita o mesmo formulÃ¡rio, mantendo os campos preenchidos.",
-                                    "Valor unitÃ¡rio Ã© usado nos cÃ¡lculos de estoque e relatÃ³rios."
+                                    "A edição de um material reaproveita o mesmo formulário, mantendo os campos preenchidos.",
+                                    "Valor unitário é usado nos cálculos de estoque e relatórios."
                                 ]
                   },
     "pessoas":  {
@@ -191,7 +199,7 @@
                                       "mediaHint":  "Formulario principal de pessoas."
                                   },
                                   {
-                                      "title":  "Registrar demissÃ£o / status",
+                                      "title":  "Registrar demissão / status",
                                       "description":  "Para desligar, marque como inativo e informe a DATA DE DEMISSAO (opcional). Reativar pede confirmacao.",
                                       "mediaHint":  "Campos de status e datas no formulario."
                                   },
@@ -203,7 +211,7 @@
                                   {
                                       "title":  "Ler resumo rapido",
                                       "description":  "Os cards de resumo mostram quantidade por centro e setores mais frequentes conforme o filtro aplicado.",
-                                      "mediaHint":  "Cards de resumo logo apÃ³s os filtros."
+                                      "mediaHint":  "Cards de resumo logo após os filtros."
                                   },
                                   {
                                       "title":  "Ver historico de alteracoes",
@@ -219,32 +227,32 @@
                 },
     "acidentes":  {
                       "title":  "Registro de acidentes",
-                      "summary":  "Cadastro completo de acidentes com filtros, histÃ³rico e detalhes.",
+                      "summary":  "Cadastro completo de acidentes com filtros, histórico e detalhes.",
                       "steps":  [
                                     {
                                         "title":  "Preencher dados do acidente",
-                                        "description":  "Selecione colaborador, tipo de acidente, lesÃ£o e parte afetada. Campos obrigatÃ³rios estÃ£o marcados com *. Ao editar, o tÃ­tulo muda para â€œEditando...â€ e o card fica destacado em amarelo; use Salvar para gravar.",
-                                        "mediaHint":  "FormulÃ¡rio de cadastro de acidentes."
+                                        "description":  "Selecione colaborador, tipo de acidente, lesão e parte afetada. Campos obrigatórios estão marcados com *. Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para gravar.",
+                                        "mediaHint":  "Formulário de cadastro de acidentes."
                                     },
                                     {
                                         "title":  "Relacionar local e agente",
-                                        "description":  "Use os campos de local, centro de serviÃ§o e agente causador para enriquecer indicadores de SST.",
-                                        "mediaHint":  "SeÃ§Ã£o de local/agente dentro do formulÃ¡rio."
+                                        "description":  "Use os campos de local, centro de serviço e agente causador para enriquecer indicadores de SST.",
+                                        "mediaHint":  "Seção de local/agente dentro do formulário."
                                     },
                                     {
                                         "title":  "Filtrar registros",
-                                        "description":  "Use o campo Busca para digitar pessoa (nome/matrÃ­cula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de serviÃ§o ou agente e clique em Aplicar. Limpar zera todos os filtros.",
+                                        "description":  "Use o campo Busca para digitar pessoa (nome/matrícula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de serviço ou agente e clique em Aplicar. Limpar zera todos os filtros.",
                                         "mediaHint":  "Bloco de filtros acima da lista de acidentes."
                                     },
                                     {
-                                        "title":  "Consultar histÃ³rico e detalhes",
-                                        "description":  "Clique no botÃ£o de relÃ³gio para ver histÃ³rico de alteraÃ§Ãµes ou no botÃ£o com olho para abrir os detalhes completos do acidente.",
+                                        "title":  "Consultar histórico e detalhes",
+                                        "description":  "Clique no botão de relógio para ver histórico de alterações ou no botão com olho para abrir os detalhes completos do acidente.",
                                         "mediaHint":  "Modal de detalhes do acidente."
                                     }
                                 ],
                       "notes":  [
-                                    "Ao salvar um acidente, a lista Ã© recarregada automaticamente.",
-                                    "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integraÃ§Ãµes de cadastro base."
+                                    "Ao salvar um acidente, a lista é recarregada automaticamente.",
+                                    "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integrações de cadastro base."
                                 ]
                   },
     "termoEpi":  {
@@ -253,28 +261,28 @@
                      "steps":  [
                                    {
                                        "title":  "Preencher filtros de busca",
-                                       "description":  "No campo Busca informe matrÃ­cula ou nome do colaborador (parcial ou completo) e, se quiser, complete com intervalo de datas de entrega. NÃ£o Ã© necessÃ¡rio preencher todos os campos.",
-                                       "mediaHint":  "FormulÃ¡rio de filtros do termo."
+                                       "description":  "No campo Busca informe matrícula ou nome do colaborador (parcial ou completo) e, se quiser, complete com intervalo de datas de entrega. Não é necessário preencher todos os campos.",
+                                       "mediaHint":  "Formulário de filtros do termo."
                                    },
                                    {
                                        "title":  "Gerar documento",
-                                       "description":  "Clique em Gerar termo para montar a prÃ©-visualizaÃ§Ã£o. Use Limpar para reiniciar os campos.",
-                                       "mediaHint":  "BotÃµes Gerar termo e Limpar."
+                                       "description":  "Clique em Gerar termo para montar a pré-visualização. Use Limpar para reiniciar os campos.",
+                                       "mediaHint":  "Botões Gerar termo e Limpar."
                                    },
                                    {
-                                       "title":  "Analise a prÃ©-visualizaÃ§Ã£o",
+                                       "title":  "Analise a pré-visualização",
                                        "description":  "Revise os dados do colaborador e dos itens entregues no iframe exibido. O badge indica se o documento veio do cache local ou do servidor.",
-                                       "mediaHint":  "Iframe de prÃ©-visualizaÃ§Ã£o do termo."
+                                       "mediaHint":  "Iframe de pré-visualização do termo."
                                    },
                                    {
                                        "title":  "Baixar PDF",
-                                       "description":  "Com a prÃ©-visualizaÃ§Ã£o carregada, clique em Baixar PDF no cabeÃ§alho da seÃ§Ã£o para salvar o arquivo.",
-                                       "mediaHint":  "BotÃ£o Baixar PDF acima do iframe."
+                                       "description":  "Com a pré-visualização carregada, clique em Baixar PDF no cabeçalho da seção para salvar o arquivo.",
+                                       "mediaHint":  "Botão Baixar PDF acima do iframe."
                                    }
                                ],
                      "notes":  [
                                    "Se nenhum HTML for retornado, revise os filtros ou gere novas entregas antes.",
-                                   "O download sÃ³ habilita depois que o HTML estiver carregado."
+                                   "O download só habilita depois que o HTML estiver carregado."
                                ]
                  },
     "configuracoes":  {

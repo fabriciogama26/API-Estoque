@@ -76,13 +76,13 @@ export function useEstoque(initialFilters, userResolver, onError) {
     const draftValue = (minStockDrafts[item.materialId] ?? '').trim()
     if (draftValue === '') {
       setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Informe um valor' }))
-      return
+      return false
     }
 
     const parsed = Number(draftValue)
     if (Number.isNaN(parsed) || parsed < 0) {
       setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor invalido' }))
-      return
+      return false
     }
 
     if (Number(item.estoqueMinimo ?? 0) === parsed) {
@@ -91,7 +91,7 @@ export function useEstoque(initialFilters, userResolver, onError) {
         delete next[item.materialId]
         return next
       })
-      return
+      return true
     }
 
     setMinStockErrors((prev) => {
@@ -108,11 +108,13 @@ export function useEstoque(initialFilters, userResolver, onError) {
         usuarioResponsavel: usuario,
       })
       await load({ ...filters }, { force: true })
+      return true
     } catch (err) {
       setError(err.message)
       if (typeof onError === 'function') {
         onError(err, { materialId: item.materialId })
       }
+      return false
     } finally {
       setSavingMinStock((prev) => {
         const next = { ...prev }

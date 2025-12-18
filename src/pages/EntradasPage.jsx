@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { EntryIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
@@ -6,12 +7,13 @@ import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModa
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { EntradasProvider, useEntradasContext } from '../context/EntradasContext.jsx'
-import { formatCurrency, formatDisplayDate, formatMaterialSummary } from '../utils/entradasUtils.js'
+import { formatCurrency, formatDisplayDate, formatMaterialSummary, normalizeSearchValue } from '../utils/entradasUtils.js'
 import { formatDisplayDateTime } from '../utils/saidasUtils.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
 
 function EntradasContent() {
+  const [searchParams] = useSearchParams()
   const {
     form,
     filters,
@@ -61,6 +63,52 @@ function EntradasContent() {
   } = useEntradasContext()
 
   const [detalheEntrada, setDetalheEntrada] = useState(null)
+
+  useEffect(() => {
+    const centroParam = (searchParams.get('centroEstoque') || searchParams.get('centroCusto') || '').trim()
+    if (!centroParam) return
+    if (isEditing) return
+    if (hasCentrosCusto && (!centrosCusto || centrosCusto.length === 0)) return
+
+    const currentCentro = (form.centroCusto || '').toString().trim()
+    if (hasCentrosCusto) {
+      const alreadyValid = (centrosCusto || []).some(
+        (item) => String(item?.id ?? item?.nome ?? '').trim() === currentCentro,
+      )
+      if (alreadyValid) {
+        return
+      }
+    } else if (currentCentro) {
+      return
+    }
+
+    const normalizedCentro = normalizeSearchValue(centroParam)
+    const centro = (centrosCusto || []).find((item) => {
+      const value = String(item?.id ?? item?.nome ?? '').trim()
+      const nome = String(item?.nome ?? '').trim()
+      return value === centroParam || normalizeSearchValue(nome) === normalizedCentro
+    })
+
+    if (!centro) {
+      if (!hasCentrosCusto) {
+        handleChange({ target: { name: 'centroCusto', value: centroParam } })
+      }
+      return
+    }
+
+    handleChange({ target: { name: 'centroCusto', value: String(centro.id ?? centro.nome) } })
+  }, [centrosCusto, form.centroCusto, handleChange, hasCentrosCusto, isEditing, searchParams])
+
+  useEffect(() => {
+    const materialIdParam = (searchParams.get('materialId') || '').trim()
+    if (!materialIdParam) return
+    if (isEditing) return
+    if (form.materialId) return
+    const material = materiaisMap.get(materialIdParam)
+    if (material) {
+      handleMaterialSelect(material)
+    }
+  }, [form.materialId, handleMaterialSelect, isEditing, materiaisMap, searchParams])
 
   const handleOpenDetalhes = (entrada) => {
     if (!entrada) {
@@ -113,6 +161,27 @@ function EntradasContent() {
         </header>
         <form className={`form${isEditing ? ' form--editing' : ''}`} onSubmit={handleSubmit}>
           <div className="form__grid form__grid--two">
+          <label className="field">
+            <span>Centro de estoque <span className="asterisco">*</span></span>
+            {hasCentrosCusto ? (
+              <select name="centroCusto" value={form.centroCusto} onChange={handleChange} required>
+                <option value="">Selecione um centro de estoque</option>
+                {centrosCusto.map((item) => (
+                  <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                    {item.nome}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                name="centroCusto"
+                value={form.centroCusto}
+                onChange={handleChange}
+                required
+                placeholder="Informe o centro de estoque"
+              />
+            )}
+          </label>
           <label className="field autocomplete">
             <span>Material <span className="asterisco">*</span> </span>
             <div className="autocomplete__control">
@@ -122,11 +191,12 @@ function EntradasContent() {
                 onChange={handleMaterialInputChange}
                 onFocus={handleMaterialFocus}
                 onBlur={handleMaterialBlur}
-                placeholder="Digite para buscar materiais"
+                placeholder={form.centroCusto ? 'Digite para buscar materiais' : 'Selecione o centro de estoque primeiro'}
+                disabled={!form.centroCusto}
                 required
               />
               {materialSearchValue ? (
-                <button type="button" className="autocomplete__clear" onClick={handleMaterialClear}>
+                <button type="button" className="autocomplete__clear" onClick={handleMaterialClear} disabled={!form.centroCusto}>
                   &times;
                 </button>
               ) : null}
@@ -158,27 +228,6 @@ function EntradasContent() {
           <label className="field">
             <span>Quantidade <span className="asterisco">*</span></span>
             <input type="number" min="1" name="quantidade" value={form.quantidade} onChange={handleChange} required />
-          </label>
-          <label className="field">
-            <span>Centro de estoque <span className="asterisco">*</span></span>
-            {hasCentrosCusto ? (
-              <select name="centroCusto" value={form.centroCusto} onChange={handleChange} required>
-                <option value="">Selecione um centro de estoque</option>
-                {centrosCusto.map((item) => (
-                  <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
-                    {item.nome}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                name="centroCusto"
-                value={form.centroCusto}
-                onChange={handleChange}
-                required
-                placeholder="Informe o centro de estoque"
-              />
-            )}
           </label>
           <label className="field">
             <span>Data da entrada <span className="asterisco">*</span></span>

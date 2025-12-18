@@ -4,6 +4,13 @@ Aplicacao React (Vite) para gestao de EPIs/Estoque integrada ao Supabase.
 
 Documentacao detalhada por pagina em `docs/`.
 
+## Atalhos a partir do Estoque atual
+
+Na lista de materiais do Estoque atual, os botões de ação por material podem abrir Entradas/Saídas já com dados pré-preenchidos via querystring:
+
+- Entradas: `?materialId=<id>&centroCusto=<centro>` (também aceita `centroEstoque`)
+- Saídas: `?centroEstoque=<centro>&materialId=<id>`
+
 ## Requisitos
 
 - Node.js 20+
@@ -50,4 +57,3 @@ Arquivos e docs:
 - Edge Functions: `supabase/functions/desligamento-import` e `supabase/functions/desligamento-template`
 - Bucket/policies: `supabase/migrations/0077_fix_imports_bucket.sql`
 - Documentacao do fluxo: `docs/DesligamentoEmMassa.txt`
-
