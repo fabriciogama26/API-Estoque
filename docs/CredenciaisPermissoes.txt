@@ -1,75 +1,66 @@
-Credenciais e Permissoes
+Credenciais e permissoes
 ========================
 
-Mapa de Codigo (funcoes, hooks e constantes)
---------------------------------------------
-- PermissionsProvider (src/context/PermissionsContext.jsx): carrega credential/page_permissions via Supabase (titular ou dependente), usa effectiveUserService para resolver credential_text/UUID e calcula canAccessPath/allowedPaths.
-- effectiveUserService (src/services/effectiveUserService.js): mapeia credential UUID<->id_text do catalogo, resolve heranca de dependentes (credential/status/paginas) e expõe credential_text/credentialId.
-- ProtectedRoute (src/components/ProtectedRoute.jsx): valida autenticacao/permissao e redireciona para /sem-acesso.
-- NavBar (src/components/NavBar.jsx): oculta itens de menu conforme canAccessPath.
-- SystemStatus (src/components/SystemStatus.jsx): mostra nome/credencial e atalho para Configuracoes.
-- NoAccessPage (src/pages/NoAccessPage.jsx): pagina de acesso negado.
-- ConfiguracoesPage / PermissionsSection (src/pages/Configuracoes.jsx): lista titulares + dependentes, edita credential/page_permissions/status e abre historico (usa target_auth_user_id e owner_app_user_id para dependentes).
-- AdminResetPasswordSection (src/pages/Configuracoes.jsx): envia reset de senha para titulares ou dependentes.
+Visao geral
+-----------
+O sistema controla acesso por:
+- Autenticacao (Supabase Auth)
+- Credencial (perfil/role)
+- Permissoes de pagina (lista de pageId)
+
+O usuario logado pode ser:
+- Titular (registro em public.app_users)
+- Dependente (registro em public.app_users_dependentes), herdando configuracoes do titular quando aplicavel
+
+
+Mapa de codigo (frontend)
+------------------------
+- PermissionsProvider: `src/context/PermissionsContext.jsx`
+  - Carrega credential/page_permissions (titular ou dependente)
+  - Calcula `canAccessPath()` e `allowedPaths`
+- effectiveUserService: `src/services/effectiveUserService.js`
+  - Resolve credencial efetiva (heranca para dependentes)
+  - Mapeia credential UUID <-> id_text do catalogo
+- ProtectedRoute: `src/components/ProtectedRoute.jsx`
+  - Bloqueia rotas sem autenticacao/permissao e redireciona para `/sem-acesso`
+- NavBar: `src/components/NavBar.jsx`
+  - Oculta itens de menu conforme `canAccessPath`
+- NoAccessPage: `src/pages/NoAccessPage.jsx`
+  - Pagina exibida quando o usuario nao tem acesso
+- Configuracoes (permissoes e reset de senha): `src/pages/Configuracoes.jsx`
+
 
 Constantes e configuracoes
 --------------------------
-- PAGE_CATALOG: ids -> rotas (src/config/permissions.js).
-- DEFAULT_CREDENTIAL_PERMISSIONS: fallback de paginas por credencial (src/config/permissions.js).
-- CREDENTIAL_OPTIONS: opcoes de UI, filtradas por hierarquia (level); master so aparece para quem ja e master.
+- Catalogo de paginas (pageId -> path): `src/config/permissions.js` (`PAGE_CATALOG`)
+- Permissoes padrao por credencial: `src/config/permissions.js` (`DEFAULT_CREDENTIAL_PERMISSIONS`)
 
-Fluxo de dados
---------------
-- Banco: app_users (titulares) e app_users_dependentes (dependentes) usam credential UUID com FK para app_credentials_catalog (id + id_text + level) e page_permissions (text[]).
-- Historico: app_users_credential_history (migrations 0063/0068/0070/0074) guarda before/after de credential/page_permissions, acao (`update` ou `password_reset`), target_auth_user_id (login titular/dependente) e owner_app_user_id/target_dependent_id para dependentes.
-- Carregamento: PermissionsProvider resolve usuario efetivo (heranca de titular para dependente) e mescla com metadata do auth; modo local cai em admin.
-- Navegacao: ProtectedRoute bloqueia quando canAccessPath = false; NavBar filtra itens; SystemStatus usa canAccessPath('/configuracoes').
-- Edicao: Configuracoes usa autocomplete (app_users + app_users_dependentes), filtra credenciais por level (admin nao ve master), salva em app_users ou app_users_dependentes e registra historico; sincroniza banimento via RPC sync_user_ban_with_status.
-- Reset de senha (admin/master): envia reset via supabase.auth.resetPasswordForEmail e registra historico (action password_reset).
 
-Credenciais padrao (catalogo)
------------------------------
-- master (level maximo): todas as paginas; visivel apenas para usuarios master.
-- admin: todas as paginas.
-- operador: dashboards, estoque, entradas, saidas, cadastros, acidentes, termo, configuracoes, no-access.
-- estagiario: dashboards, termo, no-access.
-- visitante: dashboards, termo, no-access.
+Modelo de dados (Supabase)
+--------------------------
+- Titulares: `public.app_users`
+  - `id` (uuid) deve ser o mesmo UUID do `auth.users.id`
+  - `credential` (uuid -> `app_credentials_catalog.id`)
+  - `page_permissions` (text[] com pageId)
 
-Como adicionar nova credencial
-------------------------------
-1) Catalogo: inserir em app_credentials_catalog (id_text, label, description, level coerente com a hierarquia).
-2) Frontend: adicionar em CREDENTIAL_OPTIONS e DEFAULT_CREDENTIAL_PERMISSIONS (usar pageIds do PAGE_CATALOG); ajustar describeCredential se preciso.
-3) Policies/RLS: validar se o level permite leitura/edicao (ex.: somente level <= current_user_level); service_role segue liberado.
-4) Testar: login com a credencial nova (titular ou dependente), conferir menu/rotas e historico.
+- Dependentes: `public.app_users_dependentes`
+  - `auth_user_id` (uuid do `auth.users.id` do dependente)
+  - `owner_app_user_id` (uuid do titular em `app_users.id`)
+  - `credential` e `page_permissions` podem herdar do titular quando vazios
+  - `ativo` controla se o dependente pode logar/usar o sistema
 
-UI de permissoes
-----------------
-- Autocomplete de usuario/dependente com filtro por level; master nao aparece para quem nao e master.
-- Toggles de paginas em duas colunas; status ativo/inativo so master/admin podem alterar.
-- Reset de senha (admin/master) envia email e grava historico.
+- Catalogo de credenciais: `public.app_credentials_catalog`
+  - `id` (uuid), `id_text` (ex.: admin/operador), `label`, `level` (hierarquia)
 
-Seguranca (RLS)
----------------
-- app_credentials_catalog: select para authenticated/service_role; all para service_role; pode filtrar por level <= current_credential_level().
-- app_users e app_users_dependentes: ler/editar apenas quando o level do alvo <= level do usuario logado; service_role liberado. Evitar policies recursivas; use funcao helper que captura auth.uid() uma unica vez.
-- app_users_credential_history: select para authenticated/service_role; insert quando authenticated agir sobre si (changed_by = auth.uid()) ou service_role.
+- Auditoria de mudancas: `public.app_users_credential_history`
+  - Guarda before/after de credencial/permissoes e a acao (`update`/`password_reset`)
+  - Inclui `target_auth_user_id` (para historico de dependentes e titulares)
 
-PageIds disponiveis (PAGE_CATALOG)
-----------------------------------
-- dashboard -> ['/', '/dashboard']
-- dashboard-acidentes -> ['/dashboard/acidentes']
-- estoque -> ['/estoque']
-- entradas -> ['/entradas', '/movimentacoes/entradas']
-- saidas -> ['/saidas', '/movimentacoes/saidas']
-- cadastros-pessoas -> ['/cadastros/pessoas']
-- cadastros-materiais -> ['/cadastros/materiais']
-- acidentes-cadastro -> ['/acidentes/cadastro']
-- termo-epi -> ['/documentos/termo-epi', '/termos/epi']
-- configuracoes -> ['/configuracoes']
-- no-access -> ['/sem-acesso']
 
-Notas rapidas
+Boas praticas
 -------------
-- Valores em page_permissions prevalecem sobre o default quando nao vazios.
-- Modo local (VITE_DATA_MODE=local) trata todos como admin e ignora Supabase.
-- Master enxerga/edita tudo; admins nao veem nem editam credenciais de level maior (ex.: master).
+- Sempre garantir que `public.app_users.id` = `auth.users.id` para titulares.
+- Manter `PAGE_CATALOG` e `DEFAULT_CREDENTIAL_PERMISSIONS` atualizados ao criar novas telas.
+- Proteger rotas (ProtectedRoute) e esconder menu (NavBar) nao substitui validacao no backend:
+  operacoes sensiveis devem ser validadas no Supabase (RLS/RPC/Edge Functions) quando possivel.
+

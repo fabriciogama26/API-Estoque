@@ -92,18 +92,18 @@ function EstoquePageContent() {
         <header className="card__header">
           <h2>Estoque materiais</h2>
         </header>
-      <EstoqueList
-        itens={paginatedItens}
-        pageSize={10}
-        currentPage={itensPage}
-        totalItems={itensFiltrados.length}
-        onPageChange={setItensPage}
-        minStockDrafts={minStockDrafts}
-        minStockErrors={minStockErrors}
-        savingMinStock={savingMinStock}
-        onMinStockChange={handleMinStockChange}
-        onMinStockSave={handleMinStockSave}
-      />
+        <EstoqueList
+          itens={paginatedItens}
+          pageSize={10}
+          currentPage={itensPage}
+          totalItems={itensFiltrados.length}
+          onPageChange={setItensPage}
+          minStockDrafts={minStockDrafts}
+          minStockErrors={minStockErrors}
+          savingMinStock={savingMinStock}
+          onMinStockChange={handleMinStockChange}
+          onMinStockSave={handleMinStockSave}
+        />
       </section>
     </div>
   )

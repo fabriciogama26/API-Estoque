@@ -4,7 +4,8 @@ Tela: Estoque Atual
 Visao geral
 -----------
 - Consolida o saldo atual por material, exibindo quantidade, valor e alertas de estoque minimo.
-- Permite ajustar o estoque minimo diretamente na lista (edicao inline).
+- Permite ajustar o estoque minimo por material via modal de alteracao.
+- Traz acoes rapidas por material (Entrada, Saida e Alterar minimo) para agilizar o registro de movimentacoes.
 - Carrega dados via `api.estoque.current({ periodoInicio, periodoFim })`, retornando `itens` e `alertas`.
 
 Arquitetura (modular)
@@ -54,14 +55,20 @@ Lista de itens
 --------------
 - Cada linha/cartao exibe:
   - Nome do material, fabricante, categoria (quando disponivel).
+  - ID do material e cor (quando disponivel).
   - Quantidade atual em estoque.
   - Valor unitario e valor total (formatados em BRL).
   - Informacoes adicionais: validade (em dias), CA, centro(s) de custo, data e usuario da ultima atualizacao.
-- Campo "Estoque minimo":
-  - Editavel inline.
-  - Ao confirmar, chama `api.materiais.update` com `estoqueMinimo` e `usuarioResponsavel`.
+- Acoes por material:
+  - Entrada: abre a tela de Entradas e tenta preencher Material + Centro de estoque automaticamente.
+  - Saida: abre a tela de Saidas e tenta preencher Centro de estoque + Material automaticamente (centro e obrigatorio para habilitar o campo de material).
+  - Alterar minimo: abre um modal para informar o novo estoque minimo e salvar.
+  - Observacao: quando houver mais de um centro relacionado ao material, o atalho usa o primeiro centro encontrado no contexto do estoque atual.
+- Estoque minimo (alteracao):
+  - Clique em "Alterar minimo" para abrir o modal.
+  - Ao salvar, chama `api.materiais.update` com `estoqueMinimo` e `usuarioResponsavel`.
   - Em caso de sucesso, recarrega dados do estoque atual.
-  - Em caso de erro, mostra feedback e desabilita o botao enquanto a operacao estiver em andamento.
+  - Em caso de erro, mostra feedback e bloqueia o botao enquanto a operacao estiver em andamento.
 
 Boas praticas
 -------------

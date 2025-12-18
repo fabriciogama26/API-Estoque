@@ -4,13 +4,20 @@ import { PessoasForm } from '../components/Pessoas/PessoasForm.jsx'
 import { PessoasFilters } from '../components/Pessoas/PessoasFilters.jsx'
 import { PessoasTable } from '../components/Pessoas/PessoasTable.jsx'
 import { PessoasHistoryModal } from '../components/Pessoas/PessoasHistoryModal.jsx'
+import { PessoasDesligamentoModal } from '../components/Pessoas/PessoasDesligamentoModal.jsx'
 import { PessoasResumoCards } from '../components/PessoasResumoCards.jsx'
 import { PessoasProvider, usePessoasContext } from '../context/PessoasContext.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
+import { useState } from 'react'
+import { downloadDesligamentoTemplate, importDesligamentoPlanilha } from '../services/pessoasService.js'
 
 import '../styles/PessoasPage.css'
 
 function PessoasContent() {
+  const [desligamentoOpen, setDesligamentoOpen] = useState(false)
+  const [desligamentoInfo, setDesligamentoInfo] = useState(null)
+  const [desligamentoLoading, setDesligamentoLoading] = useState(false)
+
   const {
     form,
     filters,
@@ -58,6 +65,7 @@ function PessoasContent() {
         onCancel={cancelEdit}
         error={error}
         options={formOptions}
+        onOpenDesligamento={() => setDesligamentoOpen(true)}
       />
 
       <PessoasFilters
@@ -97,6 +105,62 @@ function PessoasContent() {
       </section>
 
       <PessoasHistoryModal state={historyState} onClose={closeHistory} />
+      <PessoasDesligamentoModal
+        open={desligamentoOpen}
+        onClose={() => {
+          setDesligamentoOpen(false)
+          setDesligamentoInfo(null)
+          setDesligamentoLoading(false)
+        }}
+        info={desligamentoInfo}
+        disabled={desligamentoLoading}
+        loading={desligamentoLoading}
+        onDownloadTemplate={async () => {
+          setDesligamentoInfo({ status: 'info', message: 'Baixando modelo...' })
+          try {
+            const { blob, filename } = await downloadDesligamentoTemplate()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename || 'desligamento_template.xlsx'
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+            setDesligamentoInfo({ status: 'success', message: 'Modelo baixado com sucesso.' })
+          } catch (err) {
+            setDesligamentoInfo({ status: 'error', message: err.message || 'Falha ao baixar modelo.' })
+          }
+        }}
+        onUploadFile={async (file) => {
+          if (!file) return
+          setDesligamentoLoading(true)
+          setDesligamentoInfo({ status: 'info', message: 'Enviando planilha...' })
+          try {
+            const result = await importDesligamentoPlanilha(file)
+            setDesligamentoInfo({
+              status: 'success',
+              message: 'Importacao concluida.',
+              stats: {
+                processed: result?.processed ?? result?.total ?? 0,
+                success: result?.success ?? result?.imported ?? 0,
+                errors: result?.errors ?? result?.failed ?? 0,
+              },
+              errorsUrl: result?.errorsUrl ?? null,
+              firstError: result?.firstError ?? null,
+              errorSamples: result?.errorSamples ?? [],
+            })
+            await loadPessoas(filters, true)
+          } catch (err) {
+            setDesligamentoInfo({
+              status: 'error',
+              message: err.message || 'Falha ao importar planilha.',
+            })
+          } finally {
+            setDesligamentoLoading(false)
+          }
+        }}
+      />
     </div>
   )
 }

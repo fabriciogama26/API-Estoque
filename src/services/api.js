@@ -10,6 +10,8 @@ import {
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
 import { resolveEffectiveAppUser } from './effectiveUserService.js'
 
+const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
+
 const GENERIC_ERROR = 'Falha ao comunicar com o Supabase.'
 
 const reportClientError = (message, error, context = {}, severity = 'warn') => {
@@ -167,6 +169,7 @@ const PESSOAS_VIEW_SELECT = `
   nome,
   matricula,
   "dataAdmissao",
+  "dataDemissao",
   "usuarioCadastro",
   "usuarioCadastroNome",
   "usuarioEdicao",
@@ -1551,6 +1554,13 @@ async function resolveUsuarioIdOrThrow() {
   return usuarioId
 }
 
+async function buildAuthHeaders(extra = {}) {
+  ensureSupabase()
+  const { data } = await supabase.auth.getSession()
+  const token = data?.session?.access_token
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra }
+}
+
 async function resolveGrupoMaterialId(valor) {
   const texto = trim(valor)
   if (!texto) {
@@ -1764,6 +1774,7 @@ function mapPessoaRecord(record) {
     tipoExecucao,
     tipoExecucaoId: record.tipo_execucao_id ?? tipoExecucaoRel?.id ?? null,
     dataAdmissao: record.dataAdmissao ?? record.data_admissao ?? null,
+    dataDemissao: record.dataDemissao ?? record.data_demissao ?? null,
     usuarioCadastro: resolveTextValue(
       record.usuarioCadastroNome ??
         record.usuario_cadastro_nome ??
@@ -2115,6 +2126,7 @@ function sanitizePessoaPayload(payload = {}) {
     cargo: trim(payload.cargo),
     tipoExecucao: trim(payload.tipoExecucao ?? '').toUpperCase(),
     dataAdmissao: sanitizeDate(payload.dataAdmissao),
+    dataDemissao: sanitizeDate(payload.dataDemissao),
     ativo: toBooleanValue(payload.ativo, true),
   }
 }
@@ -2219,11 +2231,20 @@ function sanitizeDate(value) {
   if (!raw) {
     return null
   }
+  const ddMmYyyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (ddMmYyyy) {
+    const [, dd, mm, yyyy] = ddMmYyyy
+    return `${yyyy}-${mm}-${dd}`
+  }
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw)
-  if (!isDateOnly) {
+  if (isDateOnly) {
+    return raw
+  }
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) {
     return null
   }
-  return raw
+  return parsed.toISOString().slice(0, 10)
 }
 
 function buildDateFilters(query, field, inicio, fim) {
@@ -3267,6 +3288,9 @@ export const api = {
       }
       const agora = new Date().toISOString()
       const referencias = await resolvePessoaReferencias(dados)
+      if (!dados.dataAdmissao) {
+        throw new Error('Informe a data de admissao no formato dd/MM/yyyy.')
+      }
 
       const registro = await executeSingle(
         supabase
@@ -3280,6 +3304,7 @@ export const api = {
             centro_custo_id: referencias.centroCustoId,
             tipo_execucao_id: referencias.tipoExecucaoId,
             dataAdmissao: dados.dataAdmissao,
+            dataDemissao: dados.dataDemissao,
             usuarioCadastro: usuarioId,
             criadoEm: agora,
             atualizadoEm: null,
@@ -3290,6 +3315,7 @@ export const api = {
             nome,
             matricula,
             "dataAdmissao",
+            "dataDemissao",
             "usuarioCadastro",
             "usuarioEdicao",
             "criadoEm",
@@ -3325,6 +3351,7 @@ export const api = {
             nome,
             matricula,
             "dataAdmissao",
+            "dataDemissao",
             "usuarioCadastro",
             "usuarioEdicao",
             "criadoEm",
@@ -3352,6 +3379,9 @@ export const api = {
       const dados = sanitizePessoaPayload(payload)
       const usuarioId = await resolveUsuarioIdOrThrow()
       const agora = new Date().toISOString()
+      if (!dados.dataAdmissao) {
+        throw new Error('Informe a data de admissao no formato dd/MM/yyyy.')
+      }
 
       const normalizeDateValue = (value) => {
         if (!value) {
@@ -3369,16 +3399,16 @@ export const api = {
       }
 
       const camposAlterados = []
-      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao', 'ativo'].forEach((campo) => {
+      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao', 'dataDemissao', 'ativo'].forEach((campo) => {
         const valorAtual =
-          campo === 'dataAdmissao'
-            ? normalizeDateValue(atual.dataAdmissao)
+          campo === 'dataAdmissao' || campo === 'dataDemissao'
+            ? normalizeDateValue(atual[campo])
             : campo === 'ativo'
             ? (atual.ativo !== false ? 'Ativo' : 'Inativo')
             : resolveTextValue(atual[campo] ?? '')
         const valorNovo =
-          campo === 'dataAdmissao'
-            ? normalizeDateValue(dados.dataAdmissao)
+          campo === 'dataAdmissao' || campo === 'dataDemissao'
+            ? normalizeDateValue(dados[campo])
             : campo === 'ativo'
             ? (dados.ativo !== false ? 'Ativo' : 'Inativo')
             : resolveTextValue(dados[campo] ?? '')
@@ -3419,6 +3449,7 @@ export const api = {
             centro_custo_id: referencias.centroCustoId,
             tipo_execucao_id: referencias.tipoExecucaoId,
             dataAdmissao: dados.dataAdmissao,
+            dataDemissao: dados.dataDemissao,
             atualizadoEm: agora,
             usuarioEdicao: usuarioId,
             ativo: dados.ativo !== false,
@@ -3435,6 +3466,7 @@ export const api = {
             nome,
             matricula,
             "dataAdmissao",
+            "dataDemissao",
             "usuarioCadastro",
             "usuarioEdicao",
             "criadoEm",
@@ -3532,6 +3564,50 @@ export const api = {
       })
 
       return normalizePessoaHistorico(enriquecido)
+    },
+
+    async downloadDesligamentoTemplate() {
+      if (!FUNCTIONS_URL) {
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
+      }
+      const headers = await buildAuthHeaders()
+      const resp = await fetch(`${FUNCTIONS_URL}/desligamento-template`, { headers })
+      if (!resp.ok) {
+        throw new Error('Falha ao baixar modelo de desligamento.')
+      }
+      const blob = await resp.blob()
+      return { blob, filename: 'desligamento_template.xlsx' }
+    },
+
+    async importDesligamentoPlanilha(file) {
+      if (!file) {
+        throw new Error('Selecione um arquivo XLSX.')
+      }
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase nao configurado.')
+      }
+
+      const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
+      const path = `desligamento/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+
+      // 1) Upload para o Storage
+      const upload = await supabase.storage.from(importsBucket).upload(path, file, {
+        contentType:
+          file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        upsert: false,
+      })
+      if (upload.error) {
+        throw new Error(upload.error.message || 'Falha ao enviar arquivo para o Storage.')
+      }
+
+      // 2) Invoca a Edge Function passando apenas o path
+      const { data, error } = await supabase.functions.invoke('desligamento-import', {
+        body: { path },
+      })
+      if (error) {
+        throw new Error(error.message || 'Falha ao importar planilha.')
+      }
+      return data
     },
   },
   materiais: {

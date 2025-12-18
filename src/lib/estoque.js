@@ -270,6 +270,8 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       resumo: formatMaterialResumo(material),
       fabricante: material.fabricante,
       fabricanteNome: material.fabricanteNome || material.fabricante || '',
+      corMaterial: material.corMaterial || material.coresTexto || '',
+      coresTexto: material.coresTexto || '',
       validadeDias: material.validadeDias,
       ca: material.ca,
       valorUnitario: material.valorUnitario,

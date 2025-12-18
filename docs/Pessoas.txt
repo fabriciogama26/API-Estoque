@@ -1,34 +1,37 @@
 Tela: Cadastro de Pessoas
 
 - Campos com * sao obrigatorios no formulario.
+- Data de admissao (dataAdmissao) e obrigatoria.
+- Data de demissao (dataDemissao) e opcional.
 
 Visao geral
 -----------
-- Cadastro/edicao de colaboradores (funcionarios, terceiros, estagiarios) com vinculo a centro de servico, centro de custo, setor, cargo e tipo de execucao. Filtros e historico de alteracoes.
+- Cadastro/edicao de colaboradores (funcionarios, terceiros, estagiarios) com vinculo a centro de servico, centro de custo, setor, cargo e tipo de execucao.
+- A tela possui filtros e historico de alteracoes.
 
 Arquitetura (modular)
-
-- Hooks: usePessoasController (formulario/filtros/tabela), usePessoas (lista), usePessoasFiltro, useErrorLogger('pessoas').
-- Servicos: pessoasService (listar, historico, resumo), integra dataMode remoto/local.
-- Utils: pessoasUtils (formatacao de datas, uniqueSorted, resolveUsuarioNome).
+---------------------
+- Hooks: usePessoasController (formulario/filtros/tabela), useErrorLogger('pessoas').
+- Servicos: pessoasService (listar, historico, resumo) via dataClient (modo local/remoto).
 - Erros: log em app_errors via useErrorLogger.
 
 Campos e fluxos
-
-- Campos principais: matricula, nome, centro_servico_id/centro_custo_id, setor_id, cargo_id, tipo_execucao_id, dataAdmissao, ativo.
+---------------
+- Campos principais: matricula, nome, centro_servico_id/centro_custo_id, setor_id, cargo_id, tipo_execucao_id, dataAdmissao, dataDemissao, ativo.
 - Historico: timeline com alteracoes (usuario, data, campos modificados).
-- Filtros: termo livre, centro de servico, setor, cargo, ativo; "Aplicar" consulta na API; limpar restaura defaults e recarrega.
-- Tabela: paginacao local; coluna “Registrado por” usa usuarioCadastroUsername (view pessoas_view atualizada).
+- Filtros: termo livre, centro de servico, setor, cargo, ativo; "Aplicar" consulta na API; "Limpar" restaura defaults e recarrega.
+- Tabela: paginacao local; a coluna "Registrado por" usa os campos retornados pela view/RPC de pessoas.
+
+Desligamento em massa (novo)
+----------------------------
+- Existe um botao "Desligamento" na tela de Pessoas que abre um modal para importacao em massa via XLSX.
+- O fluxo completo (frontend + Supabase + Edge Functions + Storage) esta documentado em:
+  - docs/DesligamentoEmMassa.txt
 
 Boas praticas
-
-- Usar matricula como chave; manter catalogos de centro/sector/cargo atualizados.
-- Conferir pessoas_view apos migrations para garantir aliases legados (centro_servico, centro_custo, tipo_execucao) usados nas telas.
-
-Atualizacao 2025-12
-
-- Tela modularizada com hooks/services/utils; view pessoas_view inclui usuarioCadastroUsername e aliases legados para compatibilidade.
-- Botoes de acao padronizados (caneta/relógio) iguais aos de Entradas, com tooltips de editar e historico na tabela.
+-------------
+- Usar matricula como chave; manter catalogos de centro/setor/cargo atualizados.
+- Conferir pessoas_view/rpc_pessoas_completa apos migrations para garantir aliases usados na UI.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -39,48 +42,32 @@ Funcoes principais
 - PessoasPage
   - Tipo: componente de pagina React
   - Caminho: src/pages/Pessoas.jsx
-  - Responsavel por: orquestrar formulario, filtros, tabela e historico usando hooks de pessoas.
+  - Responsavel por: orquestrar formulario, filtros, tabela, historico e o modal de desligamento.
+
+- PessoasDesligamentoModal
+  - Tipo: componente de UI (modal)
+  - Caminho: src/components/Pessoas/PessoasDesligamentoModal.jsx
+  - Responsavel por: selecionar arquivo XLSX, chamar importacao e exibir retorno/erros.
+
 - usePessoasController
   - Tipo: hook/controller
   - Caminho: src/hooks/usePessoasController.js
   - Responsavel por: estado de formulario/filtros, listagem, historico, submit/editar e carregamento de catalogos auxiliares.
-- usePessoas (quando utilizado)
-  - Tipo: hook de dados
-  - Caminho: src/hooks/usePessoas.js
-  - Responsavel por: listar pessoas e controlar estados de loading/erro.
-- Componentes PessoasTable, PessoasHistoryTimeline, filtros/formularios correspondentes
-  - Tipo: componentes de UI
-  - Caminho: src/components/Pessoas/*
-  - Responsavel por: UI de tabela, historico e filtros consumindo o controller.
 
-Constantes e configuracoes
---------------------------
-- PESSOAS_FILTER_DEFAULT, PESSOAS_FORM_DEFAULT, PESSOAS_HISTORY_DEFAULT (nomes equivalentes)
-  - Tipo: configuracoes
-  - Caminho: src/config/PessoasConfig.js
-  - Uso: estados iniciais de formulario, filtros e historico.
-
-Funcoes utilitarias relacionadas
---------------------------------
-- uniqueSorted, formatDate/formatDateTime, resolveUsuarioNome
-  - Tipo: utilitarios
-  - Caminho: src/utils/pessoasUtils.js
-  - Responsavel por: ordenar/remover duplicados, formatar datas e resolver nome do usuario para exibicao.
-- Regras/validacao
-  - Tipo: funcoes de regra
-  - Caminho: src/rules/PessoasRules.js
-  - Responsavel por: validacoes especificas e helpers de filtro.
-
-Servicos e integracoes externas
--------------------------------
+Servicos e integracoes
+----------------------
 - pessoasService
-  - Tipo: servico de API
+  - Tipo: servico
   - Caminho: src/services/pessoasService.js
-  - Responsavel por: listar/atualizar pessoas, obter historico e resumos (Supabase ou local via dataClient).
+  - Responsavel por: expor metodos da API (inclui importacao de desligamento).
+
+- api.pessoas.importDesligamentoPlanilha
+  - Tipo: integracao Supabase (Storage + Edge Function)
+  - Caminho: src/services/api.js
+  - Responsavel por: (1) upload do XLSX para o bucket imports, (2) invoke da Edge Function desligamento-import com { path }.
 
 Ajuda contextual
 ----------------
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
-- Conteudo vem de src/help/helpContent.json (chave 'pessoas'); edite ali para ajustar titulos/steps/notes.
-- Para imagens, salve em public/help/pessoas/ e aponte no campo 'media' do passo (ex.: /help/pessoas/exemplo.webp).
+- Conteudo vem de src/help/helpContent.json (chave 'pessoas').
 

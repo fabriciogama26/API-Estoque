@@ -181,6 +181,15 @@ ul, ol {
   gap: 0.75rem;
   flex-wrap: wrap;
 }
+.form__actions--split {
+  justify-content: space-between;
+  align-items: center;
+}
+.form__actions-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
 
 /* Campos */
 .field {

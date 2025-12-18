@@ -1,4 +1,6 @@
 ﻿import { useState } from 'react'
+import { useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ExitIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
@@ -10,6 +12,7 @@ import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
 
 function SaidasContent() {
+  const [searchParams] = useSearchParams()
   const [detalheState, setDetalheState] = useState({ open: false, saida: null, pessoa: null, material: null })
   const {
     form,
@@ -75,6 +78,35 @@ function SaidasContent() {
     formatPessoaDetail,
     setCancelState,
   } = useSaidasContext()
+
+  useEffect(() => {
+    const centroParam = (searchParams.get('centroEstoque') || searchParams.get('centroEstoqueId') || '').trim()
+    if (!centroParam) return
+    if (editingSaida) return
+    if (form.centroEstoqueId) return
+
+    const normalizedCentro = centroParam.toLowerCase()
+    const centro = (centrosEstoqueOptions || []).find((item) => {
+      const value = String(item?.id ?? item?.nome ?? '').trim()
+      const nome = String(item?.nome ?? '').trim()
+      return value === centroParam || nome.toLowerCase() === normalizedCentro
+    })
+    if (centro) {
+      handleChange({ target: { name: 'centroEstoqueId', value: String(centro.id ?? centro.nome) } })
+    }
+  }, [centrosEstoqueOptions, editingSaida, form.centroEstoqueId, handleChange, searchParams])
+
+  useEffect(() => {
+    const materialIdParam = (searchParams.get('materialId') || '').trim()
+    if (!materialIdParam) return
+    if (editingSaida) return
+    if (!form.centroEstoqueId) return
+    if (form.materialId) return
+    const material = materiais.find((item) => String(item?.id) === materialIdParam)
+    if (material) {
+      handleMaterialSelect(material)
+    }
+  }, [editingSaida, form.centroEstoqueId, form.materialId, handleMaterialSelect, materiais, searchParams])
 
   const handleOpenDetalhes = (saida) => {
     const pessoa = pessoas.find((p) => p.id === saida.pessoaId)

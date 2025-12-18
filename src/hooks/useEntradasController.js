@@ -129,6 +129,14 @@ export function useEntradasController() {
 
   const handleChange = (event) => {
     const { name, value } = event.target
+    if (name === 'centroCusto') {
+      setForm((prev) => ({ ...prev, centroCusto: value, materialId: '' }))
+      setMaterialSearchValue('')
+      setMaterialSuggestions([])
+      setMaterialDropdownOpen(false)
+      setMaterialSearchError(null)
+      return
+    }
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -216,6 +224,9 @@ export function useEntradasController() {
     if (materialBlurTimeoutRef.current) {
       clearTimeout(materialBlurTimeoutRef.current)
       materialBlurTimeoutRef.current = null
+    }
+    if (!form.centroCusto) {
+      return
     }
     if (!form.materialId && materialSearchValue.trim().length >= MATERIAL_SEARCH_MIN_CHARS) {
       setMaterialDropdownOpen(true)
