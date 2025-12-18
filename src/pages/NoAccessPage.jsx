@@ -1,4 +1,5 @@
-import { ShieldAlert, ArrowLeft } from 'lucide-react'
+import ShieldAlert from 'lucide-react/dist/esm/icons/shield-alert.js'
+import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left.js'
 import { Link, useLocation } from 'react-router-dom'
 import { usePermissions } from '../context/PermissionsContext.jsx'
 

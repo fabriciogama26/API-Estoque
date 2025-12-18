@@ -3,6 +3,7 @@
 Aplicacao React (Vite) para gestao de EPIs/Estoque integrada ao Supabase.
 
 Documentacao detalhada por pagina em `docs/`.
+- HHT Mensal (acidentes): ver `docs/HhtMensal.txt`
 
 ## Atalhos a partir do Estoque atual
 

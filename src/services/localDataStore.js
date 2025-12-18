@@ -135,6 +135,8 @@ function getDefaultState() {
     entradas: [],
     saidas: [],
     acidentes: [],
+    hhtMensal: [],
+    hhtMensalHistorico: [],
     materialPriceHistory: [],
     entradaHistorico: [],
   }
@@ -256,6 +258,8 @@ function normalizeState(state) {
       historicoEdicao,
     }
   })
+  sanitized.hhtMensal = normalizeArray(sanitized.hhtMensal)
+  sanitized.hhtMensalHistorico = normalizeArray(sanitized.hhtMensalHistorico)
   sanitized.materialPriceHistory = normalizeArray(sanitized.materialPriceHistory)
   sanitized.entradaHistorico = normalizeArray(sanitized.entradaHistorico)
   return sanitized
@@ -293,7 +297,17 @@ function readFromStorage() {
 function applySeed(base) {
   const seeded = { ...base }
   if (seedData && typeof seedData === 'object') {
-    const keys = ['pessoas', 'materiais', 'entradas', 'saidas', 'acidentes', 'materialPriceHistory', 'entradaHistorico']
+    const keys = [
+      'pessoas',
+      'materiais',
+      'entradas',
+      'saidas',
+      'acidentes',
+      'hhtMensal',
+      'hhtMensalHistorico',
+      'materialPriceHistory',
+      'entradaHistorico',
+    ]
     keys.forEach((key) => {
       if (Array.isArray(seedData[key]) && seedData[key].length > 0) {
         seeded[key] = normalizeArray(seedData[key])

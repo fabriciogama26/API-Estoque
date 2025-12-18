@@ -103,6 +103,27 @@ const toDateOnlyIso = (value) => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
+const pad2 = (value) => String(value).padStart(2, '0')
+
+const toMonthRefIso = (value) => {
+  const raw = trim(value)
+  if (!raw) {
+    return null
+  }
+  const datePart = raw.split('T')[0]
+  const monthPrefix = /^\d{4}-\d{2}$/.test(raw) ? raw : /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart.slice(0, 7) : null
+  if (monthPrefix) {
+    return `${monthPrefix}-01`
+  }
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  return `${year}-${pad2(month)}-01`
+}
+
 const toEndOfDayIso = (value) => {
   const startIso = toDateOnlyIso(value)
   if (!startIso) {
@@ -2781,6 +2802,30 @@ const localApi = {
 
         const centroServicoBase = dados.centroServico || pessoa?.centroServico || pessoa?.setor || pessoa?.local || ''
         const localBase = dados.local || pessoa?.local || pessoa?.centroServico || ''
+        const mesRef = toMonthRefIso(dados.data)
+        if (!mesRef) {
+          throw createError(400, 'Data do acidente invalida para HHT mensal.')
+        }
+
+        const hhtMensalLista = Array.isArray(state.hhtMensal) ? state.hhtMensal : []
+        const centroKey = normalizeKeyPart(centroServicoBase)
+        const registroHht = hhtMensalLista.find((item) => {
+          if (!item || item.mesRef !== mesRef) {
+            return false
+          }
+          const itemKey = normalizeKeyPart(item.centroServicoNome ?? item.centroServico ?? '')
+          return itemKey === centroKey
+        })
+
+        if (!registroHht) {
+          throw createError(400, 'Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
+        }
+        const hhtValor =
+          registroHht.hhtFinal ?? registroHht.hhtCalculado ?? registroHht.hhtInformado ?? null
+        if (hhtValor === null || hhtValor === undefined) {
+          throw createError(400, 'HHT mensal invalido para o centro/mes informado.')
+        }
+
         const agora = nowIso()
         const acidente = {
           id: randomId(),
@@ -2801,7 +2846,7 @@ const localApi = {
           local: localBase,
           diasPerdidos: dados.diasPerdidos,
           diasDebitados: dados.diasDebitados,
-          hht: dados.hht,
+          hht: hhtValor,
           cid: dados.cid,
           cat: dados.cat,
           observacao: dados.observacao,
@@ -2854,6 +2899,28 @@ const localApi = {
 
         validateAcidentePayload(dados)
 
+        const mesRef = toMonthRefIso(dados.data)
+        if (!mesRef) {
+          throw createError(400, 'Data do acidente invalida para HHT mensal.')
+        }
+        const hhtMensalLista = Array.isArray(state.hhtMensal) ? state.hhtMensal : []
+        const centroKey = normalizeKeyPart(dados.centroServico)
+        const registroHht = hhtMensalLista.find((item) => {
+          if (!item || item.mesRef !== mesRef) {
+            return false
+          }
+          const itemKey = normalizeKeyPart(item.centroServicoNome ?? item.centroServico ?? '')
+          return itemKey === centroKey
+        })
+        if (!registroHht) {
+          throw createError(400, 'Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
+        }
+        const hhtValor =
+          registroHht.hhtFinal ?? registroHht.hhtCalculado ?? registroHht.hhtInformado ?? null
+        if (hhtValor === null || hhtValor === undefined) {
+          throw createError(400, 'HHT mensal invalido para o centro/mes informado.')
+        }
+
         const camposAntigos = ACIDENTE_HISTORY_FIELDS.reduce((acc, campo) => {
           if (campo === 'centroServico') {
             acc[campo] = atual.centroServico ?? atual.setor ?? ''
@@ -2886,7 +2953,7 @@ const localApi = {
           centroServico: dados.centroServico,
           setor: dados.centroServico,
           local: dados.local,
-          hht: dados.hht,
+          hht: hhtValor,
           atualizadoEm: agora,
           atualizadoPor: usuario,
           historicoEdicao: historicoBase,
@@ -2904,6 +2971,509 @@ const localApi = {
         }
         const historico = Array.isArray(acidente.historicoEdicao) ? acidente.historicoEdicao.slice() : []
         return sortByDateDesc(normalizeAcidenteHistory(historico), 'dataEdicao')
+      })
+    },
+  },
+  hhtMensal: {
+    async list(params = {}) {
+      const centroServicoIdFiltro = trim(params.centroServicoId ?? params.centro_servico_id)
+      const centroServicoNomeFiltro = trim(params.centroServicoNome ?? params.centro_servico_nome)
+      const mesInicio = trim(params.mesInicio ?? params.mes_inicio)
+      const mesFim = trim(params.mesFim ?? params.mes_fim)
+      const incluirInativos = params.incluirInativos === true || params.incluir_inativos === true
+
+      const toMonthRef = (value) => {
+        const raw = trim(value)
+        if (!raw) {
+          return null
+        }
+        if (/^\d{4}-\d{2}$/.test(raw)) {
+          return `${raw}-01`
+        }
+        const datePart = raw.split('T')[0]
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+          return `${datePart.slice(0, 7)}-01`
+        }
+        const iso = toDateOnlyIso(raw)
+        if (!iso) {
+          return null
+        }
+        return `${iso.slice(0, 7)}-01`
+      }
+
+      const parseMesNumero = (value) => {
+        const ref = toMonthRef(value)
+        if (!ref) {
+          return null
+        }
+        const [year, month] = ref.split('-').map(Number)
+        if (!Number.isFinite(year) || !Number.isFinite(month)) {
+          return null
+        }
+        return year * 100 + month
+      }
+
+      const inicio = parseMesNumero(mesInicio)
+      const fim = parseMesNumero(mesFim)
+
+      return readState((state) => {
+        const centros = collectCentrosServicoOptions(state)
+        const centrosMap = new Map((centros ?? []).map((item) => [item.id, item.nome]))
+
+        const lista = Array.isArray(state.hhtMensal) ? state.hhtMensal : []
+        const filtrada = lista.filter((item) => {
+          if (!item) {
+            return false
+          }
+          if (centroServicoIdFiltro && trim(item.centroServicoId) !== centroServicoIdFiltro) {
+            return false
+          }
+          if (
+            centroServicoNomeFiltro &&
+            normalizeKeyPart(item.centroServicoNome ?? item.centroServico ?? '') !==
+              normalizeKeyPart(centroServicoNomeFiltro)
+          ) {
+            return false
+          }
+          if (inicio || fim) {
+            const mesNum = parseMesNumero(item.mesRef)
+            if (mesNum === null) {
+              return false
+            }
+            if (inicio && mesNum < inicio) {
+              return false
+            }
+            if (fim && mesNum > fim) {
+              return false
+            }
+          }
+          return true
+        })
+
+        return filtrada
+          .map((item) => ({
+            ...item,
+            centroServicoNome: centrosMap.get(item.centroServicoId) ?? item.centroServicoNome ?? '',
+          }))
+          .sort((a, b) => {
+            const aRef = parseMesNumero(a.mesRef) ?? 0
+            const bRef = parseMesNumero(b.mesRef) ?? 0
+            if (aRef !== bRef) {
+              return bRef - aRef
+            }
+            return (a.centroServicoNome ?? '').localeCompare(b.centroServicoNome ?? '', 'pt-BR')
+          })
+      })
+    },
+
+    async create(payload) {
+      const toNumberLocal = (value, fallback = 0) => {
+        if (value === undefined || value === null || value === '') {
+          return fallback
+        }
+        const parsed = Number(value)
+        return Number.isNaN(parsed) ? fallback : parsed
+      }
+
+      const toNullableNumberLocal = (value) => {
+        if (value === undefined || value === null || value === '') {
+          return null
+        }
+        const parsed = Number(value)
+        return Number.isNaN(parsed) ? null : parsed
+      }
+
+      const toMonthRef = (value) => {
+        const raw = trim(value)
+        if (!raw) {
+          return null
+        }
+        if (/^\d{4}-\d{2}$/.test(raw)) {
+          return `${raw}-01`
+        }
+        const datePart = raw.split('T')[0]
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+          return `${datePart.slice(0, 7)}-01`
+        }
+        const iso = toDateOnlyIso(raw)
+        if (!iso) {
+          return null
+        }
+        return `${iso.slice(0, 7)}-01`
+      }
+
+      const modo = trim(payload.modo ?? 'simples').toLowerCase()
+      const mesRef = toMonthRef(payload.mesRef ?? payload.mes_ref)
+      const centroServicoId = trim(payload.centroServicoId ?? payload.centro_servico_id)
+
+      if (!mesRef) {
+        throw createError(400, 'Informe o mes de referencia.')
+      }
+      if (!centroServicoId) {
+        throw createError(400, 'Selecione um centro de servico.')
+      }
+
+      return writeState((state) => {
+        state.hhtMensal = Array.isArray(state.hhtMensal) ? state.hhtMensal : []
+        state.hhtMensalHistorico = Array.isArray(state.hhtMensalHistorico) ? state.hhtMensalHistorico : []
+
+        const statusNome = trim(payload.statusNome ?? payload.status_nome ?? 'Ativo')
+        const duplicado = state.hhtMensal.some(
+          (item) =>
+            item?.mesRef === mesRef &&
+            item?.centroServicoId === centroServicoId &&
+            (item?.statusNome ?? '').toLowerCase() !== 'cancelado' &&
+            statusNome.toLowerCase() !== 'cancelado',
+        )
+        if (duplicado) {
+          throw createError(400, 'Ja existe um registro para este mes e centro de servico.')
+        }
+
+        const registroBase = {
+          id: randomId(),
+          mesRef,
+          centroServicoId,
+          centroServicoNome: trim(payload.centroServicoNome ?? ''),
+          qtdPessoas: Math.max(0, Math.trunc(toNumberLocal(payload.qtdPessoas ?? payload.qtd_pessoas, 0))),
+          horasMesBase: Math.max(0, toNumberLocal(payload.horasMesBase ?? payload.horas_mes_base, 0)),
+          escalaFactor: Math.max(0, toNumberLocal(payload.escalaFactor ?? payload.escala_factor, 1)),
+          horasAfastamento: Math.max(0, toNumberLocal(payload.horasAfastamento ?? payload.horas_afastamento, 0)),
+          horasFerias: Math.max(0, toNumberLocal(payload.horasFerias ?? payload.horas_ferias, 0)),
+          horasTreinamento: Math.max(
+            0,
+            toNumberLocal(payload.horasTreinamento ?? payload.horas_treinamento, 0),
+          ),
+          horasOutrosDescontos: Math.max(
+            0,
+            toNumberLocal(payload.horasOutrosDescontos ?? payload.horas_outros_descontos, 0),
+          ),
+          horasExtras: Math.max(0, toNumberLocal(payload.horasExtras ?? payload.horas_extras, 0)),
+          modo: ['manual', 'simples', 'completo'].includes(modo) ? modo : 'simples',
+          hhtInformado: toNullableNumberLocal(payload.hhtInformado ?? payload.hht_informado),
+        }
+
+        const descontos =
+          registroBase.horasAfastamento +
+          registroBase.horasFerias +
+          registroBase.horasTreinamento +
+          registroBase.horasOutrosDescontos
+        const baseCompleto = registroBase.qtdPessoas * registroBase.horasMesBase * registroBase.escalaFactor
+        const calculadoCompleto = baseCompleto - descontos + registroBase.horasExtras
+        const calculadoSimples = registroBase.qtdPessoas * registroBase.horasMesBase
+        const hhtCalculado =
+          registroBase.modo === 'simples' ? calculadoSimples : calculadoCompleto
+
+        if (registroBase.modo === 'manual' && registroBase.hhtInformado === null) {
+          throw createError(400, 'Informe o HHT para modo manual.')
+        }
+
+        const hhtFinal = registroBase.modo === 'manual' ? registroBase.hhtInformado : hhtCalculado
+
+        const agora = nowIso()
+        const registro = {
+          ...registroBase,
+          statusId: trim(payload.statusHhtId ?? payload.status_hht_id) || null,
+          statusNome: statusNome || '',
+          hhtCalculado: Number(hhtCalculado.toFixed(2)),
+          hhtFinal: Number((hhtFinal ?? 0).toFixed(2)),
+          createdAt: agora,
+          createdBy: null,
+          updatedAt: agora,
+          updatedBy: null,
+        }
+
+        if (registro.modo !== 'manual') {
+          registro.hhtInformado = null
+        }
+
+        state.hhtMensal.push(registro)
+        return registro
+      })
+    },
+
+    async update(id, payload) {
+      if (!id) {
+        throw createError(400, 'ID obrigatorio.')
+      }
+
+      const toNumberLocal = (value, fallback = 0) => {
+        if (value === undefined || value === null || value === '') {
+          return fallback
+        }
+        const parsed = Number(value)
+        return Number.isNaN(parsed) ? fallback : parsed
+      }
+
+      const toNullableNumberLocal = (value) => {
+        if (value === undefined || value === null || value === '') {
+          return null
+        }
+        const parsed = Number(value)
+        return Number.isNaN(parsed) ? null : parsed
+      }
+
+      const toMonthRef = (value) => {
+        const raw = trim(value)
+        if (!raw) {
+          return null
+        }
+        if (/^\d{4}-\d{2}$/.test(raw)) {
+          return `${raw}-01`
+        }
+        const datePart = raw.split('T')[0]
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+          return `${datePart.slice(0, 7)}-01`
+        }
+        const iso = toDateOnlyIso(raw)
+        if (!iso) {
+          return null
+        }
+        return `${iso.slice(0, 7)}-01`
+      }
+
+      return writeState((state) => {
+        state.hhtMensal = Array.isArray(state.hhtMensal) ? state.hhtMensal : []
+        state.hhtMensalHistorico = Array.isArray(state.hhtMensalHistorico) ? state.hhtMensalHistorico : []
+
+        const index = state.hhtMensal.findIndex((item) => item?.id === id)
+        if (index === -1) {
+          throw createError(404, 'Registro nao encontrado.')
+        }
+
+          const atual = state.hhtMensal[index]
+        const modo = trim(payload.modo ?? atual.modo ?? 'simples').toLowerCase()
+        const mesRef = toMonthRef(payload.mesRef ?? payload.mes_ref ?? atual.mesRef)
+        const centroServicoId = trim(payload.centroServicoId ?? payload.centro_servico_id ?? atual.centroServicoId)
+
+        if (!mesRef) {
+          throw createError(400, 'Informe o mes de referencia.')
+        }
+        if (!centroServicoId) {
+          throw createError(400, 'Selecione um centro de servico.')
+        }
+
+        const duplicado = state.hhtMensal.some(
+          (item) =>
+            item?.id !== id &&
+            item?.mesRef === mesRef &&
+            item?.centroServicoId === centroServicoId &&
+            item?.ativo !== false,
+        )
+        if (duplicado) {
+          throw createError(400, 'Ja existe um registro para este mes e centro de servico.')
+        }
+
+        const atualizadoBase = {
+          ...atual,
+          mesRef,
+          centroServicoId,
+          centroServicoNome: trim(payload.centroServicoNome ?? atual.centroServicoNome ?? ''),
+          ativo:
+            payload.ativo !== undefined
+              ? payload.ativo !== false
+              : atual.ativo !== undefined
+              ? atual.ativo
+              : true,
+          qtdPessoas:
+            payload.qtdPessoas !== undefined || payload.qtd_pessoas !== undefined
+              ? Math.max(0, Math.trunc(toNumberLocal(payload.qtdPessoas ?? payload.qtd_pessoas, atual.qtdPessoas ?? 0)))
+              : atual.qtdPessoas ?? 0,
+          horasMesBase:
+            payload.horasMesBase !== undefined || payload.horas_mes_base !== undefined
+              ? Math.max(0, toNumberLocal(payload.horasMesBase ?? payload.horas_mes_base, atual.horasMesBase ?? 0))
+              : atual.horasMesBase ?? 0,
+          escalaFactor:
+            payload.escalaFactor !== undefined || payload.escala_factor !== undefined
+              ? Math.max(0, toNumberLocal(payload.escalaFactor ?? payload.escala_factor, atual.escalaFactor ?? 1))
+              : atual.escalaFactor ?? 1,
+          horasAfastamento:
+            payload.horasAfastamento !== undefined || payload.horas_afastamento !== undefined
+              ? Math.max(
+                  0,
+                  toNumberLocal(payload.horasAfastamento ?? payload.horas_afastamento, atual.horasAfastamento ?? 0),
+                )
+              : atual.horasAfastamento ?? 0,
+          horasFerias:
+            payload.horasFerias !== undefined || payload.horas_ferias !== undefined
+              ? Math.max(0, toNumberLocal(payload.horasFerias ?? payload.horas_ferias, atual.horasFerias ?? 0))
+              : atual.horasFerias ?? 0,
+          horasTreinamento:
+            payload.horasTreinamento !== undefined || payload.horas_treinamento !== undefined
+              ? Math.max(
+                  0,
+                  toNumberLocal(payload.horasTreinamento ?? payload.horas_treinamento, atual.horasTreinamento ?? 0),
+                )
+              : atual.horasTreinamento ?? 0,
+          horasOutrosDescontos:
+            payload.horasOutrosDescontos !== undefined || payload.horas_outros_descontos !== undefined
+              ? Math.max(
+                  0,
+                  toNumberLocal(
+                    payload.horasOutrosDescontos ?? payload.horas_outros_descontos,
+                    atual.horasOutrosDescontos ?? 0,
+                  ),
+                )
+              : atual.horasOutrosDescontos ?? 0,
+          horasExtras:
+            payload.horasExtras !== undefined || payload.horas_extras !== undefined
+              ? Math.max(0, toNumberLocal(payload.horasExtras ?? payload.horas_extras, atual.horasExtras ?? 0))
+              : atual.horasExtras ?? 0,
+          modo: ['manual', 'simples', 'completo'].includes(modo) ? modo : 'simples',
+          hhtInformado:
+            payload.hhtInformado !== undefined || payload.hht_informado !== undefined
+              ? toNullableNumberLocal(payload.hhtInformado ?? payload.hht_informado)
+              : atual.hhtInformado ?? null,
+        }
+
+        if (atualizadoBase.modo !== 'manual') {
+          atualizadoBase.hhtInformado = null
+        } else if (atualizadoBase.hhtInformado === null) {
+          throw createError(400, 'Informe o HHT para modo manual.')
+        }
+
+        const descontos =
+          atualizadoBase.horasAfastamento +
+          atualizadoBase.horasFerias +
+          atualizadoBase.horasTreinamento +
+          atualizadoBase.horasOutrosDescontos
+        const baseCompleto = atualizadoBase.qtdPessoas * atualizadoBase.horasMesBase * atualizadoBase.escalaFactor
+        const calculadoCompleto = baseCompleto - descontos + atualizadoBase.horasExtras
+        const calculadoSimples = atualizadoBase.qtdPessoas * atualizadoBase.horasMesBase
+        const hhtCalculado =
+          atualizadoBase.modo === 'simples' ? calculadoSimples : calculadoCompleto
+        const hhtFinal = atualizadoBase.modo === 'manual' ? atualizadoBase.hhtInformado : hhtCalculado
+
+        const agora = nowIso()
+        const atualizado = {
+          ...atualizadoBase,
+          statusId:
+            payload.statusHhtId !== undefined || payload.status_hht_id !== undefined
+              ? trim(payload.statusHhtId ?? payload.status_hht_id) || null
+              : atual.statusId ?? null,
+          statusNome:
+            payload.statusNome !== undefined || payload.status_nome !== undefined
+              ? trim(payload.statusNome ?? payload.status_nome) || atual.statusNome || ''
+              : atual.statusNome || '',
+          hhtCalculado: Number(hhtCalculado.toFixed(2)),
+          hhtFinal: Number((hhtFinal ?? 0).toFixed(2)),
+          updatedAt: agora,
+          updatedBy: null,
+        }
+
+        state.hhtMensalHistorico.push({
+          id: randomId(),
+          hhtMensalId: id,
+          acao: 'UPDATE',
+          alteradoEm: agora,
+          alteradoPorId: null,
+          alteradoPor: 'sistema',
+          antes: { ...atual },
+          depois: { ...atualizado },
+          motivo: null,
+        })
+
+        state.hhtMensal[index] = atualizado
+        return atualizado
+      })
+    },
+
+    async delete(id, motivo = '') {
+      if (!id) {
+        throw createError(400, 'ID obrigatorio.')
+      }
+      return writeState((state) => {
+        state.hhtMensal = Array.isArray(state.hhtMensal) ? state.hhtMensal : []
+        state.hhtMensalHistorico = Array.isArray(state.hhtMensalHistorico) ? state.hhtMensalHistorico : []
+
+        const index = state.hhtMensal.findIndex((item) => item?.id === id)
+        if (index === -1) {
+          throw createError(404, 'Registro nao encontrado.')
+        }
+        const atual = state.hhtMensal[index]
+
+        const mesRef = trim(atual.mesRef ?? '')
+        const centroNome = normalizeKeyPart(atual.centroServicoNome ?? atual.centroServico ?? '')
+        const toMonthRef = (value) => {
+          const raw = trim(value)
+          if (!raw) {
+            return null
+          }
+          const iso = toDateOnlyIso(raw)
+          if (!iso) {
+            return null
+          }
+          return `${iso.slice(0, 7)}-01`
+        }
+        const temAcidente = (Array.isArray(state.acidentes) ? state.acidentes : []).some((acidente) => {
+          const mesAcidente = toMonthRef(acidente.data ?? acidente.dataOcorrencia ?? acidente.data_ocorrencia)
+          if (!mesAcidente || mesAcidente !== mesRef) {
+            return false
+          }
+          const centroAcidente = normalizeKeyPart(
+            acidente.centroServico ?? acidente.setor ?? acidente.local ?? acidente.centro_servico,
+          )
+          return centroAcidente && centroAcidente === centroNome
+        })
+        if (temAcidente) {
+          throw createError(400, 'Nao e possivel cancelar: ha acidentes cadastrados para este centro/mes.')
+        }
+
+        const agora = nowIso()
+        const atualizado = {
+          ...atual,
+          ativo: false,
+          updatedAt: agora,
+          updatedBy: null,
+        }
+        state.hhtMensalHistorico.push({
+          id: randomId(),
+          hhtMensalId: id,
+          acao: 'UPDATE',
+          alteradoEm: agora,
+          alteradoPorId: null,
+          alteradoPor: 'sistema',
+          antes: { ...atual },
+          depois: { ...atualizado },
+          motivo: trim(motivo),
+        })
+
+        state.hhtMensal[index] = atualizado
+        return atualizado
+      })
+    },
+
+    async history(id) {
+      if (!id) {
+        throw createError(400, 'ID obrigatorio.')
+      }
+      return readState((state) => {
+        const historico = (state.hhtMensalHistorico || []).filter((item) => item?.hhtMensalId === id)
+        return sortByDateDesc(historico, 'alteradoEm')
+      })
+    },
+
+    async peopleCount(params = {}) {
+      const centroServicoId = trim(params.centroServicoId ?? params.centro_servico_id)
+      const centroServicoNomeParam = trim(params.centroServicoNome ?? params.centro_servico_nome)
+      if (!centroServicoId && !centroServicoNomeParam) {
+        throw createError(400, 'Selecione um centro de servico.')
+      }
+      return readState((state) => {
+        const centros = collectCentrosServicoOptions(state)
+        const centroNome =
+          centros.find((item) => String(item?.id ?? '') === centroServicoId)?.nome ||
+          centroServicoNomeParam ||
+          centroServicoId
+
+        const total = (state.pessoas || []).filter((pessoa) => {
+          if (!pessoa || pessoa.ativo === false) {
+            return false
+          }
+          const nomePessoa = trim(pessoa.centroServico ?? pessoa.setor ?? pessoa.local)
+          return nomePessoa === centroNome
+        }).length
+
+        return total
       })
     },
   },

@@ -82,6 +82,17 @@
   transform: none;
 }
 
+.pessoas-table-action-button--danger {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--color-danger);
+}
+
+.pessoas-table-action-button--danger:hover,
+.pessoas-table-action-button--danger:focus-visible {
+  background: var(--color-danger);
+  color: #fff;
+}
+
 .pessoas-record-history__overlay {
   position: fixed;
   inset: 0;

@@ -11,6 +11,7 @@ import {
   normalizeAgenteKey,
   normalizeAgenteNome,
   extractAgenteNome,
+  normalizeText,
 } from '../utils/acidentesUtils.js'
 import {
   formatPessoaDetail,
@@ -28,6 +29,8 @@ import {
   listTiposPorAgente,
 } from '../services/acidentesService.js'
 import { searchPessoas } from '../services/pessoasService.js'
+import { listHhtMensal } from '../services/hhtMensalService.js'
+import { listCentrosServico } from '../services/saidasService.js'
 import { ACIDENTES_FORM_DEFAULT } from '../config/AcidentesConfig.js'
 
 export function useAcidenteForm({
@@ -59,6 +62,16 @@ export function useAcidenteForm({
   const [pessoaSearchError, setPessoaSearchError] = useState(null)
   const pessoaSearchTimeoutRef = useRef(null)
   const pessoaBlurTimeoutRef = useRef(null)
+  const [centrosServicoMap, setCentrosServicoMap] = useState(new Map())
+
+  const normalizeCentroKey = useCallback((valor) => {
+    if (!valor) return ''
+    return String(valor)
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+  }, [])
 
   const pessoasPorMatricula = useMemo(() => {
     const map = new Map()
@@ -118,7 +131,7 @@ export function useAcidenteForm({
       }
     })
     return Array.from(mapa.values())
-  }, [])
+  }, [normalizeCentroKey])
 
   const fallbackPessoaSearch = useCallback(
     (term) => {
@@ -421,7 +434,11 @@ export function useAcidenteForm({
         return
       }
       if (name === 'centroServico') {
-        setForm((prev) => ({ ...prev, centroServico: value, setor: value }))
+        setForm((prev) => ({ ...prev, centroServico: value, setor: value, hht: '' }))
+        return
+      }
+      if (name === 'data') {
+        setForm((prev) => ({ ...prev, data: value, hht: '' }))
         return
       }
       setForm((prev) => ({ ...prev, [name]: value }))
@@ -633,6 +650,93 @@ export function useAcidenteForm({
       }
     }
   }, [])
+
+  useEffect(() => {
+    let cancelado = false
+    const carregarCentros = async () => {
+      try {
+        const data = await listCentrosServico()
+        if (cancelado) return
+        const mapa = new Map()
+        ;(Array.isArray(data) ? data : []).forEach((item) => {
+          const nome = normalizeText(item?.nome || item?.label || '')
+          if (nome && item?.id) {
+            mapa.set(normalizeCentroKey(nome), item.id)
+          }
+        })
+        setCentrosServicoMap(mapa)
+      } catch (err) {
+        if (cancelado) return
+        setCentrosServicoMap(new Map())
+      }
+    }
+    carregarCentros()
+    return () => {
+      cancelado = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelado = false
+    const pad2 = (value) => String(value).padStart(2, '0')
+    const toMonthRef = (value) => {
+      const raw = value ? String(value) : ''
+      if (!raw) return null
+      const datePart = raw.split('T')[0]
+      if (/^\d{4}-\d{2}$/.test(raw)) {
+        return `${raw}-01`
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+        return `${datePart.slice(0, 7)}-01`
+      }
+      const date = new Date(raw)
+      if (Number.isNaN(date.getTime())) {
+        return null
+      }
+      const year = date.getFullYear()
+      const month = date.getMonth() + 1
+      return `${year}-${pad2(month)}-01`
+    }
+    const fetchHht = async () => {
+      const centroNome = normalizeText(form.centroServico || '')
+      const dataAcidente = form.data
+      if (!centroNome || !dataAcidente) {
+        return
+      }
+      const mesRef = toMonthRef(dataAcidente)
+      if (!mesRef) {
+        return
+      }
+      const centroId = centrosServicoMap.get(normalizeCentroKey(centroNome))
+      const query = {
+        centroServicoId: centroId || undefined,
+        centroServicoNome: centroNome,
+        mesInicio: mesRef,
+        mesFim: mesRef,
+        incluirInativos: false,
+      }
+
+      try {
+        const lista = await listHhtMensal(query)
+        if (cancelado) return
+        const registro = Array.isArray(lista) ? lista.find((item) => item) : null
+        if (!registro) {
+          return
+        }
+        const valor = registro.hhtFinal ?? registro.hht_final ?? registro.hhtCalculado ?? registro.hht_calculado
+        if (valor === undefined || valor === null || Number.isNaN(Number(valor))) {
+          return
+        }
+        setForm((prev) => ({ ...prev, hht: String(valor) }))
+      } catch (err) {
+        if (cancelado) return
+      }
+    }
+    fetchHht()
+    return () => {
+      cancelado = true
+    }
+  }, [centrosServicoMap, form.centroServico, form.data, normalizeCentroKey])
 
   return {
     form,

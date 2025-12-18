@@ -255,6 +255,45 @@
                                     "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integrações de cadastro base."
                                 ]
                   },
+    "hhtMensal":  {
+                     "title":  "HHT Mensal",
+                     "summary":  "Registre o HHT (homem-hora trabalhada) por mes e centro de servico, com calculo automatico, status, historico e paginacao.",
+                     "steps":  [
+                                   {
+                                       "title":  "Escolher mes e centro",
+                                       "description":  "Informe o mes de referencia (no banco fica sempre no dia 01) e selecione o centro de servico. Mes+centro e unico.",
+                                       "mediaHint":  "Campos Mes de referencia e Centro de servico."
+                                   },
+                                   {
+                                       "title":  "Selecionar modo de calculo",
+                                       "description":  "Manual: digite o HHT final. Simples: informe apenas pessoas e horas base. Completo: habilita escala, descontos e horas extras.",
+                                       "mediaHint":  "Campo Modo e campos condicionais."
+                                   },
+                                   {
+                                       "title":  "Filtrar lista",
+                                       "description":  "Use Mes inicio, Mes fim e Centro de servico para filtrar e clique em Aplicar. Limpar remove todos os filtros.",
+                                       "mediaHint":  "Bloco de filtros do HHT mensal."
+                                   },
+                                   {
+                                       "title":  "Ver detalhes do registro",
+                                       "description":  "Use o botao de olho na tabela para abrir o modal com todos os campos: status, modo, HHT calculado/final, descontos, escala, registro (ID, registrado por, cadastrado/atualizado em/por).",
+                                       "mediaHint":  "Modal de detalhes do HHT mensal."
+                                   },
+                                   {
+                                       "title":  "Ver historico",
+                                       "description":  "Clique no botao de Historico para ver alteracoes (UPDATE/DELETE) registradas no Supabase.",
+                                       "mediaHint":  "Modal de historico do HHT mensal."
+                                   }
+                               ],
+                    "notes":  [
+                                   "HHT calculado e HHT final sao recalculados no Supabase ao salvar.",
+                                   "Horas negativas nao sao aceitas (constraints no banco).",
+                                   "Os campos Registrado/Atualizado por exibem o nome do usuario se o ID existir em app_users; caso contrario aparece o ID.",
+                                   "No cadastro de acidente, o HHT e preenchido automaticamente usando o HHT mensal ativo do centro/mes informado.",
+                                   "Status usa a tabela status_hht (Ativo/Cancelado); registros cancelados continuam visiveis, sem botoes de edicao/cancelamento.",
+                                   "A lista de HHT mensal é paginada (20 itens/pagina)."
+                                ]
+                 },
     "termoEpi":  {
                      "title":  "Termo de EPI",
                      "summary":  "Gere e baixe o termo de responsabilidade de EPI para colaboradores.",

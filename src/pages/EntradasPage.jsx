@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Eye } from 'lucide-react'
+import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { EntryIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
 import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModal.jsx'

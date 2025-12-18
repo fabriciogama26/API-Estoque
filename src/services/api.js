@@ -701,6 +701,26 @@ const toDateOnlyIso = (valor) => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
+const toMonthRefIso = (valor) => {
+  const raw = trim(valor)
+  if (!raw) {
+    return null
+  }
+  // Se for ISO ou YYYY-MM já retorna o prefixo para evitar problemas de fuso.
+  const datePart = raw.split('T')[0]
+  const monthPrefix = /^\d{4}-\d{2}$/.test(raw) ? raw : /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart.slice(0, 7) : null
+  if (monthPrefix) {
+    return `${monthPrefix}-01`
+  }
+  const data = new Date(raw)
+  if (Number.isNaN(data.getTime())) {
+    return null
+  }
+  const year = data.getFullYear()
+  const month = data.getMonth() + 1
+  return `${year}-${String(month).padStart(2, '0')}-01`
+}
+
 const toStartOfDayUtcIso = (value) => toDateOnlyIso(value)
 
 const toEndOfDayUtcIso = (value) => {
@@ -4615,6 +4635,50 @@ export const api = {
       if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
         throw new Error('Preencha os campos obrigatorios do acidente.')
       }
+
+      const centroServicoIdResolved = await resolveReferenceId(
+        'centros_servico',
+        dados.centroServico,
+        'Selecione um centro de servico valido.'
+      )
+      const mesRef = toMonthRefIso(dados.data)
+      if (!mesRef) {
+        throw new Error('Data do acidente invalida para calcular HHT.')
+      }
+      const hhtMensalRegistro = await executeSingle(
+        supabase
+          .from('hht_mensal')
+          .select('id, hht_final, status_hht (status)')
+          .eq('centro_servico_id', centroServicoIdResolved)
+          .eq('mes_ref', mesRef)
+          .limit(1),
+        'Falha ao consultar HHT mensal.'
+      )
+      if (!hhtMensalRegistro) {
+        reportClientError(
+          'HHT mensal ausente para centro/mes do acidente.',
+          null,
+          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_create' },
+          'warn',
+        )
+        throw new Error('Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
+      }
+      const statusRegistro = hhtMensalRegistro?.status_hht?.status ?? ''
+      if (statusRegistro.toLowerCase() === 'cancelado') {
+        throw new Error('HHT mensal deste centro/mes esta cancelado. Cadastre um novo antes de registrar o acidente.')
+      }
+      const hhtValor = Number(hhtMensalRegistro.hht_final ?? 0)
+      if (!Number.isFinite(hhtValor)) {
+        reportClientError(
+          'HHT mensal invalido para centro/mes do acidente.',
+          null,
+          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_create', valor: hhtMensalRegistro.hht_final },
+          'warn',
+        )
+        throw new Error('HHT mensal invalido para o centro/mes informado.')
+      }
+      dados.hht = hhtValor
+
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
       await ensureAcidenteLesoes(agentePrincipal, lesoes)
@@ -4731,6 +4795,49 @@ export const api = {
       if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
         throw new Error('Preencha os campos obrigatorios do acidente.')
       }
+
+      const centroServicoIdResolved = await resolveReferenceId(
+        'centros_servico',
+        dados.centroServico,
+        'Selecione um centro de servico valido.'
+      )
+      const mesRef = toMonthRefIso(dados.data)
+      if (!mesRef) {
+        throw new Error('Data do acidente invalida para calcular HHT.')
+      }
+      const hhtMensalRegistro = await executeSingle(
+        supabase
+          .from('hht_mensal')
+          .select('id, hht_final, status_hht (status)')
+          .eq('centro_servico_id', centroServicoIdResolved)
+          .eq('mes_ref', mesRef)
+          .limit(1),
+        'Falha ao consultar HHT mensal.'
+      )
+      if (!hhtMensalRegistro) {
+        reportClientError(
+          'HHT mensal ausente para centro/mes do acidente.',
+          null,
+          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_update', acidenteId: id },
+          'warn',
+        )
+        throw new Error('Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
+      }
+      const statusRegistro = hhtMensalRegistro?.status_hht?.status ?? ''
+      if (statusRegistro.toLowerCase() === 'cancelado') {
+        throw new Error('HHT mensal deste centro/mes esta cancelado. Cadastre um novo antes de registrar o acidente.')
+      }
+      const hhtValor = Number(hhtMensalRegistro.hht_final ?? 0)
+      if (!Number.isFinite(hhtValor)) {
+        reportClientError(
+          'HHT mensal invalido para centro/mes do acidente.',
+          null,
+          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_update', acidenteId: id, valor: hhtMensalRegistro.hht_final },
+          'warn',
+        )
+        throw new Error('HHT mensal invalido para o centro/mes informado.')
+      }
+      dados.hht = hhtValor
 
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
@@ -4884,6 +4991,408 @@ export const api = {
     async dashboard(params = {}) {
       const acidentes = await carregarAcidentes()
       return montarDashboardAcidentes(acidentes, params)
+    },
+  },
+  hhtMensal: {
+    async list(params = {}) {
+      const centroServicoId = normalizeUuid(params.centroServicoId ?? params.centro_servico_id)
+      const centroServicoNome = trim(params.centroServicoNome ?? params.centro_servico_nome ?? '')
+      const mesInicio = trim(params.mesInicio ?? params.mes_inicio ?? '')
+      const mesFim = trim(params.mesFim ?? params.mes_fim ?? '')
+      const incluirInativos = params.incluirInativos === true || params.incluir_inativos === true
+
+      const toMonthRef = (value) => {
+        const raw = trim(value)
+        if (!raw) {
+          return null
+        }
+        if (/^\d{4}-\d{2}$/.test(raw)) {
+          return `${raw}-01`
+        }
+        const datePart = raw.split('T')[0]
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+          return `${datePart.slice(0, 7)}-01`
+        }
+        const iso = toDateOnlyIso(raw)
+        if (!iso) {
+          return null
+        }
+        return `${iso.slice(0, 7)}-01`
+      }
+
+      const mapRecord = (registro) => {
+        const createdBy = registro.created_by ?? null
+        const updatedBy = registro.updated_by ?? null
+        return {
+          id: registro.id,
+          mesRef: registro.mes_ref ?? null,
+          centroServicoId: registro.centro_servico_id ?? null,
+          centroServicoNome: resolveTextValue(registro?.centro_servico_nome ?? ''),
+          statusId: registro.status_hht_id ?? null,
+          statusNome: resolveTextValue(registro?.status_nome ?? ''),
+          qtdPessoas: toNumber(registro.qtd_pessoas, 0),
+          horasMesBase: toNumber(registro.horas_mes_base, 0),
+          escalaFactor: toNumber(registro.escala_factor, 1),
+          horasAfastamento: toNumber(registro.horas_afastamento, 0),
+          horasFerias: toNumber(registro.horas_ferias, 0),
+          horasTreinamento: toNumber(registro.horas_treinamento, 0),
+          horasOutrosDescontos: toNumber(registro.horas_outros_descontos, 0),
+          horasExtras: toNumber(registro.horas_extras, 0),
+          modo: trim(registro.modo),
+          hhtInformado: toNullableNumber(registro.hht_informado),
+          hhtCalculado: toNumber(registro.hht_calculado, 0),
+          hhtFinal: toNumber(registro.hht_final, 0),
+          createdAt: registro.created_at ?? null,
+          createdBy: createdBy,
+          createdByName: resolveTextValue(registro.created_by_username ?? registro.created_by_name ?? ''),
+          updatedAt: registro.updated_at ?? null,
+          updatedBy: updatedBy,
+          updatedByName: resolveTextValue(registro.updated_by_username ?? registro.updated_by_name ?? ''),
+        }
+      }
+
+      let query = supabase
+        .from('hht_mensal_view')
+        .select(
+          `
+          id,
+          mes_ref,
+          centro_servico_id,
+          centro_servico_nome,
+          status_hht_id,
+          status_nome,
+          qtd_pessoas,
+          horas_mes_base,
+          escala_factor,
+          horas_afastamento,
+          horas_ferias,
+          horas_treinamento,
+          horas_outros_descontos,
+          horas_extras,
+          modo,
+          hht_informado,
+          hht_calculado,
+          hht_final,
+          created_at,
+          created_by,
+          created_by_name,
+          created_by_username,
+          updated_at,
+          updated_by,
+          updated_by_name,
+          updated_by_username
+        `
+        )
+        .order('mes_ref', { ascending: false })
+        .order('centro_servico_id', { ascending: true })
+
+      if (centroServicoId) {
+        query = query.eq('centro_servico_id', centroServicoId)
+      } else if (centroServicoNome) {
+        query = query.ilike('centro_servico_nome', centroServicoNome)
+      }
+
+      const inicio = toMonthRef(mesInicio)
+      if (inicio) {
+        query = query.gte('mes_ref', inicio)
+      }
+      const fim = toMonthRef(mesFim)
+      if (fim) {
+        query = query.lte('mes_ref', fim)
+      }
+
+      if (!incluirInativos) {
+        query = query.neq('status_hht.status', 'Cancelado')
+      }
+
+      const data = await execute(query, 'Falha ao listar HHT mensal.')
+      return (data ?? []).map((registro) => mapRecord(registro, new Map()))
+    },
+
+    async create(payload) {
+      const mesRef = trim(payload.mesRef ?? payload.mes_ref ?? '')
+      const centroServicoId = normalizeUuid(payload.centroServicoId ?? payload.centro_servico_id)
+      const statusHhtId = normalizeUuid(payload.statusHhtId ?? payload.status_hht_id)
+      if (!mesRef) {
+        throw new Error('Informe o mes de referencia.')
+      }
+      if (!centroServicoId) {
+        throw new Error('Selecione um centro de servico valido.')
+      }
+
+      const registro = await executeSingle(
+        supabase
+          .from('hht_mensal')
+          .insert({
+            mes_ref: mesRef,
+            centro_servico_id: centroServicoId,
+            status_hht_id: statusHhtId,
+            qtd_pessoas: toNumber(payload.qtdPessoas ?? payload.qtd_pessoas, 0),
+            horas_mes_base: toNumber(payload.horasMesBase ?? payload.horas_mes_base, 0),
+            escala_factor: toNumber(payload.escalaFactor ?? payload.escala_factor, 1),
+            horas_afastamento: toNumber(payload.horasAfastamento ?? payload.horas_afastamento, 0),
+            horas_ferias: toNumber(payload.horasFerias ?? payload.horas_ferias, 0),
+            horas_treinamento: toNumber(payload.horasTreinamento ?? payload.horas_treinamento, 0),
+            horas_outros_descontos: toNumber(
+              payload.horasOutrosDescontos ?? payload.horas_outros_descontos,
+              0,
+            ),
+            horas_extras: toNumber(payload.horasExtras ?? payload.horas_extras, 0),
+            modo: trim(payload.modo),
+            hht_informado: toNullableNumber(payload.hhtInformado ?? payload.hht_informado),
+          })
+          .select(
+            `
+            id,
+            mes_ref,
+            centro_servico_id,
+            ativo,
+            status_hht_id,
+            qtd_pessoas,
+            horas_mes_base,
+            escala_factor,
+            horas_afastamento,
+            horas_ferias,
+            horas_treinamento,
+            horas_outros_descontos,
+            horas_extras,
+            modo,
+            hht_informado,
+            hht_calculado,
+            hht_final,
+            created_at,
+            created_by,
+            updated_at,
+            updated_by,
+            centros_servico (id, nome),
+            status_hht (id, status)
+          `
+          ),
+        'Falha ao criar HHT mensal.'
+      )
+
+      return {
+        id: registro.id,
+        mesRef: registro.mes_ref ?? null,
+        centroServicoId: registro.centro_servico_id ?? null,
+        centroServicoNome: resolveTextValue(registro?.centros_servico?.nome ?? ''),
+        ativo: registro.ativo !== false,
+        qtdPessoas: toNumber(registro.qtd_pessoas, 0),
+        horasMesBase: toNumber(registro.horas_mes_base, 0),
+        escalaFactor: toNumber(registro.escala_factor, 1),
+        horasAfastamento: toNumber(registro.horas_afastamento, 0),
+        horasFerias: toNumber(registro.horas_ferias, 0),
+        horasTreinamento: toNumber(registro.horas_treinamento, 0),
+        horasOutrosDescontos: toNumber(registro.horas_outros_descontos, 0),
+        horasExtras: toNumber(registro.horas_extras, 0),
+        modo: trim(registro.modo),
+        hhtInformado: toNullableNumber(registro.hht_informado),
+        hhtCalculado: toNumber(registro.hht_calculado, 0),
+        hhtFinal: toNumber(registro.hht_final, 0),
+        createdAt: registro.created_at ?? null,
+        createdBy: registro.created_by ?? null,
+        updatedAt: registro.updated_at ?? null,
+        updatedBy: registro.updated_by ?? null,
+      }
+    },
+
+    async update(id, payload) {
+      if (!id) {
+        throw new Error('ID obrigatorio.')
+      }
+
+      const mesRef = payload.mesRef ?? payload.mes_ref
+      const centroServicoId = payload.centroServicoId ?? payload.centro_servico_id
+
+      const registro = await executeSingle(
+        supabase
+          .from('hht_mensal')
+          .update({
+            mes_ref: mesRef,
+            centro_servico_id: centroServicoId,
+            status_hht_id: payload.statusHhtId ?? payload.status_hht_id,
+            qtd_pessoas: payload.qtdPessoas ?? payload.qtd_pessoas,
+            horas_mes_base: payload.horasMesBase ?? payload.horas_mes_base,
+            escala_factor: payload.escalaFactor ?? payload.escala_factor,
+            horas_afastamento: payload.horasAfastamento ?? payload.horas_afastamento,
+            horas_ferias: payload.horasFerias ?? payload.horas_ferias,
+            horas_treinamento: payload.horasTreinamento ?? payload.horas_treinamento,
+            horas_outros_descontos: payload.horasOutrosDescontos ?? payload.horas_outros_descontos,
+            horas_extras: payload.horasExtras ?? payload.horas_extras,
+            modo: payload.modo,
+            hht_informado: payload.hhtInformado ?? payload.hht_informado,
+          })
+          .eq('id', id)
+          .select(
+            `
+            id,
+            mes_ref,
+            centro_servico_id,
+            ativo,
+            qtd_pessoas,
+            horas_mes_base,
+            escala_factor,
+            horas_afastamento,
+            horas_ferias,
+            horas_treinamento,
+            horas_outros_descontos,
+            horas_extras,
+            modo,
+            hht_informado,
+            hht_calculado,
+            hht_final,
+            created_at,
+            created_by,
+            updated_at,
+            updated_by,
+            centros_servico (id, nome)
+          `
+          ),
+        'Falha ao atualizar HHT mensal.'
+      )
+
+      return {
+        id: registro.id,
+        mesRef: registro.mes_ref ?? null,
+        centroServicoId: registro.centro_servico_id ?? null,
+        centroServicoNome: resolveTextValue(registro?.centros_servico?.nome ?? ''),
+        ativo: registro.ativo !== false,
+        qtdPessoas: toNumber(registro.qtd_pessoas, 0),
+        horasMesBase: toNumber(registro.horas_mes_base, 0),
+        escalaFactor: toNumber(registro.escala_factor, 1),
+        horasAfastamento: toNumber(registro.horas_afastamento, 0),
+        horasFerias: toNumber(registro.horas_ferias, 0),
+        horasTreinamento: toNumber(registro.horas_treinamento, 0),
+        horasOutrosDescontos: toNumber(registro.horas_outros_descontos, 0),
+        horasExtras: toNumber(registro.horas_extras, 0),
+        modo: trim(registro.modo),
+        hhtInformado: toNullableNumber(registro.hht_informado),
+        hhtCalculado: toNumber(registro.hht_calculado, 0),
+        hhtFinal: toNumber(registro.hht_final, 0),
+        createdAt: registro.created_at ?? null,
+        createdBy: registro.created_by ?? null,
+        updatedAt: registro.updated_at ?? null,
+        updatedBy: registro.updated_by ?? null,
+      }
+    },
+
+    async delete(id, motivo = '') {
+      if (!id) {
+        throw new Error('ID obrigatorio.')
+      }
+      const textoMotivo = trim(motivo)
+      await execute(
+        supabase.rpc('hht_mensal_delete', {
+          p_id: id,
+          p_motivo: textoMotivo,
+        }),
+        'Falha ao cancelar HHT mensal.'
+      )
+      return true
+    },
+
+    async history(id) {
+      if (!id) {
+        throw new Error('ID obrigatorio.')
+      }
+      const data = await execute(
+        supabase
+          .from('hht_mensal_hist')
+          .select('id, acao, alterado_em, alterado_por, antes, depois, motivo')
+          .eq('hht_mensal_id', id)
+          .order('alterado_em', { ascending: false }),
+        'Falha ao obter historico do HHT mensal.'
+      )
+      const registros = data ?? []
+      // Coleta IDs de usuarios e de status para resolver nomes.
+      const responsaveisIds = Array.from(
+        new Set(registros.map((item) => item?.alterado_por).filter((value) => Boolean(value)))
+      )
+      const statusIds = Array.from(
+        new Set(
+          registros
+            .map((item) => [item?.antes?.status_hht_id, item?.antes?.statusHhtId, item?.depois?.status_hht_id, item?.depois?.statusHhtId])
+            .flat()
+            .filter((value) => Boolean(value))
+        )
+      )
+      let usuarioNomeMap = new Map()
+      if (responsaveisIds.length > 0) {
+        try {
+          const usuarios = await execute(
+            supabase.from('app_users').select('id, display_name, username, email').in('id', responsaveisIds),
+            'Falha ao consultar usuarios do historico de HHT mensal.'
+          )
+          usuarioNomeMap = new Map(
+            (usuarios ?? [])
+              .filter((usuario) => usuario?.id)
+              .map((usuario) => [
+                usuario.id,
+                resolveTextValue(usuario.display_name ?? usuario.username ?? usuario.email ?? usuario.id),
+              ])
+          )
+        } catch (usuarioError) {
+          reportClientError(
+            'Nao foi possivel resolver nomes dos usuarios do historico de HHT mensal.',
+            usuarioError,
+            { ids: responsaveisIds }
+          )
+        }
+      }
+      let statusNomeMap = new Map()
+      if (statusIds.length > 0) {
+        try {
+          const statusRegistros = await execute(
+            supabase.from('status_hht').select('id, status').in('id', statusIds),
+            'Falha ao consultar status_hht.'
+          )
+          statusNomeMap = new Map(
+            (statusRegistros ?? []).filter((item) => item?.id).map((item) => [item.id, resolveTextValue(item.status ?? '')])
+          )
+        } catch (statusError) {
+          reportClientError('Nao foi possivel resolver nomes de status_hht.', statusError, { statusIds })
+        }
+      }
+
+      const mapStatus = (obj) => {
+        if (!obj || typeof obj !== 'object') return obj
+        const clone = { ...obj }
+        const statusValor = clone.status_hht_id ?? clone.statusHhtId ?? null
+        if (statusValor && statusNomeMap.has(statusValor)) {
+          clone.status_hht_id = statusNomeMap.get(statusValor)
+          clone.statusHhtId = statusNomeMap.get(statusValor)
+        }
+        return clone
+      }
+
+      return registros.map((item) => {
+        const usuarioId = item?.alterado_por ?? null
+        const usuarioNome = usuarioId ? usuarioNomeMap.get(usuarioId) ?? usuarioId : 'Responsavel nao informado'
+        return {
+          id: item.id,
+          acao: trim(item.acao),
+          alteradoEm: item.alterado_em ?? null,
+          alteradoPorId: usuarioId,
+          alteradoPor: usuarioNome,
+          antes: mapStatus(item.antes ?? null),
+          depois: mapStatus(item.depois ?? null),
+          motivo: item.motivo ?? null,
+        }
+      })
+    },
+
+    async peopleCount(params = {}) {
+      const centroServicoId = normalizeUuid(params.centroServicoId ?? params.centro_servico_id)
+      if (!centroServicoId) {
+        throw new Error('Selecione um centro de servico valido.')
+      }
+      const data = await execute(
+        supabase.rpc('rpc_pessoas_count_centro', { p_centro_servico_id: centroServicoId }),
+        'Falha ao obter quantidade de pessoas por centro.'
+      )
+      const registro = Array.isArray(data) ? data[0] : data ?? {}
+      const totalBruto = registro?.total ?? registro?.count ?? registro?.qtd ?? 0
+      return Number(totalBruto) || 0
     },
   },
   references: {

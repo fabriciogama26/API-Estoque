@@ -41,6 +41,7 @@ const navSections = [
     icon: AlertIcon,
     items: [
       { to: '/acidentes/cadastro', label: 'Cadastro de Acidentes', icon: ChecklistIcon, pageId: 'acidentes-cadastro' },
+      { to: '/acidentes/hht-mensal', label: 'HHT Mensal', icon: ChecklistIcon, pageId: 'acidentes-hht-mensal' },
     ],
   },
   {

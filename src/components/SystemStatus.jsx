@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { LogOut, Settings } from 'lucide-react'
+import LogOut from 'lucide-react/dist/esm/icons/log-out.js'
+import Settings from 'lucide-react/dist/esm/icons/settings.js'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'

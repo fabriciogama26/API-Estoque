@@ -12,6 +12,7 @@ import { EstoquePage } from './pages/EstoquePage.jsx'
 import { DashboardPage } from './pages/DashboardPage.jsx'
 import { DashboardAcidentes } from './pages/DashboardAcidentes.jsx'
 import { AcidentesPage } from './pages/Acidentes.jsx'
+import { HhtMensalAcidentesPage } from './pages/HhtMensalAcidentes.jsx'
 import { TermosEpiPage } from './pages/TermosEpiPage.jsx'
 import { NoAccessPage } from './pages/NoAccessPage.jsx'
 import { ErrorBoundaryWithLogger } from './components/ErrorBoundary.jsx'
@@ -37,6 +38,7 @@ function App() {
 
             <Route path="acidentes">
               <Route path="cadastro" element={<AcidentesPage />} />
+              <Route path="hht-mensal" element={<HhtMensalAcidentesPage />} />
             </Route>
 
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
