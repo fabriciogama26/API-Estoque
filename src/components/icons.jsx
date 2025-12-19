@@ -4,6 +4,7 @@ import BarChart3 from 'lucide-react/dist/esm/icons/bar-chart-3.js'
 import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.js'
 import Boxes from 'lucide-react/dist/esm/icons/boxes.js'
 import CircleDollarSign from 'lucide-react/dist/esm/icons/circle-dollar-sign.js'
+import BellRing from 'lucide-react/dist/esm/icons/bell-ring.js'
 import ClipboardList from 'lucide-react/dist/esm/icons/clipboard-list.js'
 import History from 'lucide-react/dist/esm/icons/history.js'
 import LayoutDashboard from 'lucide-react/dist/esm/icons/layout-dashboard.js'
@@ -40,6 +41,7 @@ export const MovementIcon = (props) => <ArrowDownUp {...withDefaultProps(props)}
 export const RevenueIcon = (props) => <CircleDollarSign {...withDefaultProps(props)} />
 export const StockIcon = (props) => <ShoppingCart {...withDefaultProps(props)} />
 export const AlertIcon = (props) => <AlertTriangle {...withDefaultProps(props)} />
+export const NotificationIcon = (props) => <BellRing {...withDefaultProps(props)} />
 export const TrendIcon = (props) => <TrendingUp {...withDefaultProps(props)} />
 export const PieIcon = (props) => <PieChart {...withDefaultProps(props)} />
 export const BarsIcon = (props) => <BarChart3 {...withDefaultProps(props)} />

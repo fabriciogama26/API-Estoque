@@ -59,6 +59,15 @@ export function EstoqueFilters({
           />
           <span>Apenas alertas</span>
         </label>
+        <label className="field field--checkbox field--checkbox-accent">
+          <input
+            type="checkbox"
+            name="apenasSaidas"
+            checked={Boolean(filters.apenasSaidas)}
+            onChange={onChange}
+          />
+          <span>Apenas saídas</span>
+        </label>
         <div className="form__actions">
           <button type="submit" className="button button--primary">
             Aplicar filtros

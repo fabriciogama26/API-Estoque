@@ -1,370 +1,375 @@
 {
-    "dashboard":  {
-                      "title":  "Dashboard de estoque",
-                      "summary":  "Use esta tela para ver rapidamente movimentação, valores e alertas de estoque.",
-                      "steps":  [
-                                    {
-                                        "title":  "Aplicar filtros rápidos",
-                                        "description":  "No campo Busca digite parte do nome de material, grupo ou pessoa e combine com período inicial/final; clique em Aplicar filtros para recalcular todos os gráficos. Use Limpar filtros para voltar ao panorama completo.",
-                                        "mediaHint":  "Área de filtros no topo com período e campo de busca."
-                                    },
-                                    {
-                                        "title":  "Ler os cards de destaque",
-                                        "description":  "Os cards mostram totais consolidados (movimentado, saldo e alertas). Passe o mouse no ícone (i) para entender como cada indicador é calculado.",
-                                        "mediaHint":  "Cards de resumo com valores e ícones."
-                                    },
-                                    {
-                                        "title":  "Interagir com os gráficos",
-                                        "description":  "Clique em uma barra ou fatia para filtrar o restante dos gráficos pelo mesmo termo. Use o chip Limpar que aparece acima do gráfico para remover o filtro.",
-                                        "mediaHint":  "Gráfico com tooltip e chip de filtro ativo."
-                                    },
-                                    {
-                                        "title":  "Expandir gráficos",
-                                        "description":  "Para analisar um gráfico com mais espaço, clique no botão de expandir (canto superior direito do card). Feche clicando fora ou no ícone de fechar.",
-                                        "mediaHint":  "Botão de expandir no cabeçalho do card."
-                                    }
-                                ],
-                      "notes":  [
-                                    "Os gráficos respeitam os filtros aplicados; se algo parecer zerado, confirme o período.",
-                                    "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam."
-                                ]
-                  },
-    "dashboardAcidentes":  {
-                               "title":  "Dashboard de acidentes",
-                               "summary":  "Monitore tendência, tipos de acidente e distribuições para SST.",
-                               "steps":  [
-                                             {
-                                                 "title":  "Definir filtros iniciais",
-                                                 "description":  "No campo Busca digite pessoa, agente ou local (trechos do nome/matrícula também funcionam) e combine com período e unidade/centro de serviço. Clique em Aplicar para recalcular os indicadores.",
-                                                 "mediaHint":  "Filtros do dashboard de acidentes."
-                                             },
-                                             {
-                                                 "title":  "Conferir indicadores-chave",
-                                                 "description":  "Os cards exibem totais, taxas e comparativos. Use o texto de ajuda abaixo dos cards para saber como foi calculado.",
-                                                 "mediaHint":  "Cards de KPI da tela de acidentes."
-                                             },
-                                             {
-                                                 "title":  "Ler gráficos com tooltips",
-                                                 "description":  "Use os botões (i) nos títulos para ver o que cada gráfico representa. Passe o mouse nos pontos/segmentos para ver valores detalhados.",
-                                                 "mediaHint":  "Gráfico com tooltip e ícone de info."
-                                             },
-                                             {
-                                                 "title":  "Abrir em tela cheia",
-                                                 "description":  "Clique no botão de expandir do gráfico desejado. A visualização modal permite enxergar mais pontos sem poluição visual.",
-                                                 "mediaHint":  "Modal de gráfico expandido."
-                                             }
-                                         ],
-                               "notes":  [
-                                             "Filtros são persistidos enquanto você navega pelo dashboard.",
-                                             "Se nenhum dado aparecer, valide se o período contém registros de acidentes."
-                                         ]
-                           },
-    "estoque":  {
-                    "title":  "Estoque atual",
-                    "summary":  "Consulta do saldo por material, alertas de estoque mínimo, ações rápidas e resumo financeiro.",
-                    "steps":  [
-                                  {
-                                      "title":  "Filtrar materiais",
-                                      "description":  "No campo Busca digite parte do nome, descrição, ID, cor ou CA do material para reduzir a lista; combine com centro de estoque e faixas de saldo. Clique em Aplicar para refinar ou em Limpar para remover todos os filtros.",
-                                      "mediaHint":  "Filtros de estoque e botões Aplicar/Limpar."
-                                  },
-                                  {
-                                      "title":  "Monitorar alertas",
-                                      "description":  "O bloco \"Alertas de estoque\" mostra itens abaixo do mínimo e o valor estimado para reposição. Use a lista principal para revisar e ajustar os materiais críticos.",
-                                      "mediaHint":  "Tabela de alertas com status vermelho/alarme."
-                                  },
-                                  {
-                                      "title":  "Ações por material",
-                                      "description":  "Em cada material, use o grupo \"Ações\": Entrada (abrir cadastro de entrada), Saída (abrir cadastro de saída) e o botão para alterar o mínimo.",
-                                      "mediaHint":  "Botões circulares de ações (Entrada, Saída e Alterar mínimo)."
-                                  },
-                                  {
-                                      "title":  "Alterar estoque mínimo",
-                                      "description":  "Clique em Alterar mínimo para abrir uma janela de edição. Informe o novo valor e confirme em Salvar. O sistema recarrega os dados após salvar.",
-                                      "mediaHint":  "Modal de alteração do estoque mínimo com botões Cancelar/Salvar."
-                                  },
-                                  {
-                                      "title":  "Usar paginação",
-                                      "description":  "Navegue pelas páginas no rodapé da lista para ver mais itens. O total considera os filtros aplicados.",
-                                      "mediaHint":  "Controles de página na parte inferior da lista."
-                                  }
-                              ],
-                    "notes":  [
-                                  "O resumo financeiro abaixo dos alertas usa o valor unitário cadastrado no material.",
-                                  "Se um item não mostrar centro de estoque, revise as movimentações (entradas/saídas) do material.",
-                                  "Atalho: ao clicar em Entrada/Saída a partir do Estoque atual, o sistema tenta preencher automaticamente o Centro de estoque e o Material."
-                              ]
-                },
-    "entradas":  {
-                     "title":  "Entradas de estoque",
-                     "summary":  "Registro de novas entradas e consulta histórica.",
-                     "steps":  [
-                                    {
-                                        "title":  "Registrar nova entrada",
-                                        "description":  "Primeiro selecione o Centro de estoque (*). O campo Material só é liberado após escolher o centro. Em seguida, use o autocomplete para buscar e selecionar o material por nome ou ID. Preencha quantidade e data e clique em Registrar entrada para salvar. Dica: ao acessar a tela pelo Estoque atual, Centro de estoque e Material podem vir pré-preenchidos.",
-                                        "mediaHint":  "Formulário de cadastro de entradas: Centro de estoque, Material (habilita após selecionar o centro), Quantidade e Data."
-                                    },
-                                   {
-                                       "title":  "Aplicar filtros do histórico",
-                                       "description":  "Use o campo Busca para digitar parte do nome, descrição ou ID do material (ou do usuário que registrou) e combine com centro de estoque, status e período para refinar o histórico. Use Limpar para remover todos os filtros.",
-                                       "mediaHint":  "Filtros rápidos do histórico de entradas (inclui status)."
-                                   },
-                                    {
-                                        "title":  "Editar, ver histórico ou cancelar",
-                                        "description":  "Na tabela, use os ícones para cada entrada: olho (detalhes), lápis (editar), relógio (histórico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e não exibem os botões de edição/cancelamento. O cancelamento é bloqueado se as saídas ativas ficarem maiores que o saldo sem essa entrada; ajuste/estorne saídas antes.",
-                                        "mediaHint":  "Ícones de detalhes, edição, histórico e cancelamento na linha."
-                                    },
-                                   {
-                                       "title":  "Atualizar dados",
-                                       "description":  "Clique em Atualizar no cabeçalho da lista para recarregar dados e sugestões de materiais.",
-                                       "mediaHint":  "Botão Atualizar no topo da seção de histórico."
-                                   }
-                               ],
-                      "notes":  [
-                                    "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descrição.",
-                                    "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro.",
-                                    "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já preenchidos.",
-                                     "Status e usuário de edição aparecem em detalhes e histórico; cancelamentos são registrados.",
-                                     "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrão).",
-                                     "Não é possível cancelar uma entrada se as saídas vigentes superarem o estoque que restaria sem ela; reduza ou estorne saídas primeiro."
-                                 ]
-                  },
-    "saidas":  {
-                   "title":  "Saídas de estoque",
-                   "summary":  "Entrega de EPIs para pessoas, com rastreabilidade e cancelamento.",
-                   "steps":  [
-                                 {
-                                     "title":  "Registrar saída",
-                                     "description":  "No campo de busca, digite o nome ou matrícula para achar a pessoa e selecione o material pelo autocomplete. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saída para gravar a entrega.",
-                                     "mediaHint":  "Formulário de cadastro de saídas com busca de pessoa e material."
-                                 },
-                                 {
-                                     "title":  "Conferir saldo disponível",
-                                     "description":  "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberações acima do estoque.",
-                                     "mediaHint":  "Bloco de saldo do material ao lado do formulário."
-                                 },
-                                 {
-                                     "title":  "Editar ou cancelar",
-                                     "description":  "Clique em Editar para carregar o registro no formulário: ele sobe para o topo, fica amarelo e mostra “Editando...”. Ajuste os campos necessários e clique em Salvar alterações para gravar; se desistir antes de salvar, use Cancelar edição para voltar ao modo de cadastro.",
-                                     "mediaHint":  "Ações de edição e cancelamento na tabela de saídas."
-                                 },
-                                 {
-                                     "title":  "Filtrar e paginar",
-                                     "description":  "No campo Busca digite o nome ou matrícula da pessoa, ou nome/descrição/ID do material ou CA, para trazer apenas as saídas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessário e navegue pelas páginas no rodapé.",
-                                     "mediaHint":  "Filtros superiores e paginação inferior do histórico."
-                                 }
-                             ],
-                    "notes":  [
-                                  "Saídas canceladas ficam marcadas e não impactam o saldo.",
-                                  "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já selecionados.",
-                                  "O histórico detalha quem registrou e quando a entrega foi alterada."
-                              ]
-                },
-    "materiais":  {
-                      "title":  "Cadastro de materiais / EPI",
-                      "summary":  "Cadastro centralizado de EPI com variações, características e valor.",
-                      "steps":  [
-                                    {
-                                        "title":  "Cadastrar ou editar material",
-                                        "description":  "Preencha nome, grupo, valor unitário e CA (quando houver). Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para novo cadastro ou para gravar alterações.",
-                                        "mediaHint":  "Formulário principal de materiais."
-                                    },
-                                    {
-                                        "title":  "Gerenciar variações e atributos",
-                                        "description":  "Adicione características, cores, fabricante e tamanho pelo autocomplete. Campos de lista aceitam múltiplos itens.",
-                                        "mediaHint":  "Campos de característica, cor e tamanho."
-                                    },
-                                    {
-                                        "title":  "Filtrar catálogo",
-                                        "description":  "Digite no campo Busca parte do nome, descrição, ID ou CA para filtrar rapidamente o catálogo; refine por grupo, tamanho, fabricante ou característica e clique em Aplicar. Limpar remove todos os filtros.",
-                                        "mediaHint":  "Bloco de filtros acima da tabela de materiais."
-                                    },
-                                    {
-                                        "title":  "Histórico e detalhes",
-                                        "description":  "Na tabela use o botão de relógio para ver histórico de alterações e o botão com olho para abrir o detalhamento completo do material.",
-                                        "mediaHint":  "Ações de histórico e detalhes na tabela de materiais."
-                                    }
-                                ],
-                      "notes":  [
-                                    "A edição de um material reaproveita o mesmo formulário, mantendo os campos preenchidos.",
-                                    "Valor unitário é usado nos cálculos de estoque e relatórios."
-                                ]
-                  },
-    "pessoas":  {
-                    "title":  "Cadastro de pessoas",
-                    "summary":  "Registro de colaboradores com data de admissao obrigatoria, demissao opcional e historico.",
-                    "steps":  [
-                                  {
-                                      "title":  "Cadastrar ou atualizar colaborador",
-                                      "description":  "Preencha nome, matricula, centro de servico, setor, cargo e DATA DE ADMISSAO (obrigatoria, dd/MM/yyyy). Ao editar, o formulario fica destacado; use Salvar para concluir.",
-                                      "mediaHint":  "Formulario principal de pessoas."
-                                  },
-                                  {
-                                      "title":  "Registrar demissão / status",
-                                      "description":  "Para desligar, marque como inativo e informe a DATA DE DEMISSAO (opcional). Reativar pede confirmacao.",
-                                      "mediaHint":  "Campos de status e datas no formulario."
-                                  },
-                                  {
-                                      "title":  "Filtrar lista",
-                                      "description":  "No campo Busca digite nome ou matricula (parcial) e combine com centro de servico ou setor; clique em Aplicar. Limpar remove todos os filtros.",
-                                      "mediaHint":  "Filtros e chips acima da tabela de pessoas."
-                                  },
-                                  {
-                                      "title":  "Ler resumo rapido",
-                                      "description":  "Os cards de resumo mostram quantidade por centro e setores mais frequentes conforme o filtro aplicado.",
-                                      "mediaHint":  "Cards de resumo logo após os filtros."
-                                  },
-                                  {
-                                      "title":  "Ver historico de alteracoes",
-                                      "description":  "Na tabela, clique no botao de relogio (Historico) para ver quem alterou dados do colaborador e quando.",
-                                      "mediaHint":  "Modal de historico de pessoas."
-                                  }
-                              ],
-                    "notes":  [
-                                  "DATA DE ADMISSAO e obrigatoria; DATA DE DEMISSAO e opcional. Formato aceito: dd/MM/yyyy.",
-                                  "Inativar recomenda preencher a data de demissao; reativar pede confirmacao e registra no historico.",
-                                  "Use o botao Atualizar na tabela para recarregar dados do servidor."
-                              ]
-                },
-    "acidentes":  {
-                      "title":  "Registro de acidentes",
-                      "summary":  "Cadastro completo de acidentes com filtros, histórico e detalhes.",
-                      "steps":  [
-                                    {
-                                        "title":  "Preencher dados do acidente",
-                                        "description":  "Selecione colaborador, tipo de acidente, lesão e parte afetada. Campos obrigatórios estão marcados com *. Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para gravar.",
-                                        "mediaHint":  "Formulário de cadastro de acidentes."
-                                    },
-                                    {
-                                        "title":  "Relacionar local e agente",
-                                        "description":  "Use os campos de local, centro de serviço e agente causador para enriquecer indicadores de SST.",
-                                        "mediaHint":  "Seção de local/agente dentro do formulário."
-                                    },
-                                    {
-                                        "title":  "Filtrar registros",
-                                        "description":  "Use o campo Busca para digitar pessoa (nome/matrícula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de serviço ou agente e clique em Aplicar. Limpar zera todos os filtros.",
-                                        "mediaHint":  "Bloco de filtros acima da lista de acidentes."
-                                    },
-                                    {
-                                        "title":  "Consultar histórico e detalhes",
-                                        "description":  "Clique no botão de relógio para ver histórico de alterações ou no botão com olho para abrir os detalhes completos do acidente.",
-                                        "mediaHint":  "Modal de detalhes do acidente."
-                                    }
-                                ],
-                      "notes":  [
-                                    "Ao salvar um acidente, a lista é recarregada automaticamente.",
-                                    "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integrações de cadastro base."
-                                ]
-                  },
-    "hhtMensal":  {
-                     "title":  "HHT Mensal",
-                     "summary":  "Registre o HHT (homem-hora trabalhada) por mes e centro de servico, com calculo automatico, status, historico e paginacao.",
-                     "steps":  [
-                                   {
-                                       "title":  "Escolher mes e centro",
-                                       "description":  "Informe o mes de referencia (no banco fica sempre no dia 01) e selecione o centro de servico. Mes+centro e unico.",
-                                       "mediaHint":  "Campos Mes de referencia e Centro de servico."
-                                   },
-                                   {
-                                       "title":  "Selecionar modo de calculo",
-                                       "description":  "Manual: digite o HHT final. Simples: informe apenas pessoas e horas base. Completo: habilita escala, descontos e horas extras.",
-                                       "mediaHint":  "Campo Modo e campos condicionais."
-                                   },
-                                   {
-                                       "title":  "Filtrar lista",
-                                       "description":  "Use Mes inicio, Mes fim e Centro de servico para filtrar e clique em Aplicar. Limpar remove todos os filtros.",
-                                       "mediaHint":  "Bloco de filtros do HHT mensal."
-                                   },
-                                   {
-                                       "title":  "Ver detalhes do registro",
-                                       "description":  "Use o botao de olho na tabela para abrir o modal com todos os campos: status, modo, HHT calculado/final, descontos, escala, registro (ID, registrado por, cadastrado/atualizado em/por).",
-                                       "mediaHint":  "Modal de detalhes do HHT mensal."
-                                   },
-                                   {
-                                       "title":  "Ver historico",
-                                       "description":  "Clique no botao de Historico para ver alteracoes (UPDATE/DELETE) registradas no Supabase.",
-                                       "mediaHint":  "Modal de historico do HHT mensal."
-                                   }
-                               ],
-                    "notes":  [
-                                   "HHT calculado e HHT final sao recalculados no Supabase ao salvar.",
-                                   "Horas negativas nao sao aceitas (constraints no banco).",
-                                   "Os campos Registrado/Atualizado por exibem o nome do usuario se o ID existir em app_users; caso contrario aparece o ID.",
-                                   "No cadastro de acidente, o HHT e preenchido automaticamente usando o HHT mensal ativo do centro/mes informado.",
-                                   "Status usa a tabela status_hht (Ativo/Cancelado); registros cancelados continuam visiveis, sem botoes de edicao/cancelamento.",
-                                   "A lista de HHT mensal é paginada (20 itens/pagina)."
-                                ]
-                 },
-    "termoEpi":  {
-                     "title":  "Termo de EPI",
-                     "summary":  "Gere e baixe o termo de responsabilidade de EPI para colaboradores.",
-                     "steps":  [
-                                   {
-                                       "title":  "Preencher filtros de busca",
-                                       "description":  "No campo Busca informe matrícula ou nome do colaborador (parcial ou completo) e, se quiser, complete com intervalo de datas de entrega. Não é necessário preencher todos os campos.",
-                                       "mediaHint":  "Formulário de filtros do termo."
-                                   },
-                                   {
-                                       "title":  "Gerar documento",
-                                       "description":  "Clique em Gerar termo para montar a pré-visualização. Use Limpar para reiniciar os campos.",
-                                       "mediaHint":  "Botões Gerar termo e Limpar."
-                                   },
-                                   {
-                                       "title":  "Analise a pré-visualização",
-                                       "description":  "Revise os dados do colaborador e dos itens entregues no iframe exibido. O badge indica se o documento veio do cache local ou do servidor.",
-                                       "mediaHint":  "Iframe de pré-visualização do termo."
-                                   },
-                                   {
-                                       "title":  "Baixar PDF",
-                                       "description":  "Com a pré-visualização carregada, clique em Baixar PDF no cabeçalho da seção para salvar o arquivo.",
-                                       "mediaHint":  "Botão Baixar PDF acima do iframe."
-                                   }
-                               ],
-                     "notes":  [
-                                   "Se nenhum HTML for retornado, revise os filtros ou gere novas entregas antes.",
-                                   "O download só habilita depois que o HTML estiver carregado."
-                               ]
-                 },
-    "configuracoes":  {
-                          "title":  "Configuracoes da conta",
-                          "summary":  "Gerencie credenciais/paginas de titulares e dependentes com hierarquia por nivel (master \u003e admin \u003e operador \u003e estagiario \u003e visitante) e reset de senha.",
-                          "steps":  [
-                                        {
-                                            "title":  "Buscar usuario ou dependente",
-                                            "description":  "Digite nome/username/email para trazer titulares (app_users) e dependentes (app_users_dependentes); admins nao veem credenciais acima do seu nivel (ex.: master).",
-                                            "mediaHint":  "Autocomplete de usuario."
-                                        },
-                                        {
-                                            "title":  "Definir credencial e status",
-                                            "description":  "Selecione a credencial (Master aparece apenas para quem ja e master) e alterne Ativo/Inativo. Apenas admin/master podem alterar.",
-                                            "mediaHint":  "Seletores de credencial e switch de status."
-                                        },
-                                        {
-                                            "title":  "Liberar ou bloquear paginas",
-                                            "description":  "Ative/desative os toggles de cada pagina; se nao houver lista salva, aplicamos o padrao da credencial.",
-                                            "mediaHint":  "Toggles de paginas em duas colunas."
-                                        },
-                                        {
-                                            "title":  "Salvar alteracoes",
-                                            "description":  "Clique em Salvar credencial para registrar (titular ou dependente). Historico grava credencial/paginas/status (action update).",
-                                            "mediaHint":  "Botao Salvar credencial."
-                                        },
-                                        {
-                                            "title":  "Reset de senha (admin)",
-                                            "description":  "Admins/master podem buscar usuario/dependente e enviar email de redefinicao (modo local indisponivel); registra historico com action password_reset.",
-                                            "mediaHint":  "Botao de reset de senha."
-                                        },
-                                        {
-                                            "title":  "Ver historico",
-                                            "description":  "Abra o historico para ver quem alterou credencial/paginas/status ou disparou reset (campo action mostra o tipo).",
-                                            "mediaHint":  "Botao de historico de credenciais."
-                                        }
-                                    ],
-                          "notes":  [
-                                        "Busca retorna titulares e dependentes (id do auth) respeitando o nivel do usuario logado; master enxerga tudo.",
-                                        "Em modo local, reset de senha fica indisponivel.",
-                                        "Se page_permissions estiver vazio, aplicamos o padrao da credencial.",
-                                        "As policies usam o level do catalogo para impedir que usuarios vejam/editem credenciais acima do seu nivel."
-                                    ]
-                      }
+    "dashboard": {
+        "title": "Dashboard de estoque",
+        "summary": "Use esta tela para ver rapidamente movimentação, valores e alertas de estoque.",
+        "steps": [
+            {
+                "title": "Aplicar filtros rápidos",
+                "description": "No campo Busca digite parte do nome de material, grupo ou pessoa e combine com período inicial/final; clique em Aplicar filtros para recalcular todos os gráficos. Use Limpar filtros para voltar ao panorama completo.",
+                "mediaHint": "Área de filtros no topo com período e campo de busca."
+            },
+            {
+                "title": "Ler os cards de destaque",
+                "description": "Os cards mostram totais consolidados (movimentado, saldo e alertas). Passe o mouse no ícone (i) para entender como cada indicador é calculado.",
+                "mediaHint": "Cards de resumo com valores e ícones."
+            },
+            {
+                "title": "Interagir com os gráficos",
+                "description": "Clique em uma barra ou fatia para filtrar o restante dos gráficos pelo mesmo termo. Use o chip Limpar que aparece acima do gráfico para remover o filtro.",
+                "mediaHint": "Gráfico com tooltip e chip de filtro ativo."
+            },
+            {
+                "title": "Expandir gráficos",
+                "description": "Para analisar um gráfico com mais espaço, clique no botão de expandir (canto superior direito do card). Feche clicando fora ou no ícone de fechar.",
+                "mediaHint": "Botão de expandir no cabeçalho do card."
+            }
+        ],
+        "notes": [
+            "Os gráficos respeitam os filtros aplicados; se algo parecer zerado, confirme o período.",
+            "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam."
+        ]
+    },
+    "dashboardAcidentes": {
+        "title": "Dashboard de acidentes",
+        "summary": "Monitore tendência, tipos de acidente e distribuições para SST.",
+        "steps": [
+            {
+                "title": "Definir filtros iniciais",
+                "description": "No campo Busca digite pessoa, agente ou local (trechos do nome/matrícula também funcionam) e combine com período e unidade/centro de serviço. Clique em Aplicar para recalcular os indicadores.",
+                "mediaHint": "Filtros do dashboard de acidentes."
+            },
+            {
+                "title": "Conferir indicadores-chave",
+                "description": "Os cards exibem totais, taxas e comparativos. Use o texto de ajuda abaixo dos cards para saber como foi calculado.",
+                "mediaHint": "Cards de KPI da tela de acidentes."
+            },
+            {
+                "title": "Ler gráficos com tooltips",
+                "description": "Use os botões (i) nos títulos para ver o que cada gráfico representa. Passe o mouse nos pontos/segmentos para ver valores detalhados.",
+                "mediaHint": "Gráfico com tooltip e ícone de info."
+            },
+            {
+                "title": "Abrir em tela cheia",
+                "description": "Clique no botão de expandir do gráfico desejado. A visualização modal permite enxergar mais pontos sem poluição visual.",
+                "mediaHint": "Modal de gráfico expandido."
+            }
+        ],
+        "notes": [
+            "Filtros são persistidos enquanto você navega pelo dashboard.",
+            "Se nenhum dado aparecer, valide se o período contém registros de acidentes."
+        ]
+    },
+    "estoque": {
+        "title": "Estoque atual",
+        "summary": "Consulta do saldo por material, alertas de estoque mínimo, ações rápidas e resumo financeiro.",
+        "steps": [
+            {
+                "title": "Filtrar materiais",
+                "description": "No campo Busca digite parte do nome, descrição, ID, cor ou CA do material para reduzir a lista; combine com centro de estoque e faixas de saldo. Clique em Aplicar para refinar ou em Limpar para remover todos os filtros.",
+                "mediaHint": "Filtros de estoque e botões Aplicar/Limpar."
+            },
+            {
+                "title": "Monitorar alertas",
+                "description": "O bloco \"Alertas de estoque\" mostra itens abaixo do mínimo e o valor estimado para reposição. Use a lista principal para revisar e ajustar os materiais críticos.",
+                "mediaHint": "Tabela de alertas com status vermelho/alarme."
+            },
+            {
+                "title": "Ações por material",
+                "description": "Em cada material, use o grupo 'Ações': Entrada (abrir cadastro de entrada), Saída (abrir cadastro de saída), sino (histórico de saídas do material) e o botão para alterar o mínimo. O sino fica ativo apenas se houver movimentação para o material.",
+                "mediaHint": "Botões circulares de ações (Entrada, Saída, Sino de histórico e Alterar mínimo)."
+            },
+            {
+                "title": "Consultar histórico de saídas",
+                "description": "Clique no sino em 'Ações' para abrir um modal com todas as saídas do material. Use o filtro Mês/Ano para reduzir a lista e veja quem recebeu, quantidade, data e quem autorizou. O botão só ativa quando existe movimentação registrada. Use o check \"Apenas com hist?rico de sa?das\" nos filtros para ver s? materiais com movimenta??o registrada.",
+                "mediaHint": "Modal em tabela listando saídas com filtro Mês/Ano."
+            },
+            {
+                "title": "Alterar estoque mínimo",
+                "description": "Clique em Alterar mínimo para abrir uma janela de edição. Informe o novo valor e confirme em Salvar. O sistema recarrega os dados após salvar.",
+                "mediaHint": "Modal de alteração do estoque mínimo com botões Cancelar/Salvar."
+            },
+            {
+                "title": "Usar paginação",
+                "description": "Navegue pelas páginas no rodapé da lista para ver mais itens. O total considera os filtros aplicados.",
+                "mediaHint": "Controles de página na parte inferior da lista."
+            }
+        ],
+        "notes": [
+            "O resumo financeiro abaixo dos alertas usa o valor unitário cadastrado no material.",
+            "Se um item não mostrar centro de estoque, revise as movimentações (entradas/saídas) do material.",
+            "Atalho: ao clicar em Entrada/Saída a partir do Estoque atual, o sistema tenta preencher automaticamente o Centro de estoque e o Material."
+        ]
+    },
+    "entradas": {
+        "title": "Entradas de estoque",
+        "summary": "Registro de novas entradas e consulta histórica.",
+        "steps": [
+            {
+                "title": "Registrar nova entrada",
+                "description": "Primeiro selecione o Centro de estoque (*). O campo Material só é liberado após escolher o centro. Em seguida, use o autocomplete para buscar e selecionar o material por nome ou ID. Preencha quantidade e data e clique em Registrar entrada para salvar. Dica: ao acessar a tela pelo Estoque atual, Centro de estoque e Material podem vir pré-preenchidos.",
+                "mediaHint": "Formulário de cadastro de entradas: Centro de estoque, Material (habilita após selecionar o centro), Quantidade e Data."
+            },
+            {
+                "title": "Aplicar filtros do histórico",
+                "description": "Use o campo Busca para digitar parte do nome, descrição ou ID do material (ou do usuário que registrou) e combine com centro de estoque, status e período para refinar o histórico. Use Limpar para remover todos os filtros.",
+                "mediaHint": "Filtros rápidos do histórico de entradas (inclui status)."
+            },
+            {
+                "title": "Editar, ver histórico ou cancelar",
+                "description": "Na tabela, use os ícones para cada entrada: olho (detalhes), lápis (editar), relógio (histórico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e não exibem os botões de edição/cancelamento. O cancelamento é bloqueado se as saídas ativas ficarem maiores que o saldo sem essa entrada; ajuste/estorne saídas antes.",
+                "mediaHint": "Ícones de detalhes, edição, histórico e cancelamento na linha."
+            },
+            {
+                "title": "Atualizar dados",
+                "description": "Clique em Atualizar no cabeçalho da lista para recarregar dados e sugestões de materiais.",
+                "mediaHint": "Botão Atualizar no topo da seção de histórico."
+            }
+        ],
+        "notes": [
+            "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descrição.",
+            "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro.",
+            "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já preenchidos.",
+            "Status e usuário de edição aparecem em detalhes e histórico; cancelamentos são registrados.",
+            "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrão).",
+            "Não é possível cancelar uma entrada se as saídas vigentes superarem o estoque que restaria sem ela; reduza ou estorne saídas primeiro."
+        ]
+    },
+    "saidas": {
+        "title": "Saídas de estoque",
+        "summary": "Entrega de EPIs para pessoas, com rastreabilidade e cancelamento.",
+        "steps": [
+            {
+                "title": "Registrar saída",
+                "description": "No campo de busca, digite o nome ou matrícula para achar a pessoa e selecione o material pelo autocomplete. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saída para gravar a entrega.",
+                "mediaHint": "Formulário de cadastro de saídas com busca de pessoa e material."
+            },
+            {
+                "title": "Conferir saldo disponível",
+                "description": "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberações acima do estoque.",
+                "mediaHint": "Bloco de saldo do material ao lado do formulário."
+            },
+            {
+                "title": "Editar ou cancelar",
+                "description": "Clique em Editar para carregar o registro no formulário: ele sobe para o topo, fica amarelo e mostra “Editando...”. Ajuste os campos necessários e clique em Salvar alterações para gravar; se desistir antes de salvar, use Cancelar edição para voltar ao modo de cadastro.",
+                "mediaHint": "Ações de edição e cancelamento na tabela de saídas."
+            },
+            {
+                "title": "Filtrar e paginar",
+                "description": "No campo Busca digite o nome ou matrícula da pessoa, ou nome/descrição/ID do material ou CA, para trazer apenas as saídas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessário e navegue pelas páginas no rodapé.",
+                "mediaHint": "Filtros superiores e paginação inferior do histórico."
+            }
+        ],
+        "notes": [
+            "Saídas canceladas ficam marcadas e não impactam o saldo.",
+            "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já selecionados.",
+            "O histórico detalha quem registrou e quando a entrega foi alterada."
+        ]
+    },
+    "materiais": {
+        "title": "Cadastro de materiais / EPI",
+        "summary": "Cadastro centralizado de EPI com variações, características e valor.",
+        "steps": [
+            {
+                "title": "Cadastrar ou editar material",
+                "description": "Preencha nome, grupo, valor unitário e CA (quando houver). Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para novo cadastro ou para gravar alterações.",
+                "mediaHint": "Formulário principal de materiais."
+            },
+            {
+                "title": "Gerenciar variações e atributos",
+                "description": "Adicione características, cores, fabricante e tamanho pelo autocomplete. Campos de lista aceitam múltiplos itens.",
+                "mediaHint": "Campos de característica, cor e tamanho."
+            },
+            {
+                "title": "Filtrar catálogo",
+                "description": "Digite no campo Busca parte do nome, descrição, ID ou CA para filtrar rapidamente o catálogo; refine por grupo, tamanho, fabricante ou característica e clique em Aplicar. Limpar remove todos os filtros.",
+                "mediaHint": "Bloco de filtros acima da tabela de materiais."
+            },
+            {
+                "title": "Histórico e detalhes",
+                "description": "Na tabela use o botão de relógio para ver histórico de alterações e o botão com olho para abrir o detalhamento completo do material.",
+                "mediaHint": "Ações de histórico e detalhes na tabela de materiais."
+            }
+        ],
+        "notes": [
+            "A edição de um material reaproveita o mesmo formulário, mantendo os campos preenchidos.",
+            "Valor unitário é usado nos cálculos de estoque e relatórios."
+        ]
+    },
+    "pessoas": {
+        "title": "Cadastro de pessoas",
+        "summary": "Registro de colaboradores com data de admissao obrigatoria, demissao opcional e historico.",
+        "steps": [
+            {
+                "title": "Cadastrar ou atualizar colaborador",
+                "description": "Preencha nome, matricula, centro de servico, setor, cargo e DATA DE ADMISSAO (obrigatoria, dd/MM/yyyy). Ao editar, o formulario fica destacado; use Salvar para concluir.",
+                "mediaHint": "Formulario principal de pessoas."
+            },
+            {
+                "title": "Registrar demissão / status",
+                "description": "Para desligar, marque como inativo e informe a DATA DE DEMISSAO (opcional). Reativar pede confirmacao.",
+                "mediaHint": "Campos de status e datas no formulario."
+            },
+            {
+                "title": "Filtrar lista",
+                "description": "No campo Busca digite nome ou matricula (parcial) e combine com centro de servico ou setor; clique em Aplicar. Limpar remove todos os filtros.",
+                "mediaHint": "Filtros e chips acima da tabela de pessoas."
+            },
+            {
+                "title": "Ler resumo rapido",
+                "description": "Os cards de resumo mostram quantidade por centro e setores mais frequentes conforme o filtro aplicado.",
+                "mediaHint": "Cards de resumo logo após os filtros."
+            },
+            {
+                "title": "Ver historico de alteracoes",
+                "description": "Na tabela, clique no botao de relogio (Historico) para ver quem alterou dados do colaborador e quando.",
+                "mediaHint": "Modal de historico de pessoas."
+            }
+        ],
+        "notes": [
+            "DATA DE ADMISSAO e obrigatoria; DATA DE DEMISSAO e opcional. Formato aceito: dd/MM/yyyy.",
+            "Inativar recomenda preencher a data de demissao; reativar pede confirmacao e registra no historico.",
+            "Use o botao Atualizar na tabela para recarregar dados do servidor."
+        ]
+    },
+    "acidentes": {
+        "title": "Registro de acidentes",
+        "summary": "Cadastro completo de acidentes com filtros, histórico e detalhes.",
+        "steps": [
+            {
+                "title": "Preencher dados do acidente",
+                "description": "Selecione colaborador, tipo de acidente, lesão e parte afetada. Campos obrigatórios estão marcados com *. Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para gravar.",
+                "mediaHint": "Formulário de cadastro de acidentes."
+            },
+            {
+                "title": "Relacionar local e agente",
+                "description": "Use os campos de local, centro de serviço e agente causador para enriquecer indicadores de SST.",
+                "mediaHint": "Seção de local/agente dentro do formulário."
+            },
+            {
+                "title": "Filtrar registros",
+                "description": "Use o campo Busca para digitar pessoa (nome/matrícula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de serviço ou agente e clique em Aplicar. Limpar zera todos os filtros.",
+                "mediaHint": "Bloco de filtros acima da lista de acidentes."
+            },
+            {
+                "title": "Consultar histórico e detalhes",
+                "description": "Clique no botão de relógio para ver histórico de alterações ou no botão com olho para abrir os detalhes completos do acidente.",
+                "mediaHint": "Modal de detalhes do acidente."
+            }
+        ],
+        "notes": [
+            "Ao salvar um acidente, a lista é recarregada automaticamente.",
+            "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integrações de cadastro base."
+        ]
+    },
+    "hhtMensal": {
+        "title": "HHT Mensal",
+        "summary": "Registre o HHT (homem-hora trabalhada) por mes e centro de servico, com calculo automatico, status, historico e paginacao.",
+        "steps": [
+            {
+                "title": "Escolher mes e centro",
+                "description": "Informe o mes de referencia (no banco fica sempre no dia 01) e selecione o centro de servico. Mes+centro e unico.",
+                "mediaHint": "Campos Mes de referencia e Centro de servico."
+            },
+            {
+                "title": "Selecionar modo de calculo",
+                "description": "Manual: digite o HHT final. Simples: informe apenas pessoas e horas base. Completo: habilita escala, descontos e horas extras.",
+                "mediaHint": "Campo Modo e campos condicionais."
+            },
+            {
+                "title": "Filtrar lista",
+                "description": "Use Mes inicio, Mes fim e Centro de servico para filtrar e clique em Aplicar. Limpar remove todos os filtros.",
+                "mediaHint": "Bloco de filtros do HHT mensal."
+            },
+            {
+                "title": "Ver detalhes do registro",
+                "description": "Use o botao de olho na tabela para abrir o modal com todos os campos: status, modo, HHT calculado/final, descontos, escala, registro (ID, registrado por, cadastrado/atualizado em/por).",
+                "mediaHint": "Modal de detalhes do HHT mensal."
+            },
+            {
+                "title": "Ver historico",
+                "description": "Clique no botao de Historico para ver alteracoes (UPDATE/DELETE) registradas no Supabase.",
+                "mediaHint": "Modal de historico do HHT mensal."
+            }
+        ],
+        "notes": [
+            "HHT calculado e HHT final sao recalculados no Supabase ao salvar.",
+            "Horas negativas nao sao aceitas (constraints no banco).",
+            "Os campos Registrado/Atualizado por exibem o nome do usuario se o ID existir em app_users; caso contrario aparece o ID.",
+            "No cadastro de acidente, o HHT e preenchido automaticamente usando o HHT mensal ativo do centro/mes informado.",
+            "Status usa a tabela status_hht (Ativo/Cancelado); registros cancelados continuam visiveis, sem botoes de edicao/cancelamento.",
+            "A lista de HHT mensal é paginada (20 itens/pagina)."
+        ]
+    },
+    "termoEpi": {
+        "title": "Termo de EPI",
+        "summary": "Gere e baixe o termo de responsabilidade de EPI para colaboradores.",
+        "steps": [
+            {
+                "title": "Preencher filtros de busca",
+                "description": "No campo Busca informe matrícula ou nome do colaborador (parcial ou completo) e, se quiser, complete com intervalo de datas de entrega. Não é necessário preencher todos os campos.",
+                "mediaHint": "Formulário de filtros do termo."
+            },
+            {
+                "title": "Gerar documento",
+                "description": "Clique em Gerar termo para montar a pré-visualização. Use Limpar para reiniciar os campos.",
+                "mediaHint": "Botões Gerar termo e Limpar."
+            },
+            {
+                "title": "Analise a pré-visualização",
+                "description": "Revise os dados do colaborador e dos itens entregues no iframe exibido. O badge indica se o documento veio do cache local ou do servidor.",
+                "mediaHint": "Iframe de pré-visualização do termo."
+            },
+            {
+                "title": "Baixar PDF",
+                "description": "Com a pré-visualização carregada, clique em Baixar PDF no cabeçalho da seção para salvar o arquivo.",
+                "mediaHint": "Botão Baixar PDF acima do iframe."
+            }
+        ],
+        "notes": [
+            "Se nenhum HTML for retornado, revise os filtros ou gere novas entregas antes.",
+            "O download só habilita depois que o HTML estiver carregado."
+        ]
+    },
+    "configuracoes": {
+        "title": "Configuracoes da conta",
+        "summary": "Gerencie credenciais/paginas de titulares e dependentes com hierarquia por nivel (master > admin > operador > estagiario > visitante) e reset de senha.",
+        "steps": [
+            {
+                "title": "Buscar usuario ou dependente",
+                "description": "Digite nome/username/email para trazer titulares (app_users) e dependentes (app_users_dependentes); admins nao veem credenciais acima do seu nivel (ex.: master).",
+                "mediaHint": "Autocomplete de usuario."
+            },
+            {
+                "title": "Definir credencial e status",
+                "description": "Selecione a credencial (Master aparece apenas para quem ja e master) e alterne Ativo/Inativo. Apenas admin/master podem alterar.",
+                "mediaHint": "Seletores de credencial e switch de status."
+            },
+            {
+                "title": "Liberar ou bloquear paginas",
+                "description": "Ative/desative os toggles de cada pagina; se nao houver lista salva, aplicamos o padrao da credencial.",
+                "mediaHint": "Toggles de paginas em duas colunas."
+            },
+            {
+                "title": "Salvar alteracoes",
+                "description": "Clique em Salvar credencial para registrar (titular ou dependente). Historico grava credencial/paginas/status (action update).",
+                "mediaHint": "Botao Salvar credencial."
+            },
+            {
+                "title": "Reset de senha (admin)",
+                "description": "Admins/master podem buscar usuario/dependente e enviar email de redefinicao (modo local indisponivel); registra historico com action password_reset.",
+                "mediaHint": "Botao de reset de senha."
+            },
+            {
+                "title": "Ver historico",
+                "description": "Abra o historico para ver quem alterou credencial/paginas/status ou disparou reset (campo action mostra o tipo).",
+                "mediaHint": "Botao de historico de credenciais."
+            }
+        ],
+        "notes": [
+            "Busca retorna titulares e dependentes (id do auth) respeitando o nivel do usuario logado; master enxerga tudo.",
+            "Em modo local, reset de senha fica indisponivel.",
+            "Se page_permissions estiver vazio, aplicamos o padrao da credencial.",
+            "As policies usam o level do catalogo para impedir que usuarios vejam/editem credenciais acima do seu nivel."
+        ]
+    }
 }

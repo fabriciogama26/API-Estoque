@@ -11,6 +11,8 @@ Na lista de materiais do Estoque atual, os botões de ação por material podem 
 
 - Entradas: `?materialId=<id>&centroCusto=<centro>` (também aceita `centroEstoque`)
 - Saídas: `?centroEstoque=<centro>&materialId=<id>`
+- Histórico de saídas (novo): o sino em "Ações" abre modal com todas as saídas do material, com filtro Mês/Ano. O botão só fica ativo se houver movimentação registrada.
+- Filtro "Apenas com histórico de saídas": na tela Estoque, marque para ver somente materiais com movimentação (sino ativo).
 
 ## Regras de estoque (banco)
 
@@ -63,3 +65,4 @@ Arquivos e docs:
 - Edge Functions: `supabase/functions/desligamento-import` e `supabase/functions/desligamento-template`
 - Bucket/policies: `supabase/migrations/0077_fix_imports_bucket.sql`
 - Documentacao do fluxo: `docs/DesligamentoEmMassa.txt`
+

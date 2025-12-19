@@ -2874,47 +2874,42 @@ function precisaResolverCentroServico(saida) {
 }
 
 async function preencherCentrosServicoSaidas(registros = []) {
-  const candidatos = (registros ?? []).filter((saida) => precisaResolverCentroServico(saida))
-  if (!candidatos.length) {
-    return registros
-  }
-  const pessoaIds = Array.from(new Set(candidatos.map((saida) => saida.pessoaId).filter(Boolean)))
+  const lista = Array.isArray(registros) ? registros : []
+  const pessoaIds = Array.from(new Set(lista.map((saida) => saida.pessoaId).filter(Boolean)))
   if (!pessoaIds.length) {
-    return registros
+    return lista
   }
   try {
     const detalhes = await carregarPessoasViewDetalhes(pessoaIds)
     if (!detalhes.size) {
-      return registros
+      return lista
     }
-    return (registros ?? []).map((saida) => {
-      if (!precisaResolverCentroServico(saida)) {
-        return saida
-      }
+    return lista.map((saida) => {
       const detalhe = detalhes.get(saida.pessoaId)
       if (!detalhe) {
         return saida
       }
+      const precisaResolver = precisaResolverCentroServico(saida)
       const centroNome = resolveTextValue(detalhe.centroServico ?? detalhe.local ?? detalhe.setor ?? '')
       const setorNome = resolveTextValue(detalhe.setor ?? detalhe.centroServico ?? detalhe.local ?? '')
       const localNome = resolveTextValue(detalhe.local ?? detalhe.centroServico ?? setorNome ?? '')
-      if (!centroNome && !setorNome && !localNome) {
-        return saida
-      }
       return {
         ...saida,
-        centroServico: centroNome || saida.centroServico,
+        centroServico: precisaResolver ? centroNome || saida.centroServico : saida.centroServico || centroNome,
         centroServicoId: saida.centroServicoId || detalhe.centroServicoId || null,
-        setor: setorNome || saida.setor || '',
+        setor: precisaResolver ? setorNome || saida.setor || centroNome : saida.setor || setorNome || centroNome,
         setorId: saida.setorId || detalhe.setorId || null,
-        local: localNome || saida.local || centroNome || setorNome || '',
+        local: precisaResolver ? localNome || saida.local || centroNome || setorNome || '' : saida.local || localNome || centroNome || setorNome || '',
+        pessoaNome: detalhe.nome || saida.pessoaNome || '',
+        pessoaMatricula: detalhe.matricula || saida.pessoaMatricula || '',
+        pessoa: saida.pessoa || detalhe,
       }
     })
   } catch (error) {
     reportClientError('Nao foi possivel resolver centros de servico das saidas.', error, {
       pessoaIds,
     })
-    return registros
+    return lista
   }
 }
 

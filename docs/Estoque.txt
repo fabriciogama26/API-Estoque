@@ -28,6 +28,9 @@ Filtros
 - Periodo inicial/final (mes/ano), para analisar saldo dentro de um contexto.
 - Termo de busca (nome do material, fabricante, centro).
 - Centro de estoque/servico.
+- Checkboxes:
+  - "Apenas alertas": mantém somente materiais com alerta ativo.
+  - "Apenas com histórico de saídas": mantém somente materiais que já possuem movimentação de saída (sino ativo). Útil para focar em itens que já foram entregues pelo menos uma vez.
 - Botoes:
   - "Aplicar filtros" consulta na API (sem refiltro local em memoria).
   - "Limpar filtros" restaura defaults e recarrega a visao padrao a partir da API.
@@ -62,6 +65,7 @@ Lista de itens
 - Acoes por material:
   - Entrada: abre a tela de Entradas e tenta preencher Material + Centro de estoque automaticamente.
   - Saida: abre a tela de Saidas e tenta preencher Centro de estoque + Material automaticamente (centro e obrigatorio para habilitar o campo de material).
+  - Sino de historico: abre um modal com todas as saídas do material (ativo apenas se houver movimentação). O modal traz tabela com quem recebeu, matrícula, quantidade, data e autorizado, e permite filtrar por mês/ano.
   - Alterar minimo: abre um modal para informar o novo estoque minimo e salvar.
   - Observacao: quando houver mais de um centro relacionado ao material, o atalho usa o primeiro centro encontrado no contexto do estoque atual.
 - Estoque minimo (alteracao):

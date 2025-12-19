@@ -94,6 +94,7 @@ export const filterEstoqueItens = (itens = [], filters = {}, periodoFiltro = {})
       : null
   const aplicarEstoqueMinimo = estoqueMinimoNumero !== null
   const apenasAlertas = Boolean(filters.apenasAlertas)
+  const apenasSaidas = Boolean(filters.apenasSaidas)
 
   return itens.filter((item) => {
     if (centroFiltro) {
@@ -126,6 +127,14 @@ export const filterEstoqueItens = (itens = [], filters = {}, periodoFiltro = {})
 
     if (apenasAlertas && !item.alerta) {
       return false
+    }
+
+    if (apenasSaidas) {
+      const temSaidaFlag = Boolean(item.temSaida || item.ultimaSaida)
+      const totalSaidas = Number(item.totalSaidas ?? 0)
+      if (!temSaidaFlag && totalSaidas <= 0) {
+        return false
+      }
     }
 
     return matchesTerm(item, termoNormalizado)
