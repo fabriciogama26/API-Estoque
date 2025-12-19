@@ -80,7 +80,7 @@
             },
             {
                 "title": "Consultar histórico de saídas",
-                "description": "Clique no sino em 'Ações' para abrir um modal com todas as saídas do material. Use o filtro Mês/Ano para reduzir a lista e veja quem recebeu, quantidade, data e quem autorizou. O botão só ativa quando existe movimentação registrada.",
+                "description": "Clique no sino em 'Ações' para abrir um modal com todas as saídas do material. Use o filtro Mês/Ano para reduzir a lista e veja quem recebeu, quantidade, data e quem autorizou. O botão só ativa quando existe movimentação registrada. Use o check \"Apenas com hist?rico de sa?das\" nos filtros para ver s? materiais com movimenta??o registrada.",
                 "mediaHint": "Modal em tabela listando saídas com filtro Mês/Ano."
             },
             {
