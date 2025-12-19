@@ -1,4 +1,4 @@
-import { Eye } from 'lucide-react'
+import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { EditIcon, HistoryIcon } from '../../icons.jsx'
 import {
   formatDateWithOptionalTime as formatDate,

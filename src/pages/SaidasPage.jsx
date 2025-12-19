@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react'
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Eye } from 'lucide-react'
+import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ExitIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'

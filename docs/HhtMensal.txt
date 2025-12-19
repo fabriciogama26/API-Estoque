@@ -1,0 +1,76 @@
+Tela: HHT Mensal (Acidentes)
+================================
+
+Visao geral
+-----------
+- Registrar e manter HHT (homem-hora trabalhada) por mes e centro de servico.
+- Calcula HHT final no Supabase conforme modo (manual, simples, completo).
+- Mantem historico (UPDATE/DELETE/cancelamento) com motivo e bloqueia cancelamento quando ha acidentes no mesmo centro/mes.
+- Usa status (status_hht) em vez de booleano ativo; cancelado continua visivel.
+
+Arquitetura e dados
+-------------------
+- Tabelas: hht_mensal, hht_mensal_hist, status_hht (referencia).
+- View: hht_mensal_view (traz status_nome, centro_servico_nome, created/updated username).
+- Constraints:
+  - mes_ref sempre dia 01 (date_trunc), unique (mes_ref, centro_servico_id) exceto quando status = Cancelado.
+  - Checks para horas >= 0; modo in (manual, simples, completo); hht_informado apenas no manual.
+- Triggers/Funcoes:
+  - hht_mensal_apply_calcs: normaliza modo, status default, calcula hht_calculado/hht_final, zera campos no modo simples.
+  - hht_mensal_prevent_inactivation: impede delete/cancelar se houver acidente no centro/mes; seta status cancelado.
+  - hht_mensal_log_update_delete: grava historico em hht_mensal_hist.
+  - hht_mensal_delete(p_id, p_motivo): marca como cancelado (nao deleta) e loga motivo.
+- Status padrao armazenados em app.status_hht_default e app.status_hht_cancelado; fallback busca em status_hht.
+
+Frontend (componentes principais)
+---------------------------------
+- Pagina: src/pages/HhtMensalAcidentes.jsx
+  - Form: HhtMensalForm (modo com botao de ajuda, campos dependentes).
+  - Filtros: HhtMensalFilters (mes inicio/fim, centro).
+  - Lista: HhtMensalTable (usa hht_mensal_view, paginacao 20 por pagina).
+  - Historico: HhtMensalHistoryModal/HhtMensalHistoryTimeline (mostra mudanca de status como texto).
+  - Detalhes: HhtMensalDetailsModal (Status, modo, HHTs, descontos, registro por/ em).
+  - Cancelamento: HhtMensalDeleteModal (solicita motivo).
+- Servico: api.hhtMensal.list/create/update/delete/history/peopleCount (usa view).
+- Campo HHT em Cadastro de Acidente: read-only, auto-preenchido ao selecionar data+centro; bloqueia se HHT mensal cancelado ou inexistente.
+
+Fluxos e regras de negocio
+--------------------------
+- Modo:
+  - Manual: exige hht_informado; hht_final = informado.
+  - Simples: hht_final = pessoas * horas_base; zera descontos/extras e escala = 1.
+  - Completo: hht_calculado = (pessoas * horas_base * escala) - descontos + extras.
+- Status:
+  - Ativo (default) ou Cancelado (impede novas edicoes/cancelamentos no front).
+  - Cancelar via botao remove botoes de editar/cancelar na lista e registra historico.
+- Historico:
+  - UPDATE grava antes/depois e motivo (via app.hht_motivo).
+  - DELETE (na pratica cancelamento) grava snapshot e motivo.
+  - Timeline exibe campo Status com texto (resolve no history service).
+- Validacoes:
+  - Unico mes+centro se status != Cancelado.
+  - Impede cancelar se existir acidente no mesmo mes/centro.
+  - HHT mensal cancelado nao pode ser usado para registrar acidente; mensagem orienta cadastrar novo.
+
+Paginação e listagem
+--------------------
+- Lista paginada (20 linhas/pagina) com colunas: Mes, Centro, Status, Modo, HHT final, Registrado por, Cadastrado em, Acoes.
+- Acoes ativas apenas se status != Cancelado (detalhes e historico sempre disponiveis).
+
+Historico com nomes
+-------------------
+- history() resolve nomes de usuarios (app_users) e nomes de status (status_hht) antes de enviar ao front, evitando UUIDs.
+- View ja fornece created_by_username/updated_by_username para exibir quem registrou/atualizou.
+
+Ajuda e conteudo
+----------------
+- Help inline do campo Modo (botao "i") explicando Manual/Simples/Completo.
+- helpContent.json chave "hhtMensal" atualizada com detalhes de status, historico e auto-preenchimento do HHT no cadastro de acidente.
+
+Checklist de testes rapidos
+---------------------------
+- Criar HHT (modo simples) e salvar: status Ativo, aparece na lista/paginacao.
+- Editar para modo completo (muda status? nao) e conferir historico registra alteracao.
+- Cancelar HHT: status muda para Cancelado, botoes editar/cancelar somem, historico registra status.
+- Tentar registrar acidente com HHT cancelado: deve bloquear e exibir mensagem.
+- Auto-preencher HHT no acidente ao escolher data+centro com HHT ativo no mes.

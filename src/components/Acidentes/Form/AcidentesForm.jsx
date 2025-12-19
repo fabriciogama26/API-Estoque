@@ -225,7 +225,7 @@ export function AcidentesForm({
             required
           />
         </label>
-        <label className="field">
+        <label className="field field--accent">
           <span>
             HHT <span className="asterisco">*</span>
           </span>
@@ -235,10 +235,11 @@ export function AcidentesForm({
             step="1"
             name="hht"
             value={form.hht}
-            onChange={onChange}
             placeholder="0"
             required
             inputMode="numeric"
+            readOnly
+            disabled
           />
         </label>
         <label className="field">

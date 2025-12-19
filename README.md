@@ -3,6 +3,7 @@
 Aplicacao React (Vite) para gestao de EPIs/Estoque integrada ao Supabase.
 
 Documentacao detalhada por pagina em `docs/`.
+- HHT Mensal (acidentes): ver `docs/HhtMensal.txt`
 
 ## Atalhos a partir do Estoque atual
 
@@ -10,6 +11,11 @@ Na lista de materiais do Estoque atual, os botões de ação por material podem 
 
 - Entradas: `?materialId=<id>&centroCusto=<centro>` (também aceita `centroEstoque`)
 - Saídas: `?centroEstoque=<centro>&materialId=<id>`
+
+## Regras de estoque (banco)
+
+- Saídas já são bloqueadas quando excedem o saldo disponível (`validar_saldo_saida`).
+- Cancelar uma entrada é vetado se o saldo remanescente ficar menor que as saídas ativas (ver `supabase/migrations/0082_prevent_cancel_entrada_negative_stock.sql`).
 
 ## Requisitos
 

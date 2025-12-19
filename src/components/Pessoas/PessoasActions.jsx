@@ -1,4 +1,4 @@
-import { History as HistoryIcon } from 'lucide-react'
+import HistoryIcon from 'lucide-react/dist/esm/icons/history.js'
 import { EditIcon } from '../icons.jsx'
 
 export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory, isHistoryLoading }) {

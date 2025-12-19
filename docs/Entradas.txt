@@ -75,6 +75,11 @@ Boas praticas
 - Em modo local, `localApi.entradas.*` deve replicar campos como `materialId`, `dataEntrada`, `quantidade`, `centroCusto`, `usuarioResponsavel`.
 - Utilizar filtros de data para recortes especificos antes de gerar relatorios externos.
 
+Cancelamento e saldo
+--------------------
+- O cancelamento de uma entrada e bloqueado se, ao remove-la do estoque, as saidas ativas ficarem maiores que o saldo restante. A validacao acontece no Supabase (trigger) e a mensagem aparece no modal de cancelamento.
+- Para prosseguir com o cancelamento, primeiro reduza/estorne as saidas ou registre uma nova entrada que cubra o saldo pendente.
+
 Atalhos (vindo do Estoque atual)
 -------------------------------
 - A tela de Entradas pode ser aberta com parametros na URL para pre-preencher o formulario:

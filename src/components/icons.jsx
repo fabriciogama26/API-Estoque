@@ -1,29 +1,27 @@
-import {
-  AlertTriangle,
-  ArrowDownUp,
-  BarChart3,
-  ChevronDown,
-  Boxes,
-  CircleDollarSign,
-  ClipboardList,
-  History,
-  LayoutDashboard,
-  LogIn,
-  LogOut,
-  Maximize2,
-  PenSquare,
-  PieChart,
-  Shield,
-  ShoppingCart,
-  TrendingUp,
-  Users,
-  Save,
-  XCircle,
-  Plus,
-  Info,
-  UserCircle,
-  LifeBuoy,
-} from 'lucide-react'
+import AlertTriangle from 'lucide-react/dist/esm/icons/alert-triangle.js'
+import ArrowDownUp from 'lucide-react/dist/esm/icons/arrow-down-up.js'
+import BarChart3 from 'lucide-react/dist/esm/icons/bar-chart-3.js'
+import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.js'
+import Boxes from 'lucide-react/dist/esm/icons/boxes.js'
+import CircleDollarSign from 'lucide-react/dist/esm/icons/circle-dollar-sign.js'
+import ClipboardList from 'lucide-react/dist/esm/icons/clipboard-list.js'
+import History from 'lucide-react/dist/esm/icons/history.js'
+import LayoutDashboard from 'lucide-react/dist/esm/icons/layout-dashboard.js'
+import LogIn from 'lucide-react/dist/esm/icons/log-in.js'
+import LogOut from 'lucide-react/dist/esm/icons/log-out.js'
+import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.js'
+import PenSquare from 'lucide-react/dist/esm/icons/pen-square.js'
+import PieChart from 'lucide-react/dist/esm/icons/pie-chart.js'
+import Shield from 'lucide-react/dist/esm/icons/shield.js'
+import ShoppingCart from 'lucide-react/dist/esm/icons/shopping-cart.js'
+import TrendingUp from 'lucide-react/dist/esm/icons/trending-up.js'
+import Users from 'lucide-react/dist/esm/icons/users.js'
+import Save from 'lucide-react/dist/esm/icons/save.js'
+import XCircle from 'lucide-react/dist/esm/icons/x-circle.js'
+import Plus from 'lucide-react/dist/esm/icons/plus.js'
+import Info from 'lucide-react/dist/esm/icons/info.js'
+import UserCircle from 'lucide-react/dist/esm/icons/user-circle.js'
+import LifeBuoy from 'lucide-react/dist/esm/icons/life-buoy.js'
 
 const defaultSize = 18
 const defaultStroke = 1.8
