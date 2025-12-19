@@ -5,6 +5,13 @@ function toNumber(value) {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+const normalizeText = (value) => {
+  if (value === undefined || value === null) {
+    return ''
+  }
+  return String(value).trim()
+}
+
 export function parsePeriodo(params = {}) {
   if (!params) {
     return null
@@ -263,6 +270,40 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       .sort((a, b) => b.getTime() - a.getTime())[0] || null
 
     const alertaAtivo = deficitQuantidade > 0
+    const ultimaSaidaInfo =
+      saidasMaterial
+        .map((saida) => {
+          const dataEntregaDate = new Date(saida.dataEntrega ?? saida.data_entrega ?? null)
+          if (Number.isNaN(dataEntregaDate.getTime())) {
+            return null
+          }
+          return {
+            saidaId: saida.id ?? saida.saidaId ?? null,
+            pessoaId: saida.pessoaId ?? null,
+            pessoaNome: normalizeText(saida.pessoaNome ?? saida.pessoa?.nome ?? ''),
+            pessoaMatricula: normalizeText(saida.pessoaMatricula ?? saida.pessoa?.matricula ?? ''),
+            quantidade: Number(saida.quantidade ?? 0),
+            dataEntrega: dataEntregaDate.toISOString(),
+            dataEntregaValue: dataEntregaDate.getTime(),
+            usuarioResponsavel: normalizeText(
+              saida.usuarioResponsavelNome ??
+                saida.usuarioResponsavel ??
+                saida.usuario_responsavel ??
+                saida.usuarioResponsavelId ??
+                ''
+            ),
+          }
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.dataEntregaValue - a.dataEntregaValue)[0] || null
+
+    let ultimaSaida = null
+    if (ultimaSaidaInfo) {
+      // remove campo auxiliar de ordenaÇõÇœo
+      // eslint-disable-next-line no-unused-vars
+      const { dataEntregaValue, ...rest } = ultimaSaidaInfo
+      ultimaSaida = rest
+    }
 
     return {
       materialId: material.id,
@@ -286,6 +327,8 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       totalEntradas: totalEntradasMaterial,
       totalSaidas: totalSaidasMaterial,
       ultimaAtualizacao: ultimaAtualizacaoDate ? ultimaAtualizacaoDate.toISOString() : null,
+      temSaida: saidasMaterial.length > 0,
+      ultimaSaida,
     }
   })
 

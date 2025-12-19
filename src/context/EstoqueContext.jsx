@@ -13,6 +13,7 @@ const INITIAL_FILTERS = {
   centroCusto: '',
   estoqueMinimo: '',
   apenasAlertas: false,
+  apenasSaidas: false,
 }
 
 export function EstoqueProvider({ children }) {

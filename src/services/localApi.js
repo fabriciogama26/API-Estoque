@@ -2569,7 +2569,19 @@ const localApi = {
   estoque: {
     async current(params = {}) {
       const periodo = parsePeriodo(params)
-      return readState((state) => montarEstoqueAtual(state.materiais, state.entradas, state.saidas, periodo))
+      return readState((state) => {
+        const pessoasMap = new Map((state.pessoas ?? []).map((pessoa) => [pessoa.id, mapLocalPessoaRecord(pessoa)]))
+        const saidasEnriquecidas = (state.saidas ?? []).map((saida) => {
+          const pessoa = pessoasMap.get(saida.pessoaId)
+          return {
+            ...saida,
+            pessoa,
+            pessoaNome: saida.pessoaNome ?? pessoa?.nome ?? '',
+            pessoaMatricula: saida.pessoaMatricula ?? pessoa?.matricula ?? '',
+          }
+        })
+        return montarEstoqueAtual(state.materiais, state.entradas, saidasEnriquecidas, periodo)
+      })
     },
     async saldo(materialId) {
       if (!materialId) {
