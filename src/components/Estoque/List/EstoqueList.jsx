@@ -26,6 +26,7 @@ export function EstoqueList({
     isLoading: false,
     error: null,
     filtroMes: '',
+    page: 1,
   })
   const minStockInputRef = useRef(null)
 
@@ -38,7 +39,7 @@ export function EstoqueList({
   }
 
   const closeSaidaModal = () =>
-    setSaidaModal({ open: false, item: null, registros: [], isLoading: false, error: null, filtroMes: '' })
+    setSaidaModal({ open: false, item: null, registros: [], isLoading: false, error: null, filtroMes: '', page: 1 })
 
   const loadSaidas = async (item, filtroMes) => {
     if (!item) return
@@ -57,7 +58,7 @@ export function EstoqueList({
       }
     }
 
-    setSaidaModal((prev) => ({ ...prev, isLoading: true, error: null, registros: [], item }))
+    setSaidaModal((prev) => ({ ...prev, isLoading: true, error: null, registros: [], item, page: 1 }))
     try {
       const params = { materialId: item.materialId }
       if (dataInicio) params.dataInicio = dataInicio
@@ -70,7 +71,7 @@ export function EstoqueList({
         : Array.isArray(resposta?.registros)
         ? resposta.registros
         : []
-      setSaidaModal((prev) => ({ ...prev, registros, isLoading: false }))
+      setSaidaModal((prev) => ({ ...prev, registros, isLoading: false, page: 1 }))
     } catch (err) {
       setSaidaModal((prev) => ({
         ...prev,
@@ -89,6 +90,7 @@ export function EstoqueList({
       isLoading: true,
       error: null,
       filtroMes: '',
+      page: 1,
     })
     loadSaidas(item, '')
   }
@@ -132,6 +134,11 @@ export function EstoqueList({
   const saidaIsLoading = Boolean(saidaModal.isLoading)
   const saidaError = saidaModal.error
   const hasSaidaModal = saidaModal.open && Boolean(saidaModalItem)
+  const saidaPage = saidaModal.page || 1
+  const saidaPageSize = 5
+  const saidaTotalPages =
+    saidaRegistros.length > 0 ? Math.max(1, Math.ceil(saidaRegistros.length / saidaPageSize)) : 1
+  const saidaPaginados = saidaRegistros.slice((saidaPage - 1) * saidaPageSize, saidaPage * saidaPageSize)
 
   const handleModalSave = async () => {
     if (!modalItem || modalIsSaving) return
@@ -330,50 +337,62 @@ export function EstoqueList({
             ) : saidaRegistros.length === 0 ? (
               <p className="feedback">Nenhuma saída encontrada.</p>
             ) : (
-              <table className="estoque-saida-modal__table">
-                <thead>
-                  <tr>
-                    <th>Colaborador</th>
-                    <th>Quantidade</th>
-                    <th>Data</th>
-                    <th>Autorizado por</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {saidaRegistros.map((registro) => {
-                    const nome =
-                      registro?.pessoa?.nome ||
-                      registro?.pessoaNome ||
-                      registro?.nome ||
-                      'Não informado'
-                    const matricula = registro?.pessoa?.matricula || registro?.pessoaMatricula || '-'
-                    const quantidade = formatInteger(registro?.quantidade ?? 0)
-                    const dataEntrega = formatDateTimeValue(registro?.dataEntrega || registro?.data_entrega)
-                    const autorizado =
-                      registro?.usuarioResponsavelNome ||
-                      registro?.usuarioResponsavel ||
-                      registro?.usuario_responsavel ||
-                      'Não informado'
-                    return (
-                      <tr key={registro.id || `${registro.materialId}-${registro.dataEntrega}-${quantidade}`}>
-                        <td>
-                          <div className="estoque-saida-modal__cell-main">{nome}</div>
-                          <div className="estoque-saida-modal__cell-sub">Matrícula: {matricula || '-'}</div>
-                        </td>
-                        <td>
-                          <div className="estoque-saida-modal__cell-main">{quantidade}</div>
-                        </td>
-                        <td>
-                          <div className="estoque-saida-modal__cell-main">{dataEntrega}</div>
-                        </td>
-                        <td>
-                          <div className="estoque-saida-modal__cell-main">{autorizado}</div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <>
+                <table className="estoque-saida-modal__table">
+                  <thead>
+                    <tr>
+                      <th>Colaborador</th>
+                      <th>Quantidade</th>
+                      <th>Data</th>
+                      <th>Autorizado por</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {saidaPaginados.map((registro) => {
+                      const nome =
+                        registro?.pessoa?.nome ||
+                        registro?.pessoaNome ||
+                        registro?.nome ||
+                        'Não informado'
+                      const matricula = registro?.pessoa?.matricula || registro?.pessoaMatricula || '-'
+                      const quantidade = formatInteger(registro?.quantidade ?? 0)
+                      const dataEntrega = formatDateTimeValue(registro?.dataEntrega || registro?.data_entrega)
+                      const autorizado =
+                        registro?.usuarioResponsavelNome ||
+                        registro?.usuarioResponsavel ||
+                        registro?.usuario_responsavel ||
+                        'Não informado'
+                      return (
+                        <tr key={registro.id || `${registro.materialId}-${registro.dataEntrega}-${quantidade}`}>
+                          <td>
+                            <div className="estoque-saida-modal__cell-main">{nome}</div>
+                            <div className="estoque-saida-modal__cell-sub">Matrícula: {matricula || '-'}</div>
+                          </td>
+                          <td>
+                            <div className="estoque-saida-modal__cell-main">{quantidade}</div>
+                          </td>
+                          <td>
+                            <div className="estoque-saida-modal__cell-main">{dataEntrega}</div>
+                          </td>
+                          <td>
+                            <div className="estoque-saida-modal__cell-main">{autorizado}</div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {saidaTotalPages > 1 ? (
+                  <div className="estoque-saida-modal__pagination">
+                    <TablePagination
+                      currentPage={saidaPage}
+                      totalItems={saidaRegistros.length}
+                      pageSize={saidaPageSize}
+                      onPageChange={(page) => setSaidaModal((prev) => ({ ...prev, page }))}
+                    />
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </div>
