@@ -1,14 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
-import { resolveEffectiveAppUser } from '../services/effectiveUserService.js'
-import { mapCredentialUuidToText } from '../services/effectiveUserService.js'
 import { isLocalMode } from '../config/runtime.js'
-import {
-  canAccessPath as canAccessPathHelper,
-  describeCredential,
-  resolveAllowedPageIds,
-  resolveAllowedPaths,
-} from '../config/permissions.js'
+import { PAGE_CATALOG, PAGE_REQUIRED_PERMISSION, canAccessPath as canAccessPathHelper, resolveAllowedPaths } from '../config/permissions.js'
 import { useAuth } from './AuthContext.jsx'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
 
@@ -23,17 +16,6 @@ export function PermissionsProvider({ children }) {
   )
   const [error, setError] = useState(null)
 
-  const credentialFromMetadata =
-    user?.metadata?.credential ||
-    user?.metadata?.credencial ||
-    user?.metadata?.role ||
-    user?.metadata?.cargo ||
-    user?.role ||
-    null
-
-  const pagePermissionsFromMetadata =
-    (user?.metadata?.page_permissions || user?.metadata?.permissoes_paginas || user?.metadata?.paginas || [])
-
   const loadProfile = useCallback(async () => {
     if (!isAuthenticated || !user?.id || isLocalMode || !isSupabaseConfigured() || !supabase) {
       setProfile(null)
@@ -45,21 +27,21 @@ export function PermissionsProvider({ children }) {
     setLoading(true)
     setError(null)
     try {
-      const effective = await resolveEffectiveAppUser(user.id, { forceRefresh: true })
-      const effectiveCredential = effective?.credential || null
-      const effectivePages = Array.isArray(effective?.pagePermissions) ? effective.pagePermissions : []
-      const profileData = effective?.profile
+      const { data, error: fetchError } = await supabase.from('v_me').select('*').single()
+      if (fetchError) {
+        throw fetchError
+      }
+      const profileData = data
         ? {
-            ...effective.profile,
-            credential_text: effective.profile.credential_text ?? (await mapCredentialUuidToText(effective.profile.credential)),
-            app_user_id: effective.appUserId || effective.profile.id,
-            dependent_profile: effective.dependentProfile || null,
-            is_dependent: effective.isDependent || false,
-            effective_credential: effectiveCredential,
-            effective_page_permissions: effectivePages,
+            user_id: data.user_id,
+            owner_id: data.owner_id,
+            parent_user_id: data.parent_user_id,
+            roles: Array.isArray(data.roles) ? data.roles : [],
+            permissions: Array.isArray(data.permissions) ? data.permissions : [],
+            perm_version: data.perm_version || 1,
+            is_master: Boolean(data.is_master),
           }
         : null
-
       setProfile(profileData)
     } catch (err) {
       reportError(err, { stage: 'load_permissions_profile', userId: user?.id })
@@ -74,38 +56,40 @@ export function PermissionsProvider({ children }) {
     loadProfile()
   }, [loadProfile])
 
-  const credential = useMemo(() => {
-    if (isLocalMode) {
-      return 'master'
-    }
-    // Quando for dependente, prioriza a credencial efetiva (dependente > titular)
-    if (profile?.effective_credential) {
-      return profile.effective_credential
-    }
-    return profile?.credential_text || credentialFromMetadata || 'admin'
-  }, [credentialFromMetadata, profile?.credential_text, profile?.effective_credential])
+  const derivedIsMaster = useMemo(() => {
+    const hasMasterRole = Array.isArray(profile?.roles) && profile.roles.some((r) => (r || '').toLowerCase() === 'master')
+    return Boolean(profile?.is_master) || hasMasterRole || isLocalMode
+  }, [profile?.is_master, profile?.roles])
 
-  const explicitPageIds = useMemo(() => {
-    const fromEffective = Array.isArray(profile?.effective_page_permissions)
-      ? profile.effective_page_permissions
-      : []
-    const fromProfile = Array.isArray(profile?.page_permissions) ? profile.page_permissions : []
-    const fromMetadata = Array.isArray(pagePermissionsFromMetadata) ? pagePermissionsFromMetadata : []
-    return fromEffective.length ? fromEffective : fromProfile.length ? fromProfile : fromMetadata
-  }, [pagePermissionsFromMetadata, profile?.effective_page_permissions, profile?.page_permissions])
-
-  const allowedPageIds = useMemo(
-    () => (isLocalMode ? resolveAllowedPageIds('master') : resolveAllowedPageIds(credential, explicitPageIds)),
-    [credential, explicitPageIds]
-  )
+  const derivedIsAdmin = useMemo(() => {
+    const hasAdminRole =
+      Array.isArray(profile?.roles) &&
+      profile.roles.some((r) => ['admin', 'owner'].includes((r || '').toLowerCase()))
+    return derivedIsMaster || hasAdminRole
+  }, [derivedIsMaster, profile?.roles])
 
   const allowedPaths = useMemo(
     () =>
       isLocalMode
-        ? resolveAllowedPaths({ credential: 'master', explicitPages: resolveAllowedPageIds('master') })
-        : resolveAllowedPaths({ credential, explicitPages: explicitPageIds }),
-    [credential, explicitPageIds]
+        ? resolveAllowedPaths({ permissions: [], isMaster: true })
+        : resolveAllowedPaths({
+            permissions: derivedIsAdmin ? [] : profile?.permissions || [],
+            isMaster: derivedIsMaster || derivedIsAdmin,
+          }),
+    [derivedIsAdmin, derivedIsMaster, profile?.permissions]
   )
+
+  const allowedPageIds = useMemo(() => {
+    if (isLocalMode || derivedIsMaster || derivedIsAdmin) {
+      return PAGE_CATALOG.map((p) => p.id)
+    }
+    const perms = Array.isArray(profile?.permissions) ? profile.permissions : []
+    return PAGE_CATALOG.filter((page) => {
+      const requiredPerm = PAGE_REQUIRED_PERMISSION[page.id]
+      if (!requiredPerm) return true
+      return perms.includes(requiredPerm)
+    }).map((page) => page.id)
+  }, [derivedIsAdmin, derivedIsMaster, profile?.permissions])
 
   const canAccessPath = useCallback(
     (pathname) => {
@@ -115,16 +99,25 @@ export function PermissionsProvider({ children }) {
       if (isLocalMode) {
         return true
       }
-      return canAccessPathHelper(pathname, { credential, explicitPages: explicitPageIds })
+      return canAccessPathHelper(pathname, {
+        permissions: derivedIsAdmin ? [] : profile?.permissions || [],
+        isMaster: derivedIsMaster || derivedIsAdmin,
+      })
     },
-    [credential, explicitPageIds, isAuthenticated]
+    [profile?.permissions, derivedIsAdmin, derivedIsMaster, isAuthenticated]
   )
 
-  const value = useMemo(
-    () => ({
-      credential,
-      credentialLabel: describeCredential(credential),
-      isAdmin: ['admin', 'master'].includes((credential || '').toLowerCase()),
+  const value = useMemo(() => {
+    const isAdminFlag = derivedIsAdmin
+    return {
+      permissions: profile?.permissions || [],
+      roles: profile?.roles || [],
+      ownerId: profile?.owner_id || null,
+      userId: profile?.user_id || null,
+      credential: profile?.roles?.[0] || (derivedIsMaster ? 'master' : null),
+      isMaster: derivedIsMaster,
+      isAdmin: isAdminFlag,
+      credentialLabel: profile?.roles?.[0] || (derivedIsMaster ? 'Master' : 'Usuario'),
       allowedPageIds,
       allowedPaths,
       canAccessPath,
@@ -132,9 +125,8 @@ export function PermissionsProvider({ children }) {
       error,
       profile,
       refresh: loadProfile,
-    }),
-    [allowedPageIds, allowedPaths, canAccessPath, credential, error, loadProfile, loading, profile]
-  )
+    }
+  }, [allowedPaths, canAccessPath, derivedIsAdmin, derivedIsMaster, error, loadProfile, loading, profile])
 
   return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>
 }

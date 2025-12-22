@@ -1,66 +1,112 @@
-Credenciais e permissoes
-========================
+﻿Credenciais e permissões (RBAC + owner)
+=======================================
 
-Visao geral
------------
-O sistema controla acesso por:
-- Autenticacao (Supabase Auth)
-- Credencial (perfil/role)
-- Permissoes de pagina (lista de pageId)
-
-O usuario logado pode ser:
-- Titular (registro em public.app_users)
-- Dependente (registro em public.app_users_dependentes), herdando configuracoes do titular quando aplicavel
-
-
-Mapa de codigo (frontend)
-------------------------
-- PermissionsProvider: `src/context/PermissionsContext.jsx`
-  - Carrega credential/page_permissions (titular ou dependente)
-  - Calcula `canAccessPath()` e `allowedPaths`
-- effectiveUserService: `src/services/effectiveUserService.js`
-  - Resolve credencial efetiva (heranca para dependentes)
-  - Mapeia credential UUID <-> id_text do catalogo
-- ProtectedRoute: `src/components/ProtectedRoute.jsx`
-  - Bloqueia rotas sem autenticacao/permissao e redireciona para `/sem-acesso`
-- NavBar: `src/components/NavBar.jsx`
-  - Oculta itens de menu conforme `canAccessPath`
-- NoAccessPage: `src/pages/NoAccessPage.jsx`
-  - Pagina exibida quando o usuario nao tem acesso
-- Configuracoes (permissoes e reset de senha): `src/pages/Configuracoes.jsx`
-
-
-Constantes e configuracoes
---------------------------
-- Catalogo de paginas (pageId -> path): `src/config/permissions.js` (`PAGE_CATALOG`)
-- Permissoes padrao por credencial: `src/config/permissions.js` (`DEFAULT_CREDENTIAL_PERMISSIONS`)
-
+Resumo
+------
+- Usuários (titular + dependentes) em `app_users` com `parent_user_id` e `perm_version`.
+- RBAC padrão: `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permission_overrides`.
+- Escopo por conta: `account_owner_id` em tabelas de negócio; RLS libera apenas dados do owner (`my_owner_id()`).
+- Helpers: `my_owner_id()` resolve o titular; `has_permission(key)` = override deny > override allow > role_permissions (sem legado credential master).
+- Visão `/me`: `public.v_me` traz `owner_id`, `roles`, `permissions[]`, `perm_version`, `is_master` (somente role master).
+- Front usa `PermissionsContext` + `permissions.js` para mapear rotas, menus e toggles.
 
 Modelo de dados (Supabase)
 --------------------------
-- Titulares: `public.app_users`
-  - `id` (uuid) deve ser o mesmo UUID do `auth.users.id`
-  - `credential` (uuid -> `app_credentials_catalog.id`)
-  - `page_permissions` (text[] com pageId)
+**Perfis**
+- `public.app_users`: `id` = `auth.users.id`; `parent_user_id` (null se titular); `perm_version`; `ativo`.
+- `public.app_users_dependentes`: legado; trigger mantém sincronizado em `app_users`.
+- Índice/constraint: FK `parent_user_id` -> `app_users(id)` e índice em `parent_user_id`.
 
-- Dependentes: `public.app_users_dependentes`
-  - `auth_user_id` (uuid do `auth.users.id` do dependente)
-  - `owner_app_user_id` (uuid do titular em `app_users.id`)
-  - `credential` e `page_permissions` podem herdar do titular quando vazios
-  - `ativo` controla se o dependente pode logar/usar o sistema
+**RBAC**
+- `public.roles` (id, name).
+- `public.permissions` (id, key, description).
+- `public.role_permissions` (role_id, permission_id) PK composto.
+- `public.user_roles` (user_id, role_id, scope_parent_user_id default 0000...). PK composto.
+- `public.user_permission_overrides` (user_id, permission_key, allowed) PK composto.
+- Seeds de roles: `master`, `admin`, `supervisor`, `viewer`, `owner`, `operador`, `estagiario`, `visitante`.
+- Seeds de permissions: `estoque.read|write`, `pessoas.read|write`, `acidentes.read|write`, `hht.read|write`, `rbac.manage`, `users.manage`, `credentials.manage`.
+- Mapeamentos principais:
+  - master: todas as permissions (somente via role master).
+  - admin/owner: todas as permissions seed (inclui rbac/users/credentials.manage).
+  - supervisor/viewer: leituras (hht.read, estoque.read, pessoas.read, acidentes.read).
+  - operador: estoque.read/write + pessoas.read + acidentes.read + hht.read.
+  - estagiario: leituras básicas (estoque.read, pessoas.read, acidentes.read, hht.read).
+  - visitante: estoque.read.
+  - Override por usuário: deny > allow > role.
 
-- Catalogo de credenciais: `public.app_credentials_catalog`
-  - `id` (uuid), `id_text` (ex.: admin/operador), `label`, `level` (hierarquia)
+**Helpers**
+- `public.my_owner_id(p_user_id default auth.uid())`: retorna o titular (se dependente, devolve `parent_user_id`, senão o próprio id).
+- `public.has_permission(key, p_user_id default auth.uid())`: override deny > override allow > role_permissions; sem legado credential master.
+- `public.resolve_user_permissions(p_user_id)`: array de keys efetivas; master apenas se usuário tiver role master.
 
-- Auditoria de mudancas: `public.app_users_credential_history`
-  - Guarda before/after de credencial/permissoes e a acao (`update`/`password_reset`)
-  - Inclui `target_auth_user_id` (para historico de dependentes e titulares)
+**Auditoria**
+- `public.app_users_credential_history`: log de alterações (roles/perms/reset). Campos: user_id (owner), target_auth_user_id, owner_app_user_id, target_dependent_id, user_username, changed_by, action (`role_update`/`password_reset`), before/after (pages/perms), timestamps.
+- Triggers de perm_version: em `user_roles` e `user_permission_overrides` (função `bump_perm_version`).
 
+**Conta/owner e RLS**
+- `account_owner_id` em tabelas de negócio/catálogos (materiais, entradas, saídas, pessoas, acidentes, hht, catálogos etc.).
+- Trigger `set_account_owner_id_default` define `account_owner_id = my_owner_id()` se não vier.
+- RLS por domínio (0086): select/insert/update/delete só se `account_owner_id = my_owner_id()` e, para escrita, `has_permission('<dominio>.write')`.
+  - Domínios: estoque (materiais/entradas/saídas/etc), pessoas, acidentes, hht, catálogos (estoque.write).
+- Gestão de RBAC (0092+): policies de `user_roles`/`user_permission_overrides` exigem `has_permission('rbac.manage')`.
+- 0093/0094: master pode gerenciar qualquer owner; admin/owner só dependentes do próprio owner; dependente-admin não pode alterar titular nem atribuir master.
 
-Boas praticas
--------------
-- Sempre garantir que `public.app_users.id` = `auth.users.id` para titulares.
-- Manter `PAGE_CATALOG` e `DEFAULT_CREDENTIAL_PERMISSIONS` atualizados ao criar novas telas.
-- Proteger rotas (ProtectedRoute) e esconder menu (NavBar) nao substitui validacao no backend:
-  operacoes sensiveis devem ser validadas no Supabase (RLS/RPC/Edge Functions) quando possivel.
+**Visão /me**
+- `public.v_me`: `user_id`, `owner_id`, `parent_user_id`, `roles[]`, `permissions[]`, `perm_version`, `is_master` (somente role master).
+- Grants: `grant usage on schema public to authenticated; grant select on v_me to authenticated;`.
 
+**Backfills**
+- Migration 0089: preenche `account_owner_id` por campos de autor; atribui roles padrão (owner, viewer; master para credential legacy). Após 0092, apenas role master concede acesso total.
+
+Fluxo de uso (frontend)
+-----------------------
+- Contexto: `src/context/PermissionsContext.jsx`
+  - Carrega `v_me`; deriva `isMaster` se role master.
+  - `allowedPaths`/`canAccessPath` usam `permissions.js` (PAGE_REQUIRED_PERMISSION).
+  - `isAdmin`: master ou roles admin/owner; admin tem todas as rotas liberadas (sem depender de permissions), mas ainda filtra usuários ao próprio owner.
+
+- Configurações: `src/pages/Configuracoes.jsx`
+  - Busca usuários: master vê todos; admin vê ele + dependentes (não lista masters para não-master).
+  - Dropdown de role: master, admin, operador, estagiario, visitante (owner/viewer ocultos).
+  - Toggles por grupo (`PERMISSION_GROUPS` em `src/config/permissions.js`) ligam chaves combinadas (read/write/dash/termo etc.); role master liga todos.
+  - Salvar: remove/insere `user_roles`, aplica overrides (diff vs. role), atualiza ativo, sincroniza ban, grava histórico em `app_users_credential_history`.
+  - Histórico: modal estilo histórico de saídas, usando `app_users_credential_history` do usuário.
+  - Reset de senha (admin): reusa busca, chama `supabase.auth.resetPasswordForEmail`, registra histórico `password_reset`.
+
+- Navegação/Rotas:
+  - `permissions.js`: `PAGE_CATALOG` e `PAGE_REQUIRED_PERMISSION` (ex.: dashboard -> estoque.read, dashboard-acidentes -> acidentes.read, entradas/saídas -> estoque.read, pessoas -> pessoas.read, materiais/termo -> estoque.read, hht -> hht.read, configuracoes -> estoque.write).
+  - `resolveAllowedPaths`: paths liberados; master ignora checagem.
+
+**Permissões extras do front**
+- Extras como `estoque.dashboard`, `estoque.entradas`, `estoque.saidas`, `estoque.materiais`, `estoque.termo` controlam UI/rotas; RLS valida apenas dominios read/write. Se quiser segurança fina, crie perms reais e policies específicas.
+
+**scope_parent_user_id**
+- Campo existe em `user_roles` mas não é usado; o filtro efetivo é `my_owner_id()` + `account_owner_id`. Se precisar de escopo adicional, alinhar policy e preenchimento.
+
+Como liberar acesso total (master)
+----------------------------------
+1) Usuário ativo em `app_users` (ou dependente ativo).
+2) Inserir em `user_roles` a role `master`.
+3) `isMaster` = true somente por role master → menu/rotas liberados, sem depender de permissions[].
+
+Diagnóstico rápido de “Sem permissão”
+-------------------------------------
+- Checar `/v_me`: roles contém master? permissions contém key da rota (PAGE_REQUIRED_PERMISSION)?
+- Dependente? `parent_user_id` correto?
+- RLS escrita negada? Conferir `account_owner_id` vs `my_owner_id()`.
+- Salvar credencial: verificar policy `rbac.manage` aplicada, perm rbac.manage, e se alvo não é titular quando ator não é master.
+
+Referências de migrations principais
+------------------------------------
+- 0083: parent_user_id + RBAC tables + has_permission/my_owner_id.
+- 0084: account_owner_id columns + triggers.
+- 0085: initplan fix em policies de user_roles/overrides.
+- 0086: RLS por domínio usando account_owner_id + has_permission; novas perms pessoas/acidentes.
+- 0087: perm_version bump + resolve_user_permissions + view v_me.
+- 0088: grants v_me + RLS app_errors.
+- 0089: backfill account_owner_id + roles padrão (owner/viewer/master).
+- 0090: roles adicionais (operador/estagiario/visitante) e mapeamentos.
+- 0091: policy para user_roles (estoque.write) [substituída].
+- 0092: rbac.manage/users.manage/credentials.manage, policies de gestão, master apenas por role.
+- 0093: master pode gerenciar qualquer owner; admin/owner apenas no próprio owner (is_role_master + rbac.manage).
+- 0094: dependente-admin não altera titular nem atribui master; alvo precisa ser dependente do mesmo owner, exceto para master.

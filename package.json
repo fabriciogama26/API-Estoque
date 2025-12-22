@@ -14,11 +14,13 @@
   },
   "dependencies": {
     "@hcaptcha/react-hcaptcha": "^1.17.1",
+    "@rollup/rollup-win32-x64-msvc": "^4.52.5",
     "@supabase/supabase-js": "^2.75.1",
     "lucide-react": "^0.544.0",
     "prop-types": "^15.8.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-redux": "^9.2.0",
     "react-router-dom": "^7.9.1",
     "recharts": "^3.2.1"
   },
