@@ -63,11 +63,11 @@ Fluxo de uso (frontend)
 - Contexto: `src/context/PermissionsContext.jsx`
   - Carrega `v_me`; deriva `isMaster` se role master.
   - `allowedPaths`/`canAccessPath` usam `permissions.js` (PAGE_REQUIRED_PERMISSION).
-  - `isAdmin`: master ou roles admin/owner; admin tem todas as rotas liberadas (sem depender de permissions), mas ainda filtra usuários ao próprio owner.
+  - `isAdmin`: master ou admin; admin tem todas as rotas liberadas (sem depender de permissions) e ainda filtra usu?rios ao pr?prio owner.
 
-- Configurações: `src/pages/Configuracoes.jsx`
-  - Busca usuários: master vê todos; admin vê ele + dependentes (não lista masters para não-master).
-  - Dropdown de role: master, admin, operador, estagiario, visitante (owner/viewer ocultos).
+- Configura??es: `src/pages/Configuracoes.jsx`
+  - Vis?vel apenas para master/admin.
+  - Busca usu?rios: master v? todos; admin v? ele + dependentes (n?o lista masters para n?o-master).
   - Toggles por grupo (`PERMISSION_GROUPS` em `src/config/permissions.js`) ligam chaves combinadas (read/write/dash/termo etc.); role master liga todos.
   - Salvar: remove/insere `user_roles`, aplica overrides (diff vs. role), atualiza ativo, sincroniza ban, grava histórico em `app_users_credential_history`.
   - Histórico: modal estilo histórico de saídas, usando `app_users_credential_history` do usuário.

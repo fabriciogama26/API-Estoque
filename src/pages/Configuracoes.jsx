@@ -45,25 +45,55 @@ async function searchAllUsers(term, { isMaster, currentUserId } = {}) {
   if (error) {
     return []
   }
-  const resultados = (data || []).map((u) => ({
-    id: u.id,
-    type: u.parent_user_id ? 'dependent' : 'owner',
-    label: u.username || u.display_name || u.email || u.id,
-    credential: null,
-    credentialId: null,
-    page_permissions: [],
-    ativo: u.ativo,
-    owner_app_user_id: u.parent_user_id || u.id,
-    dependent_id: u.parent_user_id ? u.id : null,
-    email: u.email || '',
-    parent_user_id: u.parent_user_id,
-  }))
+  const baseResults = (data || []).map((u) => {
+    const labelBase = u.display_name || u.username || u.email || u.id
+    return {
+      id: u.id,
+      type: u.parent_user_id ? 'dependent' : 'owner',
+      labelBase,
+      username: u.username,
+      email: u.email || '',
+      credential: null,
+      credentialId: null,
+      page_permissions: [],
+      ativo: u.ativo,
+      owner_app_user_id: u.parent_user_id || u.id,
+      dependent_id: u.parent_user_id ? u.id : null,
+      parent_user_id: u.parent_user_id,
+    }
+  })
+
+  // Minimiza ru?do: usa display_name e s? adiciona sufixo quando houver duplicata.
+  const labelCount = baseResults.reduce((acc, item) => {
+    const key = item.labelBase.toLowerCase()
+    acc.set(key, (acc.get(key) || 0) + 1)
+    return acc
+  }, new Map())
+
+  const resultados = baseResults.map((item) => {
+    const key = item.labelBase.toLowerCase()
+    const duplicated = (labelCount.get(key) || 0) > 1
+    const suffix = duplicated ? ` ? ${item.email || item.username || item.id.slice(0, 8)}` : ''
+    return {
+      id: item.id,
+      type: item.type,
+      label: `${item.labelBase}${suffix}`,
+      credential: null,
+      credentialId: null,
+      page_permissions: [],
+      ativo: item.ativo,
+      owner_app_user_id: item.owner_app_user_id,
+      dependent_id: item.dependent_id,
+      email: item.email,
+      parent_user_id: item.parent_user_id,
+    }
+  })
   const dedup = new Map()
   resultados.forEach((item) => {
     if (!dedup.has(item.id)) dedup.set(item.id, item)
   })
   return Array.from(dedup.values())
-}
+
 
 export function ConfiguracoesPage() {
   const { user } = useAuth()
