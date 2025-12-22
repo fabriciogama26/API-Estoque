@@ -138,6 +138,12 @@ declare
   v_tem_acidente boolean;
   v_status_cancelado uuid;
 begin
+  -- Bypass para service_role (ex.: Service Key/Supabase console) ou flag de sessao manual.
+  if coalesce(auth.role(), '') = 'service_role'
+     or current_setting('app.bypass_hht_guard', true) = 'on' then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+
   v_status_cancelado := nullif(current_setting('app.status_hht_cancelado', true), '')::uuid;
   if v_status_cancelado is null then
     select id into v_status_cancelado from public.status_hht where lower(status) = 'cancelado' limit 1;
@@ -220,8 +226,17 @@ end;
 $$ language plpgsql;
 
 drop trigger if exists hht_mensal_hist_trigger on public.hht_mensal;
-create trigger hht_mensal_hist_trigger
-  after update or delete on public.hht_mensal
+drop trigger if exists hht_mensal_hist_trigger_update on public.hht_mensal;
+drop trigger if exists hht_mensal_hist_trigger_delete on public.hht_mensal;
+
+-- Usa AFTER para UPDATE (precisa do NEW final) e BEFORE para DELETE (evita violar FK antes de remover o pai).
+create trigger hht_mensal_hist_trigger_update
+  after update on public.hht_mensal
+  for each row
+  execute function public.hht_mensal_log_update_delete();
+
+create trigger hht_mensal_hist_trigger_delete
+  before delete on public.hht_mensal
   for each row
   execute function public.hht_mensal_log_update_delete();
 

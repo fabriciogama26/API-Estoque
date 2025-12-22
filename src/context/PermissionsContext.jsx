@@ -64,7 +64,7 @@ export function PermissionsProvider({ children }) {
   const derivedIsAdmin = useMemo(() => {
     const hasAdminRole =
       Array.isArray(profile?.roles) &&
-      profile.roles.some((r) => ['admin', 'owner'].includes((r || '').toLowerCase()))
+      profile.roles.some((r) => (r || '').toLowerCase() === 'admin')
     return derivedIsMaster || hasAdminRole
   }, [derivedIsMaster, profile?.roles])
 
