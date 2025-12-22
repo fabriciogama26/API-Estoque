@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import SettingsIcon from 'lucide-react/dist/esm/icons/settings.js'
 import ShieldCheck from 'lucide-react/dist/esm/icons/shield-check.js'
@@ -9,13 +10,11 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { usePermissions } from '../context/PermissionsContext.jsx'
-import { CREDENTIAL_OPTIONS, PAGE_CATALOG, resolveAllowedPageIds, describeCredential } from '../config/permissions.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
-import { mapCredentialUuidToText, mapCredentialTextToUuid } from '../services/effectiveUserService.js'
 import '../styles/ConfiguracoesPage.css'
+import { PERMISSION_LABELS, PERMISSION_GROUPS } from '../config/permissions.js'
 
-// Sincroniza o status (ativo/inativo) com o auth.users via RPC (security definer no Supabase)
 async function syncAuthUserBan(userId, isActive) {
   if (!userId || !supabase) {
     return
@@ -29,7 +28,7 @@ async function syncAuthUserBan(userId, isActive) {
   }
 }
 
-async function searchAllUsers(term) {
+async function searchAllUsers(term, { isMaster, currentUserId } = {}) {
   if (!isSupabaseConfigured() || !supabase) {
     return []
   }
@@ -38,75 +37,32 @@ async function searchAllUsers(term) {
     return []
   }
   const filtros = [`username.ilike.%${q}%`, `display_name.ilike.%${q}%`, `email.ilike.%${q}%`]
-  const [usersResult, depsResult] = await Promise.all([
-    supabase
-      .from('app_users')
-      .select('id, display_name, username, email, credential, page_permissions, ativo')
-      .or(filtros.join(',')),
-    supabase
-      .from('app_users_dependentes')
-      .select(
-        `
-        id,
-        auth_user_id,
-        owner_app_user_id,
-        username,
-        display_name,
-        email,
-        credential,
-        page_permissions,
-        ativo,
-        owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, display_name, username, email, credential, page_permissions, ativo)
-      `
-      )
-      .or(filtros.join(',')),
-  ])
-
-  const resultados = []
-  const currentUserCredential = (await mapCredentialUuidToText((await supabase.auth.getSession())?.data?.session?.user?.id)) || ''
-  const isCurrentMaster = (currentUserCredential || '').toLowerCase() === 'master'
-
-  for (const user of usersResult.data || []) {
-    const credText = await mapCredentialUuidToText(user.credential)
-    if (!isCurrentMaster && (credText || '').toLowerCase() === 'master') {
-      continue
-    }
-    resultados.push({
-      id: user.id,
-      type: 'owner',
-      label: user.username || user.display_name || user.email || user.id,
-      credential: credText || 'admin',
-      credentialId: user.credential,
-      page_permissions: user.page_permissions,
-      ativo: user.ativo,
-      owner_app_user_id: user.id,
-      dependent_id: null,
-      email: user.email || '',
-    })
+  let query = supabase.from('app_users').select('id, display_name, username, email, ativo, parent_user_id').or(filtros.join(','))
+  if (!isMaster && currentUserId) {
+    query = query.or(`id.eq.${currentUserId},parent_user_id.eq.${currentUserId}`)
   }
-
-  for (const dep of depsResult.data || []) {
-    const credText = await mapCredentialUuidToText(dep.credential)
-    const ownerCred = await mapCredentialUuidToText(dep.owner?.credential)
-    const resolved = (credText || ownerCred || 'admin').toLowerCase()
-    if (!isCurrentMaster && resolved === 'master') {
-      continue
-    }
-    resultados.push({
-      id: dep.auth_user_id,
-      type: 'dependent',
-      label: dep.username || dep.display_name || dep.email || dep.auth_user_id,
-      credential: credText || ownerCred || 'admin',
-      credentialId: dep.credential || dep.owner?.credential,
-      page_permissions: dep.page_permissions?.length ? dep.page_permissions : dep.owner?.page_permissions || [],
-      ativo: dep.ativo,
-      owner_app_user_id: dep.owner_app_user_id,
-      dependent_id: dep.id,
-      email: dep.email || dep.owner?.email || '',
-    })
+  const { data, error } = await query
+  if (error) {
+    return []
   }
-
-  return resultados
+  const resultados = (data || []).map((u) => ({
+    id: u.id,
+    type: u.parent_user_id ? 'dependent' : 'owner',
+    label: u.username || u.display_name || u.email || u.id,
+    credential: null,
+    credentialId: null,
+    page_permissions: [],
+    ativo: u.ativo,
+    owner_app_user_id: u.parent_user_id || u.id,
+    dependent_id: u.parent_user_id ? u.id : null,
+    email: u.email || '',
+    parent_user_id: u.parent_user_id,
+  }))
+  const dedup = new Map()
+  resultados.forEach((item) => {
+    if (!dedup.has(item.id)) dedup.set(item.id, item)
+  })
+  return Array.from(dedup.values())
 }
 
 export function ConfiguracoesPage() {
@@ -116,7 +72,7 @@ export function ConfiguracoesPage() {
     <div className="stack config-page">
       <PageHeader
         icon={<SettingsIcon size={28} />}
-        title="ConfiguraÃ§Ãµes"
+        title="Configuracoes"
         subtitle="Gerencie sua conta e ajustes pessoais."
         actions={<HelpButton topic="configuracoes" />}
       />
@@ -126,14 +82,16 @@ export function ConfiguracoesPage() {
     </div>
   )
 }
-
 function PermissionsSection({ currentUser }) {
-  const { isAdmin, credential, allowedPageIds, refresh } = usePermissions()
+  const { isAdmin, isMaster, permissions: currentPermissions, roles: currentRoles, refresh } = usePermissions()
   const { reportError } = useErrorLogger('configuracoes_permissoes')
   const [users, setUsers] = useState([])
   const [selectedUserId, setSelectedUserId] = useState(null)
-  const [draftCredential, setDraftCredential] = useState('')
-  const [draftPages, setDraftPages] = useState([])
+  const [draftRoleId, setDraftRoleId] = useState(null)
+  const [draftPermissions, setDraftPermissions] = useState([])
+  const [rolesCatalog, setRolesCatalog] = useState([])
+  const [permissionsCatalog, setPermissionsCatalog] = useState([])
+  const [rolePermissionsMap, setRolePermissionsMap] = useState(new Map())
   const [isActive, setIsActive] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [feedback, setFeedback] = useState(null)
@@ -143,31 +101,99 @@ function PermissionsSection({ currentUser }) {
   const [historyItems, setHistoryItems] = useState([])
   const [userSearch, setUserSearch] = useState('')
   const [userSuggestions, setUserSuggestions] = useState([])
-  const [userSearchLoading, setUserSearchLoading] = useState(false)
   const [userSearchError, setUserSearchError] = useState(null)
 
-  const pageOptions = useMemo(
-    () => PAGE_CATALOG.filter((page) => !['no-access', 'configuracoes'].includes(page.id)),
-    []
+  const formatPerms = useCallback((perms) => {
+    if (!Array.isArray(perms) || perms.length === 0) return 'Nenhuma'
+    return perms.map((p) => PERMISSION_LABELS[p] || p).join(', ')
+  }, [])
+
+  const allPermissionKeys = useMemo(() => {
+    const base = new Set(permissionsCatalog.map((p) => p.key))
+    PERMISSION_GROUPS.forEach((g) => g.keys.forEach((k) => base.add(k)))
+    return Array.from(base)
+  }, [permissionsCatalog])
+
+  const computeEffectivePermissions = useCallback(
+    (roleId, overrides = []) => {
+      if (isLocalMode) {
+        return allPermissionKeys
+      }
+      const roleName = rolesCatalog.find((r) => r.id === roleId)?.name?.toLowerCase()
+      if (roleName === 'master') {
+        return allPermissionKeys
+      }
+      const roleDefault = rolePermissionsMap.get(roleId) || new Set()
+      const result = new Set(roleDefault)
+      overrides.forEach((ov) => {
+        if (!ov?.permission_key) return
+        if (ov.allowed === false) {
+          result.delete(ov.permission_key)
+        } else if (ov.allowed === true) {
+          result.add(ov.permission_key)
+        }
+      })
+      return Array.from(result)
+    },
+    [allPermissionKeys, isLocalMode, rolePermissionsMap, rolesCatalog]
   )
+
+  const hasRbacManage = useMemo(() => isMaster || (currentPermissions || []).includes('rbac.manage'), [currentPermissions, isMaster])
+
+  useEffect(() => {
+    const loadCatalogs = async () => {
+      if (isLocalMode || !isSupabaseConfigured() || !supabase) {
+        return
+      }
+      try {
+        const [rolesResult, permissionsResult, rolePermsResult] = await Promise.all([
+          supabase.from('roles').select('id, name').order('name'),
+          supabase.from('permissions').select('id, key, description').order('key'),
+          supabase.from('role_permissions').select('role_id, permission_id'),
+        ])
+        if (rolesResult.error) throw rolesResult.error
+        if (permissionsResult.error) throw permissionsResult.error
+        if (rolePermsResult.error) throw rolePermsResult.error
+        setRolesCatalog(rolesResult.data || [])
+        setPermissionsCatalog(permissionsResult.data || [])
+        const permById = new Map((permissionsResult.data || []).map((p) => [p.id, p.key]))
+        const map = new Map()
+        ;(rolePermsResult.data || []).forEach((rp) => {
+          const key = permById.get(rp.permission_id)
+          if (!key) return
+          if (!map.has(rp.role_id)) {
+            map.set(rp.role_id, new Set())
+          }
+          map.get(rp.role_id).add(key)
+        })
+        setRolePermissionsMap(map)
+      } catch (err) {
+        reportError(err, { stage: 'load_roles_permissions' })
+      }
+    }
+    loadCatalogs()
+  }, [reportError])
+
+  const permissionGroups = useMemo(() => PERMISSION_GROUPS, [])
   const selectedUser = useMemo(
     () => users.find((item) => item.id === selectedUserId) || null,
     [selectedUserId, users]
   )
 
-  const appliedPages = draftPages.length
-    ? draftPages
-    : resolveAllowedPageIds(draftCredential || selectedUser?.credential || credential)
+  const appliedPermissions = draftPermissions
 
-  const credentialOptions = useMemo(() => {
-    const base = CREDENTIAL_OPTIONS
-    const isMasterUser = (currentUser?.metadata?.credential || '').toLowerCase() === 'master'
-    if (isMasterUser) {
-      return [{ value: 'master', label: 'Master' }, ...base]
-    }
-    return base
-  }, [currentUser?.metadata?.credential])
+  const roleOptions = useMemo(
+    () =>
+      rolesCatalog
+        .filter((role) => ['master', 'admin', 'operador', 'estagiario', 'visitante'].includes(role.name.toLowerCase()))
+        .map((role) => ({
+          value: role.id,
+          label: role.name,
+        })),
+    [rolesCatalog]
+  )
 
+  const allowedPermLabels = useMemo(() => (currentPermissions || []).join(', '), [currentPermissions])
   const loadUsers = useCallback(async () => {
     if (!isAdmin) {
       setUsers([])
@@ -177,8 +203,8 @@ function PermissionsSection({ currentUser }) {
 
     const addFallbackUser = (lista, allowMaster = false) => {
       if (currentUser?.id) {
-        const cred = (currentUser.metadata?.credential || currentUser.role || 'admin').toLowerCase()
-        if (cred === 'master' && !allowMaster) {
+        const cred = (currentUser.metadata?.credential || currentUser.role || '').toLowerCase()
+        if (!allowMaster && cred === 'master') {
           return
         }
         lista.push({
@@ -186,8 +212,8 @@ function PermissionsSection({ currentUser }) {
           display_name: currentUser.name || currentUser.metadata?.nome || currentUser.metadata?.username,
           username: currentUser.metadata?.username || currentUser.email || currentUser.id,
           email: currentUser.email || '',
-          credential: cred,
-          page_permissions: currentUser.metadata?.page_permissions || [],
+          credential: null,
+          page_permissions: [],
           ativo: true,
           type: 'owner',
           owner_app_user_id: currentUser.id,
@@ -196,10 +222,8 @@ function PermissionsSection({ currentUser }) {
       }
     }
 
-    // Se Supabase nao estiver configurado ou estamos em modo local, usa fallback do usuario atual
     if (isLocalMode || !isSupabaseConfigured() || !supabase) {
       const listaFallback = []
-      // Em modo local ou sem Supabase, permite master apenas para nao travar a tela
       addFallbackUser(listaFallback, true)
       setUsers(listaFallback)
       if (!selectedUserId && listaFallback.length) {
@@ -211,74 +235,27 @@ function PermissionsSection({ currentUser }) {
     setIsLoading(true)
     setFeedback(null)
     try {
-      const [usersResult, depsResult] = await Promise.all([
-        supabase
-          .from('app_users')
-          .select('id, display_name, username, email, credential, page_permissions, ativo')
-          .order('display_name', { ascending: true }),
-        supabase
-          .from('app_users_dependentes')
-          .select(
-            `
-            id,
-            auth_user_id,
-            owner_app_user_id,
-            username,
-            display_name,
-            email,
-            credential,
-            page_permissions,
-            ativo,
-            owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, display_name, username, email, credential, page_permissions, ativo)
-          `
-          )
-          .order('display_name', { ascending: true }),
-      ])
-      if (usersResult.error) {
-        throw usersResult.error
+      let query = supabase
+        .from('app_users')
+        .select('id, display_name, username, email, page_permissions, ativo, parent_user_id')
+        .order('display_name', { ascending: true })
+      if (!isMaster && currentUser?.id) {
+        query = query.or(`id.eq.${currentUser.id},parent_user_id.eq.${currentUser.id}`)
       }
-      if (depsResult.error) {
-        throw depsResult.error
-      }
-      const listaMap = new Map()
-      const isCurrentMaster = (currentUser?.metadata?.credential || '').toLowerCase() === 'master'
-      for (const usuario of usersResult.data || []) {
-        const credText = await mapCredentialUuidToText(usuario.credential)
-        const credLower = (credText || '').toLowerCase()
-        if (!isCurrentMaster && credLower === 'master') {
-          continue
-        }
-        listaMap.set(usuario.id, {
-          ...usuario,
-          type: 'owner',
-          dependent_id: null,
-          owner_app_user_id: usuario.id,
-          credential: credText || 'admin',
-        })
-      }
-      for (const dep of depsResult.data || []) {
-        const credText = await mapCredentialUuidToText(dep.credential)
-        const ownerCred = await mapCredentialUuidToText(dep.owner?.credential)
-        const resolvedCred = (credText || ownerCred || 'admin').toLowerCase()
-        if (!isCurrentMaster && resolvedCred === 'master') {
-          continue
-        }
-        listaMap.set(dep.auth_user_id, {
-          id: dep.auth_user_id, // id do auth.user dependente
-          dependent_id: dep.id,
-          type: 'dependent',
-          display_name: dep.display_name || dep.owner?.display_name,
-          username: dep.username || dep.owner?.username || dep.auth_user_id,
-          email: dep.email || dep.owner?.email || '',
-          owner_app_user_id: dep.owner_app_user_id,
-          credential: credText || ownerCred || 'admin',
-          page_permissions: dep.page_permissions?.length
-            ? dep.page_permissions
-            : dep.owner?.page_permissions || [],
-          ativo: dep.ativo,
-        })
-      }
-      const lista = Array.from(listaMap.values())
+      const { data, error } = await query
+      if (error) throw error
+      const lista = (data || []).map((u) => ({
+        id: u.id,
+        display_name: u.display_name,
+        username: u.username,
+        email: u.email || '',
+        credential: null,
+        page_permissions: [],
+        ativo: u.ativo,
+        type: u.parent_user_id ? 'dependent' : 'owner',
+        owner_app_user_id: u.parent_user_id || u.id,
+        dependent_id: u.parent_user_id ? u.id : null,
+      }))
       if (!lista.length) {
         addFallbackUser(lista, true)
       }
@@ -297,7 +274,7 @@ function PermissionsSection({ currentUser }) {
     } finally {
       setIsLoading(false)
     }
-  }, [isAdmin, selectedUserId, currentUser])
+  }, [isAdmin, selectedUserId, currentUser, isMaster])
 
   useEffect(() => {
     if (isAdmin) {
@@ -306,45 +283,45 @@ function PermissionsSection({ currentUser }) {
   }, [isAdmin, loadUsers])
 
   useEffect(() => {
-    if (!selectedUser) {
-      return
-    }
-    const cred = (selectedUser.credential || 'admin').toLowerCase()
-    const paginasSalvas = Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : []
-    const paginasIniciais = paginasSalvas.length ? paginasSalvas : resolveAllowedPageIds(cred)
-    setDraftCredential(cred)
-    setDraftPages(paginasIniciais)
-    setIsActive(selectedUser.ativo !== false)
-  }, [selectedUser])
-
-  const togglePage = (pageId) => {
-    setDraftPages((prev) => {
-      const next = new Set(prev)
-      if (next.has(pageId)) {
-        next.delete(pageId)
-      } else {
-        next.add(pageId)
+    const loadAccess = async () => {
+      if (!selectedUser || !isSupabaseConfigured() || !supabase) {
+        setDraftRoleId(null)
+        setDraftPermissions([])
+        return
       }
-      return Array.from(next)
-    })
-  }
+      try {
+        const [userRoles, overrides] = await Promise.all([
+          supabase.from('user_roles').select('role_id').eq('user_id', selectedUser.id),
+          supabase.from('user_permission_overrides').select('permission_key, allowed').eq('user_id', selectedUser.id),
+        ])
+        if (userRoles.error) throw userRoles.error
+        if (overrides.error) throw overrides.error
+        const roleId = userRoles.data?.[0]?.role_id || null
+        setDraftRoleId(roleId)
+        setDraftPermissions(computeEffectivePermissions(roleId, overrides.data || []))
+        setIsActive(selectedUser.ativo !== false)
+      } catch (err) {
+        reportError(err, { stage: 'load_user_access', userId: selectedUser.id })
+        setDraftRoleId(null)
+        setDraftPermissions([])
+      }
+    }
+    loadAccess()
+  }, [computeEffectivePermissions, reportError, selectedUser])
 
-  const handleCredentialChange = (value) => {
-    setDraftCredential(value)
-    setDraftPages(resolveAllowedPageIds(value))
+  const handleRoleChange = (value) => {
+    setDraftRoleId(value)
+    setDraftPermissions(computeEffectivePermissions(value, []))
   }
 
   const handleUserSearchChange = async (value) => {
     setUserSearch(value)
-    setUserSearchLoading(true)
     setUserSearchError(null)
     try {
-      const results = await searchAllUsers(value)
+      const results = await searchAllUsers(value, { isMaster, currentUserId: currentUser?.id })
       setUserSuggestions(results)
     } catch (err) {
       setUserSearchError(err.message || 'Falha ao buscar usuarios.')
-    } finally {
-      setUserSearchLoading(false)
     }
   }
 
@@ -352,7 +329,6 @@ function PermissionsSection({ currentUser }) {
     setSelectedUserId(userOption.id)
     setUserSearch(userOption.label)
     setUserSuggestions([])
-    // garante que o usuario selecionado esteja na lista para hydration da UI
     setUsers((prev) => {
       const exists = prev.some((u) => u.id === userOption.id)
       if (exists) return prev
@@ -370,7 +346,6 @@ function PermissionsSection({ currentUser }) {
       })
     })
   }
-
   const handleSave = async () => {
     if (!selectedUser) {
       return
@@ -379,106 +354,73 @@ function PermissionsSection({ currentUser }) {
       setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
       return
     }
-    const beforeCredential = selectedUser.credential || 'admin'
-    const beforePages = Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : []
+    const beforePerms = appliedPermissions
     setIsLoading(true)
     setFeedback(null)
     try {
-      const credentialUuid = await mapCredentialTextToUuid(draftCredential || 'admin')
-      if (selectedUser.type === 'dependent') {
-        const { error } = await supabase
-          .from('app_users_dependentes')
-          .update({
-            credential: credentialUuid,
-            page_permissions: appliedPages,
-            ativo: isActive,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', selectedUser.dependent_id)
-        if (error) {
-          throw error
-        }
-        try {
-          await syncAuthUserBan(selectedUser.id, isActive)
-        } catch (syncError) {
-          reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
-        }
-        try {
-          await supabase.from('app_users_credential_history').insert({
-            user_id: selectedUser.owner_app_user_id || selectedUser.id,
-            target_auth_user_id: selectedUser.id,
-            owner_app_user_id: selectedUser.owner_app_user_id || null,
-            target_dependent_id: selectedUser.dependent_id || null,
-            user_username:
-              selectedUser.username ||
-              selectedUser.display_name ||
-              selectedUser.email ||
-              selectedUser.id,
-            changed_by: currentUser?.id || null,
-            changed_by_username:
-              currentUser?.metadata?.username ||
-              currentUser?.name ||
-              currentUser?.email ||
-              'Sistema',
-            action: 'update',
-            before_credential: beforeCredential,
-            after_credential: draftCredential || 'admin',
-            before_pages: beforePages,
-            after_pages: appliedPages,
-          })
-        } catch (historyError) {
-          reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
-        }
-      } else {
-        const { error } = await supabase
-          .from('app_users')
-          .update({
-            credential: credentialUuid,
-            page_permissions: appliedPages,
-            ativo: isActive,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', selectedUser.id)
+      const userId = selectedUser.id
 
-        if (error) {
-          throw error
-        }
-
-        try {
-          await syncAuthUserBan(selectedUser.id, isActive)
-        } catch (syncError) {
-          reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
-        }
-
-        try {
-          await supabase.from('app_users_credential_history').insert({
-            user_id: selectedUser.id,
-            target_auth_user_id: selectedUser.id,
-            owner_app_user_id: null,
-            target_dependent_id: null,
-            user_username:
-              selectedUser.username ||
-              selectedUser.display_name ||
-              selectedUser.email ||
-              selectedUser.id,
-            changed_by: currentUser?.id || null,
-            changed_by_username:
-              currentUser?.metadata?.username ||
-              currentUser?.name ||
-              currentUser?.email ||
-              'Sistema',
-            action: 'update',
-            before_credential: beforeCredential,
-            after_credential: draftCredential || 'admin',
-            before_pages: beforePages,
-            after_pages: appliedPages,
-          })
-        } catch (historyError) {
-          reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
-        }
+      await supabase.from('user_roles').delete().eq('user_id', userId)
+      if (draftRoleId) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role_id: draftRoleId })
+        if (roleError) throw roleError
       }
 
-      setFeedback({ type: 'success', message: 'Credencial atualizada com sucesso.' })
+      const defaultPerms = rolePermissionsMap.get(draftRoleId) || new Set()
+      const desired = new Set(appliedPermissions)
+      const overridesToSave = []
+      permissionsCatalog.forEach((perm) => {
+        const key = perm.key
+        const inDefault = defaultPerms.has(key)
+        const inDesired = desired.has(key)
+        if (inDefault !== inDesired) {
+          overridesToSave.push({ user_id: userId, permission_key: key, allowed: inDesired })
+        }
+      })
+
+      await supabase.from('user_permission_overrides').delete().eq('user_id', userId)
+      if (overridesToSave.length) {
+        const { error: ovError } = await supabase.from('user_permission_overrides').insert(overridesToSave)
+        if (ovError) throw ovError
+      }
+
+      const { error: updError } = await supabase
+        .from('app_users')
+        .update({ ativo: isActive, updated_at: new Date().toISOString() })
+        .eq('id', selectedUser.id)
+      if (updError) throw updError
+
+      try {
+        await syncAuthUserBan(selectedUser.id, isActive)
+      } catch (syncError) {
+        reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
+      }
+
+      setFeedback({ type: 'success', message: 'Role/permissoes atualizadas.' })
+
+      try {
+        await supabase.from('app_users_credential_history').insert({
+          user_id: selectedUser.owner_app_user_id || selectedUser.id,
+          target_auth_user_id: selectedUser.id,
+          owner_app_user_id: selectedUser.owner_app_user_id || null,
+          target_dependent_id: selectedUser.dependent_id || null,
+          user_username:
+            selectedUser.username || selectedUser.display_name || selectedUser.email || selectedUser.id,
+          changed_by: currentUser?.id || null,
+          changed_by_username:
+            currentUser?.metadata?.username || currentUser?.name || currentUser?.email || 'Sistema',
+          action: 'role_update',
+          before_credential: null,
+          after_credential: null,
+          before_pages: beforePerms,
+          after_pages: appliedPermissions,
+        })
+      } catch (historyError) {
+        reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
+      }
+
       await loadUsers()
       if (selectedUser.id === currentUser?.id) {
         refresh?.()
@@ -491,24 +433,11 @@ function PermissionsSection({ currentUser }) {
   }
 
   const handleReset = () => {
-    const cred = draftCredential || 'admin'
-    setDraftPages(resolveAllowedPageIds(cred))
+    setDraftPermissions(computeEffectivePermissions(draftRoleId, []))
   }
 
-  const resolvePageLabel = useCallback(
-    (pageId) => pageOptions.find((page) => page.id === pageId)?.label || pageId,
-    [pageOptions]
-  )
-
   const loadHistory = useCallback(async () => {
-    if (!selectedUserId) {
-      setHistoryError('Selecione um usuario.')
-      setHistoryItems([])
-      return
-    }
-    if (!isSupabaseConfigured() || !supabase) {
-      setHistoryError('Supabase nao configurado.')
-      setHistoryItems([])
+    if (!selectedUser || !isSupabaseConfigured() || !supabase) {
       return
     }
     setHistoryLoading(true)
@@ -517,34 +446,20 @@ function PermissionsSection({ currentUser }) {
       const { data, error } = await supabase
         .from('app_users_credential_history')
         .select(
-          'id, user_username, changed_by_username, action, before_credential, after_credential, before_pages, after_pages, created_at'
+          'id, created_at, action, before_pages, after_pages, changed_by_username, before_credential, after_credential'
         )
-        .or(`target_auth_user_id.eq.${selectedUserId},user_id.eq.${selectedUserId}`)
+        .eq('target_auth_user_id', selectedUser.id)
         .order('created_at', { ascending: false })
-      if (error) {
-        throw error
-      }
+        .limit(50)
+      if (error) throw error
       setHistoryItems(data || [])
+      setHistoryOpen(true)
     } catch (err) {
       setHistoryError(err.message || 'Falha ao carregar historico.')
-      setHistoryItems([])
     } finally {
       setHistoryLoading(false)
     }
-  }, [selectedUserId])
-
-  const handleOpenHistory = () => {
-    setHistoryOpen(true)
-    loadHistory()
-  }
-
-  const allowedLabels = useMemo(
-    () =>
-      allowedPageIds
-        .map((id) => pageOptions.find((page) => page.id === id)?.label)
-        .filter(Boolean),
-    [allowedPageIds, pageOptions]
-  )
+  }, [selectedUser])
 
   if (isLocalMode) {
     return (
@@ -573,26 +488,32 @@ function PermissionsSection({ currentUser }) {
           </div>
         </header>
         <p>
-          Credencial atual: <strong>{describeCredential(credential)}</strong>
+          Roles: <strong>{(currentRoles || []).join(', ') || 'Nenhum'}</strong>
         </p>
-        <p>
-          Paginas habilitadas: {allowedLabels.length ? allowedLabels.join(', ') : 'Todas'}
-        </p>
+        <p>Permissoes: {allowedPermLabels || 'Nenhuma'}</p>
       </section>
     )
   }
-
   return (
     <section className="card config-page__section" aria-labelledby="permissions-title">
       <header className="card__header">
         <div className="page-header__heading">
           <ShieldCheck size={24} />
           <div>
-            <h2 id="permissions-title">Credenciais e paginas</h2>
-            <p className="config-page__description">
-              Defina a credencial do usuario e quais paginas ele pode acessar.
-            </p>
+            <h2 id="permissions-title">Credenciais e Permissoes</h2>
+            <p className="config-page__description">Defina a role e as permissoes do usuario.</p>
           </div>
+        </div>
+        <div className="card__actions">
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={loadHistory}
+            disabled={!selectedUser || historyLoading}
+          >
+            <HistoryIcon size={16} />
+            <span style={{ marginLeft: 6 }}>Historico</span>
+          </button>
         </div>
       </header>
 
@@ -615,7 +536,7 @@ function PermissionsSection({ currentUser }) {
                     className="autocomplete__item"
                     onMouseDown={() => handleUserSelect(option)}
                   >
-                    {option.label} {option.credential ? `(${describeCredential(option.credential)})` : ''}
+                    {option.label}
                   </li>
                 ))}
               </ul>
@@ -625,13 +546,14 @@ function PermissionsSection({ currentUser }) {
         </label>
 
         <label className="field">
-          <span>Credencial</span>
+          <span>Role</span>
           <select
-            value={draftCredential || 'admin'}
-            onChange={(e) => handleCredentialChange(e.target.value)}
-            disabled={isLoading || !selectedUser}
+            value={draftRoleId || ''}
+            onChange={(e) => handleRoleChange(e.target.value)}
+            disabled={isLoading || !selectedUser || !hasRbacManage}
           >
-            {credentialOptions.map((option) => (
+            <option value="">Selecione</option>
+            {roleOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -648,7 +570,7 @@ function PermissionsSection({ currentUser }) {
               className="switch__input"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              disabled={isLoading || !selectedUser}
+              disabled={isLoading || !selectedUser || !hasRbacManage}
             />
             <label htmlFor="user-status-toggle" className="switch__label">
               <span className="switch__thumb" aria-hidden="true" />
@@ -656,38 +578,43 @@ function PermissionsSection({ currentUser }) {
             </label>
           </div>
         </label>
-
-        <button
-          type="button"
-          className="history-icon-button history-icon-button--inline"
-          onClick={handleOpenHistory}
-          disabled={!selectedUserId}
-          aria-label="Historico de credenciais"
-          title="Historico de credenciais"
-        >
-          <HistoryIcon size={18} />
-        </button>
       </div>
 
-      <div className="permission-pill-group" role="group" aria-label="Paginas permitidas">
-        {pageOptions.map((page) => {
-          const active = appliedPages.includes(page.id)
-          const inputId = `page-toggle-${page.id}`
+      {!hasRbacManage ? (
+        <p className="feedback feedback--error">
+          Você não tem permissão (rbac.manage) para editar credenciais/permissões. Fale com um administrador.
+        </p>
+      ) : null}
+
+      <div className="permission-pill-group" role="group" aria-label="Permissoes">
+        {permissionGroups.map((group) => {
+          const allOn = group.keys.every((key) => appliedPermissions.includes(key))
+          const inputId = `perm-group-${group.id}`
           return (
-            <div key={page.id} className={`permission-switch${active ? ' permission-switch--active' : ''}`}>
-              <span className="permission-switch__label">{page.label}</span>
+            <div key={group.id} className={`permission-switch${allOn ? ' permission-switch--active' : ''}`}>
+              <span className="permission-switch__label">{group.label}</span>
               <div className="switch__control">
                 <input
                   id={inputId}
                   type="checkbox"
                   className="switch__input"
-                  checked={active}
-                  onChange={() => togglePage(page.id)}
-                  disabled={isLoading || !selectedUser}
+                  checked={allOn}
+                  onChange={() => {
+                    setDraftPermissions((prev) => {
+                      const set = new Set(prev)
+                      if (allOn) {
+                        group.keys.forEach((k) => set.delete(k))
+                      } else {
+                        group.keys.forEach((k) => set.add(k))
+                      }
+                      return Array.from(set)
+                    })
+                  }}
+                  disabled={isLoading || !selectedUser || draftRoleId === null || !hasRbacManage}
                 />
                 <label htmlFor={inputId} className="switch__label">
                   <span className="switch__thumb" aria-hidden="true" />
-                  <span className="switch__text">{active ? 'Liberado' : 'Bloqueado'}</span>
+                  <span className="switch__text">{allOn ? 'Liberado' : 'Bloqueado'}</span>
                 </label>
               </div>
             </div>
@@ -698,23 +625,80 @@ function PermissionsSection({ currentUser }) {
       {feedback ? <p className={`feedback feedback--${feedback.type}`}>{feedback.message}</p> : null}
 
       <div className="form__actions">
-        <button type="button" className="button button--primary" onClick={handleSave} disabled={isLoading || !selectedUser}>
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={handleSave}
+          disabled={isLoading || !selectedUser || !hasRbacManage}
+        >
           {isLoading ? 'Salvando...' : 'Salvar credencial'}
+        </button>
+        <button
+          type="button"
+          className="button"
+          onClick={() => setDraftPermissions(computeEffectivePermissions(draftRoleId, []))}
+          disabled={isLoading || !selectedUser || !hasRbacManage}
+        >
+          Resetar overrides
         </button>
       </div>
 
-      <CredentialsHistoryModal
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        isLoading={historyLoading}
-        error={historyError}
-        items={historyItems}
-        resolvePageLabel={resolvePageLabel}
-      />
+      {historyOpen ? (
+        <div className="entradas-history__overlay" role="dialog" aria-modal="true" onClick={() => setHistoryOpen(false)}>
+          <div className="entradas-history__modal" onClick={(e) => e.stopPropagation()}>
+            <header className="entradas-history__header">
+              <div>
+                <h3>Histórico de credencial</h3>
+                <p className="entradas-history__subtitle">
+                  {selectedUser ? selectedUser.username || selectedUser.display_name || selectedUser.email || selectedUser.id : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="entradas-history__close"
+                onClick={() => setHistoryOpen(false)}
+                aria-label="Fechar histórico"
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="entradas-history__body">
+              {historyLoading ? (
+                <p className="feedback">Carregando histórico...</p>
+              ) : historyError ? (
+                <p className="feedback feedback--error">{historyError}</p>
+              ) : (historyItems || []).length === 0 ? (
+                <p className="feedback">Nenhum histórico registrado.</p>
+              ) : (
+                <ul className="entradas-history__list">
+                  {historyItems.map((item) => (
+                    <li key={item.id} className="entradas-history__item">
+                      <div className="entradas-history__item-header">
+                        <div>
+                          <strong>{item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : ''}</strong>
+                          <p>{item.changed_by_username || 'Sistema'}</p>
+                        </div>
+                        <span className="history-item__action">{item.action || 'alteração'}</span>
+                      </div>
+                      <div className="entradas-history__item-body">
+                        <p>
+                          <strong>Antes:</strong> {formatPerms(item.before_pages)}
+                        </p>
+                        <p>
+                          <strong>Depois:</strong> {formatPerms(item.after_pages)}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
-
 function AdminResetPasswordSection() {
   const { isAdmin } = usePermissions()
   const { user: currentUser } = useAuth()
@@ -725,7 +709,6 @@ function AdminResetPasswordSection() {
   const [feedback, setFeedback] = useState(null)
   const [userSearch, setUserSearch] = useState('')
   const [userSuggestions, setUserSuggestions] = useState([])
-  const [userSearchLoading, setUserSearchLoading] = useState(false)
   const [userSearchError, setUserSearchError] = useState(null)
 
   const loadUsers = useCallback(async () => {
@@ -748,7 +731,6 @@ function AdminResetPasswordSection() {
 
     if (!isSupabaseConfigured() || !supabase || isLocalMode) {
       const lista = []
-      // No modo local ou sem Supabase, so temos o usuario atual
       addFallbackUser(lista)
       setUsers(lista)
       if (!selectedUserId && lista.length) {
@@ -760,17 +742,16 @@ function AdminResetPasswordSection() {
     try {
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, username, display_name, email, credential, page_permissions, ativo')
+        .select('id, username, display_name, email, ativo')
         .order('display_name', { ascending: true })
       if (error) {
         throw error
       }
       const lista = []
       for (const usuario of data || []) {
-        const credText = await mapCredentialUuidToText(usuario.credential)
         lista.push({
           ...usuario,
-          credential: credText || 'admin',
+          credential: null,
           type: 'owner',
           owner_app_user_id: usuario.id,
           dependent_id: null,
@@ -836,7 +817,6 @@ function AdminResetPasswordSection() {
       }
       setFeedback({ type: 'success', message: `Email de redefinicao enviado para ${selectedUser.email}` })
 
-      // Historico de reset
       try {
         const userIdForHistory = selectedUser.owner_app_user_id || selectedUser.id
         await supabase.from('app_users_credential_history').insert({
@@ -866,15 +846,12 @@ function AdminResetPasswordSection() {
 
   const handleUserSearchChange = async (value) => {
     setUserSearch(value)
-    setUserSearchLoading(true)
     setUserSearchError(null)
     try {
-      const results = await searchAllUsers(value)
+      const results = await searchAllUsers(value, { isMaster: isAdmin, currentUserId: currentUser?.id })
       setUserSuggestions(results)
     } catch (err) {
       setUserSearchError(err.message || 'Falha ao buscar usuarios.')
-    } finally {
-      setUserSearchLoading(false)
     }
   }
 
@@ -946,7 +923,7 @@ function AdminResetPasswordSection() {
                     className="autocomplete__item"
                     onMouseDown={() => handleUserSelect(option)}
                   >
-                    {option.label} {option.credential ? `(${describeCredential(option.credential)})` : ''}
+                    {option.label}
                   </li>
                 ))}
               </ul>
@@ -964,63 +941,5 @@ function AdminResetPasswordSection() {
         </button>
       </div>
     </section>
-  )
-}
-
-function CredentialsHistoryModal({ open, onClose, isLoading, error, items, resolvePageLabel }) {
-  if (!open) {
-    return null
-  }
-
-  const actionLabel = (value) => {
-    if ((value || '').toLowerCase() === 'password_reset') {
-      return 'Reset de senha'
-    }
-    return 'Atualizacao'
-  }
-
-  return (
-    <div className="cred-history__overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="cred-history__modal" onClick={(e) => e.stopPropagation()}>
-        <header className="cred-history__header">
-          <h3>Historico de credenciais</h3>
-          <button type="button" className="cred-history__close" onClick={onClose} aria-label="Fechar historico">
-            <X size={18} />
-          </button>
-        </header>
-
-        {isLoading ? (
-          <p className="feedback">Carregando historico...</p>
-        ) : error ? (
-          <p className="feedback feedback--error">{error}</p>
-        ) : !items.length ? (
-          <p className="feedback">Nenhum historico registrado.</p>
-        ) : (
-          <ul className="cred-history__list">
-            {items.map((item) => (
-              <li key={item.id} className="cred-history__item">
-                <div className="cred-history__meta">
-                  <span><strong>Quando:</strong> {new Date(item.created_at).toLocaleString('pt-BR')}</span>
-                  <span><strong>Por:</strong> {item.changed_by_username || 'Sistema'}</span>
-                  <span><strong>Usuario:</strong> {item.user_username || '-'}</span>
-                  <span><strong>Acao:</strong> {actionLabel(item.action)}</span>
-                </div>
-                <p>
-                  <strong>Credencial:</strong> {item.before_credential || 'admin'} â†’ {item.after_credential || 'admin'}
-                </p>
-                <div className="cred-history__badges">
-                  <span className="cred-history__badge">
-                    Paginas antes: {(item.before_pages || []).map(resolvePageLabel).join(', ') || 'Default'}
-                  </span>
-                  <span className="cred-history__badge">
-                    Paginas depois: {(item.after_pages || []).map(resolvePageLabel).join(', ') || 'Default'}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
   )
 }
