@@ -17,8 +17,8 @@ Arquitetura e dados
   - Checks para horas >= 0; modo in (manual, simples, completo); hht_informado apenas no manual.
 - Triggers/Funcoes:
   - hht_mensal_apply_calcs: normaliza modo, status default, calcula hht_calculado/hht_final, zera campos no modo simples.
-  - hht_mensal_prevent_inactivation: impede delete/cancelar se houver acidente no centro/mes; seta status cancelado.
-  - hht_mensal_log_update_delete: grava historico em hht_mensal_hist.
+  - hht_mensal_prevent_inactivation: impede delete/cancelar se houver acidente no centro/mes; libera se role = service_role ou flag de sessao `app.bypass_hht_guard = 'on'`.
+  - hht_mensal_log_update_delete: grava historico em hht_mensal_hist; usa trigger AFTER UPDATE e BEFORE DELETE (log antes de remover o pai).
   - hht_mensal_delete(p_id, p_motivo): marca como cancelado (nao deleta) e loga motivo.
 - Status padrao armazenados em app.status_hht_default e app.status_hht_cancelado; fallback busca em status_hht.
 
