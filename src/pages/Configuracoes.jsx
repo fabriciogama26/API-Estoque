@@ -94,6 +94,7 @@ async function searchAllUsers(term, { isMaster, currentUserId } = {}) {
   })
   return Array.from(dedup.values())
 
+}
 
 export function ConfiguracoesPage() {
   const { user } = useAuth()
