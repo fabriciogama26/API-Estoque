@@ -29,3 +29,6 @@ Guia rapido do painel de ajuda
   - Mantenha texto ASCII simples para evitar problemas de codificacao.
   - MediaHint e MediaCaption sao leves e nao exigem arquivo.
   - Limite passos a conteudo pratico (o modal ja suporta lista, notas e links).
+
+- Ajuste recente (Configuracoes)
+  - Apenas master/admin acessam a pagina; use `helpContent.json` (topico "configuracoes") para refletir roles/permissoes/historico (antes/depois e quem alterou).

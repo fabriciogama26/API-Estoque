@@ -46,11 +46,15 @@ async function searchAllUsers(term, { isMaster, currentUserId } = {}) {
     return []
   }
   const baseResults = (data || []).map((u) => {
-    const labelBase = u.display_name || u.username || u.email || u.id
+    const display = u.display_name || ''
+    const uname = u.username || ''
+    const labelBase = display || uname || u.email || u.id
+    const labelFull = labelBase + (uname ? ` (${uname})` : u.email ? ` (${u.email})` : '')
     return {
       id: u.id,
       type: u.parent_user_id ? 'dependent' : 'owner',
       labelBase,
+      labelFull,
       username: u.username,
       email: u.email || '',
       credential: null,
@@ -65,19 +69,19 @@ async function searchAllUsers(term, { isMaster, currentUserId } = {}) {
 
   // Minimiza ru?do: usa display_name e s? adiciona sufixo quando houver duplicata.
   const labelCount = baseResults.reduce((acc, item) => {
-    const key = item.labelBase.toLowerCase()
+    const key = (item.labelBase || '').toLowerCase()
     acc.set(key, (acc.get(key) || 0) + 1)
     return acc
   }, new Map())
 
   const resultados = baseResults.map((item) => {
-    const key = item.labelBase.toLowerCase()
+    const key = (item.labelBase || '').toLowerCase()
     const duplicated = (labelCount.get(key) || 0) > 1
     const suffix = duplicated ? ` ? ${item.email || item.username || item.id.slice(0, 8)}` : ''
     return {
       id: item.id,
       type: item.type,
-      label: `${item.labelBase}${suffix}`,
+      label: `${item.labelFull}${suffix}`,
       credential: null,
       credentialId: null,
       page_permissions: [],
@@ -123,6 +127,7 @@ function PermissionsSection({ currentUser }) {
   const [rolesCatalog, setRolesCatalog] = useState([])
   const [permissionsCatalog, setPermissionsCatalog] = useState([])
   const [rolePermissionsMap, setRolePermissionsMap] = useState(new Map())
+  const [baselinePermissions, setBaselinePermissions] = useState([])
   const [isActive, setIsActive] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [feedback, setFeedback] = useState(null)
@@ -143,6 +148,16 @@ function PermissionsSection({ currentUser }) {
     const base = new Set(permissionsCatalog.map((p) => p.key))
     PERMISSION_GROUPS.forEach((g) => g.keys.forEach((k) => base.add(k)))
     return Array.from(base)
+  }, [permissionsCatalog])
+
+  // Chaves de permiss?o que existem s? no front (ex.: dashboards) e n?o est?o no cat?logo do banco.
+  const uiOnlyKeys = useMemo(() => {
+    const catalogSet = new Set(permissionsCatalog.map((p) => p.key))
+    const extras = new Set()
+    PERMISSION_GROUPS.forEach((g) => g.keys.forEach((k) => {
+      if (!catalogSet.has(k)) extras.add(k)
+    }))
+    return Array.from(extras)
   }, [permissionsCatalog])
 
   const computeEffectivePermissions = useCallback(
@@ -328,8 +343,10 @@ function PermissionsSection({ currentUser }) {
         if (userRoles.error) throw userRoles.error
         if (overrides.error) throw overrides.error
         const roleId = userRoles.data?.[0]?.role_id || null
+        const effective = computeEffectivePermissions(roleId, overrides.data || [])
         setDraftRoleId(roleId)
-        setDraftPermissions(computeEffectivePermissions(roleId, overrides.data || []))
+        setDraftPermissions(effective)
+        setBaselinePermissions(effective)
         setIsActive(selectedUser.ativo !== false)
       } catch (err) {
         reportError(err, { stage: 'load_user_access', userId: selectedUser.id })
@@ -385,7 +402,8 @@ function PermissionsSection({ currentUser }) {
       setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
       return
     }
-    const beforePerms = appliedPermissions
+    const beforePerms = baselinePermissions
+    const afterPerms = appliedPermissions
     setIsLoading(true)
     setFeedback(null)
     try {
@@ -402,8 +420,9 @@ function PermissionsSection({ currentUser }) {
       const defaultPerms = rolePermissionsMap.get(draftRoleId) || new Set()
       const desired = new Set(appliedPermissions)
       const overridesToSave = []
-      permissionsCatalog.forEach((perm) => {
-        const key = perm.key
+
+      const allKeysForDiff = new Set([...permissionsCatalog.map((p) => p.key), ...uiOnlyKeys])
+      allKeysForDiff.forEach((key) => {
         const inDefault = defaultPerms.has(key)
         const inDesired = desired.has(key)
         if (inDefault !== inDesired) {
@@ -446,7 +465,7 @@ function PermissionsSection({ currentUser }) {
           before_credential: null,
           after_credential: null,
           before_pages: beforePerms,
-          after_pages: appliedPermissions,
+          after_pages: afterPerms,
         })
       } catch (historyError) {
         reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
@@ -456,6 +475,7 @@ function PermissionsSection({ currentUser }) {
       if (selectedUser.id === currentUser?.id) {
         refresh?.()
       }
+      setBaselinePermissions(afterPerms)
     } catch (err) {
       setFeedback({ type: 'error', message: err.message || 'Nao foi possivel salvar as permissoes.' })
     } finally {
@@ -477,7 +497,7 @@ function PermissionsSection({ currentUser }) {
       const { data, error } = await supabase
         .from('app_users_credential_history')
         .select(
-          'id, created_at, action, before_pages, after_pages, changed_by_username, before_credential, after_credential'
+          'id, created_at, action, before_pages, after_pages, changed_by_username, user_username, before_credential, after_credential'
         )
         .eq('target_auth_user_id', selectedUser.id)
         .order('created_at', { ascending: false })
@@ -662,74 +682,13 @@ function PermissionsSection({ currentUser }) {
           onClick={handleSave}
           disabled={isLoading || !selectedUser || !hasRbacManage}
         >
-          {isLoading ? 'Salvando...' : 'Salvar credencial'}
-        </button>
-        <button
-          type="button"
-          className="button"
-          onClick={() => setDraftPermissions(computeEffectivePermissions(draftRoleId, []))}
-          disabled={isLoading || !selectedUser || !hasRbacManage}
-        >
-          Resetar overrides
+          {isLoading ? "Salvando..." : "Salvar credencial"}
         </button>
       </div>
-
-      {historyOpen ? (
-        <div className="entradas-history__overlay" role="dialog" aria-modal="true" onClick={() => setHistoryOpen(false)}>
-          <div className="entradas-history__modal" onClick={(e) => e.stopPropagation()}>
-            <header className="entradas-history__header">
-              <div>
-                <h3>Histórico de credencial</h3>
-                <p className="entradas-history__subtitle">
-                  {selectedUser ? selectedUser.username || selectedUser.display_name || selectedUser.email || selectedUser.id : ''}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="entradas-history__close"
-                onClick={() => setHistoryOpen(false)}
-                aria-label="Fechar histórico"
-              >
-                <X size={18} />
-              </button>
-            </header>
-            <div className="entradas-history__body">
-              {historyLoading ? (
-                <p className="feedback">Carregando histórico...</p>
-              ) : historyError ? (
-                <p className="feedback feedback--error">{historyError}</p>
-              ) : (historyItems || []).length === 0 ? (
-                <p className="feedback">Nenhum histórico registrado.</p>
-              ) : (
-                <ul className="entradas-history__list">
-                  {historyItems.map((item) => (
-                    <li key={item.id} className="entradas-history__item">
-                      <div className="entradas-history__item-header">
-                        <div>
-                          <strong>{item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : ''}</strong>
-                          <p>{item.changed_by_username || 'Sistema'}</p>
-                        </div>
-                        <span className="history-item__action">{item.action || 'alteração'}</span>
-                      </div>
-                      <div className="entradas-history__item-body">
-                        <p>
-                          <strong>Antes:</strong> {formatPerms(item.before_pages)}
-                        </p>
-                        <p>
-                          <strong>Depois:</strong> {formatPerms(item.after_pages)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   )
 }
+
 function AdminResetPasswordSection() {
   const { isAdmin } = usePermissions()
   const { user: currentUser } = useAuth()
@@ -801,7 +760,7 @@ function AdminResetPasswordSection() {
         setSelectedUserId(lista[0].id)
       }
     }
-  }, [currentUser, selectedUserId])
+  }, [currentUser, reportError, selectedUserId])
 
   useEffect(() => {
     if (isAdmin) {
