@@ -23,6 +23,7 @@ Na lista de materiais do Estoque atual, os botões de ação por material podem 
 
 - Node.js 20+
 - Projeto Supabase (Postgres + Auth + Storage)
+- RBAC/RLS: veja `docs/CredenciaisPermissoes.txt` e `docs/Configuracoes.txt` para detalhes de roles/permissoes e tela de configuracoes (apenas master/admin).
 
 ## Rodar localmente
 

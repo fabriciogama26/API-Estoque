@@ -40,7 +40,7 @@ Modelo de dados (Supabase)
 - `public.resolve_user_permissions(p_user_id)`: array de keys efetivas; master apenas se usuário tiver role master.
 
 **Auditoria**
-- `public.app_users_credential_history`: log de alterações (roles/perms/reset). Campos: user_id (owner), target_auth_user_id, owner_app_user_id, target_dependent_id, user_username, changed_by, action (`role_update`/`password_reset`), before/after (pages/perms), timestamps.
+- `public.app_users_credential_history`: log de altera??es (roles/perms/reset). Campos: user_id (owner), target_auth_user_id, owner_app_user_id, target_dependent_id, user_username (alvo), changed_by/_username (autor), action (`role_update`/`password_reset`), before/after (permissions array), timestamps.
 - Triggers de perm_version: em `user_roles` e `user_permission_overrides` (função `bump_perm_version`).
 
 **Conta/owner e RLS**
