@@ -1,30 +1,30 @@
-Guia rapido do painel de ajuda
-------------------------------
-
-- Onde ficam os textos
-  - Arquivo: src/help/helpContent.json (um topico por pagina).
-  - Campos: title, summary, steps (com title/description e media/mediaHint/mediaCaption/mediaAlt), notes, links.
-  - O componente HelpButton le esse JSON e mostra no modal.
-
-- Como adicionar ou trocar imagens
-  1) Salve o arquivo em public/help/<topico>/nome-da-imagem.webp (prefira .webp ou .jpg leve).
-  2) No passo correspondente, preencha:
-     "media": "/help/<topico>/nome-da-imagem.webp",
-     "mediaAlt": "Descricao curta da imagem",
-     "mediaCaption": "Opcional, contexto extra"
-  3) Se ainda nao tiver imagem, deixe apenas "mediaHint" (texto de placeholder).
-  4) URLs externas tambem funcionam em "media", mas manter em /public evita depender de rede.
-
-- Como criar um novo topico/pagina
-  1) Adicione a chave no src/help/helpContent.json com a estrutura completa (title, summary, steps, notes).
-  2) Importe e use <HelpButton topic="suaChave" /> no cabecalho da pagina (prop actions do PageHeader).
-  3) Adicione imagens em public/help/suaChave/ se quiser ilustracao.
-
-- Como editar a ajuda do campo Agente (Cadastro de Acidentes)
-  - Arquivo: src/help/helpAcidentesAgentes.json.
-  - Campos: titulo, resumo e lista de agentes (cada um com descricao e tipos/lesoes).
-  - O icone ao lado de "Agente *" abre esse modal especifico; ajuste o texto no JSON para refletir o uso interno da empresa.
-
+Guia rapido do painel de ajuda
+------------------------------
+
+- Onde ficam os textos
+  - Arquivo: src/help/helpContent.json (um topico por pagina).
+  - Campos: title, summary, steps (com title/description e media/mediaHint/mediaCaption/mediaAlt), notes, links.
+  - O componente HelpButton le esse JSON e mostra no modal.
+
+- Como adicionar ou trocar imagens
+  1) Salve o arquivo em public/help/<topico>/nome-da-imagem.webp (prefira .webp ou .jpg leve).
+  2) No passo correspondente, preencha:
+     "media": "/help/<topico>/nome-da-imagem.webp",
+     "mediaAlt": "Descricao curta da imagem",
+     "mediaCaption": "Opcional, contexto extra"
+  3) Se ainda nao tiver imagem, deixe apenas "mediaHint" (texto de placeholder).
+  4) URLs externas tambem funcionam em "media", mas manter em /public evita depender de rede.
+
+- Como criar um novo topico/pagina
+  1) Adicione a chave no src/help/helpContent.json com a estrutura completa (title, summary, steps, notes).
+  2) Importe e use <HelpButton topic="suaChave" /> no cabecalho da pagina (prop actions do PageHeader).
+  3) Adicione imagens em public/help/suaChave/ se quiser ilustracao.
+
+- Como editar a ajuda do campo Agente (Cadastro de Acidentes)
+  - Arquivo: src/help/helpAcidentesAgentes.json.
+  - Campos: titulo, resumo e lista de agentes (cada um com descricao e tipos/lesoes).
+  - O icone ao lado de "Agente *" abre esse modal especifico; ajuste o texto no JSON para refletir o uso interno da empresa.
+
 - Dicas de formato
   - Mantenha texto ASCII simples para evitar problemas de codificacao.
   - MediaHint e MediaCaption sao leves e nao exigem arquivo.

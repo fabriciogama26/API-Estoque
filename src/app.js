@@ -19,7 +19,9 @@ app.use((req, _res, next) => {
 
 // === CORS ===
 const allowedOrigins = [
-  'https://proteg.vercel.app', // frontend em produção
+  'https://segtrab.com',       // frontend em produção (apex)
+  'https://www.segtrab.com',   // frontend em produção (www)
+  'https://proteg.vercel.app', // domínio legado no Vercel
   'http://localhost:5173'      // frontend em desenvolvimento (Vite)
 ];
 

@@ -13,7 +13,7 @@ Componentes
   - Função: `HCAPTCHA_SECRET` (secret privado do hCaptcha) e opcional `HCAPTCHA_SITEKEY`.
 
 Configuração do hCaptcha
-- Domains: cadastre hostnames sem protocolo. Produção: `proteg.vercel.app`. Dev: `localhost`, `127.0.0.1`.
+- Domains: cadastre hostnames sem protocolo. Produção: `segtrab.com`, `www.segtrab.com`. Dev: `localhost`, `127.0.0.1`.
 - Copie o sitekey (público) para `VITE_HCAPTCHA_SITEKEY`.
 - Copie o secret (privado) para o secret da função (`HCAPTCHA_SECRET`).
 
