@@ -52,7 +52,7 @@ export function MateriaisMaisUsadosChart({ data }) {
         <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
         <Tooltip />
         <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ color: '#475569' }} />
-        <Bar dataKey="totalQuantidade" name="Movimentaçôes" radius={[6, 6, 0, 0]} fill="#34d399" />
+        <Bar dataKey="totalQuantidade" name="Movimentacoes" radius={[6, 6, 0, 0]} fill="#34d399" />
       </BarChart>
     </ResponsiveContainer>
   )
