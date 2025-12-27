@@ -1,7 +1,6 @@
 /* eslint-env node */
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -21,14 +20,7 @@ export default defineConfig({
     // host: '0.0.0.0', // habilite para acessar pela rede
     port: Number(process.env.VITE_PORT || 5173),
     watch: {
-      ignored: [
-        '**/SupabaseBackup/**',
-        '**/node_modules_old/**',
-        // Evita erro UNKNOWN lstat em pasta corrompida que nao usamos mais.
-        '**/Acidentes/HhtMensal/**',
-        '**/Acidentes/HHTMEN~1/**',
-        path.resolve(fileURLToPath(new URL('./src/components/Acidentes/HhtMensal', import.meta.url))),
-      ],
+      ignored: ['**/SupabaseBackup/**', '**/node_modules_old/**']
     }
   }
 })

@@ -3,7 +3,7 @@ import { NavBar } from '../components/NavBar.jsx'
 import { SystemStatus } from '../components/SystemStatus.jsx'
 import '../styles/layout.css'
 
-const logoSrc = '/logo_segtrab.png'
+const logoSrc = '/banner.png'
 
 export function MainLayout() {
   return (

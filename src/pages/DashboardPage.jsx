@@ -196,7 +196,7 @@ function ChartsGrid() {
         ),
       },
       topCentros: {
-        title: 'Top centro de serviços',
+        title: 'Top centro de serviÃ§os',
         render: () => (
           <EstoquePorMaterialChart
             data={topCentrosServicoTop}
