@@ -3,7 +3,7 @@ import { securityConfig } from '../config/security.js'
 import { CaptchaGuard } from '../components/CaptchaGuard.jsx'
 import '../styles/ResetPasswordPage.css'
 
-const logoSrc = '/logo2.png'
+const logoSrc = '/logo_segtrab.png'
 
 export function ResetPasswordPage() {
   const {
