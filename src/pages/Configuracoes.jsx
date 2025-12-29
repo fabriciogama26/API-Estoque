@@ -28,77 +28,78 @@ async function syncAuthUserBan(userId, isActive) {
   }
 }
 
-async function searchAllUsers(term, { isMaster, currentUserId } = {}) {
-  if (!isSupabaseConfigured() || !supabase) {
-    return []
-  }
-  const q = (term || '').trim()
-  if (q.length < 2) {
-    return []
-  }
-  const filtros = [`username.ilike.%${q}%`, `display_name.ilike.%${q}%`, `email.ilike.%${q}%`]
-  let query = supabase.from('app_users').select('id, display_name, username, email, ativo, parent_user_id').or(filtros.join(','))
-  if (!isMaster && currentUserId) {
-    query = query.or(`id.eq.${currentUserId},parent_user_id.eq.${currentUserId}`)
-  }
-  const { data, error } = await query
-  if (error) {
-    return []
-  }
-  const baseResults = (data || []).map((u) => {
-    const display = u.display_name || ''
-    const uname = u.username || ''
-    const labelBase = display || uname || u.email || u.id
-    const labelFull = labelBase + (uname ? ` (${uname})` : u.email ? ` (${u.email})` : '')
-    return {
-      id: u.id,
-      type: u.parent_user_id ? 'dependent' : 'owner',
-      labelBase,
-      labelFull,
-      username: u.username,
-      email: u.email || '',
-      credential: null,
-      credentialId: null,
-      page_permissions: [],
-      ativo: u.ativo,
-      owner_app_user_id: u.parent_user_id || u.id,
-      dependent_id: u.parent_user_id ? u.id : null,
-      parent_user_id: u.parent_user_id,
-    }
-  })
-
-  // Minimiza ru?do: usa display_name e s? adiciona sufixo quando houver duplicata.
-  const labelCount = baseResults.reduce((acc, item) => {
-    const key = (item.labelBase || '').toLowerCase()
-    acc.set(key, (acc.get(key) || 0) + 1)
-    return acc
-  }, new Map())
-
-  const resultados = baseResults.map((item) => {
-    const key = (item.labelBase || '').toLowerCase()
-    const duplicated = (labelCount.get(key) || 0) > 1
-    const suffix = duplicated ? ` ? ${item.email || item.username || item.id.slice(0, 8)}` : ''
-    return {
-      id: item.id,
-      type: item.type,
-      label: `${item.labelFull}${suffix}`,
-      credential: null,
-      credentialId: null,
-      page_permissions: [],
-      ativo: item.ativo,
-      owner_app_user_id: item.owner_app_user_id,
-      dependent_id: item.dependent_id,
-      email: item.email,
-      parent_user_id: item.parent_user_id,
-    }
-  })
-  const dedup = new Map()
-  resultados.forEach((item) => {
-    if (!dedup.has(item.id)) dedup.set(item.id, item)
-  })
-  return Array.from(dedup.values())
-
-}
+async function searchAllUsers(term) {
+  if (!isSupabaseConfigured() || !supabase) {
+    return []
+  }
+  const q = (term || '').trim()
+  if (q.length < 2) {
+    return []
+  }
+
+  // Usa RPC para filtrar por tenant/owner no servidor e limitar retorno.
+  const { data, error } = await supabase.rpc('search_users', {
+    p_term: q,
+    p_limit: 20,
+    p_offset: 0,
+  })
+
+  if (error || !Array.isArray(data)) {
+    return []
+  }
+
+  const baseResults = data.map((u) => {
+    const display = u.display_name || ''
+    const uname = u.username || ''
+    const labelBase = display || uname || u.email_masked || u.id
+    const labelFull = labelBase + (uname ? ` (${uname})` : u.email_masked ? ` (${u.email_masked})` : '')
+    return {
+      id: u.id,
+      type: u.parent_user_id ? 'dependent' : 'owner',
+      labelBase,
+      labelFull,
+      username: u.username,
+      email: u.email_masked || '',
+      credential: null,
+      credentialId: null,
+      page_permissions: [],
+      ativo: u.ativo,
+      owner_app_user_id: u.parent_user_id || u.id,
+      dependent_id: u.parent_user_id ? u.id : null,
+      parent_user_id: u.parent_user_id,
+    }
+  })
+
+  const labelCount = baseResults.reduce((acc, item) => {
+    const key = (item.labelBase || '').toLowerCase()
+    acc.set(key, (acc.get(key) || 0) + 1)
+    return acc
+  }, new Map())
+
+  const resultados = baseResults.map((item) => {
+    const key = (item.labelBase || '').toLowerCase()
+    const duplicated = (labelCount.get(key) || 0) > 1
+    const suffix = duplicated ? ` • ${item.email || item.username || item.id.slice(0, 8)}` : ''
+    return {
+      id: item.id,
+      type: item.type,
+      label: `${item.labelFull}${suffix}`,
+      credential: null,
+      credentialId: null,
+      page_permissions: [],
+      ativo: item.ativo,
+      owner_app_user_id: item.owner_app_user_id,
+      dependent_id: item.dependent_id,
+      email: item.email,
+      parent_user_id: item.parent_user_id,
+    }
+  })
+  const dedup = new Map()
+  resultados.forEach((item) => {
+    if (!dedup.has(item.id)) dedup.set(item.id, item)
+  })
+  return Array.from(dedup.values())
+}
 
 export function ConfiguracoesPage() {
   const { user } = useAuth()
@@ -131,22 +132,17 @@ function PermissionsSection({ currentUser }) {
   const [isActive, setIsActive] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [feedback, setFeedback] = useState(null)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyError, setHistoryError] = useState(null)
-  const [historyItems, setHistoryItems] = useState([])
+  const [, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [, setHistoryError] = useState(null)
+  const [, setHistoryItems] = useState([])
   const [userSearch, setUserSearch] = useState('')
   const [userSuggestions, setUserSuggestions] = useState([])
   const [userSearchError, setUserSearchError] = useState(null)
 
-  const formatPerms = useCallback((perms) => {
-    if (!Array.isArray(perms) || perms.length === 0) return 'Nenhuma'
-    return perms.map((p) => PERMISSION_LABELS[p] || p).join(', ')
-  }, [])
-
-  const allPermissionKeys = useMemo(() => {
-    const base = new Set(permissionsCatalog.map((p) => p.key))
-    PERMISSION_GROUPS.forEach((g) => g.keys.forEach((k) => base.add(k)))
+  const allPermissionKeys = useMemo(() => {
+    const base = new Set(permissionsCatalog.map((p) => p.key))
+    PERMISSION_GROUPS.forEach((g) => g.keys.forEach((k) => base.add(k)))
     return Array.from(base)
   }, [permissionsCatalog])
 
@@ -181,8 +177,8 @@ function PermissionsSection({ currentUser }) {
       })
       return Array.from(result)
     },
-    [allPermissionKeys, isLocalMode, rolePermissionsMap, rolesCatalog]
-  )
+    [allPermissionKeys, rolePermissionsMap, rolesCatalog]
+  )
 
   const hasRbacManage = useMemo(() => isMaster || (currentPermissions || []).includes('rbac.manage'), [currentPermissions, isMaster])
 
@@ -395,101 +391,102 @@ function PermissionsSection({ currentUser }) {
     })
   }
   const handleSave = async () => {
-    if (!selectedUser) {
-      return
-    }
-    if (!isSupabaseConfigured() || !supabase) {
-      setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
-      return
-    }
-    const beforePerms = baselinePermissions
-    const afterPerms = appliedPermissions
-    setIsLoading(true)
-    setFeedback(null)
-    try {
-      const userId = selectedUser.id
+    if (!selectedUser) {
+      return
+    }
+    if (!isSupabaseConfigured() || !supabase) {
+      setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
+      return
+    }
+    const beforePerms = baselinePermissions
+    const afterPerms = appliedPermissions
+    setIsLoading(true)
+    setFeedback(null)
+    try {
+      const userId = selectedUser.id
+
+      // Atualiza role via RPC protegida.
+      const { error: roleError } = await supabase.rpc('rpc_admin_set_user_role', {
+        target_user_id: userId,
+        role_id: draftRoleId || null,
+      })
+      if (roleError) throw roleError
+
+      const defaultPerms = rolePermissionsMap.get(draftRoleId) || new Set()
+      const desired = new Set(appliedPermissions)
+      const overridesToSave = []
+
+      const allKeysForDiff = new Set([...permissionsCatalog.map((p) => p.key), ...uiOnlyKeys])
+      allKeysForDiff.forEach((key) => {
+        const inDefault = defaultPerms.has(key)
+        const inDesired = desired.has(key)
+        if (inDefault !== inDesired) {
+          overridesToSave.push({ permission_key: key, allowed: inDesired })
+        }
+      })
+
+      // Define overrides via RPC dedicada.
+      if (overridesToSave.length) {
+        const { error: ovError } = await supabase.rpc('rpc_admin_grant_permission_override', {
+          target_user_id: userId,
+          overrides: overridesToSave,
+        })
+        if (ovError) throw ovError
+      } else {
+        // limpa overrides quando não há diferenças
+        await supabase.rpc('rpc_admin_grant_permission_override', {
+          target_user_id: userId,
+          overrides: [],
+        })
+      }
+
+      // Atualiza status via RPC.
+      const { error: statusError } = await supabase.rpc('rpc_admin_set_user_status', {
+        target_user_id: userId,
+        status: isActive,
+      })
+      if (statusError) throw statusError
+
+      try {
+        await syncAuthUserBan(selectedUser.id, isActive)
+      } catch (syncError) {
+        reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
+      }
+
+      setFeedback({ type: 'success', message: 'Role/permissoes atualizadas.' })
+
+      try {
+        await supabase.rpc('rpc_admin_write_credential_history', {
+          target_user_id: selectedUser.id,
+          owner_user_id: selectedUser.owner_app_user_id || selectedUser.id,
+          dependent_id: selectedUser.dependent_id || null,
+          user_username:
+            selectedUser.username || selectedUser.display_name || selectedUser.email || selectedUser.id,
+          changed_by: currentUser?.id || null,
+          changed_by_username:
+            currentUser?.metadata?.username || currentUser?.name || currentUser?.email || 'Sistema',
+          before_pages: beforePerms,
+          after_pages: afterPerms,
+        })
+      } catch (historyError) {
+        reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
+      }
+
+      await loadUsers()
+      if (selectedUser.id === currentUser?.id) {
+        refresh?.()
+      }
+      setBaselinePermissions(afterPerms)
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.message || 'Nao foi possivel salvar as permissoes.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-      await supabase.from('user_roles').delete().eq('user_id', userId)
-      if (draftRoleId) {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role_id: draftRoleId })
-        if (roleError) throw roleError
-      }
-
-      const defaultPerms = rolePermissionsMap.get(draftRoleId) || new Set()
-      const desired = new Set(appliedPermissions)
-      const overridesToSave = []
-
-      const allKeysForDiff = new Set([...permissionsCatalog.map((p) => p.key), ...uiOnlyKeys])
-      allKeysForDiff.forEach((key) => {
-        const inDefault = defaultPerms.has(key)
-        const inDesired = desired.has(key)
-        if (inDefault !== inDesired) {
-          overridesToSave.push({ user_id: userId, permission_key: key, allowed: inDesired })
-        }
-      })
-
-      await supabase.from('user_permission_overrides').delete().eq('user_id', userId)
-      if (overridesToSave.length) {
-        const { error: ovError } = await supabase.from('user_permission_overrides').insert(overridesToSave)
-        if (ovError) throw ovError
-      }
-
-      const { error: updError } = await supabase
-        .from('app_users')
-        .update({ ativo: isActive, updated_at: new Date().toISOString() })
-        .eq('id', selectedUser.id)
-      if (updError) throw updError
-
-      try {
-        await syncAuthUserBan(selectedUser.id, isActive)
-      } catch (syncError) {
-        reportError(syncError, { stage: 'sync_user_ban', userId: selectedUser.id })
-      }
-
-      setFeedback({ type: 'success', message: 'Role/permissoes atualizadas.' })
-
-      try {
-        await supabase.from('app_users_credential_history').insert({
-          user_id: selectedUser.owner_app_user_id || selectedUser.id,
-          target_auth_user_id: selectedUser.id,
-          owner_app_user_id: selectedUser.owner_app_user_id || null,
-          target_dependent_id: selectedUser.dependent_id || null,
-          user_username:
-            selectedUser.username || selectedUser.display_name || selectedUser.email || selectedUser.id,
-          changed_by: currentUser?.id || null,
-          changed_by_username:
-            currentUser?.metadata?.username || currentUser?.name || currentUser?.email || 'Sistema',
-          action: 'role_update',
-          before_credential: null,
-          after_credential: null,
-          before_pages: beforePerms,
-          after_pages: afterPerms,
-        })
-      } catch (historyError) {
-        reportError(historyError, { stage: 'credential_history', userId: selectedUser.id })
-      }
-
-      await loadUsers()
-      if (selectedUser.id === currentUser?.id) {
-        refresh?.()
-      }
-      setBaselinePermissions(afterPerms)
-    } catch (err) {
-      setFeedback({ type: 'error', message: err.message || 'Nao foi possivel salvar as permissoes.' })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleReset = () => {
-    setDraftPermissions(computeEffectivePermissions(draftRoleId, []))
-  }
-
-  const loadHistory = useCallback(async () => {
-    if (!selectedUser || !isSupabaseConfigured() || !supabase) {
-      return
+  const loadHistory = useCallback(async () => {
+    if (!selectedUser || !isSupabaseConfigured() || !supabase) {
+      return
     }
     setHistoryLoading(true)
     setHistoryError(null)
@@ -773,11 +770,11 @@ function AdminResetPasswordSection() {
     [users, selectedUserId]
   )
 
-  const handleSend = async () => {
-    setFeedback(null)
-    if (!isAdmin) {
-      setFeedback({ type: 'error', message: 'Apenas administradores podem enviar reset de senha.' })
-      return
+  const handleSend = async () => {
+    setFeedback(null)
+    if (!isAdmin) {
+      setFeedback({ type: 'error', message: 'Apenas administradores podem enviar reset de senha.' })
+      return
     }
     if (isLocalMode) {
       setFeedback({ type: 'error', message: 'Reset de senha indisponivel no modo local.' })
@@ -787,25 +784,19 @@ function AdminResetPasswordSection() {
       setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
       return
     }
-    if (!selectedUser?.email) {
-      setFeedback({ type: 'error', message: 'Usuario sem email cadastrado para reset.' })
-      return
-    }
-
-    setIsSending(true)
-    try {
-      const rawRedirect = import.meta?.env?.VITE_SUPABASE_PASSWORD_REDIRECT ?? ''
-      const redirectTo =
-        typeof rawRedirect === 'string' && rawRedirect.trim().length > 0 ? rawRedirect.trim() : undefined
-
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        selectedUser.email,
-        redirectTo ? { redirectTo } : undefined
-      )
-      if (error) {
-        throw error
-      }
-      setFeedback({ type: 'success', message: `Email de redefinicao enviado para ${selectedUser.email}` })
+    if (!selectedUser?.email) {
+      setFeedback({ type: 'error', message: 'Usuario sem email cadastrado para reset.' })
+      return
+    }
+
+    setIsSending(true)
+    try {
+      // Chama Edge Function protegida para reset, que valida tenant/role no backend.
+      const { error } = await supabase.functions.invoke('request-password-reset', {
+        body: { target_user_id: selectedUser.id },
+      })
+      if (error) throw error
+      setFeedback({ type: 'success', message: `Email de redefinicao enviado para ${selectedUser.email}` })
 
       try {
         const userIdForHistory = selectedUser.owner_app_user_id || selectedUser.id

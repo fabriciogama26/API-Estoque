@@ -1,0 +1,32 @@
+Revisao de seguranca do front-end (API-Estoque)
+
+1) Permissoes e autorizacao
+- Modo local: so habilita em desenvolvimento (runtime.js) e build de producao falha se VITE_DATA_MODE != remote (vite.config.js). Guard do front apenas redireciona; chamadas diretas a Supabase/API continuam sendo o vetor de risco.
+- isAdmin no front eh tratado como master para rota/pagina; enforcement real deve ficar no backend/RLS.
+- PAGE_REQUIRED_PERMISSION precisa estar alinhado com backend; pagina Configuracoes exige estoque.write no client, mas validacao real eh no servidor.
+
+2) Segredos e credenciais
+- supabaseClient expõe VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (padrao Supabase; requer RLS).
+- AuthContext so carrega LOCAL_AUTH em desenvolvimento; login local falha fora de DEV, evitando vazamento em prod.
+
+3) Consultas e acoes administrativas
+- Configuracoes.jsx: searchAllUsers virou RPC search_users (owner scope + limite/paginacao + email mascarado).
+- Admin: rpc_admin_set_user_role/status/overrides/history usam owner scope; request_password_reset virou Edge Function request-password-reset (depende de deploy/envs).
+- dataClient alterna api/localApi por isLocalMode; risco mitigado pela trava de build.
+
+4) Logs, dados sensiveis e sessao
+- useErrorLogger/errorLogService: sanitizacao de message/stack/context (whitelist, remove email/token, truncamento). Evitar PII em mensagens.
+- app_errors/api_errors: RLS master-only para leitura; coluna account_owner_id removida. Sessao Supabase fica no localStorage (risco XSS); aplicar CSP e escape de dados de usuario.
+
+5) Integridade / logica de negocio
+- Validacoes criticas ainda sao client-side; mutacoes diretas podem ser abusadas. Necessario reforco no backend (RLS/constraints/triggers/RPC) para estoque/acidentes e correlatos.
+
+6) Owner scope e dados
+- account_owner_id backfilled para 59191387-669b-4585-8e11-7070d9769d86 em todas as tabelas que possuem a coluna; FKs account_owner_id -> app_users.id criadas (migracao 20250107_owner_fk_and_public_tables.sql).
+- Catalogos globais (sem account_owner_id, RLS: select permitido a authenticated, insert/update/delete bloqueados): caracteristica_epi, acidente_tipos, acidente_partes_sub_grupo, acidente_partes_grupo, acidente_partes, cor, epi_classe, grupos_material, grupos_material_itens, acidente_locais, acidente_lesoes, acidente_agentes, material_grupo_caracteristica_epi, material_grupo_cor, medidas_calcado, medidas_vestimentas, roles, status_entrada, status_hht, status_saida.
+
+Pendencias backend
+- Garantir roles admin/master no seed e popular user_roles com scope_parent_user_id = owner correto (ex.: 5919...d86) para habilitar is_admin/is_master.
+- Deploy da Edge Function request-password-reset com SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (opcional SUPABASE_PASSWORD_REDIRECT whitelisted).
+- Validar que todas as migrations estao aplicadas (20250101/02/03/04 corrigida; 05 so se precisou reverter catalogos; 06 backfill; 07 FKs/catalogos globais) e que RLS de account_owner_id permanece ativa nas tabelas de negocio.
+- Testar RLS/RPC: admin de um owner só opera no proprio owner; master atravessa; usuario comum nao chama RPCs admin.

@@ -1,7 +1,7 @@
 import { useLoginForm } from '../hooks/useLoginForm.js'
 import '../styles/LoginPage.css'
 
-const logoSrc = '/logo2.png'
+const logoSrc = '/logo_segtrab.png'
 
 
 const BadgeIcon = () => (

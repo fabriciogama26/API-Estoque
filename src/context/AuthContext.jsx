@@ -7,17 +7,20 @@ import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../ser
 
 const STORAGE_KEY = 'api-estoque-auth'
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
-const LOCAL_AUTH = {
-  username: (import.meta.env.VITE_LOCAL_USERNAME || 'admin').trim(),
-  password: (import.meta.env.VITE_LOCAL_PASSWORD || 'admin123').trim(),
-  name: (import.meta.env.VITE_LOCAL_DISPLAY_NAME || 'Administrador Local').trim(),
-}
+// Credenciais locais só são carregadas em ambiente de desenvolvimento.
+const LOCAL_AUTH = import.meta.env.DEV
+  ? {
+      username: (import.meta.env.VITE_LOCAL_USERNAME || 'admin').trim(),
+      password: (import.meta.env.VITE_LOCAL_PASSWORD || 'admin123').trim(),
+      name: (import.meta.env.VITE_LOCAL_DISPLAY_NAME || 'Administrador Local').trim(),
+    }
+  : null
 
 export const AuthContext = createContext(null)
 
 function buildLocalUser(identifier) {
-  const username = identifier || LOCAL_AUTH.username || 'admin'
-  const name = LOCAL_AUTH.name || username
+  const username = identifier || LOCAL_AUTH?.username || 'admin'
+  const name = LOCAL_AUTH?.name || username
   return {
     id: 'local-user',
     email: `${username}@local`,
@@ -229,6 +232,9 @@ export function AuthProvider({ children }) {
       }
 
       if (isLocalMode) {
+        if (!LOCAL_AUTH) {
+          throw new Error('Modo local indisponivel fora do ambiente de desenvolvimento.')
+        }
         const identifier = username.trim()
         if (identifier !== LOCAL_AUTH.username || password !== LOCAL_AUTH.password) {
           throw new Error('Usuario ou senha invalidos')

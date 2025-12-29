@@ -1,6 +1,8 @@
 const RAW_DATA_MODE = (import.meta.env.VITE_DATA_MODE || 'remote').trim().toLowerCase()
+const IS_DEV = Boolean(import.meta.env.DEV)
 
-export const dataMode = RAW_DATA_MODE === 'local' ? 'local' : 'remote'
+// Local mode só existe em ambiente de desenvolvimento.
+export const dataMode = RAW_DATA_MODE === 'local' && IS_DEV ? 'local' : 'remote'
 export const isLocalMode = dataMode === 'local'
 export const isRemoteMode = !isLocalMode
 
