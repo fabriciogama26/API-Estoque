@@ -28,7 +28,6 @@ export function AcidentesPage() {
 
 function AcidentesPageContent() {
   const {
-    acidentes,
     acidentesFiltrados,
     isLoading: isLoadingAcidentes,
     error: listError,
@@ -61,7 +60,6 @@ function AcidentesPageContent() {
     handleSubmit,
     startEdit,
     cancelEdit,
-    resetForm,
     editingAcidente,
     tipoOpcoes,
     tiposError,

@@ -131,7 +131,7 @@ export function useAcidenteForm({
       }
     })
     return Array.from(mapa.values())
-  }, [normalizeCentroKey])
+  }, [])
 
   const fallbackPessoaSearch = useCallback(
     (term) => {
@@ -665,7 +665,7 @@ export function useAcidenteForm({
           }
         })
         setCentrosServicoMap(mapa)
-      } catch (err) {
+      } catch {
         if (cancelado) return
         setCentrosServicoMap(new Map())
       }
@@ -674,7 +674,7 @@ export function useAcidenteForm({
     return () => {
       cancelado = true
     }
-  }, [])
+  }, [normalizeCentroKey])
 
   useEffect(() => {
     let cancelado = false
@@ -728,7 +728,7 @@ export function useAcidenteForm({
           return
         }
         setForm((prev) => ({ ...prev, hht: String(valor) }))
-      } catch (err) {
+      } catch {
         if (cancelado) return
       }
     }

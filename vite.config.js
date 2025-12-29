@@ -7,20 +7,30 @@ import react from '@vitejs/plugin-react'
 const d3ScaleDist = fileURLToPath(new URL('./node_modules/d3-scale/dist/d3-scale.js', import.meta.url))
 const d3ShapeDist = fileURLToPath(new URL('./node_modules/d3-shape/dist/d3-shape.js', import.meta.url))
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    // Workaround: evita ler arquivos "src" corrompidos em alguns ambientes Windows.
-    alias: {
-      'd3-scale': d3ScaleDist,
-      'd3-shape': d3ShapeDist,
+export default defineConfig(({ mode }) => {
+  // Travamento: em build de produção, somente VITE_DATA_MODE=remote é aceito.
+  if (mode === 'production') {
+    const dataMode = (process.env.VITE_DATA_MODE || 'remote').trim().toLowerCase()
+    if (dataMode !== 'remote') {
+      throw new Error('Build bloqueado: VITE_DATA_MODE precisa ser "remote" em produção.')
+    }
+  }
+
+  return {
+    plugins: [react()],
+    resolve: {
+      // Workaround: evita ler arquivos "src" corrompidos em alguns ambientes Windows.
+      alias: {
+        'd3-scale': d3ScaleDist,
+        'd3-shape': d3ShapeDist,
+      },
     },
-  },
-  server: {
-    // host: '0.0.0.0', // habilite para acessar pela rede
-    port: Number(process.env.VITE_PORT || 5173),
-    watch: {
-      ignored: ['**/SupabaseBackup/**', '**/node_modules_old/**']
+    server: {
+      // host: '0.0.0.0', // habilite para acessar pela rede
+      port: Number(process.env.VITE_PORT || 5173),
+      watch: {
+        ignored: ['**/SupabaseBackup/**', '**/node_modules_old/**']
+      }
     }
   }
 })
