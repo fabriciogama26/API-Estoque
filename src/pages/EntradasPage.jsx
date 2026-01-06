@@ -128,6 +128,7 @@ function EntradasContent() {
   const detalheCadastradoEm =
     detalheEntrada?.criadoEm ||
     detalheEntrada?.created_at ||
+    detalheEntrada?.create_at ||
     detalheEntrada?.createdAt ||
     detalheEntrada?.dataEntrada ||
     ''
@@ -348,7 +349,12 @@ function EntradasContent() {
                   const registradoPor =
                     entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || entrada.usuarioResponsavelId || 'Nao informado'
                   const cadastradoEm =
-                    entrada.criadoEm || entrada.created_at || entrada.createdAt || entrada.dataEntrada || entrada.data_entrada
+                    entrada.criadoEm ||
+                    entrada.created_at ||
+                    entrada.create_at ||
+                    entrada.createdAt ||
+                    entrada.dataEntrada ||
+                    entrada.data_entrada
                   const cadastradoEmLabel = cadastradoEm ? formatDisplayDateTime(cadastradoEm) : 'Nao informado'
                   const statusLabel = entrada.statusNome || entrada.status || 'Nao informado'
                   return (

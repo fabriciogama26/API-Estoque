@@ -1840,6 +1840,15 @@ function mapEntradaRecord(record) {
   const usuarioEdicaoRaw = record.usuarioEdicao ?? record.usuario_edicao ?? ''
   const usuarioEdicaoId = isUuidValue(usuarioEdicaoRaw) ? usuarioEdicaoRaw : null
   const usuarioEdicaoNome = resolveTextValue(usuarioEdicaoRaw)
+  const criadoEm =
+    record.criadoEm ??
+    record.criado_em ??
+    record.created_at ??
+    record.create_at ??
+    record.createdAt ??
+    record.dataEntrada ??
+    record.data_entrada ??
+    null
   return {
     id: record.id,
     materialId: record.materialId ?? record.material_id ?? null,
@@ -1847,6 +1856,10 @@ function mapEntradaRecord(record) {
     centroCustoId: centroCustoId ?? null,
     centroCusto: centroCustoNome || centroCustoRaw || '',
     dataEntrada: record.dataEntrada ?? record.data_entrada ?? null,
+    criadoEm,
+    createdAt: record.createdAt ?? record.created_at ?? record.create_at ?? null,
+    created_at: record.created_at ?? record.create_at ?? null,
+    create_at: record.create_at ?? null,
     usuarioResponsavelId: usuarioId,
     usuarioResponsavel: usuarioId ? usuarioId : usuarioTexto,
     usuarioResponsavelNome: usuarioId ? '' : usuarioTexto,
