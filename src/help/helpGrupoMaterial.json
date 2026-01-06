@@ -46,8 +46,6 @@
       "materiais": [
         "Capacete",
         "Carneira",
-        "Filtro de máscara",
-        "Máscara com filtro",
         "Óculos de segurança",
         "Protetor facial"
       ]
@@ -65,6 +63,7 @@
       "descricao": "Respiradores e filtros para poeiras, fumaças, gases ou vapores.",
       "materiais": [
         "Filtro de máscara",
+        "Máscara com filtro",
         "Máscara sem filtro",
         "Respirador purificador de ar"
       ]
