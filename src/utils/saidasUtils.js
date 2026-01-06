@@ -166,14 +166,23 @@ export const formatCurrency = (value) =>
 
 export const formatDisplayDateTime = (value) => {
   if (!value) return 'Nao informado'
-  const date = new Date(value)
+  const raw = typeof value === 'string' ? value.trim() : value
+  if (!raw) return 'Nao informado'
+  const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return 'Nao informado'
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  // Valores de data apenas (ex.: YYYY-MM-DD ou meia noite UTC) nao devem perder 1 dia por causa do fuso.
+  const isDateOnlyValue =
+    typeof raw === 'string' &&
+    (/^\d{4}-\d{2}-\d{2}$/.test(raw) ||
+      /^\d{4}-\d{2}-\d{2}[T\s]00:00:00(?:\.\d+)?(?:Z|[+-]00:?00)?$/.test(raw))
+
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   return date.toLocaleString('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
     hour12: false,
-    timeZone,
+    timeZone: isDateOnlyValue ? 'UTC' : timeZone,
   })
 }
 
