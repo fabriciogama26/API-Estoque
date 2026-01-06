@@ -1401,6 +1401,15 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
   const idValues = Array.isArray(corIds) ? corIds : []
   const nameValues = Array.isArray(corNames) ? corNames : []
 
+  // Se veio nome mas não conseguimos IDs válidos, não siga silenciosamente.
+  if (!idValues.length && nameValues.length) {
+    throw new Error('Cor informada não encontrada no catálogo. Cadastre a cor ou selecione uma existente.')
+  }
+  // Nenhum dado de cor: nada a fazer.
+  if (!idValues.length && !nameValues.length) {
+    return
+  }
+
   let idInserted = false
   try {
     await replaceMaterialRelationsWithFallback({
@@ -1438,6 +1447,13 @@ async function replaceMaterialCaracteristicaVinculos(
 ) {
   const idValues = Array.isArray(caracteristicaIds) ? caracteristicaIds : []
   const nameValues = Array.isArray(caracteristicaNames) ? caracteristicaNames : []
+
+  if (!idValues.length && nameValues.length) {
+    throw new Error('Característica informada não encontrada no catálogo. Cadastre a característica ou selecione uma existente.')
+  }
+  if (!idValues.length && !nameValues.length) {
+    return
+  }
 
   let idInserted = false
   try {
@@ -3691,11 +3707,17 @@ export const api = {
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const corRelationIds =
-        corNames.length > 0 ? await resolveCorIdsFromNames(corNames) : coresIds
+        (Array.isArray(coresIds) && coresIds.length
+          ? coresIds
+          : corNames.length > 0
+            ? await resolveCorIdsFromNames(corNames)
+            : []) || []
       const caracteristicaRelationIds =
-        caracteristicaNames.length > 0
-          ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
-          : caracteristicaIds
+        (Array.isArray(caracteristicaIds) && caracteristicaIds.length
+          ? caracteristicaIds
+          : caracteristicaNames.length > 0
+            ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+            : []) || []
       const supabasePayload = buildMaterialSupabasePayload(
         {
           ...dados,
@@ -3859,11 +3881,17 @@ export const api = {
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const corRelationIds =
-        corNames.length > 0 ? await resolveCorIdsFromNames(corNames) : coresIds
+        (Array.isArray(coresIds) && coresIds.length
+          ? coresIds
+          : corNames.length > 0
+            ? await resolveCorIdsFromNames(corNames)
+            : []) || []
       const caracteristicaRelationIds =
-        caracteristicaNames.length > 0
-          ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
-          : caracteristicaIds
+        (Array.isArray(caracteristicaIds) && caracteristicaIds.length
+          ? caracteristicaIds
+          : caracteristicaNames.length > 0
+            ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+            : []) || []
       const supabasePayload = buildMaterialSupabasePayload(
         dados,
         {

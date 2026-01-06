@@ -31,13 +31,17 @@ LEFT JOIN public.grupos_material_itens gmi
 WHERE m.id = p_material_id;
 $$;
 
--- Resolve numero (usa apenas numeroEspecifico)
+-- Resolve numero (prioriza numeroEspecifico; se vazio, usa numeroCalcado/numeroVestimenta)
 CREATE OR REPLACE FUNCTION public.material_resolve_numero(p_material_id uuid)
 RETURNS text LANGUAGE sql STABLE AS
 $$
 SELECT COALESCE(
   NULLIF(m."numeroEspecifico"::text, ''),
+  NULLIF(m."numeroCalcado"::text, ''),
+  NULLIF(m."numeroVestimenta"::text, ''),
   m."numeroEspecifico"::text,
+  m."numeroCalcado"::text,
+  m."numeroVestimenta"::text,
   ''
 )
 FROM public.materiais m
@@ -64,7 +68,7 @@ SELECT md5(
       COALESCE(m."grupoMaterial"::text, ''),
       COALESCE(public.material_resolve_item_nome(m.id), ''),
       COALESCE(public.material_resolve_numero(m.id), ''),
-      COALESCE(cores_agg.cores_string, fn_normalize_text(m.corMaterial), '')
+      COALESCE(cores_agg.cores_string, '')
     )
   )
 )
@@ -103,8 +107,8 @@ SELECT md5(
       COALESCE(public.material_resolve_item_nome(m.id), ''),
       COALESCE(public.material_resolve_numero(m.id), ''),
       COALESCE(NULLIF(m.ca, ''), ''),
-      COALESCE(cores_agg.cores_string, fn_normalize_text(m.corMaterial), ''),
-      COALESCE(caracteristicas_agg.caracteristicas_string, fn_normalize_text(m.caracteristicaEpi), '')
+      COALESCE(cores_agg.cores_string, ''),
+      COALESCE(caracteristicas_agg.caracteristicas_string, '')
     )
   )
 )
@@ -129,18 +133,14 @@ BEGIN
   v_grupo_norm := NULLIF(fn_normalize_any(NEW."grupoMaterial"), '');
   v_nome_norm := NULLIF(fn_normalize_any(NEW.nome), '');
 
-  -- Regra: C.A nao pode aparecer em grupo/item diferente
-  IF v_ca_norm IS NOT NULL AND v_nome_norm IS NOT NULL AND v_grupo_norm IS NOT NULL AND EXISTS (
+  -- Regra: C.A nao pode repetir (em qualquer grupo/item)
+  IF v_ca_norm IS NOT NULL AND EXISTS (
     SELECT 1
     FROM public.materiais m
     WHERE m.id <> NEW.id
       AND NULLIF(fn_normalize_any(m.ca), '') = v_ca_norm
-      AND (
-        NULLIF(fn_normalize_any(m."grupoMaterial"), '') IS DISTINCT FROM v_grupo_norm OR
-        NULLIF(fn_normalize_any(m.nome), '') IS DISTINCT FROM v_nome_norm
-      )
   ) THEN
-    RAISE EXCEPTION 'Ja existe C.A associado a outro grupo ou item.';
+    RAISE EXCEPTION 'Ja existe material cadastrado com este C.A.';
   END IF;
 
   v_hash_base := public.material_hash_base(NEW.id);
