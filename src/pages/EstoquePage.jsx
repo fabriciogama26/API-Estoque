@@ -1,11 +1,12 @@
 import { PageHeader } from '../components/PageHeader.jsx'
-import { InventoryIcon } from '../components/icons.jsx'
+import { InventoryIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { EstoqueFilters } from '../components/Estoque/Filters/EstoqueFilters.jsx'
 import { EstoqueAlerts } from '../components/Estoque/Alerts/EstoqueAlerts.jsx'
 import { EstoqueSummary } from '../components/Estoque/Summary/EstoqueSummary.jsx'
 import { EstoqueList } from '../components/Estoque/List/EstoqueList.jsx'
 import { EstoqueProvider, useEstoqueContext } from '../context/EstoqueContext.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
+import { downloadEstoqueCsv } from '../utils/estoqueUtils.js'
 
 import '../styles/EstoquePage.css'
 
@@ -46,6 +47,11 @@ function EstoquePageContent() {
   const handleSubmit = (event) => {
     event.preventDefault()
     applyFilters({ source: 'filters' })
+  }
+
+  const handleExportCsv = () => {
+    const filename = `estoque-atual-${new Date().toISOString().slice(0, 10)}.csv`
+    downloadEstoqueCsv(itensFiltrados, { filename })
   }
 
   return (
@@ -91,6 +97,16 @@ function EstoquePageContent() {
       <section className="card">
         <header className="card__header">
           <h2>Estoque materiais</h2>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleExportCsv}
+            aria-label="Exportar estoque atual em CSV"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <SpreadsheetIcon size={16} />
+            <span>Exportar Excel (CSV)</span>
+          </button>
         </header>
         <EstoqueList
           itens={paginatedItens}

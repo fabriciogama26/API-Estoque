@@ -23,6 +23,7 @@ import Plus from 'lucide-react/dist/esm/icons/plus.js'
 import Info from 'lucide-react/dist/esm/icons/info.js'
 import UserCircle from 'lucide-react/dist/esm/icons/user-circle.js'
 import LifeBuoy from 'lucide-react/dist/esm/icons/life-buoy.js'
+import FileSpreadsheet from 'lucide-react/dist/esm/icons/file-spreadsheet.js'
 
 const defaultSize = 18
 const defaultStroke = 1.8
@@ -55,3 +56,4 @@ export const AddIcon = (props) => <Plus {...withDefaultProps(props)} />
 export const InfoIcon = (props) => <Info {...withDefaultProps(props)} />
 export const PersonIcon = (props) => <UserCircle {...withDefaultProps(props)} />
 export const HelpIcon = (props) => <LifeBuoy {...withDefaultProps(props)} />
+export const SpreadsheetIcon = (props) => <FileSpreadsheet {...withDefaultProps(props)} />

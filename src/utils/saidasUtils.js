@@ -168,21 +168,37 @@ export const formatDisplayDateTime = (value) => {
   if (!value) return 'Nao informado'
   const raw = typeof value === 'string' ? value.trim() : value
   if (!raw) return 'Nao informado'
+
+  // Se for string ISO, detecta presença de hora
+  const isoMatch =
+    typeof raw === 'string'
+      ? raw.match(
+          /^\s*(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?\s*$/,
+        )
+      : null
+
+  if (isoMatch) {
+    const [, year, month, day, hour, minute, second] = isoMatch
+    const dateOnlyText = `${year}-${month}-${day}`
+    const hasTime = hour !== undefined && hour !== null
+    const timeIsZero = hasTime && hour === '00' && minute === '00' && (!second || second === '00')
+
+    // Para datas sem hora (ou 00:00), mostra só a data, sem ajuste de fuso
+    if (!hasTime || timeIsZero) {
+      const localDate = new Date(`${dateOnlyText}T00:00:00`)
+      return Number.isNaN(localDate.getTime()) ? 'Nao informado' : localDate.toLocaleDateString('pt-BR')
+    }
+  }
+
+  // Para valores com hora, converte para o fuso local e exibe data+hora
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return 'Nao informado'
-
-  // Valores de data apenas (ex.: YYYY-MM-DD ou meia noite UTC) nao devem perder 1 dia por causa do fuso.
-  const isDateOnlyValue =
-    typeof raw === 'string' &&
-    (/^\d{4}-\d{2}-\d{2}$/.test(raw) ||
-      /^\d{4}-\d{2}-\d{2}[T\s]00:00:00(?:\.\d+)?(?:Z|[+-]00:?00)?$/.test(raw))
-
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined
   return date.toLocaleString('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
     hour12: false,
-    timeZone: isDateOnlyValue ? 'UTC' : timeZone,
+    timeZone,
   })
 }
 

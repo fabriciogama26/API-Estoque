@@ -31,21 +31,45 @@ LEFT JOIN public.grupos_material_itens gmi
 WHERE m.id = p_material_id;
 $$;
 
+-- Resolve numero (usa apenas numeroEspecifico)
+CREATE OR REPLACE FUNCTION public.material_resolve_numero(p_material_id uuid)
+RETURNS text LANGUAGE sql STABLE AS
+$$
+SELECT COALESCE(
+  NULLIF(m."numeroEspecifico"::text, ''),
+  m."numeroEspecifico"::text,
+  ''
+)
+FROM public.materiais m
+WHERE m.id = p_material_id;
+$$;
+
 -- Função: hash camada 1 (fabricante + grupo + item + numeroEspecifico)
 CREATE OR REPLACE FUNCTION public.material_hash_base(p_material_id uuid)
 RETURNS text LANGUAGE sql STABLE AS
 $$
+WITH cores_agg AS (
+  SELECT
+    mgc.material_id,
+    ARRAY_TO_STRING(ARRAY_AGG(DISTINCT fn_normalize_text(c.cor) ORDER BY fn_normalize_text(c.cor)), ';') AS cores_string
+  FROM public.material_grupo_cor mgc
+  LEFT JOIN public.cor c ON c.id::text = mgc.grupo_material_cor::text
+  WHERE mgc.material_id = p_material_id
+  GROUP BY mgc.material_id
+)
 SELECT md5(
   fn_normalize_text(
     CONCAT_WS('|',
       COALESCE(m.fabricante::text, ''),
       COALESCE(m."grupoMaterial"::text, ''),
       COALESCE(public.material_resolve_item_nome(m.id), ''),
-      COALESCE(m."numeroEspecifico"::text, '')
+      COALESCE(public.material_resolve_numero(m.id), ''),
+      COALESCE(cores_agg.cores_string, fn_normalize_text(m.corMaterial), '')
     )
   )
 )
 FROM public.materiais m
+LEFT JOIN cores_agg ON cores_agg.material_id = m.id
 WHERE m.id = p_material_id;
 $$;
 
@@ -77,10 +101,10 @@ SELECT md5(
       COALESCE(m.fabricante::text, ''),
       COALESCE(m."grupoMaterial"::text, ''),
       COALESCE(public.material_resolve_item_nome(m.id), ''),
-      COALESCE(m."numeroEspecifico"::text, ''),
+      COALESCE(public.material_resolve_numero(m.id), ''),
       COALESCE(NULLIF(m.ca, ''), ''),
-      COALESCE(cores_agg.cores_string, ''),
-      COALESCE(caracteristicas_agg.caracteristicas_string, '')
+      COALESCE(cores_agg.cores_string, fn_normalize_text(m.corMaterial), ''),
+      COALESCE(caracteristicas_agg.caracteristicas_string, fn_normalize_text(m.caracteristicaEpi), '')
     )
   )
 )
@@ -98,10 +122,9 @@ DECLARE
   v_ca_norm text;
   v_grupo_norm text;
   v_nome_norm text;
+  v_hash_base text;
+  v_hash_completo text;
 BEGIN
-  NEW.hash_base := public.material_hash_base(NEW.id);
-  NEW.hash_completo := public.material_hash_completo(NEW.id);
-
   v_ca_norm := NULLIF(fn_normalize_any(NEW.ca), '');
   v_grupo_norm := NULLIF(fn_normalize_any(NEW."grupoMaterial"), '');
   v_nome_norm := NULLIF(fn_normalize_any(NEW.nome), '');
@@ -120,16 +143,24 @@ BEGIN
     RAISE EXCEPTION 'Ja existe C.A associado a outro grupo ou item.';
   END IF;
 
+  v_hash_base := public.material_hash_base(NEW.id);
+  v_hash_completo := public.material_hash_completo(NEW.id);
+
+  NEW.hash_base := v_hash_base;
+  NEW.hash_completo := v_hash_completo;
+
   IF EXISTS (
     SELECT 1 FROM public.materiais m
-    WHERE m.id <> NEW.id AND m.hash_completo = NEW.hash_completo
+    WHERE m.id <> NEW.id
+      AND public.material_hash_completo(m.id) = v_hash_completo
   ) THEN
     RAISE EXCEPTION 'Material duplicado com mesmas cores/caracteristicas e C.A.';
   END IF;
 
   IF EXISTS (
     SELECT 1 FROM public.materiais m
-    WHERE m.id <> NEW.id AND m.hash_base = NEW.hash_base
+    WHERE m.id <> NEW.id
+      AND public.material_hash_base(m.id) = v_hash_base
   ) THEN
     RAISE EXCEPTION 'Material duplicado (mesmo fabricante/grupo/item/numero especifico).';
   END IF;
