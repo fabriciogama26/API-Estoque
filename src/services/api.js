@@ -249,7 +249,9 @@ const MATERIAL_TABLE_SELECT_COLUMNS = `
 const MATERIAL_SELECT_COLUMNS = `
   ${MATERIAL_TABLE_SELECT_COLUMNS},
   "caracteristicaNome",
+  "caracteristicasIds",
   "corNome",
+  "coresIds",
   "numeroCalcadoNome",
   "numeroVestimentaNome",
   "usuarioCadastroNome",
@@ -1671,6 +1673,7 @@ function mapMaterialRecord(record) {
   const coresIds = coresLista.map((item) => item.id).filter(Boolean)
   const caracteristicasTexto = caracteristicasNomes.join('; ')
   const coresTexto = coresNomes.join('; ')
+  const corMaterialFallback = trim(record.corMaterial ?? record.cor_material ?? '')
   const usuarioCadastroId = trim(record.usuarioCadastro ?? record.usuario_cadastro ?? '')
   const usuarioCadastroNome =
     trim(record.usuarioCadastroNome ?? record.usuario_cadastro_nome ?? '') ||
@@ -1721,7 +1724,7 @@ function mapMaterialRecord(record) {
     caracteristicasIds,
     caracteristicasNomes,
     caracteristicasTexto,
-    corMaterial: coresLista[0]?.nome || coresTexto || '',
+    corMaterial: coresLista[0]?.nome || coresTexto || corMaterialFallback,
     cores: coresLista,
     coresIds,
     coresNomes,
