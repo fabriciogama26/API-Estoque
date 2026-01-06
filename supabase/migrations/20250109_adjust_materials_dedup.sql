@@ -149,20 +149,21 @@ BEGIN
   NEW.hash_base := v_hash_base;
   NEW.hash_completo := v_hash_completo;
 
+  -- Se CA estiver vazio, bloquear base igual (fabricante+grupo+item+numero+cores) sem perguntar
+  IF v_ca_norm IS NULL AND EXISTS (
+    SELECT 1 FROM public.materiais m
+    WHERE m.id <> NEW.id
+      AND public.material_hash_base(m.id) = v_hash_base
+  ) THEN
+    RAISE EXCEPTION 'Material duplicado com base igual e CA vazio.';
+  END IF;
+
   IF EXISTS (
     SELECT 1 FROM public.materiais m
     WHERE m.id <> NEW.id
       AND public.material_hash_completo(m.id) = v_hash_completo
   ) THEN
     RAISE EXCEPTION 'Material duplicado com mesmas cores/caracteristicas e C.A.';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM public.materiais m
-    WHERE m.id <> NEW.id
-      AND public.material_hash_base(m.id) = v_hash_base
-  ) THEN
-    RAISE EXCEPTION 'Material duplicado (mesmo fabricante/grupo/item/numero especifico).';
   END IF;
 
   RETURN NEW;
@@ -188,13 +189,6 @@ BEGIN
     WHERE m.id <> alvo AND m.hash_completo = (SELECT hash_completo FROM public.materiais WHERE id = alvo)
   ) THEN
     RAISE EXCEPTION 'Material duplicado com mesmas cores/caracteristicas e C.A.';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM public.materiais m
-    WHERE m.id <> alvo AND m.hash_base = (SELECT hash_base FROM public.materiais WHERE id = alvo)
-  ) THEN
-    RAISE EXCEPTION 'Material duplicado (mesmo fabricante/grupo/item/numero especifico).';
   END IF;
 
   RETURN NULL;
