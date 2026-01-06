@@ -168,18 +168,33 @@ export const formatDisplayDateTime = (value) => {
   if (!value) return 'Nao informado'
   const raw = typeof value === 'string' ? value.trim() : value
   if (!raw) return 'Nao informado'
+
+  // Tenta preservar o horario exibindo exatamente o que veio do banco (sem aplicar fuso).
+  const isoMatch =
+    typeof raw === 'string'
+      ? raw.match(
+          /^\s*(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?\s*$/,
+        )
+      : null
+  if (isoMatch) {
+    const [, year, month, day, hour, minute, second] = isoMatch
+    const dateOnly = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+    const datePart = Number.isNaN(dateOnly.getTime())
+      ? null
+      : dateOnly.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+    if (datePart) {
+      const hasTime = hour !== undefined && hour !== null
+      const timeIsZero = hasTime && hour === '00' && minute === '00' && (!second || second === '00')
+      if (!hasTime || timeIsZero) {
+        return datePart
+      }
+      const timePart = second && second !== '00' ? `${hour}:${minute}:${second}` : `${hour}:${minute}`
+      return `${datePart} ${timePart}`
+    }
+  }
+
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return 'Nao informado'
-
-  // Valores de data apenas (ex.: YYYY-MM-DD ou meia noite UTC) nao devem perder 1 dia por causa do fuso.
-  const isDateOnlyValue =
-    typeof raw === 'string' &&
-    (/^\d{4}-\d{2}-\d{2}$/.test(raw) ||
-      /^\d{4}-\d{2}-\d{2}[T\s]00:00:00(?:\.\d+)?(?:Z|[+-]00:?00)?$/.test(raw))
-
-  if (isDateOnlyValue) {
-    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
-  }
 
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   return date.toLocaleString('pt-BR', {
