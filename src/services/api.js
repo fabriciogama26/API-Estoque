@@ -380,6 +380,21 @@ const normalizeUuid = (value) => {
   return UUID_REGEX.test(texto) ? texto : null
 }
 
+const toUuidOrNull = (value) => normalizeUuid(value) ?? null
+const toUuidArrayOrEmpty = (arr) =>
+  Array.isArray(arr) ? arr.map((item) => toUuidOrNull(item)).filter(Boolean) : []
+
+const resolvePreflightOwnerId = (effective) => {
+  if (!effective) {
+    return null
+  }
+  const cred = (effective.credential || effective.credentialId || '').toString().toLowerCase()
+  if (cred === 'admin' || cred === 'master') {
+    return null
+  }
+  return toUuidOrNull(effective.appUserId) || null
+}
+
 const normalizeOptionId = (value) => {
   if (value === null || value === undefined) {
     return null
@@ -1401,6 +1416,15 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
   const idValues = Array.isArray(corIds) ? corIds : []
   const nameValues = Array.isArray(corNames) ? corNames : []
 
+  // Se veio nome mas não conseguimos IDs válidos, não siga silenciosamente.
+  if (!idValues.length && nameValues.length) {
+    throw new Error('Cor informada não encontrada no catálogo. Cadastre a cor ou selecione uma existente.')
+  }
+  // Nenhum dado de cor: nada a fazer.
+  if (!idValues.length && !nameValues.length) {
+    return
+  }
+
   let idInserted = false
   try {
     await replaceMaterialRelationsWithFallback({
@@ -1438,6 +1462,13 @@ async function replaceMaterialCaracteristicaVinculos(
 ) {
   const idValues = Array.isArray(caracteristicaIds) ? caracteristicaIds : []
   const nameValues = Array.isArray(caracteristicaNames) ? caracteristicaNames : []
+
+  if (!idValues.length && nameValues.length) {
+    throw new Error('Característica informada não encontrada no catálogo. Cadastre a característica ou selecione uma existente.')
+  }
+  if (!idValues.length && !nameValues.length) {
+    return
+  }
 
   let idInserted = false
   try {
@@ -3409,6 +3440,13 @@ export const api = {
       const atual = mapPessoaRecord(atualRaw)
       const dados = sanitizePessoaPayload(payload)
       const usuarioId = await resolveUsuarioIdOrThrow()
+      let effective = null
+      try {
+        effective = typeof resolveEffectiveAppUser === 'function' ? await resolveEffectiveAppUser(usuarioId) : null
+      } catch (err) {
+        reportClientError('Falha ao resolver account_owner_id; prosseguindo sem owner.', err, { usuarioId })
+        effective = null
+      }
       const agora = new Date().toISOString()
       if (!dados.dataAdmissao) {
         throw new Error('Informe a data de admissao no formato dd/MM/yyyy.')
@@ -3666,6 +3704,13 @@ export const api = {
         throw new Error('Preencha nome, fabricante e validade (em dias).')
       }
       const usuarioId = await resolveUsuarioIdOrThrow()
+      let effective = null
+      try {
+        effective = typeof resolveEffectiveAppUser === 'function' ? await resolveEffectiveAppUser(usuarioId) : null
+      } catch (err) {
+        reportClientError('Falha ao resolver account_owner_id; prosseguindo sem owner.', err, { usuarioId })
+        effective = null
+      }
       const agora = new Date().toISOString()
 
       const nomeItemId = await resolveMaterialItemId(dados.nome || dados.nomeId || dados.materialItemNome)
@@ -3691,11 +3736,50 @@ export const api = {
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const corRelationIds =
-        corNames.length > 0 ? await resolveCorIdsFromNames(corNames) : coresIds
+        (Array.isArray(coresIds) && coresIds.length
+          ? coresIds
+          : corNames.length > 0
+            ? await resolveCorIdsFromNames(corNames)
+            : []) || []
       const caracteristicaRelationIds =
-        caracteristicaNames.length > 0
-          ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
-          : caracteristicaIds
+        (Array.isArray(caracteristicaIds) && caracteristicaIds.length
+          ? caracteristicaIds
+          : caracteristicaNames.length > 0
+            ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+            : []) || []
+
+      // Preflight: CA conflito ou base igual com CA diferente (escopo do owner)
+      const preflight = await executeMaybeSingle(
+        supabase.rpc('material_preflight_check', {
+          p_grupo: toUuidOrNull(grupoMaterialId),
+          p_nome: toUuidOrNull(nomeItemId),
+          p_fabricante: toUuidOrNull(fabricanteId),
+          p_numero_especifico: dados.numeroEspecifico ?? null,
+          p_numero_calcado: toUuidOrNull(dados.numeroCalcado),
+          p_numero_vestimenta: toUuidOrNull(dados.numeroVestimenta),
+          p_ca: dados.ca ?? null,
+          p_account_owner_id: resolvePreflightOwnerId(effective),
+          p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
+          p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
+        }),
+        'Falha no preflight de material.'
+      )
+      if (preflight?.ca_conflict) {
+        const err = new Error('Ja existe material com este C.A. em outro grupo/item.')
+        err.code = 'CA_CONFLICT'
+        throw err
+      }
+      if (preflight?.base_conflict_empty) {
+        const err = new Error('Material duplicado (base igual com CA vazio/ausente).')
+        err.code = 'BASE_EMPTY_CONFLICT'
+        throw err
+      }
+      if (preflight?.base_match_ca_diff && !dados.forceBaseCaDiff) {
+        const err = new Error('BASE_CA_DIFF')
+        err.code = 'BASE_CA_DIFF'
+        err.details = preflight?.base_match_ids || []
+        throw err
+      }
       const supabasePayload = buildMaterialSupabasePayload(
         {
           ...dados,
@@ -3780,6 +3864,13 @@ export const api = {
       const materialAtual = mapMaterialRecord(registroAtual)
       const dadosCombinados = sanitizeMaterialPayload({ ...materialAtual, ...payload })
       const usuarioId = await resolveUsuarioIdOrThrow()
+      let effective = null
+      try {
+        effective = typeof resolveEffectiveAppUser === 'function' ? await resolveEffectiveAppUser(usuarioId) : null
+      } catch (err) {
+        reportClientError('Falha ao resolver account_owner_id; prosseguindo sem owner.', err, { usuarioId })
+        effective = null
+      }
       const agora = new Date().toISOString()
       const camposAlterados = []
       MATERIAL_HISTORY_FIELDS.forEach((campo) => {
@@ -3859,11 +3950,49 @@ export const api = {
       const corNames = extractTextualNames(dados.cores)
       const caracteristicaNames = extractTextualNames(dados.caracteristicas)
       const corRelationIds =
-        corNames.length > 0 ? await resolveCorIdsFromNames(corNames) : coresIds
+        (Array.isArray(coresIds) && coresIds.length
+          ? coresIds
+          : corNames.length > 0
+            ? await resolveCorIdsFromNames(corNames)
+            : []) || []
       const caracteristicaRelationIds =
-        caracteristicaNames.length > 0
-          ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
-          : caracteristicaIds
+        (Array.isArray(caracteristicaIds) && caracteristicaIds.length
+          ? caracteristicaIds
+          : caracteristicaNames.length > 0
+            ? await resolveCaracteristicaIdsFromNames(caracteristicaNames)
+            : []) || []
+
+      const preflight = await executeMaybeSingle(
+        supabase.rpc('material_preflight_check', {
+          p_grupo: toUuidOrNull(grupoMaterialId),
+          p_nome: toUuidOrNull(nomeItemId),
+          p_fabricante: toUuidOrNull(fabricanteId),
+          p_numero_especifico: dadosCombinados.numeroEspecifico ?? null,
+          p_numero_calcado: toUuidOrNull(dadosCombinados.numeroCalcado),
+          p_numero_vestimenta: toUuidOrNull(dadosCombinados.numeroVestimenta),
+          p_ca: dadosCombinados.ca ?? null,
+          p_account_owner_id: resolvePreflightOwnerId(effective),
+          p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
+          p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
+        }),
+        'Falha no preflight de material.'
+      )
+      if (preflight?.ca_conflict) {
+        const err = new Error('Ja existe material com este C.A. em outro grupo/item.')
+        err.code = 'CA_CONFLICT'
+        throw err
+      }
+      if (preflight?.base_conflict_empty) {
+        const err = new Error('Material duplicado (base igual com CA vazio/ausente).')
+        err.code = 'BASE_EMPTY_CONFLICT'
+        throw err
+      }
+      if (preflight?.base_match_ca_diff && !dadosCombinados.forceBaseCaDiff) {
+        const err = new Error('BASE_CA_DIFF')
+        err.code = 'BASE_CA_DIFF'
+        err.details = preflight?.base_match_ids || []
+        throw err
+      }
       const supabasePayload = buildMaterialSupabasePayload(
         dados,
         {

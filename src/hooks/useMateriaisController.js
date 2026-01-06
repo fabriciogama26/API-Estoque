@@ -52,6 +52,11 @@ export function useMateriaisController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('materiais')
 
+  const BASE_DIFF_PROMPT_DEFAULT = useMemo(
+    () => ({ open: false, payload: null, id: null, editing: false, details: [] }),
+    []
+  )
+
   const [form, setForm] = useState(() => createMateriaisFormDefault())
   const [filters, setFilters] = useState(() => ({ ...MATERIAIS_FILTER_DEFAULT }))
   const [materiais, setMateriais] = useState([])
@@ -85,6 +90,7 @@ export function useMateriaisController() {
   const [tamanhoOptions, setTamanhoOptions] = useState([])
   const [isLoadingTamanhos, setIsLoadingTamanhos] = useState(false)
   const [tamanhoError, setTamanhoError] = useState(null)
+  const [baseDiffPrompt, setBaseDiffPrompt] = useState(BASE_DIFF_PROMPT_DEFAULT)
 
   const loadMateriais = useCallback(async () => {
     setIsLoading(true)
@@ -447,6 +453,39 @@ export function useMateriaisController() {
     setIsLoadingItems(false)
   }
 
+  const closeBaseDiffPrompt = useCallback(
+    () => setBaseDiffPrompt(BASE_DIFF_PROMPT_DEFAULT),
+    [BASE_DIFF_PROMPT_DEFAULT]
+  )
+
+  const confirmBaseDiff = useCallback(async () => {
+    if (!baseDiffPrompt.open || !baseDiffPrompt.payload) {
+      closeBaseDiffPrompt()
+      return
+    }
+    setIsSaving(true)
+    try {
+      if (baseDiffPrompt.editing && baseDiffPrompt.id) {
+        await updateMaterial(baseDiffPrompt.id, { ...baseDiffPrompt.payload, forceBaseCaDiff: true })
+        setHistoryCache((prev) => {
+          const next = { ...prev }
+          delete next[baseDiffPrompt.id]
+          return next
+        })
+      } else {
+        await createMaterial({ ...baseDiffPrompt.payload, forceBaseCaDiff: true })
+      }
+      resetForm()
+      await loadMateriais()
+      closeBaseDiffPrompt()
+    } catch (err) {
+      setError(err.message || 'Falha ao salvar material.')
+      reportError(err, { area: 'materiais_submit_base_diff', editing: baseDiffPrompt.editing })
+    } finally {
+      setIsSaving(false)
+    }
+  }, [baseDiffPrompt, closeBaseDiffPrompt, loadMateriais, reportError, resetForm])
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError(null)
@@ -460,7 +499,23 @@ export function useMateriaisController() {
       const usuario = resolveUsuarioNome(user)
       if (editingMaterial) {
         const payload = updateMaterialPayload(form, usuario)
-        await updateMaterial(editingMaterial.id, payload)
+        try {
+          await updateMaterial(editingMaterial.id, payload)
+        } catch (err) {
+          if (err?.code === 'BASE_CA_DIFF') {
+            setBaseDiffPrompt({
+              open: true,
+              payload,
+              id: editingMaterial?.id ?? null,
+              editing: true,
+              details: Array.isArray(err?.details) ? err.details : [],
+            })
+            setIsSaving(false)
+            return
+          } else {
+            throw err
+          }
+        }
         setHistoryCache((prev) => {
           const next = { ...prev }
           delete next[editingMaterial.id]
@@ -470,7 +525,23 @@ export function useMateriaisController() {
         await loadMateriais()
       } else {
         const payload = createMaterialPayload(form, usuario)
-        await createMaterial(payload)
+        try {
+          await createMaterial(payload)
+        } catch (err) {
+          if (err?.code === 'BASE_CA_DIFF') {
+            setBaseDiffPrompt({
+              open: true,
+              payload,
+              id: null,
+              editing: false,
+              details: Array.isArray(err?.details) ? err.details : [],
+            })
+            setIsSaving(false)
+            return
+          } else {
+            throw err
+          }
+        }
         resetForm()
         await loadMateriais()
       }
@@ -630,6 +701,9 @@ export function useMateriaisController() {
     startEdit,
     resetForm,
     loadMateriais,
+    baseDiffPrompt,
+    confirmBaseDiff,
+    cancelBaseDiff: closeBaseDiffPrompt,
     setCurrentPage: () => {},
   }
 }

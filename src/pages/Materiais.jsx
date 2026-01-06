@@ -58,6 +58,9 @@ function MateriaisContent() {
     startEdit,
     resetForm,
     loadMateriais,
+    baseDiffPrompt,
+    confirmBaseDiff,
+    cancelBaseDiff,
   } = useMateriaisContext()
 
   const handleOpenDetalhe = async (material) => {
@@ -153,6 +156,44 @@ function MateriaisContent() {
       </section>
 
       <MateriaisHistoryModal modal={historyModal} onClose={closeHistoryModal} />
+      {baseDiffPrompt.open ? (
+        <div className="modal__overlay" role="dialog" aria-modal="true">
+          <div className="modal__content" onClick={(event) => event.stopPropagation()}>
+            <header className="modal__header">
+              <h3>Material com CA diferente</h3>
+              <button type="button" className="modal__close" onClick={cancelBaseDiff} aria-label="Fechar">
+                x
+              </button>
+            </header>
+            <div className="modal__body">
+              <p className="feedback feedback--warning">
+                Já existe material com mesmo grupo, item, fabricante, numeração, cores e características, mas com outro
+                C.A. Deseja salvar mesmo assim usando este C.A. diferente?
+              </p>
+              {Array.isArray(baseDiffPrompt.details) && baseDiffPrompt.details.length ? (
+                <div className="card card--muted" style={{ marginTop: '0.5rem' }}>
+                  <strong>IDs encontrados:</strong>
+                  <ul style={{ margin: '0.5rem 0 0 1rem' }}>
+                    {baseDiffPrompt.details.map((id) => (
+                      <li key={id} style={{ wordBreak: 'break-all' }}>
+                        {id}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+            <footer className="modal__footer" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="button button--ghost" onClick={cancelBaseDiff}>
+                Cancelar
+              </button>
+              <button type="button" className="button" onClick={confirmBaseDiff}>
+                Usar CA diferente
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
       {detalhe.open && detalhe.material ? (
         <div className="saida-details__overlay" role="dialog" aria-modal="true" onClick={handleCloseDetalhe}>
           <div className="saida-details__modal" onClick={(event) => event.stopPropagation()}>
