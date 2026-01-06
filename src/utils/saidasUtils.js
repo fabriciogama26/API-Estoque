@@ -177,12 +177,16 @@ export const formatDisplayDateTime = (value) => {
     (/^\d{4}-\d{2}-\d{2}$/.test(raw) ||
       /^\d{4}-\d{2}-\d{2}[T\s]00:00:00(?:\.\d+)?(?:Z|[+-]00:?00)?$/.test(raw))
 
+  if (isDateOnlyValue) {
+    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+  }
+
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   return date.toLocaleString('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
     hour12: false,
-    timeZone: isDateOnlyValue ? 'UTC' : timeZone,
+    timeZone,
   })
 }
 
