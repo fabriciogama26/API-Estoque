@@ -2,30 +2,37 @@ Duplicidade de Materiais
 ========================
 
 1. **Objetivo**
-   - Nenhum material deve ser repetido no banco com a mesma combinação de `fabricante`, `grupoMaterial`, `numeroEspecifico`, `valorUnitario`, `ca`, `cores` e `características`.
-   - O backend agora valida essa unicidade no nível do banco para não depender só do frontend.
+   - Nenhum material deve ser repetido no banco com a mesma base: `fabricante`, `grupoMaterial`, `nome (item)`, `numeroEspecifico/Calcado/Vestimenta`, `ca`, `cores` e `características`.
+   - A deduplicação roda em duas camadas: (a) preflight no frontend (RPC) para avisar/bloquear antes de gravar; (b) triggers no banco para impedir inserts/updates conflitantes.
 
 2. **View `materiais_unicos_view`**
    - Agrega cada material com as cores e características ordenadas.
    - Calcula `hash_unico = md5(lower(concat_ws('|', fabricante, grupoMaterial, numeroEspecifico, valorUnitario, ca, cores_string, caracteristicas_string)))`.
    - Serve como base para comparar combinações completas.
 
-3. **Função `material_hash_completo(material_id uuid)`**
-   - Regera o mesmo hash usado pela view para um `material_id` específico (inclui cores/características e campos numéricos).
+3. **Hashes atuais**
+   - `material_hash_base(material_id)`: fabricante + grupo + item + número (resolve númeroEspecifico > calcado > vestimenta) + cores.
+   - `material_hash_completo(material_id)`: base + CA + cores + características.
 
-4. **Função `evitar_duplicidade_material()` + trigger**
-   - Trigger `BEFORE INSERT OR UPDATE` em `public.materiais` chama a função.
-   - A função busca o hash do material em `materiais_unicos_view`; se outro `id` possuir o mesmo `hash_unico`, dispara `RAISE EXCEPTION 'Material duplicado...'`.
-   - Essa exceção aborta o insert/update antes de salvar.
+4. **Triggers no banco**
+   - INSERT: `evitar_duplicidade_material` (mig. `20250109_adjust_materials_dedup.sql`) bloqueia:
+     - CA repetido na mesma base completa (hash_base + hash_completo).
+     - Base igual com CA vazio (usa base + características, via hash_completo).
+     - Hash completo igual (cores/características + CA).
+   - UPDATE: `evitar_duplicidade_material_update` (mig. `20250112_base_ca_diff_update.sql`) replica as regras acima ignorando o próprio registro (`m.id <> NEW.id`).
+   - Triggers relacionais (`material_grupo_cor`, `material_grupo_caracteristica_epi`) recalculam hashes e revalidam após mudanças de vínculos.
 
-5. **Triggers auxiliares em `material_grupo_cor` e `material_grupo_caracteristica_epi`**
-   - Após inserir/atualizar/excluir cores ou características, reexecuta `evitar_duplicidade_material()` para o `material_id` afetado.
-   - Mantém a validação mesmo quando as relações são alteradas depois da linha principal.
+5. **RPC de preflight (`material_preflight_check`)**
+   - Migração `20250111_material_preflight.sql`.
+   - Entrada: grupo, item, fabricante, números, CA, cores[], características[], `p_material_id` (NULL em create; id em update) e `p_account_owner_id` para escopo.
+   - Retorno: `ca_conflict` (mesma base+CA), `base_conflict_empty` (base igual com CA ausente) e `base_match_ca_diff` + `base_match_ids` (base igual com CA diferente).
+   - Front bloqueia CA duplicado ou base com CA vazio; no caso de CA diferente abre modal e só grava se usuário confirmar (`forceBaseCaDiff`).
 
 6. **Testes**
-   - Crie um material e outro com os mesmos campos + cores + características → o segundo insert deve falhar com `Material duplicado...`.
-   - Tente editar cores/características de um material já existente para igualar outro → o update deve ser barrado.
-   - Materiais diferentes (ex: CA ou valor/cores divergentes) continuam passando.
+   - Preflight (frontend): criar com base igual e CA diferente → receber modal; confirmar grava, cancelar aborta. Criar com base igual e CA vazio → bloqueia. Criar com CA duplicado na mesma base → bloqueia.
+   - Trigger INSERT: tente inserir base igual com CA vazio → falha. Inserir base+CA igual (mesmas cores/características) → falha.
+   - Trigger UPDATE: editar um material para ficar igual a outro (mesma base+CA) → falha; editar sem alterar base/CA passa (ignora o próprio id).
+   - Materiais com mesmo CA mas base diferente (ex.: outra cor ou característica) continuam permitidos se não violarem as regras acima.
 
 
 Atualizacao 2025-11

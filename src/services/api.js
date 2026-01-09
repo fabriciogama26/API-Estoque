@@ -2287,6 +2287,7 @@ function sanitizeMaterialPayload(payload = {}) {
     coresIds: normalizeRelationIds(coresSelecionadas.map((item) => item?.id)),
     corMaterial: corMaterialTexto,
     coresTexto: corMaterialTexto,
+    forceBaseCaDiff: payload.forceBaseCaDiff === true,
   }
 }
 
@@ -3761,6 +3762,7 @@ export const api = {
           p_account_owner_id: resolvePreflightOwnerId(effective),
           p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
           p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
+          p_material_id: null,
         }),
         'Falha no preflight de material.'
       )
@@ -3862,7 +3864,10 @@ export const api = {
       }
 
       const materialAtual = mapMaterialRecord(registroAtual)
+      const caOriginal = trim(materialAtual?.ca ?? '')
       const dadosCombinados = sanitizeMaterialPayload({ ...materialAtual, ...payload })
+      const caNovo = trim(dadosCombinados?.ca ?? '')
+      const caAlterado = caNovo !== caOriginal
       const usuarioId = await resolveUsuarioIdOrThrow()
       let effective = null
       try {
@@ -3974,24 +3979,21 @@ export const api = {
           p_account_owner_id: resolvePreflightOwnerId(effective),
           p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
           p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
+          p_material_id: id,
         }),
         'Falha no preflight de material.'
       )
-      if (preflight?.ca_conflict) {
-        const err = new Error('Ja existe material com este C.A. em outro grupo/item.')
-        err.code = 'CA_CONFLICT'
-        throw err
-      }
-      if (preflight?.base_conflict_empty) {
-        const err = new Error('Material duplicado (base igual com CA vazio/ausente).')
-        err.code = 'BASE_EMPTY_CONFLICT'
-        throw err
-      }
+      // Em edição só alerta base igual + CA diferente (permite confirmar no modal)
       if (preflight?.base_match_ca_diff && !dadosCombinados.forceBaseCaDiff) {
-        const err = new Error('BASE_CA_DIFF')
-        err.code = 'BASE_CA_DIFF'
-        err.details = preflight?.base_match_ids || []
-        throw err
+        // Se o CA não mudou, não faz sentido alertar (já existe com CA diferente e estamos mantendo o mesmo CA)
+        if (!caAlterado) {
+          // prossegue sem modal
+        } else {
+          const err = new Error('BASE_CA_DIFF')
+          err.code = 'BASE_CA_DIFF'
+          err.details = preflight?.base_match_ids || []
+          throw err
+        }
       }
       const supabasePayload = buildMaterialSupabasePayload(
         dados,

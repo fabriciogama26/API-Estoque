@@ -14,7 +14,15 @@ Na lista de materiais do Estoque atual, os botões de ação por material podem 
 - Histórico de saídas (novo): o sino em "Ações" abre modal com todas as saídas do material, com filtro Mês/Ano. O botão só fica ativo se houver movimentação registrada.
 - Filtro "Apenas com histórico de saídas": na tela Estoque, marque para ver somente materiais com movimentação (sino ativo).
 
-## Regras de estoque (banco)
+## Materiais (deduplicacao/CA)
+
+- Preflight (`material_preflight_check`) roda no create/update e compara por base completa (fabricante + grupo + item + numero/tamanho + cores + caracteristicas): CA duplicado (bloqueia), base igual com CA vazio (bloqueia) e base igual com CA diferente (alerta). Master enxerga todos; dependente filtra por `account_owner_id`.
+- Base igual + CA diferente abre modal de confirmacao listando IDs conflitantes; so salva se confirmar (envia `forceBaseCaDiff`). Em update, a funcao ignora o proprio `p_material_id`.
+- Trigger de INSERT (`evitar_duplicidade_material`, mig. `20250109_adjust_materials_dedup.sql`) bloqueia base igual com CA vazio e CA repetido na mesma base (inclui cores/caracteristicas).
+- Trigger de UPDATE (`evitar_duplicidade_material_update`, mig. `20250112_base_ca_diff_update.sql`) replica as regras acima, sempre desconsiderando o registro editado.
+- RPC base: `20250111_material_preflight.sql`.
+
+## Regras de estoque (banco)
 
 - Saídas já são bloqueadas quando excedem o saldo disponível (`validar_saldo_saida`).
 - Cancelar uma entrada é vetado se o saldo remanescente ficar menor que as saídas ativas (ver `supabase/migrations/0082_prevent_cancel_entrada_negative_stock.sql`).
