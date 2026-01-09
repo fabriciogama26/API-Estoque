@@ -15,7 +15,7 @@ Arquitetura (modular)
 
 Fluxos principais
 
-- Formulário: dados básicos (item/grupo/fabricante), medidas (calçado/vestimenta), CA, validade, valor unitário, estoque mínimo, ativo; prevenção de duplicidade via gatilho.
+- Formulário: dados básicos (item/grupo/fabricante), medidas (calçado/vestimenta), CA, validade, valor unitário, estoque mínimo, ativo; prevenção de duplicidade via preflight + gatilhos.
 - Lista: colunas Grupo, Material, Descrição, Valor unitário, Validade (dias), Fabricante, Registrado por, Cadastrado em; ações Ver (detalhes em cartões), Editar, Histórico.
 - Filtros: termo livre, grupo, tamanho/número, fabricante, características, cores, status e intervalo de valor unitário (mín/máx); ajuste os campos e clique em Aplicar para recalcular (sem refiltro automático); limpar restaura defaults.
 - Detalhes: modal em cartões (padrão acidentes) com todos os campos, buscando o material completo por id.
@@ -27,9 +27,10 @@ Boas práticas
 - Priorizar consultas com projeção mínima na lista e buscar detalhes completos sob demanda.
 - Respeitar mensagens de duplicidade do gatilho; ajustar catálogos antes de forçar inserts.
 
-Atualização 2025-12
+Atualizações recentes
 
-- Lista reordenada, filtro de valor unitário adicionado, detalhes/histórico padronizados, datas de cadastro mapeadas, botão de olho para detalhes.
+- 2025-12: Lista reordenada, filtro de valor unitário adicionado, detalhes/histórico padronizados, datas de cadastro mapeadas, botão de olho para detalhes.
+- 2026-01: Preflight `material_preflight_check` compara base completa (fabricante+grupo+item+número+cores+características) e retorna: `ca_conflict` (bloqueia), `base_conflict_empty` (bloqueia) e `base_match_ca_diff` (alerta/modal). Em update o próprio id é ignorado (`p_material_id`). Os gatilhos de INSERT/UPDATE usam os hashes `hash_base`/`hash_completo` para impedir base igual com CA vazio ou CA repetido na mesma base.
 
 ===========================================
 Mapa de Código (funções, hooks e constantes)

@@ -1,4 +1,4 @@
--- Ajusta deduplicacao de materiais (para novos INSERT/UPDATE):
+-- Ajusta deduplicacao de materiais (somente novos INSERT; UPDATE nao bloqueia mais)
 -- hash completo considera (fabricante + grupo + item + numeroEspecifico + CA + cores + caracteristicas)
 -- e remove valorUnitario da comparacao. Nao recalcula dados antigos e nao cria indice unico,
 -- para evitar quebra em bases ja existentes.
@@ -133,14 +133,15 @@ BEGIN
   v_grupo_norm := NULLIF(fn_normalize_any(NEW."grupoMaterial"), '');
   v_nome_norm := NULLIF(fn_normalize_any(NEW.nome), '');
 
-  -- Regra: C.A nao pode repetir (em qualquer grupo/item)
+  -- Regra: C.A nao pode repetir na mesma base (fabricante+grupo+item+numero+cores+caracteristicas)
   IF v_ca_norm IS NOT NULL AND EXISTS (
     SELECT 1
     FROM public.materiais m
-    WHERE m.id <> NEW.id
-      AND NULLIF(fn_normalize_any(m.ca), '') = v_ca_norm
+    WHERE NULLIF(fn_normalize_any(m.ca), '') = v_ca_norm
+      AND public.material_hash_base(m.id) = public.material_hash_base(NEW.id)
+      AND public.material_hash_completo(m.id) = public.material_hash_completo(NEW.id)
   ) THEN
-    RAISE EXCEPTION 'Ja existe material cadastrado com este C.A.';
+    RAISE EXCEPTION 'Ja existe material cadastrado com este C.A. na mesma base.';
   END IF;
 
   v_hash_base := public.material_hash_base(NEW.id);
@@ -149,19 +150,18 @@ BEGIN
   NEW.hash_base := v_hash_base;
   NEW.hash_completo := v_hash_completo;
 
-  -- Se CA estiver vazio, bloquear base igual (fabricante+grupo+item+numero+cores) sem perguntar
+  -- Se CA estiver vazio, bloquear base igual (fabricante+grupo+item+numero+cores+caracteristicas) sem perguntar
   IF v_ca_norm IS NULL AND EXISTS (
     SELECT 1 FROM public.materiais m
-    WHERE m.id <> NEW.id
-      AND public.material_hash_base(m.id) = v_hash_base
+    WHERE public.material_hash_base(m.id) = v_hash_base
+      AND public.material_hash_completo(m.id) = public.material_hash_completo(NEW.id)
   ) THEN
     RAISE EXCEPTION 'Material duplicado com base igual e CA vazio.';
   END IF;
 
   IF EXISTS (
     SELECT 1 FROM public.materiais m
-    WHERE m.id <> NEW.id
-      AND public.material_hash_completo(m.id) = v_hash_completo
+    WHERE public.material_hash_completo(m.id) = v_hash_completo
   ) THEN
     RAISE EXCEPTION 'Material duplicado com mesmas cores/caracteristicas e C.A.';
   END IF;
@@ -211,7 +211,7 @@ $$;
 -- Recria trigger principal para garantir uso da funcao atualizada
 DROP TRIGGER IF EXISTS impedir_material_duplicado ON public.materiais;
 CREATE TRIGGER impedir_material_duplicado
-BEFORE INSERT OR UPDATE ON public.materiais
+BEFORE INSERT ON public.materiais
 FOR EACH ROW
 EXECUTE FUNCTION public.evitar_duplicidade_material();
 
