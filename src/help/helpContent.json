@@ -203,7 +203,7 @@
         "notes": [
             "A edição de um material reaproveita o mesmo formulário, mantendo os campos preenchidos.",
             "Valor unitário é usado nos cálculos de estoque e relatórios.",
-            "CA vazio não pode repetir base; CA diferente na mesma base exige confirmação prévia."
+            "CA vazio não pode repetir base; CA diferente na mesma base exige confirmação prévia; CA duplicado é bloqueado."
         ]
     },
     "pessoas": {

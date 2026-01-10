@@ -1,4 +1,7 @@
 import PropTypes from 'prop-types'
+import { TablePagination } from '../TablePagination.jsx'
+import { HISTORY_PAGE_SIZE } from '../../config/pagination.js'
+import { useHistoryPagination } from '../../hooks/useHistoryPagination.js'
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -73,6 +76,10 @@ export function EntradasHistoryModal({ state, onClose }) {
   }
 
   const { entrada, registros = [], isLoading, error } = state
+  const { pageItems, currentPage, pageSize, totalItems, setPage, startIndex } = useHistoryPagination(
+    Array.isArray(registros) ? registros : [],
+    HISTORY_PAGE_SIZE,
+  )
 
   return (
     <div className="entradas-history__overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
@@ -94,38 +101,51 @@ export function EntradasHistoryModal({ state, onClose }) {
           ) : registros.length === 0 ? (
             <p className="feedback">Nenhum historico registrado.</p>
           ) : (
-            <ul className="entradas-history__list">
-              {registros.map((item, index) => {
-                const rawSnapshot = item.snapshot ?? {}
-                const currentSnapshot = rawSnapshot.atual ?? rawSnapshot
-                const snapshotAnteriorDireto = rawSnapshot.anterior ?? null
-                const previousFallback =
-                  index === registros.length - 1 ? null : (registros[index + 1]?.snapshot?.atual ?? registros[index + 1]?.snapshot ?? null)
-                const previous = snapshotAnteriorDireto || previousFallback
-                const changes = buildChanges(currentSnapshot, previous)
-                return (
-                  <li key={item.id} className="entradas-history__item">
-                    <div className="entradas-history__item-header">
-                      <div>
-                        <strong>{formatDateTime(item.criadoEm)}</strong>
-                        <p>{item.usuario || 'Responsavel nao informado'}</p>
+            <>
+              <ul className="entradas-history__list">
+                {pageItems.map((item, index) => {
+                  const rawSnapshot = item.snapshot ?? {}
+                  const currentSnapshot = rawSnapshot.atual ?? rawSnapshot
+                  const snapshotAnteriorDireto = rawSnapshot.anterior ?? null
+                  const globalIndex = startIndex + index
+                  const previousFallback =
+                    globalIndex === totalItems - 1
+                      ? null
+                      : Array.isArray(registros) && registros[globalIndex + 1]
+                        ? registros[globalIndex + 1]?.snapshot?.atual ?? registros[globalIndex + 1]?.snapshot ?? null
+                        : null
+                  const previous = snapshotAnteriorDireto || previousFallback
+                  const changes = buildChanges(currentSnapshot, previous)
+                  return (
+                    <li key={item.id} className="entradas-history__item">
+                      <div className="entradas-history__item-header">
+                        <div>
+                          <strong>{formatDateTime(item.criadoEm)}</strong>
+                          <p>{item.usuario || 'Responsavel nao informado'}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="entradas-history__item-body">
-                      {changes.length === 0 ? (
-                        <p className="feedback">Sem alteracoes registradas.</p>
-                      ) : (
-                        changes.map((change) => (
-                          <p key={`${item.id}-${change.label}`}>
-                            <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
-                          </p>
-                        ))
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                      <div className="entradas-history__item-body">
+                        {changes.length === 0 ? (
+                          <p className="feedback">Sem alteracoes registradas.</p>
+                        ) : (
+                          changes.map((change) => (
+                            <p key={`${item.id}-${change.label}`}>
+                              <strong>{change.label}:</strong> "{change.before}" -> "{change.after}"
+                            </p>
+                          ))
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+              <TablePagination
+                totalItems={totalItems}
+                pageSize={pageSize}
+                currentPage={currentPage}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </div>
       </div>

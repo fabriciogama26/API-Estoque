@@ -1,3 +1,6 @@
+import { TablePagination } from '../../../TablePagination.jsx'
+import { HISTORY_PAGE_SIZE } from '../../../../config/pagination.js'
+import { useHistoryPagination } from '../../../../hooks/useHistoryPagination.js'
 import { formatDateTimeFullPreserve } from '../../../../utils/acidentesUtils.js'
 
 const FIELD_LABELS = {
@@ -82,7 +85,7 @@ const buildChangesSummary = (antes, depois) => {
     const to = normalizeValue(readField(depois, snake, camel))
     if (from !== to) {
       const label = FIELD_LABELS[snake] ?? FIELD_LABELS[camel] ?? camel
-      changes.push(`${label}: "${from || '-'}" → "${to || '-'}"`)
+      changes.push(`${label}: "${from || '-'}" -> "${to || '-'}"`)
     }
   })
 
@@ -90,54 +93,68 @@ const buildChangesSummary = (antes, depois) => {
 }
 
 export function HhtMensalHistoryTimeline({ registros }) {
-  if (!Array.isArray(registros) || registros.length === 0) {
+  const ordered = Array.isArray(registros) ? registros : []
+  const { pageItems, currentPage, pageSize, totalItems, setPage } = useHistoryPagination(
+    ordered,
+    HISTORY_PAGE_SIZE,
+  )
+
+  if (!ordered.length) {
     return <p className="feedback">Nenhum historico registrado.</p>
   }
 
   return (
-    <ul className="entradas-history__list">
-      {registros.map((item) => {
-        const alteradoEm = item.alteradoEm ?? item.alterado_em ?? null
-        const usuario = item.alteradoPor ?? item.alterado_por ?? item.usuario ?? 'sistema'
-        const acao = (item.acao ?? '').toUpperCase()
-        const changes = acao === 'UPDATE' ? buildChangesSummary(item.antes, item.depois) : []
+    <>
+      <ul className="entradas-history__list">
+        {pageItems.map((item) => {
+          const alteradoEm = item.alteradoEm ?? item.alterado_em ?? null
+          const usuario = item.alteradoPor ?? item.alterado_por ?? item.usuario ?? 'sistema'
+          const acao = (item.acao ?? '').toUpperCase()
+          const changes = acao === 'UPDATE' ? buildChangesSummary(item.antes, item.depois) : []
 
-        return (
-          <li key={item.id} className="entradas-history__item">
-            <div className="entradas-history__item-header">
-              <strong>{acao === 'DELETE' ? 'DELETE' : 'UPDATE'}</strong>
-              <span className="data-table__muted">{alteradoEm ? formatDateTimeFullPreserve(alteradoEm) : '-'}</span>
-            </div>
-            <div className="entradas-history__item-body">
-              <p>
-                <strong>Usuario:</strong> {usuario || 'sistema'}
-              </p>
-              {acao === 'DELETE' ? <p>Registro excluido.</p> : null}
-              {acao === 'UPDATE' ? (
-                changes.length ? (
-                  <>
-                    <p>
-                      <strong>Alteracoes:</strong>
-                    </p>
-                    <ul className="pessoas-history-list">
-                      {changes.map((change) => (
-                        <li key={change}>{change}</li>
-                      ))}
-                    </ul>
-                  </>
-                ) : (
-                  <p>Nenhuma alteracao relevante detectada.</p>
-                )
-              ) : null}
-              {item.motivo ? (
+          return (
+            <li key={item.id} className="entradas-history__item">
+              <div className="entradas-history__item-header">
+                <strong>{acao === 'DELETE' ? 'DELETE' : 'UPDATE'}</strong>
+                <span className="data-table__muted">{alteradoEm ? formatDateTimeFullPreserve(alteradoEm) : '-'}</span>
+              </div>
+              <div className="entradas-history__item-body">
                 <p>
-                  <strong>Motivo:</strong> {item.motivo}
+                  <strong>Usuario:</strong> {usuario || 'sistema'}
                 </p>
-              ) : null}
-            </div>
-          </li>
-        )
-      })}
-    </ul>
+                {acao === 'DELETE' ? <p>Registro excluido.</p> : null}
+                {acao === 'UPDATE' ? (
+                  changes.length ? (
+                    <>
+                      <p>
+                        <strong>Alteracoes:</strong>
+                      </p>
+                      <ul className="pessoas-history-list">
+                        {changes.map((change) => (
+                          <li key={change}>{change}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p>Nenhuma alteracao relevante detectada.</p>
+                  )
+                ) : null}
+                {item.motivo ? (
+                  <p>
+                    <strong>Motivo:</strong> {item.motivo}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+      <TablePagination
+        totalItems={totalItems}
+        pageSize={pageSize}
+        currentPage={currentPage}
+        onPageChange={setPage}
+      />
+    </>
   )
 }

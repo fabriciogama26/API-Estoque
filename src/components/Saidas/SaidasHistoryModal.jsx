@@ -1,8 +1,11 @@
 import PropTypes from 'prop-types'
+import { TablePagination } from '../TablePagination.jsx'
+import { HISTORY_PAGE_SIZE } from '../../config/pagination.js'
+import { useHistoryPagination } from '../../hooks/useHistoryPagination.js'
 
 const formatDateTime = (value) => {
   if (!value) {
-    return 'Data não informada'
+    return 'Data nao informada'
   }
   if (typeof value === 'string') {
     const parsed = Date.parse(value)
@@ -19,7 +22,7 @@ const formatDateTime = (value) => {
 
 const formatValue = (value) => {
   if (value === undefined || value === null || value === '') {
-    return 'Não informado'
+    return 'Nao informado'
   }
   if (value instanceof Date) {
     return formatDateTime(value)
@@ -42,7 +45,7 @@ const buildChanges = (currentSnapshot, previousSnapshot) => {
     { key: 'quantidade', label: 'Quantidade' },
     { key: 'status', label: 'Status' },
     { key: 'centroCusto', label: 'Centro de custo' },
-    { key: 'centroServico', label: 'Centro de serviço' },
+    { key: 'centroServico', label: 'Centro de servico' },
     { key: 'dataEntrega', label: 'Data de entrega' },
     { key: 'dataTroca', label: 'Data de troca' },
   ]
@@ -83,71 +86,86 @@ export function SaidasHistoryModal({ state, onClose }) {
   }
 
   const { saida, registros = [], isLoading, error } = state
+  const { pageItems, currentPage, pageSize, totalItems, setPage, startIndex } = useHistoryPagination(
+    Array.isArray(registros) ? registros : [],
+    HISTORY_PAGE_SIZE,
+  )
 
   return (
     <div className="entradas-history__overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
       <div className="entradas-history__modal" onClick={stopPropagation}>
         <header className="entradas-history__header">
           <div>
-            <h3>Histórico de saídas</h3>
+            <h3>Historico de saidas</h3>
             <p className="entradas-history__subtitle">{saida ? saida.id : ''}</p>
           </div>
-          <button type="button" className="entradas-history__close" onClick={onClose} aria-label="Fechar histórico">
+          <button type="button" className="entradas-history__close" onClick={onClose} aria-label="Fechar historico">
             x
           </button>
         </header>
         <div className="entradas-history__body">
           {isLoading ? (
-            <p className="feedback">Carregando histórico...</p>
+            <p className="feedback">Carregando historico...</p>
           ) : error ? (
             <p className="feedback feedback--error">{error}</p>
           ) : registros.length === 0 ? (
-            <p className="feedback">Nenhum histórico registrado.</p>
+            <p className="feedback">Nenhum historico registrado.</p>
           ) : (
-            <ul className="entradas-history__list">
-              {registros.map((item, index) => {
-                const rawSnapshot = item.snapshot ?? {}
-                const currentSnapshot = rawSnapshot.atual ?? rawSnapshot
-                const snapshotAnteriorDireto = rawSnapshot.anterior ?? null
-                const previousFallback =
-                  index === registros.length - 1
-                    ? null
-                    : registros[index + 1]?.snapshot?.atual ?? registros[index + 1]?.snapshot ?? null
-                const previous = snapshotAnteriorDireto || previousFallback
-                const changes = buildChanges(currentSnapshot, previous)
-                const anotacao =
-                  currentSnapshot.motivoCancelamento ||
-                  currentSnapshot.statusMotivo ||
-                  rawSnapshot.motivoCancelamento ||
-                  ''
-                return (
-                  <li key={item.id} className="entradas-history__item">
-                    <div className="entradas-history__item-header">
-                      <div>
-                        <strong>{formatDateTime(item.criadoEm)}</strong>
-                        <p>{item.usuario || 'Responsavel nao informado'}</p>
+            <>
+              <ul className="entradas-history__list">
+                {pageItems.map((item, index) => {
+                  const rawSnapshot = item.snapshot ?? {}
+                  const currentSnapshot = rawSnapshot.atual ?? rawSnapshot
+                  const snapshotAnteriorDireto = rawSnapshot.anterior ?? null
+                  const globalIndex = startIndex + index
+                  const previousFallback =
+                    globalIndex === totalItems - 1
+                      ? null
+                      : Array.isArray(registros) && registros[globalIndex + 1]
+                        ? registros[globalIndex + 1]?.snapshot?.atual ?? registros[globalIndex + 1]?.snapshot ?? null
+                        : null
+                  const previous = snapshotAnteriorDireto || previousFallback
+                  const changes = buildChanges(currentSnapshot, previous)
+                  const anotacao =
+                    currentSnapshot.motivoCancelamento ||
+                    currentSnapshot.statusMotivo ||
+                    rawSnapshot.motivoCancelamento ||
+                    ''
+                  return (
+                    <li key={item.id} className="entradas-history__item">
+                      <div className="entradas-history__item-header">
+                        <div>
+                          <strong>{formatDateTime(item.criadoEm)}</strong>
+                          <p>{item.usuario || 'Responsavel nao informado'}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="entradas-history__item-body">
-                      {changes.length === 0 ? (
-                        <p className="feedback">Sem alteracoes registradas.</p>
-                      ) : (
-                        changes.map((change) => (
-                          <p key={`${item.id}-${change.label}`}>
-                            <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
+                      <div className="entradas-history__item-body">
+                        {changes.length === 0 ? (
+                          <p className="feedback">Sem alteracoes registradas.</p>
+                        ) : (
+                          changes.map((change) => (
+                            <p key={`${item.id}-${change.label}`}>
+                              <strong>{change.label}:</strong> "{change.before}" -> "{change.after}"
+                            </p>
+                          ))
+                        )}
+                        {anotacao ? (
+                          <p className="entradas-history__note">
+                            <strong>Motivo:</strong> {anotacao}
                           </p>
-                        ))
-                      )}
-                      {anotacao ? (
-                        <p className="entradas-history__note">
-                          <strong>Motivo:</strong> {anotacao}
-                        </p>
-                      ) : null}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                        ) : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+              <TablePagination
+                totalItems={totalItems}
+                pageSize={pageSize}
+                currentPage={currentPage}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </div>
       </div>

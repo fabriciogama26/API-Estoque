@@ -16,7 +16,7 @@ Duplicidade de Materiais
 
 4. **Triggers no banco**
    - INSERT: `evitar_duplicidade_material` (mig. `20250109_adjust_materials_dedup.sql`) bloqueia:
-     - CA repetido na mesma base completa (hash_base + hash_completo).
+     - CA repetido em qualquer material (global, mesmo se base diferente).
      - Base igual com CA vazio (usa base + características, via hash_completo).
      - Hash completo igual (cores/características + CA).
    - UPDATE: `evitar_duplicidade_material_update` (mig. `20250112_base_ca_diff_update.sql`) replica as regras acima ignorando o próprio registro (`m.id <> NEW.id`).
