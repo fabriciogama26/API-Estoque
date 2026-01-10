@@ -6,8 +6,9 @@ import { AcidentesFilters } from '../components/Acidentes/Filters/AcidentesFilte
 import { AcidentesTable } from '../components/Acidentes/Table/AcidentesTable.jsx'
 import { AcidentesHistoryModal } from '../components/Acidentes/Modal/AcidentesHistoryModal.jsx'
 import { AcidenteDetailsModal } from '../components/Acidentes/Modal/AcidenteDetailsModal.jsx'
+import { AcidenteCancelModal } from '../components/Acidentes/Modal/AcidenteCancelModal.jsx'
 import { ACIDENTES_HISTORY_DEFAULT } from '../config/AcidentesConfig.js'
-import { getAcidenteHistory } from '../services/acidentesService.js'
+import { cancelAcidente, getAcidenteHistory } from '../services/acidentesService.js'
 import { usePessoas } from '../hooks/usePessoas.js'
 import { useLocais } from '../hooks/useLocais.js'
 import { usePartes } from '../hooks/usePartes.js'
@@ -17,6 +18,7 @@ import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 
 import '../styles/AcidentesPage.css'
+import '../styles/AcidentesTableStatus.css'
 
 export function AcidentesPage() {
   return (
@@ -51,6 +53,7 @@ function AcidentesPageContent() {
   const [historyCache, setHistoryCache] = useState({})
   const [historyState, setHistoryState] = useState(() => ({ ...ACIDENTES_HISTORY_DEFAULT }))
   const [detailsState, setDetailsState] = useState({ open: false, acidente: null })
+  const [cancelState, setCancelState] = useState({ open: false, acidente: null, error: null, isSaving: false })
 
   const {
     form,
@@ -126,6 +129,30 @@ function AcidentesPageContent() {
 
   const closeDetails = () => {
     setDetailsState({ open: false, acidente: null })
+  }
+
+  const openCancelModal = (acidente) => {
+    setCancelState({ open: true, acidente, error: null, isSaving: false, motivo: '' })
+  }
+
+  const closeCancelModal = () => {
+    setCancelState({ open: false, acidente: null, error: null, isSaving: false, motivo: '' })
+  }
+
+  const confirmCancel = async () => {
+    const alvo = cancelState.acidente
+    if (!alvo?.id) return
+    setCancelState((prev) => ({ ...prev, isSaving: true, error: null }))
+    try {
+      await cancelAcidente(alvo.id, { motivo: cancelState.motivo })
+      await reloadAcidentes()
+      setHistoryCache({})
+      setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT })
+      closeCancelModal()
+    } catch (err) {
+      reportError(err, { area: 'cancel_acidente', acidenteId: alvo.id })
+      setCancelState((prev) => ({ ...prev, error: err.message || 'Não foi possível cancelar o acidente.', isSaving: false }))
+    }
   }
 
   return (
@@ -205,6 +232,7 @@ function AcidentesPageContent() {
             onEdit={startEdit}
             onHistory={openHistory}
             onDetails={openDetails}
+            onCancel={openCancelModal}
             editingId={editingAcidente?.id ?? null}
             isSaving={isSaving}
             historyState={historyState}
@@ -214,6 +242,13 @@ function AcidentesPageContent() {
 
       <AcidentesHistoryModal state={historyState} onClose={closeHistory} />
       <AcidenteDetailsModal open={detailsState.open} acidente={detailsState.acidente} onClose={closeDetails} />
+      <AcidenteCancelModal
+        state={cancelState}
+        onClose={closeCancelModal}
+        onConfirm={confirmCancel}
+        onMotivoChange={(motivo) => setCancelState((prev) => ({ ...prev, motivo }))}
+        isSaving={cancelState.isSaving}
+      />
     </div>
   )
 }

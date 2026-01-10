@@ -1,0 +1,14 @@
+.status-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background-color: #e6f6ec;
+  color: #166534;
+}
+
+.status-chip--cancelado {
+  background-color: #ffe8e8;
+  color: #b91c1c;
+}

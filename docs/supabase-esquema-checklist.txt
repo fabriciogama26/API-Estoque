@@ -18,6 +18,7 @@ Tabelas principais
 - **materiais + material_price_history**: cadastro de EPIs com estoque mínimo, CA, valor unitário e histórico de preço.【F:supabase/README.md†L12-L55】
 - **entradas / saidas**: movimentação de estoque com campos de auditoria (`usuarioResponsavel`, datas).【F:supabase/README.md†L12-L55】
 - **acidentes + acidente_historico**: registros completos de SST com vínculo a agentes, tipos, partes e lesões.【F:supabase/README.md†L12-L55】
+- Colunas recentes: `ativo boolean default true` e `cancel_motivo` (texto/nullable) para cancelamento; HHT nao � salvo no acidente (dashboard cruza com hht_mensal).
 
 Tabelas de referência
 ---------------------
@@ -28,7 +29,7 @@ Tabelas de referência
 
 Views e suportes
 ----------------
-- `vw_indicadores_acidentes`: alimenta o dashboard de acidentes (resumo, tendência e distribuições por tipo/agente/cargo/parte/lesão). Certifique-se de atualizar ao alterar o schema.【F:src/pages/DashboardAcidentes.jsx†L81-L229】
+- `vw_indicadores_acidentes`: alimenta o dashboard de acidentes (resumo, tend�ncia e distribui��es por tipo/agente/cargo/parte/les�o). Calcula TF/TG via hht_mensal por centro/m�s e filtra acidentes `ativo=true`. Certifique-se de atualizar ao alterar o schema.�??F:src/pages/DashboardAcidentes.jsx�?�L81-L229�?
 - Outras views podem ser adicionadas para relatórios, desde que respeitem RLS.
 
 Checklist de validação
@@ -61,3 +62,4 @@ Atualizacao 2025-12 (configuracoes/dependentes)
 --------------------------------------------
 - Check de RLS: autocomplete deve ler app_users e app_users_dependentes (policies para authenticated/service_role) e master deve aparecer para admin/master.
 - Conferir seeds do catalogo de credenciais e FKs UUID em app_users/app_users_dependentes/app_users_credential_history.
+

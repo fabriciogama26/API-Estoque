@@ -32,7 +32,7 @@ Frontend (componentes principais)
   - Detalhes: HhtMensalDetailsModal (Status, modo, HHTs, descontos, registro por/ em).
   - Cancelamento: HhtMensalDeleteModal (solicita motivo).
 - Servico: api.hhtMensal.list/create/update/delete/history/peopleCount (usa view).
-- Campo HHT em Cadastro de Acidente: read-only, auto-preenchido ao selecionar data+centro; bloqueia se HHT mensal cancelado ou inexistente.
+- IntegraÇõÇœo com acidentes: a ficha de acidente nao tem campo HHT; o dashboard cruza data + centro com o `hht_mensal` ativo do mes para calcular TF/TG.
 
 Fluxos e regras de negocio
 --------------------------
@@ -73,4 +73,4 @@ Checklist de testes rapidos
 - Editar para modo completo (muda status? nao) e conferir historico registra alteracao.
 - Cancelar HHT: status muda para Cancelado, botoes editar/cancelar somem, historico registra status.
 - Tentar registrar acidente com HHT cancelado: deve bloquear e exibir mensagem.
-- Auto-preencher HHT no acidente ao escolher data+centro com HHT ativo no mes.
+- Dashboard de acidentes deve usar o HHT mensal ativo (por centro/mes) ao calcular TF/TG; acidentes cancelados nao entram no somatorio.

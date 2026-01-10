@@ -141,17 +141,6 @@ export function validateAcidenteForm(form) {
   if (!local) {
     return 'Selecione o local do acidente.'
   }
-  const hhtTexto = String(form.hht ?? '').trim()
-  if (!hhtTexto) {
-    return 'Informe o HHT do acidente.'
-  }
-  const hht = integerOrNull(form.hht)
-  if (hht === null) {
-    return 'HHT deve ser um numero inteiro.'
-  }
-  if (hht < 0) {
-    return 'HHT nao pode ser negativo.'
-  }
 
   const hasDiasPerdidos = String(form.diasPerdidos ?? '').trim() !== ''
   if (!hasDiasPerdidos) {
@@ -233,7 +222,6 @@ export function createAcidentePayload(form, usuarioCadastro) {
     data: dataNormalizada,
     diasPerdidos: integerOrNull(form.diasPerdidos),
     diasDebitados: integerOrNull(form.diasDebitados),
-    hht: integerOrNull(form.hht),
     tipo: tiposSelecionados.join('; '),
     tipoPrincipal,
     agente: agentesSelecionados.join('; '),
@@ -296,7 +284,6 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     data: dataNormalizada,
     diasPerdidos: integerOrNull(form.diasPerdidos),
     diasDebitados: integerOrNull(form.diasDebitados),
-    hht: integerOrNull(form.hht),
     tipo: tiposSelecionados.join('; '),
     tipoPrincipal,
     agente: agentesSelecionados.join('; '),

@@ -9,7 +9,6 @@ export const ACIDENTES_FORM_DEFAULT = {
   dataSesmt: '',
   diasPerdidos: '',
   diasDebitados: '',
-  hht: '',
   tipo: '',
   tipos: [],
   agente: '',

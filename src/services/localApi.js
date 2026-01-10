@@ -313,10 +313,11 @@ const ACIDENTE_HISTORY_FIELDS = [
   'local',
   'diasPerdidos',
   'diasDebitados',
-  'hht',
   'cid',
   'cat',
   'observacao',
+  'ativo',
+  'cancelMotivo',
 ]
 
 const normalizeHistoryValue = (value) => {
@@ -513,6 +514,7 @@ const mapLocalAcidenteRecord = (acidente) => {
   const tiposLista = splitMultiValue(acidente.tipos ?? acidente.tipo ?? '')
   return {
     ...acidente,
+    ativo: acidente.ativo !== false,
     centroServico,
     setor: acidente.setor ?? centroServico,
     local: acidente.local ?? centroServico,
@@ -527,6 +529,8 @@ const mapLocalAcidenteRecord = (acidente) => {
     dataEsocial: acidente.dataEsocial ?? acidente.data_esocial ?? null,
     sesmt: Boolean(acidente.sesmt),
     dataSesmt: acidente.dataSesmt ?? acidente.data_sesmt ?? null,
+    ativo: acidente.ativo !== false,
+    cancelMotivo: acidente.cancelMotivo ?? acidente.cancel_motivo ?? null,
   }
 }
 
@@ -1498,8 +1502,6 @@ const sanitizeAcidentePayload = (payload = {}) => {
     : []
   const agentes = splitMultiValue(payload.agentes ?? payload.agente ?? '')
   const tipos = splitMultiValue(payload.tipos ?? payload.tipo ?? '')
-  const hhtTexto = trim(payload.hht)
-  const hhtValor = hhtTexto === '' ? null : Number(hhtTexto)
   return {
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
@@ -1523,13 +1525,13 @@ const sanitizeAcidentePayload = (payload = {}) => {
       payload.diasDebitados !== undefined && payload.diasDebitados !== null
         ? Number(payload.diasDebitados)
         : 0,
-    hht: hhtValor,
     cid: sanitizeOptional(payload.cid),
     cat: sanitizeOptional(payload.cat),
     observacao: sanitizeOptional(payload.observacao),
     dataEsocial: toIsoOrNull(payload.dataEsocial, false),
     sesmt: toBoolean(payload.sesmt),
     dataSesmt: toIsoOrNull(payload.dataSesmt, false),
+    cancelMotivo: sanitizeOptional(payload.cancelMotivo ?? payload.motivo),
   }
 }
 
@@ -1561,15 +1563,43 @@ const validateAcidentePayload = (payload) => {
   if (!Number.isInteger(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
     throw createError(400, 'Dias debitados deve ser um inteiro zero ou positivo.')
   }
-  if (payload.hht === undefined || payload.hht === null || String(payload.hht).trim() === '') {
-    throw createError(400, 'HHT obrigatorio.')
-  }
-  if (!Number.isInteger(Number(payload.hht)) || Number(payload.hht) < 0) {
-    throw createError(400, 'HHT deve ser um inteiro zero ou positivo.')
-  }
   if (payload.cat && !/^\d+$/.test(String(payload.cat))) {
     throw createError(400, 'CAT deve conter apenas numeros inteiros.')
   }
+}
+
+const applyHhtToLocalAcidentes = (state, mesRef, centroServicoId, centroServicoNome, hhtValor) => {
+  const valor = Number(hhtValor)
+  if (!Number.isFinite(valor) || valor < 0) {
+    return
+  }
+  const mes = toMonthRefIso(mesRef)
+  if (!mes) {
+    return
+  }
+  const centroKey = normalizeKeyPart(centroServicoId || centroServicoNome || '')
+  if (!centroKey || !Array.isArray(state.acidentes)) {
+    return
+  }
+  state.acidentes.forEach((acidente, index) => {
+    const mesAcidente = toMonthRefIso(
+      acidente?.data ?? acidente?.dataOcorrencia ?? acidente?.data_ocorrencia ?? '',
+    )
+    if (mesAcidente !== mes) {
+      return
+    }
+    const centroAcidente = normalizeKeyPart(
+      acidente?.centroServico ?? acidente?.setor ?? acidente?.local ?? acidente?.centro_servico ?? '',
+    )
+    if (!centroAcidente || centroAcidente !== centroKey) {
+      return
+    }
+    const hhtAtual = Number(acidente?.hht)
+    if (Number.isFinite(hhtAtual) && hhtAtual > 0) {
+      return
+    }
+    state.acidentes[index] = { ...acidente, hht: valor }
+  })
 }
 
 const calcularDataTroca = (dataEntregaIso, validadeDias) => {
@@ -2792,11 +2822,20 @@ const localApi = {
       })
     },
     async list() {
-      return readState((state) => sortByDateDesc(state.acidentes.map(mapLocalAcidenteRecord), 'data'))
+      return readState((state) =>
+        sortByDateDesc(
+          (state.acidentes || []).map(mapLocalAcidenteRecord),
+          'data'
+        )
+      )
     },
     async dashboard(params = {}) {
       return readState((state) =>
-        montarDashboardAcidentes(state.acidentes.map(mapLocalAcidenteRecord), params)
+        montarDashboardAcidentes(
+          state.acidentes.map(mapLocalAcidenteRecord),
+          params,
+          Array.isArray(state.hhtMensal) ? state.hhtMensal : []
+        )
       )
     },
     async create(payload) {
@@ -2829,14 +2868,8 @@ const localApi = {
           return itemKey === centroKey
         })
 
-        if (!registroHht) {
-          throw createError(400, 'Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
-        }
         const hhtValor =
-          registroHht.hhtFinal ?? registroHht.hhtCalculado ?? registroHht.hhtInformado ?? null
-        if (hhtValor === null || hhtValor === undefined) {
-          throw createError(400, 'HHT mensal invalido para o centro/mes informado.')
-        }
+          registroHht?.hhtFinal ?? registroHht?.hhtCalculado ?? registroHht?.hhtInformado ?? null
 
         const agora = nowIso()
         const acidente = {
@@ -2850,27 +2883,29 @@ const localApi = {
           agente: dados.agente,
           agentes: splitMultiValue(dados.agente),
           lesao: dados.lesao,
-          lesoes: dados.lesoes,
-          parteLesionada: dados.parteLesionada,
-          partesLesionadas: dados.partesLesionadas,
-          centroServico: centroServicoBase,
-          setor: centroServicoBase,
-          local: localBase,
-          diasPerdidos: dados.diasPerdidos,
-          diasDebitados: dados.diasDebitados,
-          hht: hhtValor,
-          cid: dados.cid,
-          cat: dados.cat,
-          observacao: dados.observacao,
-          dataEsocial: dados.dataEsocial,
-          sesmt: dados.sesmt,
-          dataSesmt: dados.dataSesmt,
-          registradoPor: usuario,
-          criadoEm: agora,
-          atualizadoEm: null,
-          atualizadoPor: null,
-          historicoEdicao: [],
-        }
+        lesoes: dados.lesoes,
+        parteLesionada: dados.parteLesionada,
+        partesLesionadas: dados.partesLesionadas,
+        centroServico: centroServicoBase,
+        setor: centroServicoBase,
+        local: localBase,
+        diasPerdidos: dados.diasPerdidos,
+        diasDebitados: dados.diasDebitados,
+        hht: hhtValor,
+        cid: dados.cid,
+        cat: dados.cat,
+        observacao: dados.observacao,
+        dataEsocial: dados.dataEsocial,
+        sesmt: dados.sesmt,
+        dataSesmt: dados.dataSesmt,
+        registradoPor: usuario,
+        criadoEm: agora,
+        atualizadoEm: null,
+        atualizadoPor: null,
+        ativo: true,
+        cancelMotivo: dados.cancelMotivo ?? null,
+        historicoEdicao: [],
+      }
 
         state.acidentes.push(acidente)
         return mapLocalAcidenteRecord(acidente)
@@ -2924,14 +2959,9 @@ const localApi = {
           const itemKey = normalizeKeyPart(item.centroServicoNome ?? item.centroServico ?? '')
           return itemKey === centroKey
         })
-        if (!registroHht) {
-          throw createError(400, 'Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
-        }
+        const hhtBase = Number.isFinite(dados.hht) ? dados.hht : Number.isFinite(atual.hht) ? atual.hht : 0
         const hhtValor =
-          registroHht.hhtFinal ?? registroHht.hhtCalculado ?? registroHht.hhtInformado ?? null
-        if (hhtValor === null || hhtValor === undefined) {
-          throw createError(400, 'HHT mensal invalido para o centro/mes informado.')
-        }
+          registroHht?.hhtFinal ?? registroHht?.hhtCalculado ?? registroHht?.hhtInformado ?? hhtBase
 
         const camposAntigos = ACIDENTE_HISTORY_FIELDS.reduce((acc, campo) => {
           if (campo === 'centroServico') {
@@ -2971,6 +3001,44 @@ const localApi = {
           historicoEdicao: historicoBase,
         }
 
+        state.acidentes[index] = atualizado
+        return mapLocalAcidenteRecord(atualizado)
+      })
+    },
+    async cancel(id, payload = {}) {
+      if (!id) {
+        throw createError(400, 'ID do acidente obrigatorio.')
+      }
+      return writeState((state) => {
+        const index = state.acidentes.findIndex((item) => item.id === id)
+        if (index === -1) {
+          throw createError(404, 'Acidente nao encontrado.')
+        }
+        const agora = nowIso()
+        const usuario = trim(payload.usuarioResponsavel) || 'sistema'
+        const atual = state.acidentes[index]
+        const atualizado = {
+          ...atual,
+          ativo: false,
+          cancelMotivo: dadosSanitizados.cancelMotivo ?? atual.cancelMotivo ?? null,
+          atualizadoEm: agora,
+          atualizadoPor: usuario,
+        }
+        const camposAlterados = [
+          { campo: 'ativo', de: atual.ativo !== false, para: false },
+          {
+            campo: 'cancelMotivo',
+            de: atual.cancelMotivo ?? '',
+            para: atualizado.cancelMotivo ?? '',
+          },
+        ]
+        const historicoBase = Array.isArray(atual.historicoEdicao) ? atual.historicoEdicao.slice() : []
+        historicoBase.push({
+          id: randomId(),
+          dataEdicao: agora,
+          usuarioResponsavel: usuario,
+          camposAlterados,
+        })
         state.acidentes[index] = atualizado
         return mapLocalAcidenteRecord(atualizado)
       })
@@ -3199,6 +3267,7 @@ const localApi = {
         }
 
         state.hhtMensal.push(registro)
+        applyHhtToLocalAcidentes(state, mesRef, centroServicoId, registro.centroServicoNome, registro.hhtFinal)
         return registro
       })
     },
@@ -3385,6 +3454,7 @@ const localApi = {
         })
 
         state.hhtMensal[index] = atualizado
+        applyHhtToLocalAcidentes(state, atualizado.mesRef, atualizado.centroServicoId, atualizado.centroServicoNome, atualizado.hhtFinal)
         return atualizado
       })
     },

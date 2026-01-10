@@ -11,13 +11,13 @@ Visao geral
 
 Fluxo de carregamento
 ---------------------
-1. Ao montar, aplica filtros padrao (ano/período corrente) e carrega os dados.
-2. Modo local:
+1. Ao montar, aplica filtros padrao (ano/periodo corrente) e carrega os dados.
+2. Modo remoto (padrao):
+   - Consulta a view `vw_indicadores_acidentes` (taxas calculadas em SQL usando `hht_mensal` por centro/mes e apenas acidentes `ativo=true`).
+   - Normaliza colunas para o formato interno (`resumo`, `tendencia`, `tipos`, `partes_lesionadas`, `cargos`, `agentes`, `lesoes`) e monta o label do periodo com base nos filtros.
+3. Fallback local:
+   - Se a view falhar, usa `localApi.acidentes.dashboard`/`montarDashboardAcidentes` (JS) com HHT mensal carregado de `hht_mensal_view`.
    - API retorna objeto com: `resumo`, `tendencia`, `tipos`, `partesLesionadas`, `cargos`, `agentes`, `options`.
-3. Modo remoto:
-   - Consulta a view `vw_indicadores_acidentes`.
-   - Normaliza colunas para o formato interno (`resumo`, `tendencia`, `tipos`, `partes_lesionadas`, `cargos`, `agentes`, `lesoes`).
-   - Se nao houver dados, exibe estado vazio e limpa opcoes dinamicas de filtros.
 
 Filtros suportados
 ------------------
@@ -56,7 +56,8 @@ Erros e pre-requisitos
 - Supabase:
   - Quando `VITE_SUPABASE_URL` ou `VITE_SUPABASE_ANON_KEY` nao estiverem configuradas (fora do modo local), a tela exibe aviso para ajustar as variaveis de ambiente.
 - View `vw_indicadores_acidentes`:
-  - Deve ser criada/atualizada nas migrations.
+  - Deve ser criada/atualizada nas migrations (usa `hht_mensal` em vez de campo HHT no acidente).
+  - Filtra acidentes por `ativo=true` e ignora cancelados.
   - Precisa expor: taxas classicas (TF, TG), `dias_debitados`, `total_trabalhadores`, `indice_acidentados`, `indice_avaliacao_gravidade`, `indice_relativo_acidentes`.
 - Seeds locais:
   - `localApi.acidentes.dashboard` deve conter dados de exemplo para testes offline.
@@ -122,4 +123,10 @@ Ajuda contextual
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
 - Conteudo vem de src/help/helpContent.json (chave 'dashboardAcidentes'); edite ali para ajustar titulos/steps/notes.
 - Para imagens, salve em public/help/dashboardAcidentes/ e aponte no campo 'media' do passo (ex.: /help/dashboardAcidentes/exemplo.webp).
+
+Atualizacao 2026-01
+-------------------
+- Dashboard consome a view `vw_indicadores_acidentes` primeiro (SQL com `hht_mensal` e acidentes `ativo=true`); fallback JS so ocorre em caso de falha.
+- TF/TG/IA/IAG/IRA calculadas na view com HHT mensal do centro/mes; acidentes cancelados nao entram nos calculos.
+
 

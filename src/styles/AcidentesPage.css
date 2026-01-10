@@ -486,3 +486,73 @@
   margin: 0.25rem 0 0;
   color: var(--color-muted, #64748b);
 }
+
+.acidentes-form__section {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 0.9rem;
+  padding: 1rem 1rem 1.1rem;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.acidentes-form__section + .acidentes-form__section {
+  margin-top: 1rem;
+}
+
+.acidentes-form__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.acidentes-form__section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-primary-dark, #0f172a);
+}
+
+.acidentes-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.acidentes-form__grid--four {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.acidentes-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.field--inline {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.field--inline small {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .acidentes-form__section {
+    padding: 0.85rem;
+  }
+
+  .acidentes-form__grid,
+  .acidentes-form__grid--four {
+    grid-template-columns: 1fr;
+  }
+
+  .acidentes-form__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
