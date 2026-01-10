@@ -21,7 +21,7 @@ Aplicação completa para controle de EPIs, construída com React (Vite) e integ
 
 - Preflight de materiais (CA/base): `material_preflight_check` agora inclui cores/caracteristicas, escopo por owner e ignora o proprio registro quando `p_material_id` vem preenchido na edicao.
 - Alerta visual: no cadastro/edicao o aviso de CA diferente usa modal estilizado (sem `window.confirm`) listando IDs conflitantes e so salva se confirmar (`forceBaseCaDiff`).
-- Deduplicacao no banco: INSERT segue `20250109_adjust_materials_dedup.sql` (CA nao repete na mesma base completa; base com CA vazio bloqueia). UPDATE espelha as mesmas regras ignorando o proprio id via `20250112_base_ca_diff_update.sql`.
+- Deduplicacao no banco: INSERT segue `20250109_adjust_materials_dedup.sql` (bloqueia qualquer CA repetido, e tambem base igual com CA vazio/cores/caracteristicas). UPDATE espelha as regras de base/hash ignorando o proprio id via `20250112_base_ca_diff_update.sql`.
 
 ## Novidades 2025-11
 

@@ -58,7 +58,8 @@ Filtros, auto-complete e listagem
   - Tenta usar `api.materiais.search`; se nao existir, aplica fallback local sobre `api.materiais.list`.
   - Limita a quantidade de resultados retornados por consulta.
 - Historico:
-  - Usa `TablePagination` com `TABLE_PAGE_SIZE` para paginar.
+  - Modal paginado com `useHistoryPagination` (5 registros por pagina via `HISTORY_PAGE_SIZE`).
+  - Mantem comparacao com o snapshot anterior mesmo mudando de pagina.
   - Cada linha exibe:
     - Material, quantidade, centro de estoque/custo.
     - Valor unitario e valor total (quando disponivel).

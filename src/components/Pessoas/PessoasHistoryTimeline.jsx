@@ -1,3 +1,7 @@
+import { useMemo } from 'react'
+import { TablePagination } from '../TablePagination.jsx'
+import { HISTORY_PAGE_SIZE } from '../../config/pagination.js'
+import { useHistoryPagination } from '../../hooks/useHistoryPagination.js'
 import { formatDate, formatDateTime } from '../../utils/pessoasUtils.js'
 
 const FIELD_LABELS = {
@@ -18,7 +22,7 @@ function formatValue(campo, valor) {
     if (!texto || texto === 'null' || texto === 'undefined') {
       return '-'
     }
-    if (['false', '0', 'inativo', 'inact', 'nao', 'não'].includes(texto)) {
+    if (['false', '0', 'inativo', 'inact', 'nao'].includes(texto)) {
       return 'Inativo'
     }
     return 'Ativo'
@@ -48,22 +52,39 @@ function formatChange(registro) {
 }
 
 export function PessoasHistoryTimeline({ registros }) {
-  if (!registros?.length) {
+  const ordered = useMemo(() => {
+    if (!registros?.length) {
+      return []
+    }
+    return registros.slice().sort((a, b) => new Date(b.dataEdicao) - new Date(a.dataEdicao))
+  }, [registros])
+
+  const { pageItems, currentPage, pageSize, totalItems, setPage } = useHistoryPagination(
+    ordered,
+    HISTORY_PAGE_SIZE,
+  )
+
+  if (!ordered.length) {
     return null
   }
 
   return (
-    <ul className="pessoas-history-list">
-      {registros
-        .slice()
-        .sort((a, b) => new Date(b.dataEdicao) - new Date(a.dataEdicao))
-        .map((registro) => (
+    <>
+      <ul className="pessoas-history-list">
+        {pageItems.map((registro) => (
           <li key={registro.id}>
             <span>{formatDateTime(registro.dataEdicao)}</span>
             <span>{registro.usuarioResponsavel || '-'}</span>
             <span>{formatChange(registro)}</span>
           </li>
         ))}
-    </ul>
+      </ul>
+      <TablePagination
+        totalItems={totalItems}
+        pageSize={pageSize}
+        currentPage={currentPage}
+        onPageChange={setPage}
+      />
+    </>
   )
 }

@@ -1,4 +1,8 @@
-﻿import { formatCurrency } from '../../utils/MateriaisUtils.js'
+import { useMemo } from 'react'
+import { TablePagination } from '../TablePagination.jsx'
+import { HISTORY_PAGE_SIZE } from '../../config/pagination.js'
+import { useHistoryPagination } from '../../hooks/useHistoryPagination.js'
+import { formatCurrency } from '../../utils/MateriaisUtils.js'
 import { formatSelectionValue } from '../../utils/selectionUtils.js'
 
 const FIELD_LABELS = {
@@ -7,18 +11,18 @@ const FIELD_LABELS = {
   fabricanteNome: 'Fabricante',
   validadeDias: 'Validade (dias)',
   ca: 'CA',
-  valorUnitario: 'Valor unitário',
-  estoqueMinimo: 'Estoque mínimo',
+  valorUnitario: 'Valor unitario',
+  estoqueMinimo: 'Estoque minimo',
   ativo: 'Status',
-  descricao: 'Descrição',
+  descricao: 'Descricao',
   grupoMaterial: 'Grupo de material',
   grupoMaterialNome: 'Grupo de material',
-  numeroCalcado: 'Número de calçado',
-  numeroVestimenta: 'Número de vestimenta',
-  numeroEspecifico: 'Número específico',
-  caracteristicaEpi: 'Características',
-  caracteristicas: 'Características',
-  caracteristicas_epi: 'Características',
+  numeroCalcado: 'Numero de calcado',
+  numeroVestimenta: 'Numero de vestimenta',
+  numeroEspecifico: 'Numero especifico',
+  caracteristicaEpi: 'Caracteristicas',
+  caracteristicas: 'Caracteristicas',
+  caracteristicas_epi: 'Caracteristicas',
   cores: 'Cores',
   corMaterial: 'Cor principal',
 }
@@ -70,41 +74,59 @@ const buildChanges = (registro) => {
 }
 
 export function MateriaisHistoricoTimeline({ registros }) {
-  if (!registros?.length) {
+  const ordered = useMemo(() => {
+    if (!registros?.length) {
+      return []
+    }
+    return registros
+      .slice()
+      .sort((a, b) => new Date(b.dataRegistro ?? b.criadoEm ?? 0) - new Date(a.dataRegistro ?? a.criadoEm ?? 0))
+  }, [registros])
+
+  const { pageItems, currentPage, pageSize, totalItems, setPage } = useHistoryPagination(
+    ordered,
+    HISTORY_PAGE_SIZE,
+  )
+
+  if (!ordered.length) {
     return null
   }
 
-  const ordenados = registros
-    .slice()
-    .sort((a, b) => new Date(b.dataRegistro ?? b.criadoEm ?? 0) - new Date(a.dataRegistro ?? a.criadoEm ?? 0))
-
   return (
-    <ul className="entradas-history__list">
-      {ordenados.map((registro) => {
-        const data = registro.dataRegistro ?? registro.criadoEm
-        const changes = buildChanges(registro)
-        return (
-          <li key={registro.id} className="entradas-history__item">
-            <div className="entradas-history__item-header">
-              <div>
-                <strong>{formatDateTime(data)}</strong>
-                <p>{registro.usuarioResponsavel || 'Responsavel não informado'}</p>
+    <>
+      <ul className="entradas-history__list">
+        {pageItems.map((registro) => {
+          const data = registro.dataRegistro ?? registro.criadoEm
+          const changes = buildChanges(registro)
+          return (
+            <li key={registro.id} className="entradas-history__item">
+              <div className="entradas-history__item-header">
+                <div>
+                  <strong>{formatDateTime(data)}</strong>
+                  <p>{registro.usuarioResponsavel || 'Responsavel nao informado'}</p>
+                </div>
               </div>
-            </div>
-            <div className="entradas-history__item-body">
-              {changes.length === 0 ? (
-                <p className="feedback">Sem alterações registradas.</p>
-              ) : (
-                changes.map((change) => (
-                  <p key={`${registro.id}-${change.campo}`}>
-                    <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
-                  </p>
-                ))
-              )}
-            </div>
-          </li>
-        )
-      })}
-    </ul>
+              <div className="entradas-history__item-body">
+                {changes.length === 0 ? (
+                  <p className="feedback">Sem alteracoes registradas.</p>
+                ) : (
+                  changes.map((change) => (
+                    <p key={`${registro.id}-${change.campo}`}>
+                      <strong>{change.label}:</strong> "{change.before}" -> "{change.after}"
+                    </p>
+                  ))
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+      <TablePagination
+        totalItems={totalItems}
+        pageSize={pageSize}
+        currentPage={currentPage}
+        onPageChange={setPage}
+      />
+    </>
   )
 }

@@ -1,3 +1,7 @@
+import { useMemo } from 'react'
+import { TablePagination } from '../../TablePagination.jsx'
+import { HISTORY_PAGE_SIZE } from '../../../config/pagination.js'
+import { useHistoryPagination } from '../../../hooks/useHistoryPagination.js'
 import { formatDateTimeFull, formatHistoryValue } from '../../../utils/acidentesUtils.js'
 
 const FIELD_LABELS = {
@@ -43,16 +47,26 @@ const buildChanges = (registro) => {
 }
 
 export function AcidentesHistoryTimeline({ registros }) {
-  if (!registros?.length) {
+  const ordered = useMemo(() => {
+    if (!registros?.length) {
+      return []
+    }
+    return registros.slice().sort((a, b) => new Date(b.dataEdicao) - new Date(a.dataEdicao))
+  }, [registros])
+
+  const { pageItems, currentPage, pageSize, totalItems, setPage } = useHistoryPagination(
+    ordered,
+    HISTORY_PAGE_SIZE,
+  )
+
+  if (!ordered.length) {
     return null
   }
 
   return (
-    <ul className="entradas-history__list">
-      {registros
-        .slice()
-        .sort((a, b) => new Date(b.dataEdicao) - new Date(a.dataEdicao))
-        .map((registro) => {
+    <>
+      <ul className="entradas-history__list">
+        {pageItems.map((registro) => {
           const changes = buildChanges(registro)
           return (
             <li key={registro.id} className="entradas-history__item">
@@ -68,7 +82,7 @@ export function AcidentesHistoryTimeline({ registros }) {
                 ) : (
                   changes.map((change) => (
                     <p key={`${registro.id}-${change.campo}`}>
-                      <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
+                      <strong>{change.label}:</strong> "{change.before}" -> "{change.after}"
                     </p>
                   ))
                 )}
@@ -76,6 +90,13 @@ export function AcidentesHistoryTimeline({ registros }) {
             </li>
           )
         })}
-    </ul>
+      </ul>
+      <TablePagination
+        totalItems={totalItems}
+        pageSize={pageSize}
+        currentPage={currentPage}
+        onPageChange={setPage}
+      />
+    </>
   )
 }

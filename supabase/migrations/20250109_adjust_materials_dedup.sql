@@ -133,15 +133,13 @@ BEGIN
   v_grupo_norm := NULLIF(fn_normalize_any(NEW."grupoMaterial"), '');
   v_nome_norm := NULLIF(fn_normalize_any(NEW.nome), '');
 
-  -- Regra: C.A nao pode repetir na mesma base (fabricante+grupo+item+numero+cores+caracteristicas)
+  -- Regra: C.A nao pode repetir em nenhum material existente
   IF v_ca_norm IS NOT NULL AND EXISTS (
     SELECT 1
     FROM public.materiais m
     WHERE NULLIF(fn_normalize_any(m.ca), '') = v_ca_norm
-      AND public.material_hash_base(m.id) = public.material_hash_base(NEW.id)
-      AND public.material_hash_completo(m.id) = public.material_hash_completo(NEW.id)
   ) THEN
-    RAISE EXCEPTION 'Ja existe material cadastrado com este C.A. na mesma base.';
+    RAISE EXCEPTION 'Ja existe material cadastrado com este C.A.';
   END IF;
 
   v_hash_base := public.material_hash_base(NEW.id);
