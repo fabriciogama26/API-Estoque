@@ -244,32 +244,33 @@
     },
     "acidentes": {
         "title": "Registro de acidentes",
-        "summary": "Cadastro completo de acidentes com filtros, histórico e detalhes.",
+        "summary": "Cadastro completo de acidentes com filtros, historico, status e cancelamento controlado.",
         "steps": [
             {
                 "title": "Preencher dados do acidente",
-                "description": "Selecione colaborador, tipo de acidente, lesão e parte afetada. Campos obrigatórios estão marcados com *. Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para gravar.",
-                "mediaHint": "Formulário de cadastro de acidentes."
+                "description": "Selecione colaborador (matricula/nome), tipo, agente, lesao e parte afetada. Campos obrigatorios estao marcados com *. Ao editar, o titulo muda para \"Editando...\"; use Salvar para gravar.",
+                "mediaHint": "Formulario de cadastro de acidentes sem campo de HHT."
             },
             {
-                "title": "Relacionar local e agente",
-                "description": "Use os campos de local, centro de serviço e agente causador para enriquecer indicadores de SST.",
-                "mediaHint": "Seção de local/agente dentro do formulário."
+                "title": "Definir status e cancelar se preciso",
+                "description": "Use o botao de X para cancelar um registro: abre modal (estilo HHT) pedindo motivo, grava no historico e marca o status como Cancelado (fica visivel, mas sai dos calculos).",
+                "mediaHint": "Botao de cancelar com modal de motivo."
             },
             {
                 "title": "Filtrar registros",
-                "description": "Use o campo Busca para digitar pessoa (nome/matrícula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de serviço ou agente e clique em Aplicar. Limpar zera todos os filtros.",
+                "description": "Use o campo Busca para digitar pessoa (nome/matricula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de servico ou agente e clique em Aplicar. Limpar zera todos os filtros.",
                 "mediaHint": "Bloco de filtros acima da lista de acidentes."
             },
             {
-                "title": "Consultar histórico e detalhes",
-                "description": "Clique no botão de relógio para ver histórico de alterações ou no botão com olho para abrir os detalhes completos do acidente.",
-                "mediaHint": "Modal de detalhes do acidente."
+                "title": "Consultar historico e detalhes",
+                "description": "Clique no botao de relogio para ver historico (inclui mudanca de status/motivo) ou no botao com olho para abrir os detalhes completos do acidente, agora com o status exibido.",
+                "mediaHint": "Modal de detalhes do acidente com status."
             }
         ],
         "notes": [
-            "Ao salvar um acidente, a lista é recarregada automaticamente.",
-            "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integrações de cadastro base."
+            "Ao salvar um acidente, a lista e recarregada automaticamente.",
+            "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integracoes de cadastro base.",
+            "HHT nao e informado na ficha; o dashboard cruza data+centro com o HHT mensal ativo. Cancelados (ativo=false) nao entram nos calculos."
         ]
     },
     "hhtMensal": {
@@ -384,4 +385,5 @@
         ]
     }
 }
+
 

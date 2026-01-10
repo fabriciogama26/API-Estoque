@@ -48,15 +48,18 @@ Campos principais do formulario
   - Partes lesionadas – permite informar uma ou mais regioes afetadas.
 - Campos complementares:
   - CID, CAT, Observacao, Data eSocial, flag SESMT, Data SESMT.
+- Status e cancelamento:
+  - Campo `ativo` controla se o acidente entra nos calculos. Cancelar apenas desativa (continua listado) e registra motivo em `cancel_motivo`.
 
 Fluxos principais
 -----------------
 1) Cadastro/edicao
    - Usuario digita matricula ou nome; autocomplete exibe sugestoes e, ao selecionar, preenche dados da pessoa.
-   - Preenche campos obrigatorios: matricula, data, dias perdidos/debitados, HHT, centro de servico, local, agente(s), tipo(s), lesao(oes), parte(s) lesionada(s).
+   - Preenche campos obrigatorios: matricula, data, dias perdidos/debitados, centro de servico, local, agente(s), tipo(s), lesao(oes), parte(s) lesionada(s).
    - Campos auxiliares: CAT, observacao, CID, flags de lancamento (eSocial/SESMT).
    - Botao alterna entre "Registrar acidente" (novo) e "Salvar alteracoes" (edicao).
    - "Cancelar edicao" limpa o formulario, reseta estado de edicao e limpa caches associados se necessario.
+   - HHT nao é informado na ficha; o dashboard cruza data + centro com `hht_mensal`.
 
 2) Multiselecoes (agente/tipo/lesoes/partes)
    - Select exibe opcoes disponiveis; ao confirmar/adicionar, o item vira chip removivel.
@@ -75,8 +78,9 @@ Fluxos principais
    - "Aplicar" usa `filterAcidentes(acidentes, filters)` para gerar a lista filtrada; "Limpar" restaura `ACIDENTES_FILTER_DEFAULT` e recarrega a lista principal, se necessario.
 
 5) Tabela e detalhes
-   - Colunas exibidas: Nome, Matricula, Cargo, Data, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
-   - Acoes: editar, historico e detalhar. O botao "Detalhar" abre um modal com os demais campos (agente/tipo/lesoes/partes, dias, HHT, eSOCIAL, SESMT, observacao), cabecalho com ID do cadastro e resumo de matricula/nome/data.
+   - Colunas exibidas: Nome, Matricula, Status (ativo/cancelado), Data, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
+   - Acoes: editar, historico, detalhar e cancelar (X vermelho). O botao "Detalhar" abre um modal com os demais campos (agente/tipo/lesoes/partes, dias, eSOCIAL, SESMT, observacao) e inclui o status atual.
+   - Cancelar abre modal (mesmo estilo do HHT mensal) solicitando motivo; define `ativo = false`, grava `cancel_motivo` e adiciona no historico. O registro continua visivel, mas sai dos calculos/dashboard.
 
 Carregamento de dados
 ---------------------
@@ -91,17 +95,21 @@ Regras e validacoes
 -------------------
 - `validateAcidenteForm`:
   - Garante preenchimento de campos obrigatorios.
-  - Converte texto para numero em campos como dias perdidos, dias debitados e HHT.
+  - Converte texto para numero em campos como dias perdidos e dias debitados.
   - Checa se os grupos obrigatorios (agentes/tipos/lesoes/partes) estao preenchidos quando configurados.
 - `createAcidentePayload` e `updateAcidentePayload`:
   - Montam o payload no formato esperado pela API/BD.
   - Mantem consistencia entre listas (`agentes`, `tipos`, `lesoes`, `partesLesionadas`) e campos unicos legados (`agente`, `tipo`, `lesao`, `parteLesionada`).
+- `cancelAcidente`:
+  - Define `ativo = false`, salva `cancel_motivo` e registra historico com os campos alterados.
+  - Requer que a coluna `cancel_motivo` exista na tabela `acidentes` (texto/nullable).
 
 Boas praticas
 -------------
 - Garantir que catalogos (agentes, tipos, lesoes, partes) estejam criados/populados antes de liberar a tela para os usuarios.
 - Preferir matricula como chave em imports e integracoes; nome e cargo sao derivados da tabela de pessoas.
 - Usar o historico como ferramenta de auditoria, principalmente quando ha ajustes manuais de dados.
+- HHT nao e campo do formulario; o dashboard cruza data + centro com `hht_mensal` ativo do mes para calcular taxas.
 
 Atualizacao 2025-12
 -------------------
@@ -109,6 +117,12 @@ Atualizacao 2025-12
 - UI dividida em componentes (`AcidentesForm`, `AcidentesFilters`, `AcidentesTable`, `AcidentesHistoryModal`).
 - Tratamento de erros integrado com `useErrorLogger('acidentes')`.
 - Botoes de acao (editar/historico) padronizados com os mesmos icones e tooltips usados em Entradas/Materiais/Pessoas.
+
+Atualizacao 2026-01
+-------------------
+- Campo HHT removido da ficha; taxas agora cruzam acidentes com `hht_mensal` pelo centro e mes.
+- Status exibido na lista e detalhes; botao de cancelamento segue estilo do HHT mensal, grava `ativo=false` e `cancel_motivo` e permanece visivel (nao entra nos calculos).
+- Historico inclui alteracoes de status/motivo de cancelamento.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

@@ -59,6 +59,7 @@ function normalizeKey(value) {
   }
   return String(value)
     .trim()
+    .replace(/\s+/g, ' ')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -243,7 +244,55 @@ function distribuirPorChave(lista, keySelector, fallback) {
   )
 }
 
-function montarTendencia(acidentes, periodoInicio, periodoFim) {
+function buildHhtMap(hhtMensal = []) {
+  const mapa = new Map()
+  ;(Array.isArray(hhtMensal) ? hhtMensal : []).forEach((item) => {
+    const rawPeriodo = item?.mesRef ?? item?.mes_ref ?? ''
+    const periodo =
+      (() => {
+        if (rawPeriodo instanceof Date) {
+          return rawPeriodo.toISOString().slice(0, 7)
+        }
+        const texto = String(rawPeriodo || '').trim()
+        if (/^\d{4}-\d{2}$/.test(texto)) {
+          return texto
+        }
+        if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+          return texto.slice(0, 7)
+        }
+        if (texto.includes('T') && /^\d{4}-\d{2}/.test(texto)) {
+          return texto.slice(0, 7)
+        }
+        return sanitizeMonth(texto)
+      })()
+    const centro = normalizeKey(item?.centroServicoNome ?? item?.centroServico ?? item?.centro_servico)
+    const valor = toNumber(item?.hhtFinal ?? item?.hht_final ?? item?.hhtCalculado ?? item?.hht_calculado)
+    if (!periodo || !centro) {
+      return
+    }
+    if (!Number.isFinite(valor) || valor < 0) {
+      return
+    }
+    mapa.set(`${periodo}||${centro}`, valor)
+  })
+  return mapa
+}
+
+function resolveHhtAcidente(acidente, hhtMap) {
+  const data = parseIsoDate(acidente?.data)
+  if (!data) {
+    return toNumber(acidente?.hht)
+  }
+  const periodo = buildPeriodo(data.getUTCFullYear(), data.getUTCMonth())
+  const centro = normalizeKey(acidente?.centroServico ?? acidente?.setor ?? acidente?.local)
+  const chave = `${periodo}||${centro}`
+  if (hhtMap && hhtMap.has(chave)) {
+    return hhtMap.get(chave)
+  }
+  return toNumber(acidente?.hht)
+}
+
+function montarTendencia(acidentes, periodoInicio, periodoFim, hhtMap) {
   const mapa = new Map()
 
   acidentes.forEach((acidente) => {
@@ -263,7 +312,7 @@ function montarTendencia(acidentes, periodoInicio, periodoFim) {
     const grupo = mapa.get(periodo)
     grupo.total_acidentes += 1
     grupo.dias_perdidos += toNumber(acidente?.diasPerdidos)
-    grupo.hht_total += toNumber(acidente?.hht)
+    grupo.hht_total += resolveHhtAcidente(acidente, hhtMap)
   })
 
   const periodosDisponiveis = Array.from(mapa.keys()).sort(comparePeriodos)
@@ -314,7 +363,7 @@ function montarTendencia(acidentes, periodoInicio, periodoFim) {
   })
 }
 
-export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
+export function montarDashboardAcidentes(acidentes = [], filtros = {}, hhtMensal = []) {
   let periodoInicio = sanitizeMonth(filtros.periodoInicio)
   let periodoFim = sanitizeMonth(filtros.periodoFim)
   if (periodoInicio && periodoFim && comparePeriodos(periodoInicio, periodoFim) > 0) {
@@ -333,7 +382,10 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
   const inicioDate = buildMonthBoundary(periodoInicio, 'start')
   const fimDate = buildMonthBoundary(periodoFim, 'end')
 
-  const acidentesValidos = Array.isArray(acidentes) ? acidentes : []
+  const acidentesValidos = (Array.isArray(acidentes) ? acidentes : []).filter(
+    (item) => item?.ativo !== false
+  )
+  const hhtMap = buildHhtMap(hhtMensal)
 
   const filtradosPorPeriodo = acidentesValidos.filter((acidente) => {
     const data = parseIsoDate(acidente?.data)
@@ -395,7 +447,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
 
   const totalAcidentes = listaFiltrada.length
   const diasPerdidos = listaFiltrada.reduce((total, acidente) => total + toNumber(acidente?.diasPerdidos), 0)
-  const hhtTotal = listaFiltrada.reduce((total, acidente) => total + toNumber(acidente?.hht), 0)
+  const hhtTotal = listaFiltrada.reduce((total, acidente) => total + resolveHhtAcidente(acidente, hhtMap), 0)
   const totalAcidentesComAfastamento = listaFiltrada.filter((acidente) => toNumber(acidente?.diasPerdidos) > 0).length
   const totalAcidentesSemAfastamento = listaFiltrada.filter((acidente) => toNumber(acidente?.diasPerdidos) === 0).length
 
@@ -414,7 +466,7 @@ export function montarDashboardAcidentes(acidentes = [], filtros = {}) {
     periodo_label: buildPeriodoLabel(periodoInicio, periodoFim),
   }
 
-  const tendencia = montarTendencia(listaFiltrada, periodoInicio, periodoFim)
+  const tendencia = montarTendencia(listaFiltrada, periodoInicio, periodoFim, hhtMap)
   const tipos = distribuirPorChave(
     listaFiltrada,
     (item) => item?.tipos ?? item?.tipo,

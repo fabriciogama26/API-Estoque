@@ -159,6 +159,8 @@ const ACIDENTE_HISTORY_FIELDS = [
   'cid',
   'cat',
   'observacao',
+  'ativo',
+  'cancelMotivo',
 ]
 
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
@@ -736,6 +738,161 @@ const toMonthRefIso = (valor) => {
   const year = data.getFullYear()
   const month = data.getMonth() + 1
   return `${year}-${String(month).padStart(2, '0')}-01`
+}
+
+const buildMonthRangeIso = (mesRef) => {
+  const inicio = toDateOnlyIso(mesRef)
+  if (!inicio) {
+    return null
+  }
+  const startDate = new Date(inicio)
+  if (Number.isNaN(startDate.getTime())) {
+    return null
+  }
+  const endDate = new Date(startDate)
+  endDate.setUTCMonth(endDate.getUTCMonth() + 1)
+  return {
+    inicio: startDate.toISOString(),
+    fim: endDate.toISOString(),
+  }
+}
+
+const sanitizeMonthRef = (valor) => {
+  const raw = trim(valor)
+  if (!raw) {
+    return null
+  }
+  const datePart = raw.split('T')[0]
+  if (/^\d{4}-\d{2}$/.test(raw)) {
+    return raw
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return datePart.slice(0, 7)
+  }
+  return null
+}
+
+const MONTH_NAMES_PT = [
+  'janeiro',
+  'fevereiro',
+  'marco',
+  'abril',
+  'maio',
+  'junho',
+  'julho',
+  'agosto',
+  'setembro',
+  'outubro',
+  'novembro',
+  'dezembro',
+]
+
+const formatPeriodoLabel = (inicio, fim) => {
+  const buildLabel = (periodo) => {
+    const sanitized = sanitizeMonthRef(periodo)
+    if (!sanitized) return ''
+    const [anoStr, mesStr] = sanitized.split('-')
+    const mesIdx = Number.parseInt(mesStr, 10) - 1
+    const nomeMes = MONTH_NAMES_PT[mesIdx] ?? mesStr
+    return `${nomeMes} de ${anoStr}`
+  }
+
+  const inicioLabel = buildLabel(inicio)
+  const fimLabel = buildLabel(fim)
+
+  if (inicioLabel && fimLabel) {
+    if (sanitizeMonthRef(inicio) === sanitizeMonthRef(fim)) {
+      return inicioLabel
+    }
+    return `${inicioLabel} a ${fimLabel}`
+  }
+  if (inicioLabel) {
+    return `A partir de ${inicioLabel}`
+  }
+  if (fimLabel) {
+    return `Ate ${fimLabel}`
+  }
+  return 'Todos os periodos'
+}
+
+const normalizePeriodoRange = (inicio, fim) => {
+  const start = sanitizeMonthRef(inicio) || null
+  const end = sanitizeMonthRef(fim) || null
+  if (start && end && start > end) {
+    return { inicio: end, fim: start }
+  }
+  return { inicio: start, fim: end }
+}
+
+const isPeriodoWithinRange = (periodo, inicio, fim) => {
+  const current = sanitizeMonthRef(periodo)
+  if (!current) return false
+  if (inicio && current < inicio) return false
+  if (fim && current > fim) return false
+  return true
+}
+
+const parseJsonArray = (valor, fallback = []) => {
+  if (Array.isArray(valor)) return valor
+  if (valor === null || valor === undefined) return fallback
+  if (typeof valor === 'string') {
+    try {
+      const parsed = JSON.parse(valor)
+      return Array.isArray(parsed) ? parsed : fallback
+    } catch (_err) {
+      return fallback
+    }
+  }
+  return fallback
+}
+
+const parseJsonObject = (valor, fallback = {}) => {
+  if (valor && typeof valor === 'object' && !Array.isArray(valor)) {
+    return valor
+  }
+  if (typeof valor === 'string') {
+    try {
+      const parsed = JSON.parse(valor)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback
+    } catch (_err) {
+      return fallback
+    }
+  }
+  return fallback
+}
+
+const extractOptionValues = (lista = [], key) => {
+  const mapa = new Map()
+  lista.forEach((item) => {
+    const valor = (item?.[key] ?? '').toString().trim()
+    if (!valor) return
+    const chave = valor.toLowerCase()
+    if (!mapa.has(chave)) {
+      mapa.set(chave, valor)
+    }
+  })
+  return Array.from(mapa.values()).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
+}
+
+let statusHhtDefaultIdCache = null
+async function resolveStatusHhtDefaultId() {
+  if (statusHhtDefaultIdCache) {
+    return statusHhtDefaultIdCache
+  }
+  try {
+    const registro = await executeMaybeSingle(
+      supabase.from('status_hht').select('id, status').ilike('status', 'ativo').limit(1),
+      'Falha ao consultar status_hht padrao.'
+    )
+    const id = normalizeOptionId(registro?.id)
+    if (id) {
+      statusHhtDefaultIdCache = id
+      return id
+    }
+  } catch (error) {
+    reportClientError('Nao foi possivel obter status_hht padrao.', error)
+  }
+  return null
 }
 
 const toStartOfDayUtcIso = (value) => toDateOnlyIso(value)
@@ -2181,6 +2338,62 @@ function mapAcidenteRecord(record) {
     registradoPor: record.registradoPor ?? record.registrado_por ?? '',
     atualizadoPor: record.atualizadoPor ?? record.atualizado_por ?? '',
     hht: toNullableNumber(record.hht),
+    ativo: record.ativo !== false,
+    cancelMotivo: record.cancel_motivo ?? record.cancelMotivo ?? null,
+  }
+}
+
+async function resolveHhtMensalValor(centroServicoId, mesRef) {
+  if (!centroServicoId || !mesRef) {
+    return { valor: null, status: '' }
+  }
+  const registro = await executeMaybeSingle(
+    supabase
+      .from('hht_mensal')
+      .select('id, hht_final, status_hht (status)')
+      .eq('centro_servico_id', centroServicoId)
+      .eq('mes_ref', mesRef)
+      .limit(1),
+    'Falha ao consultar HHT mensal.'
+  )
+  if (!registro) {
+    return { valor: null, status: '' }
+  }
+  const valor = Number(registro.hht_final ?? 0)
+  const status = resolveTextValue(registro?.status_hht?.status ?? '')
+  if (!Number.isFinite(valor) || valor < 0) {
+    return { valor: null, status }
+  }
+  return { valor, status }
+}
+
+async function syncAcidentesHht(centroServicoId, mesRef, hhtValor) {
+  const valor = Number(hhtValor)
+  if (!centroServicoId || !mesRef || !Number.isFinite(valor) || valor < 0) {
+    return
+  }
+  const intervalo = buildMonthRangeIso(mesRef)
+  if (!intervalo) {
+    return
+  }
+  try {
+    await execute(
+      supabase
+        .from('acidentes')
+        .update({ hht: valor })
+        .eq('centro_servico', centroServicoId)
+        .gte('data', intervalo.inicio)
+        .lt('data', intervalo.fim)
+        .or('hht.is.null,hht.eq.0'),
+      'Falha ao vincular HHT aos acidentes.'
+    )
+  } catch (error) {
+    reportClientError(
+      'Nao foi possivel sincronizar HHT dos acidentes.',
+      error,
+      { centroServicoId, mesRef, hht: valor },
+      'warn'
+    )
   }
 }
 
@@ -3100,6 +3313,120 @@ async function carregarAcidentes() {
   )
   return (data ?? []).map(mapAcidenteRecord)
 }
+
+const mapDashboardFromView = (registro, periodoInicio, periodoFim) => {
+  const { inicio, fim } = normalizePeriodoRange(periodoInicio, periodoFim)
+
+  const tendenciaOrdenada = parseJsonArray(registro?.tendencia)
+    .map((item) => ({
+      ...item,
+      periodo: sanitizeMonthRef(item?.periodo) || item?.periodo || null,
+      total_acidentes: toNumber(item?.total_acidentes, 0),
+      dias_perdidos: toNumber(item?.dias_perdidos, 0),
+      dias_debitados: toNumber(item?.dias_debitados, 0),
+      hht_total: toNumber(item?.hht_total, 0),
+      taxa_frequencia: toNumber(item?.taxa_frequencia, 0),
+      taxa_gravidade: toNumber(item?.taxa_gravidade, 0),
+    }))
+    .filter((item) => item?.periodo)
+    .sort((a, b) => a.periodo.localeCompare(b.periodo))
+
+  const tendenciaFiltrada = tendenciaOrdenada.filter((item) => isPeriodoWithinRange(item.periodo, inicio, fim))
+  const tendenciaAplicada = tendenciaFiltrada.length ? tendenciaFiltrada : tendenciaOrdenada
+
+  const totais = tendenciaAplicada.reduce(
+    (acc, item) => {
+      acc.total_acidentes += toNumber(item.total_acidentes, 0)
+      acc.dias_perdidos += toNumber(item.dias_perdidos, 0)
+      acc.dias_debitados += toNumber(item.dias_debitados, 0)
+      acc.hht_total += toNumber(item.hht_total, 0)
+      return acc
+    },
+    { total_acidentes: 0, dias_perdidos: 0, dias_debitados: 0, hht_total: 0 }
+  )
+
+  const resumoBase = parseJsonObject(registro?.resumo)
+  const hhtTotal = toNumber(totais.hht_total, 0)
+  const tf = hhtTotal > 0 ? Number(((toNumber(totais.total_acidentes, 0) * 1000000) / hhtTotal).toFixed(2)) : 0
+  const tgBase =
+    hhtTotal > 0
+      ? Number(
+          (((toNumber(totais.dias_perdidos, 0) + toNumber(totais.dias_debitados, 0)) * 1000000) / hhtTotal).toFixed(2)
+        )
+      : 0
+
+  const periodoInicioLabel = inicio || tendenciaAplicada[0]?.periodo || null
+  const periodoFimLabel = fim || tendenciaAplicada[tendenciaAplicada.length - 1]?.periodo || periodoInicioLabel || null
+
+  const resumo = {
+    ...resumoBase,
+    periodo: resumoBase?.periodo ?? periodoInicioLabel,
+    periodo_label: formatPeriodoLabel(periodoInicioLabel, periodoFimLabel),
+    periodo_referencia: formatPeriodoLabel(periodoInicioLabel, periodoFimLabel),
+    referencia: formatPeriodoLabel(periodoInicioLabel, periodoFimLabel),
+    total_acidentes: toNumber(totais.total_acidentes, 0),
+    total_acidentes_afastamento: toNumber(resumoBase?.total_acidentes_afastamento, 0),
+    total_acidentes_sem_afastamento: toNumber(resumoBase?.total_acidentes_sem_afastamento, 0),
+    dias_perdidos: toNumber(totais.dias_perdidos, 0),
+    dias_debitados: toNumber(totais.dias_debitados, 0),
+    hht_total: hhtTotal,
+    taxa_frequencia: tf,
+    taxa_frequencia_afastamento: resumoBase?.taxa_frequencia_afastamento ?? tf,
+    taxa_frequencia_sem_afastamento: resumoBase?.taxa_frequencia_sem_afastamento ?? tf,
+    taxa_gravidade: resumoBase?.taxa_gravidade ?? tgBase,
+    indice_acidentados: resumoBase?.indice_acidentados ?? Number(((tf + tgBase) / 100).toFixed(2)),
+    indice_avaliacao_gravidade:
+      resumoBase?.indice_avaliacao_gravidade ??
+      (toNumber(resumoBase?.total_acidentes_afastamento, 0) > 0
+        ? Number(
+            (
+              (toNumber(totais.dias_perdidos, 0) + toNumber(totais.dias_debitados, 0)) /
+              toNumber(resumoBase?.total_acidentes_afastamento, 0)
+            ).toFixed(2)
+          )
+        : 0),
+    total_trabalhadores: toNumber(resumoBase?.total_trabalhadores, 0),
+    indice_relativo_acidentes:
+      resumoBase?.indice_relativo_acidentes ??
+      (toNumber(resumoBase?.total_trabalhadores, 0) > 0
+        ? Number(
+            (
+              toNumber(resumoBase?.total_acidentes_afastamento ?? totais.total_acidentes, 0) *
+              1000 /
+              toNumber(resumoBase?.total_trabalhadores, 0)
+            ).toFixed(2)
+          )
+        : 0),
+  }
+
+  const tipos = parseJsonArray(registro?.tipos)
+  const partesLesionadas = parseJsonArray(registro?.partes_lesionadas)
+  const lesoes = parseJsonArray(registro?.lesoes)
+  const cargos = parseJsonArray(registro?.cargos)
+  const agentes = parseJsonArray(registro?.agentes)
+  const pessoasPorCentro = parseJsonArray(registro?.pessoas_por_centro)
+
+  const options = {
+    centrosServico: extractOptionValues(pessoasPorCentro, 'centro_servico'),
+    tipos: extractOptionValues(tipos, 'tipo'),
+    lesoes: extractOptionValues(lesoes, 'lesao'),
+    partesLesionadas: extractOptionValues(partesLesionadas, 'parte_lesionada'),
+    agentes: extractOptionValues(agentes, 'agente'),
+    cargos: extractOptionValues(cargos, 'cargo'),
+  }
+
+  return {
+    resumo,
+    tendencia: tendenciaAplicada,
+    tipos,
+    partesLesionadas,
+    lesoes,
+    cargos,
+    agentes,
+    options,
+  }
+}
+
 
 async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
@@ -4787,39 +5114,7 @@ export const api = {
       if (!mesRef) {
         throw new Error('Data do acidente invalida para calcular HHT.')
       }
-      const hhtMensalRegistro = await executeSingle(
-        supabase
-          .from('hht_mensal')
-          .select('id, hht_final, status_hht (status)')
-          .eq('centro_servico_id', centroServicoIdResolved)
-          .eq('mes_ref', mesRef)
-          .limit(1),
-        'Falha ao consultar HHT mensal.'
-      )
-      if (!hhtMensalRegistro) {
-        reportClientError(
-          'HHT mensal ausente para centro/mes do acidente.',
-          null,
-          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_create' },
-          'warn',
-        )
-        throw new Error('Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
-      }
-      const statusRegistro = hhtMensalRegistro?.status_hht?.status ?? ''
-      if (statusRegistro.toLowerCase() === 'cancelado') {
-        throw new Error('HHT mensal deste centro/mes esta cancelado. Cadastre um novo antes de registrar o acidente.')
-      }
-      const hhtValor = Number(hhtMensalRegistro.hht_final ?? 0)
-      if (!Number.isFinite(hhtValor)) {
-        reportClientError(
-          'HHT mensal invalido para centro/mes do acidente.',
-          null,
-          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_create', valor: hhtMensalRegistro.hht_final },
-          'warn',
-        )
-        throw new Error('HHT mensal invalido para o centro/mes informado.')
-      }
-      dados.hht = hhtValor
+      // HHT não é mais persistido no acidente; taxas usam hht_mensal no dashboard.
 
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
@@ -4898,7 +5193,6 @@ export const api = {
           (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
       )
       const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
-
       const dados = {
         matricula: trim(payload.matricula ?? atual.matricula),
         nome: trim(payload.nome ?? atual.nome),
@@ -4915,7 +5209,6 @@ export const api = {
         data: payload.data ? new Date(payload.data).toISOString() : atual.data,
         diasPerdidos: toNumber(payload.diasPerdidos ?? atual.diasPerdidos ?? atual.dias_perdidos ?? 0),
         diasDebitados: toNumber(payload.diasDebitados ?? atual.diasDebitados ?? atual.dias_debitados ?? 0),
-        hht: toNullableNumber(payload.hht ?? atual.hht),
         cid: trim(payload.cid ?? atual.cid ?? ''),
         cat: trim(payload.cat ?? atual.cat ?? ''),
         observacao: trim(payload.observacao ?? atual.observacao ?? ''),
@@ -4947,39 +5240,7 @@ export const api = {
       if (!mesRef) {
         throw new Error('Data do acidente invalida para calcular HHT.')
       }
-      const hhtMensalRegistro = await executeSingle(
-        supabase
-          .from('hht_mensal')
-          .select('id, hht_final, status_hht (status)')
-          .eq('centro_servico_id', centroServicoIdResolved)
-          .eq('mes_ref', mesRef)
-          .limit(1),
-        'Falha ao consultar HHT mensal.'
-      )
-      if (!hhtMensalRegistro) {
-        reportClientError(
-          'HHT mensal ausente para centro/mes do acidente.',
-          null,
-          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_update', acidenteId: id },
-          'warn',
-        )
-        throw new Error('Cadastre o HHT mensal deste centro/mes antes de registrar o acidente.')
-      }
-      const statusRegistro = hhtMensalRegistro?.status_hht?.status ?? ''
-      if (statusRegistro.toLowerCase() === 'cancelado') {
-        throw new Error('HHT mensal deste centro/mes esta cancelado. Cadastre um novo antes de registrar o acidente.')
-      }
-      const hhtValor = Number(hhtMensalRegistro.hht_final ?? 0)
-      if (!Number.isFinite(hhtValor)) {
-        reportClientError(
-          'HHT mensal invalido para centro/mes do acidente.',
-          null,
-          { centroServicoId: centroServicoIdResolved, mesRef, stage: 'acidente_update', acidenteId: id, valor: hhtMensalRegistro.hht_final },
-          'warn',
-        )
-        throw new Error('HHT mensal invalido para o centro/mes informado.')
-      }
-      dados.hht = hhtValor
+      // HHT não é mais persistido no acidente; taxas usam hht_mensal no dashboard.
 
       const usuario = await resolveUsuarioResponsavel()
       await ensureAcidentePartes(partes)
@@ -5001,7 +5262,6 @@ export const api = {
         local: dados.local,
         diasPerdidos: dados.diasPerdidos,
         diasDebitados: dados.diasDebitados,
-        hht: dados.hht,
         cid: dados.cid,
         cat: dados.cat,
         observacao: dados.observacao,
@@ -5070,6 +5330,47 @@ export const api = {
       }
       return mapAcidenteRecord(registro)
     },
+    async cancel(id, payload = {}) {
+      if (!id) {
+        throw new Error('ID obrigatorio.')
+      }
+      const agora = new Date().toISOString()
+      const usuario = await resolveUsuarioResponsavel()
+      const motivo = trim(payload?.motivo ?? payload?.cancelMotivo ?? '')
+      const registro = await executeSingle(
+        supabase
+          .from('acidentes')
+          .update({
+            ativo: false,
+            atualizadoPor: usuario,
+            atualizadoEm: agora,
+            cancel_motivo: motivo || null,
+          })
+          .eq('id', id)
+          .select(),
+        'Falha ao cancelar acidente.'
+      )
+
+      const historicoRegistro = {
+        acidente_id: id,
+        data_edicao: agora,
+        usuario_responsavel: usuario,
+        campos_alterados: [
+          { campo: 'ativo', de: true, para: false },
+          { campo: 'cancelMotivo', de: '', para: motivo || '' },
+        ],
+      }
+      try {
+        await execute(
+          supabase.from('acidente_historico').insert(historicoRegistro),
+          'Falha ao registrar historico do acidente.'
+        )
+      } catch (err) {
+        reportClientError('Nao foi possivel registrar historico do acidente ao cancelar.', err, { id })
+      }
+
+      return mapAcidenteRecord(registro)
+    },
     async history(id) {
       if (!id) {
         throw new Error('ID obrigatorio.')
@@ -5131,8 +5432,46 @@ export const api = {
     },
 
     async dashboard(params = {}) {
+      const inicio = sanitizeMonthRef(params?.periodoInicio) || null
+      const fim = sanitizeMonthRef(params?.periodoFim) || null
+      const anoFiltro = Number.isFinite(Number(params?.ano)) ? Number(params.ano) : null
+
+      try {
+        let query = supabase.from('vw_indicadores_acidentes').select('*')
+        if (anoFiltro !== null) {
+          query = query.eq('ano', anoFiltro)
+        }
+        const dadosView = await execute(query, 'Falha ao carregar indicadores de acidentes (SQL).')
+        const lista = Array.isArray(dadosView) ? dadosView : []
+        if (lista.length > 0) {
+          return mapDashboardFromView(lista[0], inicio, fim)
+        }
+      } catch (error) {
+        reportClientError('Falha ao carregar dashboard de acidentes via view SQL; usando calculo local.', error, {
+          area: 'dashboard_acidentes_sql',
+        })
+      }
+
       const acidentes = await carregarAcidentes()
-      return montarDashboardAcidentes(acidentes, params)
+      let hhtMensal = []
+      try {
+        const dadosHht = await execute(
+          supabase
+            .from('hht_mensal_view')
+            .select('mes_ref, centro_servico_nome, hht_final, status_nome'),
+          'Falha ao listar HHT mensal para dashboard.'
+        )
+        const lista = Array.isArray(dadosHht) ? dadosHht : []
+        hhtMensal = lista.filter((item) => {
+          const mesRef = String(item?.mes_ref ?? '').slice(0, 7)
+          if (inicio && mesRef && mesRef < inicio) return false
+          if (fim && mesRef && mesRef > fim) return false
+          return true
+        })
+      } catch (error) {
+        reportClientError('Nao foi possivel carregar HHT mensal para dashboard.', error)
+      }
+      return montarDashboardAcidentes(acidentes, params, hhtMensal)
     },
   },
   hhtMensal: {
@@ -5254,12 +5593,18 @@ export const api = {
     async create(payload) {
       const mesRef = trim(payload.mesRef ?? payload.mes_ref ?? '')
       const centroServicoId = normalizeUuid(payload.centroServicoId ?? payload.centro_servico_id)
-      const statusHhtId = normalizeUuid(payload.statusHhtId ?? payload.status_hht_id)
+      let statusHhtId = normalizeUuid(payload.statusHhtId ?? payload.status_hht_id)
       if (!mesRef) {
         throw new Error('Informe o mes de referencia.')
       }
       if (!centroServicoId) {
         throw new Error('Selecione um centro de servico valido.')
+      }
+      if (!statusHhtId) {
+        statusHhtId = await resolveStatusHhtDefaultId()
+      }
+      if (!statusHhtId) {
+        throw new Error('Status do HHT mensal nao encontrado.')
       }
 
       const registro = await executeSingle(
@@ -5288,7 +5633,6 @@ export const api = {
             id,
             mes_ref,
             centro_servico_id,
-            ativo,
             status_hht_id,
             qtd_pessoas,
             horas_mes_base,
@@ -5313,12 +5657,18 @@ export const api = {
         'Falha ao criar HHT mensal.'
       )
 
+      if (
+        Number.isFinite(registro?.hht_final) &&
+        (registro?.status_hht?.status || '').toLowerCase() !== 'cancelado'
+      ) {
+        await syncAcidentesHht(registro.centro_servico_id, registro.mes_ref, registro.hht_final)
+      }
+
       return {
         id: registro.id,
         mesRef: registro.mes_ref ?? null,
         centroServicoId: registro.centro_servico_id ?? null,
         centroServicoNome: resolveTextValue(registro?.centros_servico?.nome ?? ''),
-        ativo: registro.ativo !== false,
         qtdPessoas: toNumber(registro.qtd_pessoas, 0),
         horasMesBase: toNumber(registro.horas_mes_base, 0),
         escalaFactor: toNumber(registro.escala_factor, 1),
@@ -5345,6 +5695,13 @@ export const api = {
 
       const mesRef = payload.mesRef ?? payload.mes_ref
       const centroServicoId = payload.centroServicoId ?? payload.centro_servico_id
+      let statusHhtId = normalizeUuid(payload.statusHhtId ?? payload.status_hht_id)
+      if (!statusHhtId) {
+        statusHhtId = await resolveStatusHhtDefaultId()
+      }
+      if (!statusHhtId) {
+        throw new Error('Status do HHT mensal nao encontrado.')
+      }
 
       const registro = await executeSingle(
         supabase
@@ -5352,7 +5709,7 @@ export const api = {
           .update({
             mes_ref: mesRef,
             centro_servico_id: centroServicoId,
-            status_hht_id: payload.statusHhtId ?? payload.status_hht_id,
+            status_hht_id: statusHhtId,
             qtd_pessoas: payload.qtdPessoas ?? payload.qtd_pessoas,
             horas_mes_base: payload.horasMesBase ?? payload.horas_mes_base,
             escala_factor: payload.escalaFactor ?? payload.escala_factor,
@@ -5370,7 +5727,6 @@ export const api = {
             id,
             mes_ref,
             centro_servico_id,
-            ativo,
             qtd_pessoas,
             horas_mes_base,
             escala_factor,
@@ -5387,18 +5743,25 @@ export const api = {
             created_by,
             updated_at,
             updated_by,
-            centros_servico (id, nome)
+            centros_servico (id, nome),
+            status_hht (id, status)
           `
           ),
         'Falha ao atualizar HHT mensal.'
       )
+
+      if (
+        Number.isFinite(registro?.hht_final) &&
+        (registro?.status_hht?.status || '').toLowerCase() !== 'cancelado'
+      ) {
+        await syncAcidentesHht(registro.centro_servico_id, registro.mes_ref, registro.hht_final)
+      }
 
       return {
         id: registro.id,
         mesRef: registro.mes_ref ?? null,
         centroServicoId: registro.centro_servico_id ?? null,
         centroServicoNome: resolveTextValue(registro?.centros_servico?.nome ?? ''),
-        ativo: registro.ativo !== false,
         qtdPessoas: toNumber(registro.qtd_pessoas, 0),
         horasMesBase: toNumber(registro.horas_mes_base, 0),
         escalaFactor: toNumber(registro.escala_factor, 1),

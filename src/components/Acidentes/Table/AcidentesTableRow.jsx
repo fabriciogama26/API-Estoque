@@ -1,5 +1,5 @@
 import Eye from 'lucide-react/dist/esm/icons/eye.js'
-import { EditIcon, HistoryIcon } from '../../icons.jsx'
+import { EditIcon, HistoryIcon, CancelIcon } from '../../icons.jsx'
 import {
   formatDateWithOptionalTime as formatDate,
   formatDateTimeFullPreserve,
@@ -10,6 +10,7 @@ export function AcidentesTableRow({
   onEdit,
   onHistory,
   onDetails,
+  onCancel,
   isSaving,
   historyState,
   isEditing,
@@ -18,11 +19,15 @@ export function AcidentesTableRow({
   const isHistoryLoading = Boolean(historyState?.isLoading && historyState?.acidente?.id === acidente.id)
   const disableHistory = isSaving || isHistoryLoading || typeof onHistory !== 'function'
   const disableDetails = isSaving || isEditing || typeof onDetails !== 'function'
+  const disableCancel = isSaving || typeof onCancel !== 'function'
 
   const registradoPor =
     acidente.registradoPor ?? acidente.usuarioCadastroNome ?? acidente.usuarioCadastro ?? '-'
   const criadoEm =
     acidente.criadoEm ?? acidente.criado_em ?? acidente.createdAt ?? acidente.created_at ?? null
+
+  const statusLabel = acidente.ativo === false ? 'Cancelado' : 'Ativo'
+  const statusClass = acidente.ativo === false ? 'status-chip status-chip--cancelado' : 'status-chip status-chip--ativo'
 
   return (
     <tr>
@@ -30,7 +35,9 @@ export function AcidentesTableRow({
         <strong>{acidente.nome}</strong>
       </td>
       <td>{acidente.matricula || '-'}</td>
-      <td>{acidente.cargo || '-'}</td>
+      <td>
+        <span className={statusClass}>{statusLabel}</span>
+      </td>
       <td>{formatDate(acidente.data)}</td>
       <td>{acidente.centroServico || acidente.setor || '-'}</td>
       <td>{acidente.local || '-'}</td>
@@ -72,6 +79,18 @@ export function AcidentesTableRow({
               title="Historico do acidente"
             >
               <HistoryIcon size={16} strokeWidth={1.8} />
+            </button>
+          ) : null}
+          {typeof onCancel === 'function' ? (
+            <button
+              type="button"
+              className="pessoas-table-action-button pessoas-table-action-button--danger"
+              onClick={() => onCancel(acidente)}
+              disabled={disableCancel}
+              aria-label={`Cancelar ${acidente.nome}`}
+              title="Cancelar acidente"
+            >
+              <CancelIcon size={16} strokeWidth={1.8} />
             </button>
           ) : null}
         </div>

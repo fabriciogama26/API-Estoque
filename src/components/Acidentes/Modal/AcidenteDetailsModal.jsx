@@ -102,7 +102,7 @@ export function AcidenteDetailsModal({ open, acidente, onClose }) {
           <div className="acidente-details__grid">
             <DetailItem label="Dias perdidos" value={formatNumberValue(acidente.diasPerdidos)} />
             <DetailItem label="Dias debitados" value={formatNumberValue(acidente.diasDebitados)} />
-            <DetailItem label="HHT" value={formatNumberValue(acidente.hht)} />
+            <DetailItem label="Status" value={acidente.ativo === false ? 'Cancelado' : 'Ativo'} />
             <DetailItem
               label="Lancado eSOCIAL"
               value={formatStatusWithDate(Boolean(acidente.dataEsocial), acidente.dataEsocial)}

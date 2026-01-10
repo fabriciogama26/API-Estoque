@@ -29,7 +29,6 @@ import {
   listTiposPorAgente,
 } from '../services/acidentesService.js'
 import { searchPessoas } from '../services/pessoasService.js'
-import { listHhtMensal } from '../services/hhtMensalService.js'
 import { listCentrosServico } from '../services/saidasService.js'
 import { ACIDENTES_FORM_DEFAULT } from '../config/AcidentesConfig.js'
 
@@ -434,11 +433,11 @@ export function useAcidenteForm({
         return
       }
       if (name === 'centroServico') {
-        setForm((prev) => ({ ...prev, centroServico: value, setor: value, hht: '' }))
+        setForm((prev) => ({ ...prev, centroServico: value, setor: value }))
         return
       }
       if (name === 'data') {
-        setForm((prev) => ({ ...prev, data: value, hht: '' }))
+        setForm((prev) => ({ ...prev, data: value }))
         return
       }
       setForm((prev) => ({ ...prev, [name]: value }))
@@ -517,8 +516,6 @@ export function useAcidenteForm({
         lesao: lesoesSelecionadas[0] || '',
         lesoes: lesoesSelecionadas,
         parteLesionada: acidente.parteLesionada || '',
-        hht:
-          acidente.hht !== null && acidente.hht !== undefined ? String(acidente.hht) : '',
         centroServico: acidente.centroServico || acidente.setor || '',
         setor: acidente.centroServico || acidente.setor || '',
         local: resolveLocalDisponivel(acidente.local || acidente.centroServico || ''),
@@ -677,65 +674,7 @@ export function useAcidenteForm({
   }, [normalizeCentroKey])
 
   useEffect(() => {
-    let cancelado = false
-    const pad2 = (value) => String(value).padStart(2, '0')
-    const toMonthRef = (value) => {
-      const raw = value ? String(value) : ''
-      if (!raw) return null
-      const datePart = raw.split('T')[0]
-      if (/^\d{4}-\d{2}$/.test(raw)) {
-        return `${raw}-01`
-      }
-      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-        return `${datePart.slice(0, 7)}-01`
-      }
-      const date = new Date(raw)
-      if (Number.isNaN(date.getTime())) {
-        return null
-      }
-      const year = date.getFullYear()
-      const month = date.getMonth() + 1
-      return `${year}-${pad2(month)}-01`
-    }
-    const fetchHht = async () => {
-      const centroNome = normalizeText(form.centroServico || '')
-      const dataAcidente = form.data
-      if (!centroNome || !dataAcidente) {
-        return
-      }
-      const mesRef = toMonthRef(dataAcidente)
-      if (!mesRef) {
-        return
-      }
-      const centroId = centrosServicoMap.get(normalizeCentroKey(centroNome))
-      const query = {
-        centroServicoId: centroId || undefined,
-        centroServicoNome: centroNome,
-        mesInicio: mesRef,
-        mesFim: mesRef,
-        incluirInativos: false,
-      }
-
-      try {
-        const lista = await listHhtMensal(query)
-        if (cancelado) return
-        const registro = Array.isArray(lista) ? lista.find((item) => item) : null
-        if (!registro) {
-          return
-        }
-        const valor = registro.hhtFinal ?? registro.hht_final ?? registro.hhtCalculado ?? registro.hht_calculado
-        if (valor === undefined || valor === null || Number.isNaN(Number(valor))) {
-          return
-        }
-        setForm((prev) => ({ ...prev, hht: String(valor) }))
-      } catch {
-        if (cancelado) return
-      }
-    }
-    fetchHht()
-    return () => {
-      cancelado = true
-    }
+    // HHT não é mais preenchido no formulário; taxas são calculadas no dashboard usando hht_mensal.
   }, [centrosServicoMap, form.centroServico, form.data, normalizeCentroKey])
 
   return {

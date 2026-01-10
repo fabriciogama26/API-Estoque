@@ -19,3 +19,4 @@ export const listTiposPorAgente = (agentePayload) => api.acidentes.agentTypes(ag
 export const createAcidente = (payload) => api.acidentes.create(payload)
 export const updateAcidente = (id, payload) => api.acidentes.update(id, payload)
 export const getAcidenteHistory = (id) => api.acidentes.history(id)
+export const cancelAcidente = (id, payload) => api.acidentes.cancel(id, payload)

@@ -50,6 +50,11 @@ As migrations foram escritas para serem idempotentes sempre que possível. Mesmo
 - `0073_fix_performance_warnings`: remove _fkcov_* redundantes, cria `app_users_credential_fkey_idx` e consolida as policies de `app_credentials_catalog` (SELECT para authenticated; ALL para service_role).
 - Avisos restantes do linter são apenas `unused_index` (INFO). Veja `performance.md` para decidir se algum pode ser dropado.
 
+### Atualizações 2026-01 (acidentes/HHT)
+- `20250113_make_acidentes_hht_nullable.sql`: remove obrigatoriedade de HHT na tabela de acidentes (dashboard passa a usar `hht_mensal`).
+- `20250113_use_ativo_flag_acidentes.sql`: garante `ativo boolean default true`; prepare a coluna `cancel_motivo` para registrar cancelamentos.
+- `20250113_update_vw_indicadores_acidentes_hht_join.sql`: refaz a view de indicadores de acidentes para cruzar `hht_mensal` por centro/mês e ignorar acidentes cancelados.
+
 ## Como aplicar localmente
 
 1. Faça login na CLI: `supabase login` e informe o access token da sua conta.
@@ -91,6 +96,7 @@ As migrations foram escritas para serem idempotentes sempre que possível. Mesmo
 
 - [ ] Todas as tabelas essenciais existem e possuem RLS habilitado (verifique com `select * from pg_policies where schemaname = 'public';`).
 - [ ] Views `vw_indicadores_acidentes` e demais estruturas de suporte estão alinhadas com os dashboards (quando aplicável). A view precisa expor `indice_acidentados`, `indice_avaliacao_gravidade`, `indice_relativo_acidentes`, `dias_debitados` e `total_trabalhadores` além das taxas tradicionais.
+- [ ] Tabela `acidentes` com `ativo boolean default true` e coluna `cancel_motivo` para registrar cancelamentos; HHT não é armazenado no acidente (dashboard cruza com `hht_mensal`).
 - [ ] Tabelas de referência (`centros_servico`, `setores`, `cargos`, `centros_custo`, `tipo_execucao`, `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`) possuem dados mínimos para alimentar os formulários.
 - [ ] Usuários de teste foram criados no Supabase Auth e conseguem autenticar no frontend.
 - [ ] Seeds locais carregaram corretamente (caso esteja rodando o modo `local`).

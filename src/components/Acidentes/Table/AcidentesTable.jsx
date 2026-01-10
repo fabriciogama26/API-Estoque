@@ -8,6 +8,7 @@ export function AcidentesTable({
   onEdit,
   onHistory,
   onDetails,
+  onCancel,
   editingId,
   isSaving,
   historyState,
@@ -44,7 +45,7 @@ export function AcidentesTable({
             <tr>
               <th>Nome</th>
               <th>Matricula</th>
-              <th>Cargo</th>
+              <th>Status</th>
               <th>Data</th>
               <th>Centro de servico</th>
               <th>Local</th>
@@ -63,6 +64,7 @@ export function AcidentesTable({
                 onEdit={onEdit}
                 onHistory={onHistory}
                 onDetails={onDetails}
+                onCancel={onCancel}
                 isSaving={isSaving}
                 historyState={historyState}
                 isEditing={editingId === acidente.id}
