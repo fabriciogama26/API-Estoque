@@ -11,26 +11,7 @@ export const formatDateInputValue = (value) => {
 }
 
 export const buildPessoasQuery = (filters = PESSOAS_FILTER_DEFAULT) => {
-  const query = {}
-  const termo = filters.termo?.trim()
-  if (termo) query.termo = termo
-  const centroServico = filters.centroServico ?? filters.local
-  if (centroServico && centroServico.toLowerCase() !== 'todos') {
-    query.centroServico = centroServico
-  }
-  const cargo = filters.cargo
-  if (cargo && cargo.toLowerCase() !== 'todos') {
-    query.cargo = cargo
-  }
-  const setor = filters.setor
-  if (setor && setor.toLowerCase() !== 'todos') {
-    query.setor = setor
-  }
-  const tipoExecucao = filters.tipoExecucao?.trim()
-  if (tipoExecucao && tipoExecucao.toLowerCase() !== 'todos') {
-    query.tipoExecucao = tipoExecucao
-  }
-  return query
+  return {} // filtros aplicados apenas no frontend
 }
 
 export const mapOptionsById = (lista = []) =>

@@ -13,6 +13,7 @@ import {
   extractSetores,
   extractTiposExecucao,
   sortPessoasByNome,
+  filterPessoas,
   updatePessoaPayload,
 } from '../rules/PessoasRules.js'
 import { resolveUsuarioNome } from '../utils/pessoasUtils.js'
@@ -25,6 +26,14 @@ import {
   listPessoasReferences,
   updatePessoa,
 } from '../services/pessoasService.js'
+
+const CANCEL_INITIAL = {
+  open: false,
+  pessoa: null,
+  isSubmitting: false,
+  error: null,
+  observacao: '',
+}
 
 export function usePessoasController() {
   const { user } = useAuth()
@@ -40,6 +49,14 @@ export function usePessoasController() {
   const [editingPessoa, setEditingPessoa] = useState(null)
   const [historyCache, setHistoryCache] = useState({})
   const [historyState, setHistoryState] = useState(() => ({ ...PESSOAS_HISTORY_DEFAULT }))
+  const [cancelState, setCancelState] = useState({ ...CANCEL_INITIAL })
+  const [nomeDiffPrompt, setNomeDiffPrompt] = useState({
+    open: false,
+    payload: null,
+    id: null,
+    editing: false,
+    details: [],
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -83,7 +100,7 @@ export function usePessoasController() {
       setIsLoading(true)
       setError(null)
       try {
-        const query = buildPessoasQuery(params)
+        const query = {} // filtros aplicados apenas no frontend
         const needsOptionsRefresh = refreshOptions || pessoasOptions.length === 0
         const [optionsData, filteredData] = await Promise.all([
           needsOptionsRefresh ? listPessoas() : Promise.resolve(null),
@@ -144,7 +161,8 @@ export function usePessoasController() {
           return pessoaNormalizada
         })
 
-        setPessoas(enrichedPessoas)
+        const finalPessoas = filterPessoas(enrichedPessoas, { ...params })
+        setPessoas(finalPessoas)
       } catch (err) {
         setError(err.message)
         reportError(err, { area: 'pessoas_load' })
@@ -170,14 +188,6 @@ export function usePessoasController() {
     const { name, value, type, checked } = event.target
     if (name === 'ativo') {
       const proximoValor = type === 'checkbox' ? Boolean(checked) : value !== 'false'
-      const mensagem = proximoValor
-        ? 'Deseja reativar este colaborador? Ele volta a ser considerado nos calculos e dashboards.'
-        : 'Deseja realmente inativar este colaborador? Ele continuara visivel na lista, mas sera ignorado nos calculos e dashboards.'
-      const aprovado = typeof window === 'undefined' ? true : window.confirm(mensagem)
-      if (!aprovado) {
-        event.preventDefault?.()
-        return
-      }
       setForm((prev) => ({ ...prev, ativo: proximoValor }))
       return
     }
@@ -212,6 +222,23 @@ export function usePessoasController() {
     loadPessoas(nextFilters)
   }
 
+  const buildFormFromPessoa = useCallback(
+    (pessoa) => ({
+      nome: pessoa?.nome || '',
+      matricula: pessoa?.matricula || '',
+      centroServico: pessoa?.centroServico ?? pessoa?.local ?? '',
+      local: pessoa?.centroServico ?? pessoa?.local ?? '',
+      setor: pessoa?.setor ?? '',
+      cargo: pessoa?.cargo || '',
+      dataAdmissao: formatDateInputValue(pessoa?.dataAdmissao),
+      dataDemissao: formatDateInputValue(pessoa?.dataDemissao),
+      tipoExecucao: pessoa?.tipoExecucao || '',
+      ativo: pessoa?.ativo !== false,
+      observacao: pessoa?.observacao || '',
+    }),
+    [],
+  )
+
   const resetForm = () => {
     setEditingPessoa(null)
     setForm({ ...PESSOAS_FORM_DEFAULT })
@@ -223,10 +250,41 @@ export function usePessoasController() {
     setError(null)
     try {
       const usuario = (user && (user.id || user.user?.id)) || resolveUsuarioNome(user)
+      const payload = editingPessoa ? updatePessoaPayload(form, usuario) : createPessoaPayload(form, usuario)
       if (editingPessoa) {
-        await updatePessoa(editingPessoa.id, updatePessoaPayload(form, usuario))
+        try {
+          await updatePessoa(editingPessoa.id, payload)
+        } catch (err) {
+          if (err?.code === 'PESSOA_NOME_CONFLITO') {
+            setNomeDiffPrompt({
+              open: true,
+              payload,
+              id: editingPessoa?.id ?? null,
+              editing: true,
+              details: Array.isArray(err?.details) ? err.details : [],
+            })
+            setIsSaving(false)
+            return
+          }
+          throw err
+        }
       } else {
-        await createPessoa(createPessoaPayload(form, usuario))
+        try {
+          await createPessoa(payload)
+        } catch (err) {
+          if (err?.code === 'PESSOA_NOME_CONFLITO') {
+            setNomeDiffPrompt({
+              open: true,
+              payload,
+              id: null,
+              editing: false,
+              details: Array.isArray(err?.details) ? err.details : [],
+            })
+            setIsSaving(false)
+            return
+          }
+          throw err
+        }
       }
       resetForm()
       setHistoryCache({})
@@ -249,18 +307,7 @@ export function usePessoasController() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
     setEditingPessoa(pessoa)
-    setForm({
-      nome: pessoa.nome || '',
-      matricula: pessoa.matricula || '',
-      centroServico: pessoa.centroServico ?? pessoa.local ?? '',
-      local: pessoa.centroServico ?? pessoa.local ?? '',
-      setor: pessoa.setor ?? '',
-      cargo: pessoa.cargo || '',
-      dataAdmissao: formatDateInputValue(pessoa.dataAdmissao),
-      dataDemissao: formatDateInputValue(pessoa.dataDemissao),
-      tipoExecucao: pessoa.tipoExecucao || '',
-      ativo: pessoa.ativo !== false,
-    })
+    setForm(buildFormFromPessoa(pessoa))
   }
 
   const cancelEdit = () => {
@@ -294,6 +341,81 @@ export function usePessoasController() {
   const closeHistory = () => {
     setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
   }
+
+  const openCancelModal = (pessoa) => setCancelState({ ...CANCEL_INITIAL, open: true, pessoa })
+
+  const closeCancelModal = () => setCancelState({ ...CANCEL_INITIAL })
+
+  const handleCancelObservationChange = (value) =>
+    setCancelState((prev) => ({ ...prev, observacao: typeof value === 'string' ? value : '' }))
+
+  const handleCancelSubmit = async () => {
+    if (!cancelState.pessoa?.id) return
+    const observacao = (cancelState.observacao || '').trim()
+    if (!observacao) {
+      setCancelState((prev) => ({ ...prev, error: 'Descreva o motivo do cancelamento.' }))
+      return
+    }
+    setCancelState((prev) => ({ ...prev, isSubmitting: true, error: null }))
+    try {
+      const usuario = (user && (user.id || user.user?.id)) || resolveUsuarioNome(user)
+      const payloadBase = { ...buildFormFromPessoa(cancelState.pessoa), ativo: false, observacao }
+      await updatePessoa(cancelState.pessoa.id, updatePessoaPayload(payloadBase, usuario))
+      if (editingPessoa?.id === cancelState.pessoa.id) {
+        resetForm()
+      }
+      setHistoryCache({})
+      closeCancelModal()
+      await loadPessoas(filters, true)
+      getPessoasResumo()
+        .then((data) => setResumo(data ?? { totalGeral: 0, porCentro: [], porSetor: [] }))
+        .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
+    } catch (err) {
+      setCancelState((prev) => ({
+        ...prev,
+        isSubmitting: false,
+        error: err.message || 'Falha ao cancelar pessoa.',
+      }))
+      reportError(err, { area: 'pessoas_cancel', pessoaId: cancelState.pessoa.id })
+    }
+  }
+
+  const cancelNomeDiff = () => {
+    setNomeDiffPrompt({
+      open: false,
+      payload: null,
+      id: null,
+      editing: false,
+      details: [],
+    })
+  }
+
+  const confirmNomeDiff = useCallback(async () => {
+    if (!nomeDiffPrompt.open || !nomeDiffPrompt.payload) return
+    setIsSaving(true)
+    setError(null)
+    try {
+      if (nomeDiffPrompt.editing) {
+        await updatePessoa(nomeDiffPrompt.id, { ...nomeDiffPrompt.payload, forceNomeConflict: true })
+      } else {
+        await createPessoa({ ...nomeDiffPrompt.payload, forceNomeConflict: true })
+      }
+      resetForm()
+      setHistoryCache({})
+      setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
+      await loadPessoas(filters, true)
+      await refreshReferencias()
+      getPessoasResumo()
+        .then((data) => setResumo(data ?? { totalGeral: 0, porCentro: [], porSetor: [] }))
+        .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
+    } catch (err) {
+      setError(err.message)
+      reportError(err, { area: 'pessoas_submit_nome_conflict', editing: nomeDiffPrompt.editing })
+    } finally {
+      setIsSaving(false)
+      cancelNomeDiff()
+    }
+  }, [filters, loadPessoas, nomeDiffPrompt, refreshReferencias, reportError, resetForm])
 
   const pessoasOrdenadas = useMemo(() => sortPessoasByNome(pessoas), [pessoas])
 
@@ -342,6 +464,7 @@ export function usePessoasController() {
     resumo,
     editingPessoa,
     historyState,
+    cancelState,
     isSaving,
     isLoading,
     error,
@@ -360,6 +483,13 @@ export function usePessoasController() {
     cancelEdit,
     openHistory,
     closeHistory,
+    openCancelModal,
+    closeCancelModal,
+    handleCancelObservationChange,
+    handleCancelSubmit,
     loadPessoas,
+    nomeDiffPrompt,
+    cancelNomeDiff,
+    confirmNomeDiff,
   }
 }

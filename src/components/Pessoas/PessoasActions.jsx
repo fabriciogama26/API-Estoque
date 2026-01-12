@@ -1,12 +1,34 @@
 import HistoryIcon from 'lucide-react/dist/esm/icons/history.js'
-import { EditIcon } from '../icons.jsx'
+import EyeIcon from 'lucide-react/dist/esm/icons/eye.js'
+import { CancelIcon, EditIcon } from '../icons.jsx'
 
-export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory, isHistoryLoading }) {
+export function PessoasActions({
+  pessoa,
+  isEditing,
+  isSaving,
+  onEdit,
+  onHistory,
+  onDetalhes,
+  onCancel,
+  isHistoryLoading,
+  isCanceling,
+  isInactive,
+}) {
   const disableEdit = isEditing || isSaving
   const disableHistory = isHistoryLoading || isSaving
+  const disableCancel = isCanceling || isSaving || isInactive
 
   return (
     <div className="pessoas-data-table__actions">
+      <button
+        type="button"
+        className="pessoas-table-action-button"
+        onClick={() => onDetalhes?.(pessoa)}
+        aria-label={`Ver detalhes de ${pessoa.nome}`}
+        title="Ver detalhes"
+      >
+        <EyeIcon size={16} strokeWidth={1.8} />
+      </button>
       <button
         type="button"
         className="pessoas-table-action-button"
@@ -27,6 +49,18 @@ export function PessoasActions({ pessoa, isEditing, isSaving, onEdit, onHistory,
       >
         <HistoryIcon size={16} strokeWidth={1.8} />
       </button>
+      {!isInactive ? (
+        <button
+          type="button"
+          className="pessoas-table-action-button pessoas-table-action-button--danger"
+          onClick={() => onCancel?.(pessoa)}
+          disabled={disableCancel}
+          aria-label={`Cancelar ${pessoa.nome}`}
+          title="Cancelar pessoa"
+        >
+          <CancelIcon size={16} strokeWidth={1.8} />
+        </button>
+      ) : null}
     </div>
   )
 }

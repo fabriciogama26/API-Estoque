@@ -2,7 +2,7 @@ Tela: Cadastro de Pessoas
 
 - Campos com * sao obrigatorios no formulario.
 - Data de admissao (dataAdmissao) e obrigatoria.
-- Data de demissao (dataDemissao) e opcional.
+- Data de demissao (dataDemissao) e opcional; se preenchida, o backend forÃ§a `ativo=false`. Se nula/vazia, o backend forÃ§a `ativo=true` (trigger em `supabase/migrations/20250114_force_inativo_on_demissao.sql`).
 
 Visao geral
 -----------
@@ -19,8 +19,9 @@ Campos e fluxos
 ---------------
 - Campos principais: matricula, nome, centro_servico_id/centro_custo_id, setor_id, cargo_id, tipo_execucao_id, dataAdmissao, dataDemissao, ativo.
 - Historico: timeline com alteracoes (usuario, data, campos modificados).
-- Filtros: termo livre, centro de servico, setor, cargo, ativo; "Aplicar" consulta na API; "Limpar" restaura defaults e recarrega.
+- Filtros: termo livre, centro de servico, setor, cargo, ativo, cadastrado de/ate; aplicados apenas no frontend (backend jÃ¡ filtra por `account_owner_id`).
 - Tabela: paginacao local; a coluna "Registrado por" usa os campos retornados pela view/RPC de pessoas.
+- Historico: modal no padrÃ£o Materiais, mostrando campo a campo (inclui Observacao).
 
 Desligamento em massa (novo)
 ----------------------------
@@ -32,6 +33,7 @@ Boas praticas
 -------------
 - Usar matricula como chave; manter catalogos de centro/setor/cargo atualizados.
 - Conferir pessoas_view/rpc_pessoas_completa apos migrations para garantir aliases usados na UI.
+- Duplicidade: preflight `pessoas_preflight_check` (20250114) bloqueia matricula duplicada e alerta nome igual com matricula diferente (modal). Trigger `evitar_duplicidade_pessoa` bloqueia matricula repetida em insert/update respeitando owner e ignorando o proprio id em update.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -43,6 +45,8 @@ Funcoes principais
   - Tipo: componente de pagina React
   - Caminho: src/pages/Pessoas.jsx
   - Responsavel por: orquestrar formulario, filtros, tabela, historico e o modal de desligamento.
+  - Detalhes: modal cartao (padrÃ£o Saidas) com todos os campos + status.
+  - Cancelar: modal exige observacao; seta ativo=false; historico registra observacao/ativo.
 
 - PessoasDesligamentoModal
   - Tipo: componente de UI (modal)

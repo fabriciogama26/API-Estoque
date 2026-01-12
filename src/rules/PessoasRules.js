@@ -31,6 +31,7 @@ export function createPessoaPayload(form, usuario) {
     tipoExecucao: sanitizeCampo(form.tipoExecucao),
     usuarioCadastro: usuario,
     ativo: true,
+    observacao: sanitizeCampo(form.observacao),
   }
 }
 
@@ -49,6 +50,7 @@ export function updatePessoaPayload(form, usuario) {
     tipoExecucao: sanitizeCampo(form.tipoExecucao),
     usuarioResponsavel: usuario,
     ativo: form.ativo !== false,
+    observacao: sanitizeCampo(form.observacao),
   }
 }
 
@@ -56,6 +58,9 @@ export function filterPessoas(pessoas, filters) {
   const termo = filters.termo.trim().toLowerCase()
   const centroServicoFiltro = (filters.centroServico ?? filters.local ?? 'todos')
   const setorFiltro = (filters.setor ?? 'todos')
+  const statusFiltro = (filters.status ?? 'todos').toString().toLowerCase()
+  const cadastradoInicio = filters.cadastradoInicio ? new Date(`${filters.cadastradoInicio}T00:00:00`) : null
+  const cadastradoFim = filters.cadastradoFim ? new Date(`${filters.cadastradoFim}T23:59:59.999`) : null
 
   return pessoas.filter((pessoa) => {
     const centroServicoAtual = pessoa.centroServico ?? pessoa.local ?? ''
@@ -69,6 +74,32 @@ export function filterPessoas(pessoas, filters) {
 
     if (filters.cargo !== 'todos' && pessoa.cargo !== filters.cargo) {
       return false
+    }
+
+    if (statusFiltro === 'ativo' && pessoa.ativo === false) {
+      return false
+    }
+    if (statusFiltro === 'inativo' && pessoa.ativo !== false) {
+      return false
+    }
+
+    if (cadastradoInicio instanceof Date && !Number.isNaN(cadastradoInicio)) {
+      const criado = new Date(pessoa.criadoEm || pessoa.createdAt || pessoa.created_at || 0)
+      if (Number.isNaN(criado)) {
+        return false
+      }
+      if (criado < cadastradoInicio) {
+        return false
+      }
+    }
+    if (cadastradoFim instanceof Date && !Number.isNaN(cadastradoFim)) {
+      const criado = new Date(pessoa.criadoEm || pessoa.createdAt || pessoa.created_at || 0)
+      if (Number.isNaN(criado)) {
+        return false
+      }
+      if (criado > cadastradoFim) {
+        return false
+      }
     }
 
     if (!termo) {

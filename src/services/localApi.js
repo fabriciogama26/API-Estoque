@@ -1893,6 +1893,9 @@ const localApi = {
             centroServico: params.centroServico ?? params.local ?? 'todos',
             local: params.local ?? params.centroServico ?? 'todos',
             cargo: params.cargo ?? 'todos',
+            status: params.status ?? 'todos',
+            cadastradoInicio: params.cadastradoInicio ?? '',
+            cadastradoFim: params.cadastradoFim ?? '',
           }
           return filterPessoas(pessoas, filters)
         })
