@@ -67,6 +67,32 @@ export function PessoasFilters({
             ))}
           </select>
         </label>
+        <label className="field">
+          <span>Status</span>
+          <select name="status" value={filters.status} onChange={onChange}>
+            <option value="todos">Todos</option>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Cadastrado de</span>
+          <input
+            type="date"
+            name="cadastradoInicio"
+            value={filters.cadastradoInicio}
+            onChange={onChange}
+          />
+        </label>
+        <label className="field">
+          <span>Cadastrado ate</span>
+          <input
+            type="date"
+            name="cadastradoFim"
+            value={filters.cadastradoFim}
+            onChange={onChange}
+          />
+        </label>
         <div className="form__actions">
           <button type="submit" className="button button--ghost">Aplicar</button>
           <button type="button" className="button button--ghost" onClick={onClear}>

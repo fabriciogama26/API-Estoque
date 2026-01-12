@@ -14,26 +14,23 @@ export function PessoasHistoryModal({ state, onClose }) {
   }
 
   return (
-    <div
-      className="pessoas-record-history__overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="pessoa-history-title"
-      onClick={handleOverlayClick}
-    >
-      <div className="pessoas-record-history__modal" onClick={stopPropagation}>
-        <header className="pessoas-record-history__header">
-          <h3 id="pessoa-history-title">Historico de edicoes - {state.pessoa?.nome}</h3>
+    <div className="entradas-history__overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
+      <div className="entradas-history__modal" onClick={stopPropagation}>
+        <header className="entradas-history__header">
+          <div>
+            <h3 id="pessoa-history-title">Historico de edicoes</h3>
+            <p className="entradas-history__subtitle">{state.pessoa?.nome || '-'}</p>
+          </div>
           <button
             type="button"
-            className="pessoas-record-history__close"
+            className="entradas-history__close"
             onClick={onClose}
             aria-label="Fechar historico"
           >
             x
           </button>
         </header>
-        <div className="pessoas-record-history__body">
+        <div className="entradas-history__body">
           {state.isLoading ? (
             <p className="feedback">Carregando historico...</p>
           ) : state.error ? (

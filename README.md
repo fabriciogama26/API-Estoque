@@ -16,19 +16,25 @@ Documentacao detalhada por pagina em `docs/`.
 
 
 
-Na lista de materiais do Estoque atual, os botões de ação por material podem abrir Entradas/Saídas já com dados pré-preenchidos via querystring:
+Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material podem abrir Entradas/SaÃ­das jÃ¡ com dados prÃ©-preenchidos via querystring:
 
 
 
-- Entradas: `?materialId=<id>&centroCusto=<centro>` (também aceita `centroEstoque`)
+- Entradas: `?materialId=<id>&centroCusto=<centro>` (tambÃ©m aceita `centroEstoque`)
 
-- Saídas: `?centroEstoque=<centro>&materialId=<id>`
+- SaÃ­das: `?centroEstoque=<centro>&materialId=<id>`
 
-- Histórico de saídas (novo): o sino em "Ações" abre modal com todas as saídas do material, com filtro Mês/Ano. O botão só fica ativo se houver movimentação registrada.
+- HistÃ³rico de saÃ­das (novo): o sino em "AÃ§Ãµes" abre modal com todas as saÃ­das do material, com filtro MÃªs/Ano. O botÃ£o sÃ³ fica ativo se houver movimentaÃ§Ã£o registrada.
 
-- Filtro "Apenas com histórico de saídas": na tela Estoque, marque para ver somente materiais com movimentação (sino ativo).
+- Filtro "Apenas com histÃ³rico de saÃ­das": na tela Estoque, marque para ver somente materiais com movimentaÃ§Ã£o (sino ativo).
 
 
+
+## Pessoas (status x demissao)
+
+- Trigger `supabase/migrations/20250114_force_inativo_on_demissao.sql` força `ativo=false` quando `dataDemissao` for preenchida e `ativo=true` quando vazia/nula.
+- Cancelar pessoa exige observacao e registra no historico (modal no padrão Materiais).
+- Filtros da lista (status, datas de cadastro, etc.) são aplicados no frontend; o backend já filtra por `account_owner_id`.
 
 ## Historicos (UI)
 
@@ -43,12 +49,17 @@ Na lista de materiais do Estoque atual, os botões de ação por material podem 
 - Trigger de UPDATE (`evitar_duplicidade_material_update`, mig. `20250112_base_ca_diff_update.sql`) replica as regras de base/hash ignorando o registro editado.
 - RPC base: `20250111_material_preflight.sql`.
 
+## Pessoas (deduplicacao)
+
+- Preflight `pessoas_preflight_check` (mig. `20250114_pessoas_preflight.sql`) no create/update, escopo por owner: bloqueia matricula duplicada; alerta quando nome igual e matricula diferente (modal de confirmacao). UPDATE ignora o proprio `p_pessoa_id`.
+- Trigger `evitar_duplicidade_pessoa` (mesma mig.) bloqueia matricula repetida no INSERT/UPDATE respeitando owner e desconsiderando o proprio id no update.
+
 ## Regras de estoque (banco)
 
 
-- Saídas já são bloqueadas quando excedem o saldo disponível (`validar_saldo_saida`).
+- SaÃ­das jÃ¡ sÃ£o bloqueadas quando excedem o saldo disponÃ­vel (`validar_saldo_saida`).
 
-- Cancelar uma entrada é vetado se o saldo remanescente ficar menor que as saídas ativas (ver `supabase/migrations/0082_prevent_cancel_entrada_negative_stock.sql`).
+- Cancelar uma entrada Ã© vetado se o saldo remanescente ficar menor que as saÃ­das ativas (ver `supabase/migrations/0082_prevent_cancel_entrada_negative_stock.sql`).
 
 
 

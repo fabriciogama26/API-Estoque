@@ -172,6 +172,7 @@ const PESSOAS_VIEW_SELECT = `
   matricula,
   "dataAdmissao",
   "dataDemissao",
+  observacao,
   "usuarioCadastro",
   "usuarioCadastroNome",
   "usuarioEdicao",
@@ -1986,6 +1987,7 @@ function mapPessoaRecord(record) {
     tipoExecucaoId: record.tipo_execucao_id ?? tipoExecucaoRel?.id ?? null,
     dataAdmissao: record.dataAdmissao ?? record.data_admissao ?? null,
     dataDemissao: record.dataDemissao ?? record.data_demissao ?? null,
+    observacao: record.observacao ?? record.observacao_cancelamento ?? '',
     usuarioCadastro: resolveTextValue(
       record.usuarioCadastroNome ??
         record.usuario_cadastro_nome ??
@@ -2408,6 +2410,8 @@ function sanitizePessoaPayload(payload = {}) {
     dataAdmissao: sanitizeDate(payload.dataAdmissao),
     dataDemissao: sanitizeDate(payload.dataDemissao),
     ativo: toBooleanValue(payload.ativo, true),
+    observacao: trim(payload.observacao),
+    forceNomeConflict: payload.forceNomeConflict === true,
   }
 }
 
@@ -3537,25 +3541,24 @@ export const api = {
         setorId: null,
         cargoId: null,
         tipoExecucaoId: null,
+        ativo: null,
+        cadastradoInicio: null,
+        cadastradoFim: null,
       }
 
       const centroServico = trim(params.centroServico ?? params.local ?? '')
       if (centroServico && centroServico.toLowerCase() !== 'todos') {
-        filtros.centroServicoId = await resolveReferenceId(
-          'centros_servico',
-          centroServico,
-          'Centro de servi├ºo inv├ílido para filtro.'
-        )
+        filtros.centroServicoId = await resolveReferenceId('centros_servico', centroServico, 'Centro de servico invalido para filtro.')
       }
 
       const setor = trim(params.setor ?? '')
       if (setor && setor.toLowerCase() !== 'todos') {
-        filtros.setorId = await resolveReferenceId('setores', setor, 'Setor inv├ílido para filtro.')
+        filtros.setorId = await resolveReferenceId('setores', setor, 'Setor invalido para filtro.')
       }
 
       const cargo = trim(params.cargo ?? '')
       if (cargo && cargo.toLowerCase() !== 'todos') {
-        filtros.cargoId = await resolveReferenceId('cargos', cargo, 'Cargo inv├ílido para filtro.')
+        filtros.cargoId = await resolveReferenceId('cargos', cargo, 'Cargo invalido para filtro.')
       }
 
       const tipoExecucaoFiltro = trim(params.tipoExecucao ?? '')
@@ -3563,9 +3566,21 @@ export const api = {
         filtros.tipoExecucaoId = await resolveReferenceId(
           'tipo_execucao',
           tipoExecucaoFiltro.toUpperCase(),
-          'Tipo de execu├º├úo inv├ílido para filtro.'
+          'Tipo de execucao invalido para filtro.'
         )
       }
+
+      const statusFiltro = trim(params.status ?? '')
+      if (statusFiltro) {
+        const statusLower = statusFiltro.toLowerCase()
+        if (statusLower === 'ativo') filtros.ativo = true
+        else if (statusLower === 'inativo') filtros.ativo = false
+      }
+
+      const cadastradoInicio = sanitizeDate(params.cadastradoInicio)
+      const cadastradoFim = sanitizeDate(params.cadastradoFim)
+      filtros.cadastradoInicio = cadastradoInicio ? `${cadastradoInicio}T00:00:00` : null
+      filtros.cadastradoFim = cadastradoFim ? `${cadastradoFim}T23:59:59.999` : null
 
       const termo = trim(params.termo)
 
@@ -3584,6 +3599,15 @@ export const api = {
         if (filtros.tipoExecucaoId) {
           builder = builder.eq('tipo_execucao_id', filtros.tipoExecucaoId)
         }
+        if (filtros.ativo !== null) {
+          builder = builder.eq('ativo', filtros.ativo)
+        }
+        if (filtros.cadastradoInicio) {
+          builder = builder.gte('criadoEm', filtros.cadastradoInicio)
+        }
+        if (filtros.cadastradoFim) {
+          builder = builder.lte('criadoEm', filtros.cadastradoFim)
+        }
         return builder
       }
 
@@ -3596,7 +3620,6 @@ export const api = {
         const data = await execute(query, 'Falha ao listar pessoas.')
         let registros = (data ?? []).map(mapPessoaRecord)
         if ((!registros || registros.length === 0) && !termo) {
-          // Fallback direto na view caso o RPC esteja desatualizado ou sem dados.
           const fallbackDados = await execute(
             supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).order('nome', { ascending: true }),
             'Falha ao listar pessoas (fallback view).'
@@ -3608,11 +3631,9 @@ export const api = {
         if (!termo) {
           throw error
         }
-        reportClientError(
-          'Erro ao aplicar filtro remoto por termo em pessoas, usando filtro local.',
-          error,
-          { termo }
-        )
+        reportClientError('Erro ao aplicar filtro remoto por termo em pessoas, usando filtro local.', error, {
+          termo,
+        })
         const fallbackData = await execute(buildQuery(), 'Falha ao listar pessoas.')
         const registros = (fallbackData ?? []).map(mapPessoaRecord)
         return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
@@ -3681,6 +3702,34 @@ export const api = {
       if (!dados.dataAdmissao) {
         throw new Error('Informe a data de admissao no formato dd/MM/yyyy.')
       }
+      let effective = null
+      try {
+        effective = typeof resolveEffectiveAppUser === 'function' ? await resolveEffectiveAppUser(usuarioId) : null
+      } catch (err) {
+        reportClientError('Falha ao resolver account_owner_id; prosseguindo sem owner.', err, { usuarioId })
+        effective = null
+      }
+
+      const preflight = await executeMaybeSingle(
+        supabase.rpc('pessoas_preflight_check', {
+          p_owner: resolvePreflightOwnerId(effective),
+          p_nome: dados.nome,
+          p_matricula: dados.matricula,
+          p_pessoa_id: null,
+        }),
+        'Falha no preflight de pessoa.'
+      )
+      if (preflight?.matricula_conflict) {
+        const err = new Error('Ja existe pessoa com esta matricula.')
+        err.code = 'PESSOA_MATRICULA_DUP'
+        throw err
+      }
+      if (preflight?.nome_conflict && !dados.forceNomeConflict) {
+        const err = new Error('PESSOA_NOME_CONFLITO')
+        err.code = 'PESSOA_NOME_CONFLITO'
+        err.details = preflight?.conflict_ids || []
+        throw err
+      }
 
       const registro = await executeSingle(
         supabase
@@ -3688,6 +3737,7 @@ export const api = {
           .insert({
             nome: dados.nome,
             matricula: dados.matricula,
+            observacao: dados.observacao,
             centro_servico_id: referencias.centroServicoId,
             setor_id: referencias.setorId,
             cargo_id: referencias.cargoId,
@@ -3740,6 +3790,7 @@ export const api = {
             id,
             nome,
             matricula,
+            observacao,
             "dataAdmissao",
             "dataDemissao",
             "usuarioCadastro",
@@ -3796,7 +3847,7 @@ export const api = {
       }
 
       const camposAlterados = []
-      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao', 'dataDemissao', 'ativo'].forEach((campo) => {
+      ;['nome', 'matricula', 'centroServico', 'setor', 'cargo', 'tipoExecucao', 'dataAdmissao', 'dataDemissao', 'observacao', 'ativo'].forEach((campo) => {
         const valorAtual =
           campo === 'dataAdmissao' || campo === 'dataDemissao'
             ? normalizeDateValue(atual[campo])
@@ -3834,17 +3885,39 @@ export const api = {
 
       const referencias = await resolvePessoaReferencias(dados)
 
+      const preflight = await executeMaybeSingle(
+        supabase.rpc('pessoas_preflight_check', {
+          p_owner: resolvePreflightOwnerId(effective),
+          p_nome: dados.nome,
+          p_matricula: dados.matricula,
+          p_pessoa_id: id,
+        }),
+        'Falha no preflight de pessoa.'
+      )
+      if (preflight?.matricula_conflict) {
+        const err = new Error('Ja existe pessoa com esta matricula.')
+        err.code = 'PESSOA_MATRICULA_DUP'
+        throw err
+      }
+      if (preflight?.nome_conflict && !dados.forceNomeConflict) {
+        const err = new Error('PESSOA_NOME_CONFLITO')
+        err.code = 'PESSOA_NOME_CONFLITO'
+        err.details = preflight?.conflict_ids || []
+        throw err
+      }
+
       await execute(
-        supabase
-          .from('pessoas')
-          .update({
-            nome: dados.nome,
-            matricula: dados.matricula,
-            centro_servico_id: referencias.centroServicoId,
-            setor_id: referencias.setorId,
-            cargo_id: referencias.cargoId,
-            centro_custo_id: referencias.centroCustoId,
-            tipo_execucao_id: referencias.tipoExecucaoId,
+          supabase
+            .from('pessoas')
+            .update({
+              nome: dados.nome,
+              matricula: dados.matricula,
+              observacao: dados.observacao,
+              centro_servico_id: referencias.centroServicoId,
+              setor_id: referencias.setorId,
+              cargo_id: referencias.cargoId,
+              centro_custo_id: referencias.centroCustoId,
+              tipo_execucao_id: referencias.tipoExecucaoId,
             dataAdmissao: dados.dataAdmissao,
             dataDemissao: dados.dataDemissao,
             atualizadoEm: agora,
@@ -6161,3 +6234,4 @@ async function carregarPessoasViewDetalhes(ids) {
     return new Map()
   }
 }
+

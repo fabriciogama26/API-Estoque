@@ -119,16 +119,18 @@ export function PessoasForm({
             required
           />
         </label>
-        <label className="field">
-          <span>Data de demissao</span>
-          <input
-            type="date"
-            name="dataDemissao"
-            value={form.dataDemissao}
-            onChange={onChange}
-            placeholder="2025-01-01"
-          />
-        </label>
+        {editingPessoa ? (
+          <label className="field">
+            <span>Data de demissao</span>
+            <input
+              type="date"
+              name="dataDemissao"
+              value={form.dataDemissao}
+              onChange={onChange}
+              placeholder="2025-01-01"
+            />
+          </label>
+        ) : null}
         <label className="field">
           <span>Tipo Execucao <span className="asterisco">*</span></span>
           <select name="tipoExecucao" value={form.tipoExecucao} onChange={onChange} required>
@@ -141,7 +143,7 @@ export function PessoasForm({
           </select>
         </label>
       </div>
-      {editingPessoa ? (
+      {editingPessoa && editingPessoa.ativo === false ? (
         <div className="pessoas-form__status">
           <label className="field field--checkbox">
             <input
@@ -150,11 +152,9 @@ export function PessoasForm({
               checked={form.ativo !== false}
               onChange={onChange}
             />
-            <span>Manter colaborador ativo nos cálculos e dashboards</span>
+            <span>Ativar</span>
           </label>
-          <p className="field__hint">
-            Pessoas inativas continuam visíveis na lista, mas deixam de aparecer nas métricas.
-          </p>
+          <p className="field__hint">Marque para reativar um colaborador cancelado.</p>
         </div>
       ) : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}

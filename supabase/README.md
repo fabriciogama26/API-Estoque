@@ -54,6 +54,7 @@ As migrations foram escritas para serem idempotentes sempre que possível. Mesmo
 - `20250113_make_acidentes_hht_nullable.sql`: remove obrigatoriedade de HHT na tabela de acidentes (dashboard passa a usar `hht_mensal`).
 - `20250113_use_ativo_flag_acidentes.sql`: garante `ativo boolean default true`; prepare a coluna `cancel_motivo` para registrar cancelamentos.
 - `20250113_update_vw_indicadores_acidentes_hht_join.sql`: refaz a view de indicadores de acidentes para cruzar `hht_mensal` por centro/mês e ignorar acidentes cancelados.
+- `20250114_force_inativo_on_demissao.sql`: trigger em `pessoas` for�a `ativo=false` quando `dataDemissao` for preenchida e `ativo=true` quando vazia/nula.
 
 ## Como aplicar localmente
 

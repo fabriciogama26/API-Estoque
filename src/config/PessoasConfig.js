@@ -9,6 +9,7 @@ export const PESSOAS_FORM_DEFAULT = {
   dataDemissao: '',
   tipoExecucao: '',
   ativo: true,
+  observacao: '',
 }
 
 export const PESSOAS_FILTER_DEFAULT = {
@@ -18,6 +19,9 @@ export const PESSOAS_FILTER_DEFAULT = {
   cargo: 'todos',
   local: 'todos',
   tipoExecucao: 'todos',
+  status: 'todos',
+  cadastradoInicio: '',
+  cadastradoFim: '',
 }
 
 export const PESSOAS_HISTORY_DEFAULT = {
