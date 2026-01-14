@@ -1,22 +1,38 @@
 {
-  "title": "Materiais",
-  "summary": "Cadastro e manutenção dos materiais (EPI/EPC/itens em geral).",
-  "sections": [
-    {
-      "title": "O que cadastrar",
-      "items": [
-        "Nome/descrição",
-        "Categoria",
-        "Validade/prazo de troca (quando aplicável)",
-        "Ativo/Inativo"
-      ]
-    },
-    {
-      "title": "Boas práticas",
-      "items": [
-        "Padronize a nomenclatura.",
-        "Revise categorias para melhorar filtros e relatórios."
-      ]
-    }
-  ]
+  "materiais": {
+    "title": "Cadastro de materiais / EPI",
+    "summary": "Cadastro centralizado de EPI com variações, características e valor.",
+    "steps": [
+      {
+        "title": "Cadastrar ou editar material",
+        "description": "Preencha nome, grupo, valor unitário e CA (quando houver). Ao editar, o título muda para “Editando...” e o card fica destacado em amarelo; use Salvar para novo cadastro ou para gravar alterações.",
+        "mediaHint": "Formulário principal de materiais."
+      },
+      {
+        "title": "Gerenciar variações e atributos",
+        "description": "Adicione características, cores, fabricante e tamanho pelo autocomplete. Campos de lista aceitam múltiplos itens.",
+        "mediaHint": "Campos de característica, cor e tamanho."
+      },
+      {
+        "title": "Filtrar catálogo",
+        "description": "Digite no campo Busca parte do nome, descrição, ID ou CA para filtrar rapidamente o catálogo; refine por grupo, tamanho, fabricante ou característica e clique em Aplicar. Limpar remove todos os filtros.",
+        "mediaHint": "Bloco de filtros acima da tabela de materiais."
+      },
+      {
+        "title": "Histórico e detalhes",
+        "description": "Na tabela use o botão de relógio para ver histórico de alterações e o botão com olho para abrir o detalhamento completo do material.",
+        "mediaHint": "Ações de histórico e detalhes na tabela de materiais."
+      },
+      {
+        "title": "Alerta de CA diferente",
+        "description": "Se já existir base igual (grupo, item, fabricante, numeração, cores e características) com outro CA, o sistema mostra um modal de confirmação antes de salvar. Confirme apenas se for realmente um CA diferente para o mesmo conjunto.",
+        "mediaHint": "Modal de confirmação exibido quando há base igual com CA diferente."
+      }
+    ],
+    "notes": [
+      "A edição de um material reaproveita o mesmo formulário, mantendo os campos preenchidos.",
+      "Valor unitário é usado nos cálculos de estoque e relatórios.",
+      "CA vazio não pode repetir base; CA diferente na mesma base exige confirmação prévia; CA duplicado é bloqueado."
+    ]
+  }
 }

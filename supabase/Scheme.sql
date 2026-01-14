@@ -101,9 +101,11 @@ CREATE TABLE public.acidentes (
   partes_lesionadas ARRAY NOT NULL DEFAULT '{}'::text[],
   lesoes ARRAY NOT NULL DEFAULT '{}'::text[],
   data_esocial timestamp with time zone,
-  sesmt boolean,
+  sesmt boolean DEFAULT false,
   data_sesmt timestamp with time zone,
   account_owner_id uuid,
+  ativo boolean DEFAULT true,
+  cancel_motivo text text,
   CONSTRAINT acidentes_pkey PRIMARY KEY (id),
   CONSTRAINT acidentes_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
 );
@@ -389,7 +391,7 @@ CREATE TABLE public.materiais (
   usuarioAtualizacao uuid,
   atualizadoEm timestamp with time zone DEFAULT now(),
   descricao text,
-  grupoMaterial uuid,
+  grupoMaterial uuid NOT NULL,
   numeroCalcado uuid,
   numeroVestimenta uuid,
   numeroEspecifico text,
@@ -462,7 +464,7 @@ CREATE TABLE public.pessoas (
   criadoEm timestamp with time zone NOT NULL DEFAULT now(),
   usuarioEdicao uuid,
   atualizadoEm timestamp with time zone DEFAULT now(),
-  dataAdmissao timestamp with time zone DEFAULT now(),
+  dataAdmissao timestamp with time zone NOT NULL DEFAULT now(),
   centro_servico_id uuid NOT NULL,
   setor_id uuid NOT NULL,
   cargo_id uuid NOT NULL,
@@ -471,6 +473,7 @@ CREATE TABLE public.pessoas (
   ativo boolean NOT NULL DEFAULT true,
   dataDemissao timestamp with time zone,
   account_owner_id uuid,
+  observacao text,
   CONSTRAINT pessoas_pkey PRIMARY KEY (id),
   CONSTRAINT pessoas_usuario_cadastro_fk FOREIGN KEY (usuarioCadastro) REFERENCES public.app_users(id),
   CONSTRAINT pessoas_centro_servico_fk FOREIGN KEY (centro_servico_id) REFERENCES public.centros_servico(id),
@@ -540,6 +543,9 @@ CREATE TABLE public.saidas (
   atualizadoEm timestamp with time zone DEFAULT now(),
   usuarioEdicao uuid,
   account_owner_id uuid,
+  isTroca boolean NOT NULL DEFAULT false,
+  trocaDeSaida uuid,
+  trocaSequencia integer NOT NULL DEFAULT 0,
   CONSTRAINT saidas_pkey PRIMARY KEY (id),
   CONSTRAINT saidas_centro_custo_fkey FOREIGN KEY (centro_custo) REFERENCES public.centros_custo(id),
   CONSTRAINT saidas_centro_servico_fkey FOREIGN KEY (centro_servico) REFERENCES public.centros_servico(id),
@@ -549,7 +555,8 @@ CREATE TABLE public.saidas (
   CONSTRAINT saidas_usuarioResponsavel_fkey FOREIGN KEY (usuarioResponsavel) REFERENCES public.app_users(id),
   CONSTRAINT saidas_centro_estoque_fkey FOREIGN KEY (centro_estoque) REFERENCES public.centros_estoque(id),
   CONSTRAINT saidas_usuarioEdicao_fkey FOREIGN KEY (usuarioEdicao) REFERENCES public.app_users(id),
-  CONSTRAINT saidas_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
+  CONSTRAINT saidas_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id),
+  CONSTRAINT saidas_trocaDeSaida_fkey FOREIGN KEY (trocaDeSaida) REFERENCES public.saidas(id)
 );
 CREATE TABLE public.saidas_historico (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

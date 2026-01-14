@@ -27,6 +27,7 @@ Duplicidade de Materiais
    - Entrada: grupo, item, fabricante, números, CA, cores[], características[], `p_material_id` (NULL em create; id em update) e `p_account_owner_id` para escopo.
    - Retorno: `ca_conflict` (mesma base+CA), `base_conflict_empty` (base igual com CA ausente) e `base_match_ca_diff` + `base_match_ids` (base igual com CA diferente).
    - Front bloqueia CA duplicado ou base com CA vazio; no caso de CA diferente abre modal e só grava se usuário confirmar (`forceBaseCaDiff`).
+   - Persistencia: RPCs material_create_full/material_update_full gravam material + vinculos (cores/caracteristicas) em uma unica transacao; triggers continuam como protecao final.
 
 6. **Testes**
    - Preflight (frontend): criar com base igual e CA diferente → receber modal; confirmar grava, cancelar aborta. Criar com base igual e CA vazio → bloqueia. Criar com CA duplicado na mesma base → bloqueia.
@@ -39,3 +40,4 @@ Atualizacao 2025-11
 --------------------
 - Expliquei que, alem de consolidar registros duplicados, e preciso garantir a consistencia do `fabricanteNome`, pois os graficos clicaveis exibem o texto exatamente como armazenado.
 - Inclui checklist para revisar campos `resumo` e `grupoMaterial` apos mesclas, assegurando que o formato `Nome | Categoria | Numero | Caracteristica | Fabricante` permaneça limpo para uso nos eixos.
+

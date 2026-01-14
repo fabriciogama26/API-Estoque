@@ -12,6 +12,9 @@ Arquitetura (modular)
 - Serviço: saidasService (listar/criar/atualizar/cancelar) com dataMode remoto/local.
 - Utils: saidasUtils para formatar/filtrar registros; rules para payloads/validações.
 - Erros: useErrorLogger('saidas') registra falhas em app_errors.
+- Problemas/RLS conhecidos
+  - Trigger `trg_set_data_troca` (função `set_data_troca`) lê `materiais` para calcular `dataTroca`; se não estiver `SECURITY DEFINER` e com `row_security off`, o INSERT pode falhar com RLS. Solução aplicada: recriar `set_data_troca` como definer + row_security off.
+  - FKs referenciam status_saida, centros*, materiais, pessoas; essas tabelas precisam de SELECT liberado para evitar 42501 em inserts/updates.
 
 Fluxos principais
 
