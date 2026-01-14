@@ -57,7 +57,12 @@ GRANT EXECUTE ON FUNCTION public.material_resolve_numero(uuid) TO anon, authenti
 
 -- Função: hash camada 1 (fabricante + grupo + item + numeroEspecifico)
 CREATE OR REPLACE FUNCTION public.material_hash_base(p_material_id uuid)
-RETURNS text LANGUAGE sql STABLE AS
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off AS
 $$
 WITH cores_agg AS (
   SELECT
@@ -86,7 +91,12 @@ $$;
 
 -- Função: hash camada 2 (base + CA + cores + caracteristicas)
 CREATE OR REPLACE FUNCTION public.material_hash_completo(p_material_id uuid)
-RETURNS text LANGUAGE sql STABLE AS
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off AS
 $$
 WITH cores_agg AS (
   SELECT
@@ -127,53 +137,64 @@ $$;
 
 -- Trigger BEFORE insert/update para setar hashes e validar duplicidade (sem valorUnitario)
 CREATE OR REPLACE FUNCTION public.evitar_duplicidade_material()
-RETURNS trigger AS
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off AS
 $$
 DECLARE
   v_ca_norm text;
-  v_grupo_norm text;
-  v_nome_norm text;
   v_hash_base text;
   v_hash_completo text;
+  v_owner uuid;
 BEGIN
-  v_ca_norm := NULLIF(fn_normalize_any(NEW.ca), '');
-  v_grupo_norm := NULLIF(fn_normalize_any(NEW."grupoMaterial"), '');
-  v_nome_norm := NULLIF(fn_normalize_any(NEW.nome), '');
+  if new.id is null then
+    new.id := gen_random_uuid();
+  end if;
 
-  -- Regra: C.A nao pode repetir em nenhum material existente
+  v_ca_norm := NULLIF(fn_normalize_any(NEW.ca), '');
+  v_owner := COALESCE(NEW.account_owner_id, public.my_owner_id());
+
+  -- Regra: C.A nao pode repetir dentro do mesmo owner
   IF v_ca_norm IS NOT NULL AND EXISTS (
     SELECT 1
     FROM public.materiais m
     WHERE NULLIF(fn_normalize_any(m.ca), '') = v_ca_norm
+      AND m.account_owner_id = v_owner
   ) THEN
     RAISE EXCEPTION 'Ja existe material cadastrado com este C.A.';
   END IF;
 
   v_hash_base := public.material_hash_base(NEW.id);
-  v_hash_completo := public.material_hash_completo(NEW.id);
-
   NEW.hash_base := v_hash_base;
-  NEW.hash_completo := v_hash_completo;
 
-  -- Se CA estiver vazio, bloquear base igual (fabricante+grupo+item+numero+cores+caracteristicas) sem perguntar
-  IF v_ca_norm IS NULL AND EXISTS (
-    SELECT 1 FROM public.materiais m
-    WHERE public.material_hash_base(m.id) = v_hash_base
-      AND public.material_hash_completo(m.id) = public.material_hash_completo(NEW.id)
-  ) THEN
-    RAISE EXCEPTION 'Material duplicado com base igual e CA vazio.';
-  END IF;
+  -- Em INSERT, o hash completo e duplicidades com cores/caracteristicas
+  -- sao consolidados pelos triggers relacionais apos vinculos.
+  IF TG_OP = 'UPDATE' THEN
+    v_hash_completo := public.material_hash_completo(NEW.id);
+    NEW.hash_completo := v_hash_completo;
 
-  IF EXISTS (
-    SELECT 1 FROM public.materiais m
-    WHERE public.material_hash_completo(m.id) = v_hash_completo
-  ) THEN
-    RAISE EXCEPTION 'Material duplicado com mesmas cores/caracteristicas e C.A.';
+    -- Se CA estiver vazio, bloquear base igual (fabricante+grupo+item+numero+cores+caracteristicas) sem perguntar
+    IF v_ca_norm IS NULL AND EXISTS (
+      SELECT 1 FROM public.materiais m
+      WHERE public.material_hash_base(m.id) = v_hash_base
+        AND public.material_hash_completo(m.id) = v_hash_completo
+    ) THEN
+      RAISE EXCEPTION 'Material duplicado com base igual e CA vazio.';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM public.materiais m
+      WHERE public.material_hash_completo(m.id) = v_hash_completo
+    ) THEN
+      RAISE EXCEPTION 'Material duplicado com mesmas cores/caracteristicas e C.A.';
+    END IF;
   END IF;
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger para revalidar apos mudancas em cores/caracteristicas
 CREATE OR REPLACE FUNCTION public.verificar_duplicidade_material_relacionado()

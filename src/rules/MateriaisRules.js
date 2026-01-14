@@ -210,6 +210,11 @@ export function validateMaterialForm(form) {
     return 'Informe ao menos uma caracteristica.'
   }
 
+  const cores = mergeSelectionLists(form.cores, form.coresIds, form.corMaterial)
+  if (!cores.length) {
+    return 'Informe ao menos uma cor.'
+  }
+
   const validade = Number(form.validadeDias)
   if (!Number.isFinite(validade) || validade <= 0) {
     return 'Validade deve ser maior que zero.'

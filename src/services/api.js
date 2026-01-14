@@ -4199,43 +4199,17 @@ export const api = {
         },
       )
 
-      let materialCriadoId
-      try {
-        const inseridos = await execute(
-          supabase.from('materiais').insert(supabasePayload).select('id'),
-          'Falha ao criar material.'
-        )
-        materialCriadoId = Array.isArray(inseridos) && inseridos.length ? inseridos[0].id : inseridos?.id
-        if (!materialCriadoId) {
-          throw new Error('Falha ao criar material.')
-        }
-
-        await insereCores(materialCriadoId, corRelationIds, corNames)
-        await insereCaracteristicas(
-          materialCriadoId,
-          caracteristicaRelationIds,
-          caracteristicaNames,
-        )
-      } catch (error) {
-        if (materialCriadoId) {
-          try {
-            ensureSupabase()
-            const { error: cleanupError } = await supabase
-              .from('materiais')
-              .delete()
-              .eq('id', materialCriadoId)
-            if (cleanupError) {
-              reportClientError('Falha ao remover material apos erro de vinculo.', cleanupError, {
-                materialId: materialCriadoId,
-              }, 'error')
-            }
-          } catch (cleanupError) {
-            reportClientError('Falha ao limpar material apos erro de vinculo.', cleanupError, {
-              materialId: materialCriadoId,
-            }, 'error')
-          }
-        }
-        throw error
+      const criado = await executeMaybeSingle(
+        supabase.rpc('material_create_full', {
+          p_material: supabasePayload,
+          p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
+          p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
+        }),
+        'Falha ao criar material.'
+      )
+      const materialCriadoId = criado?.id
+      if (!materialCriadoId) {
+        throw new Error('Falha ao criar material.')
       }
       const registro = await executeSingle(
         supabase
@@ -4404,12 +4378,18 @@ export const api = {
         },
       )
 
-      await execute(
-        supabase.from('materiais').update(supabasePayload).eq('id', id),
+      const atualizado = await executeMaybeSingle(
+        supabase.rpc('material_update_full', {
+          p_material_id: id,
+          p_material: supabasePayload,
+          p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
+          p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
+        }),
         'Falha ao atualizar material.'
       )
-      await insereCores(id, corRelationIds, corNames)
-      await insereCaracteristicas(id, caracteristicaRelationIds, caracteristicaNames)
+      if (!atualizado?.id) {
+        throw new Error('Falha ao atualizar material.')
+      }
       const registro = await executeSingle(
         supabase
           .from('materiais_view')

@@ -63,6 +63,9 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 STABLE
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
 AS $$
 DECLARE
   v_ca_norm text := NULLIF(fn_normalize_any(p_ca), '');

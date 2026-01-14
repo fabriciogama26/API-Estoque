@@ -48,6 +48,7 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 - Trigger de INSERT (`evitar_duplicidade_material`, mig. `20250109_adjust_materials_dedup.sql`) bloqueia qualquer CA repetido (mesmo em outra base), alem de base igual com CA vazio e hash completo (cores/caracteristicas/CA).
 - Trigger de UPDATE (`evitar_duplicidade_material_update`, mig. `20250112_base_ca_diff_update.sql`) replica as regras de base/hash ignorando o registro editado.
 - RPC base: `20250111_material_preflight.sql`.
+- Persistencia: RPCs material_create_full (20250129) e material_update_full (20250130) gravam material + vinculos em uma unica transacao; evita 42501 nas tabelas de vinculo.
 
 ## Pessoas (deduplicacao)
 
@@ -153,6 +154,7 @@ Arquivos e docs:
 - Bucket/policies: `supabase/migrations/0077_fix_imports_bucket.sql`
 
 - Documentacao do fluxo: `docs/DesligamentoEmMassa.txt`
+
 
 
 
