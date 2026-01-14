@@ -20,6 +20,7 @@ export const initialSaidaFilters = {
   status: '',
   dataInicio: '',
   dataFim: '',
+  trocaPrazo: '',
 }
 
 // Limites de busca e debounce
@@ -221,4 +222,47 @@ export const formatDateToInput = (value) => {
   // Corrige o fuso para não somar/subtrair dia no input type="date"
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
   return localDate.toISOString().slice(0, 10)
+}
+
+const parseDateWithoutTimezone = (value) => {
+  if (!value) return null
+  const str = String(value).trim()
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (match) {
+    const [, y, m, d] = match
+    const year = Number(y)
+    const month = Number(m) - 1
+    const day = Number(d)
+    const date = new Date(year, month, day)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  const dt = new Date(value)
+  return Number.isNaN(dt.getTime()) ? null : dt
+}
+
+export const formatDisplayDateSimple = (value) => {
+  const date = parseDateWithoutTimezone(value)
+  if (!date) return 'Nao informado'
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${day}/${month}/${year}`
+}
+
+export const getTrocaPrazoStatus = (dataTroca) => {
+  const data = parseDateWithoutTimezone(dataTroca)
+  if (!data) return null
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const diffDias = Math.floor((data.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDias < 0) {
+    return { variant: 'atrasada', label: 'Limite passado' }
+  }
+  if (diffDias === 0) {
+    return { variant: 'limite', label: 'Data limite' }
+  }
+  if (diffDias >= 1 && diffDias <= 7) {
+    return { variant: 'alerta', label: '7 dias para o limite da troca' }
+  }
+  return null
 }

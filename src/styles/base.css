@@ -461,13 +461,13 @@ ul, ol {
   color: rgba(30, 41, 59, 0.92);
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
-.data-table tbody tr:nth-child(even) {
-  background: rgba(148, 163, 184, 0.08);
-}
 .data-table__muted {
   margin: 0.25rem 0 0;
   font-size: 0.78rem;
   color: rgba(100, 116, 139, 0.85);
+}
+.data-table tbody tr:nth-child(even):not([class*="data-table__row--troca-"]) {
+  background: rgba(148, 163, 184, 0.08);
 }
 .table-actions {
   display: flex;

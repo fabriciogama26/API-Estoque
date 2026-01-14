@@ -89,11 +89,11 @@ export function PessoasHistoryTimeline({ registros }) {
                 {changes.length === 0 ? (
                   <p className="feedback">Sem alteracoes registradas.</p>
                 ) : (
-                  changes.map((change) => (
-                    <p key={`${registro.id}-${change.campo}`}>
-                      <strong>{change.label}:</strong> "{change.before}" -> "{change.after}"
-                    </p>
-                  ))
+                    changes.map((change) => (
+                      <p key={`${registro.id}-${change.campo}`}>
+                        <strong>{change.label}:</strong> "{change.before}" → "{change.after}"
+                      </p>
+                    ))
                 )}
               </div>
             </li>

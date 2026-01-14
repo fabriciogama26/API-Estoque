@@ -1,0 +1,90 @@
+ {
+ "dashboardAcidentes": {
+
+
+        "title": "Dashboard de acidentes",
+
+
+        "summary": "Monitore tendÃªncia, tipos de acidente e distribuiÃ§Ãµes para SST.",
+
+
+        "steps": [
+
+
+            {
+
+
+                "title": "Definir filtros iniciais",
+
+
+                "description": "No campo Busca digite pessoa, agente ou local (trechos do nome/matrÃ­cula tambÃ©m funcionam) e combine com perÃ­odo e unidade/centro de serviÃ§o. Clique em Aplicar para recalcular os indicadores.",
+
+
+                "mediaHint": "Filtros do dashboard de acidentes."
+
+
+            },
+
+
+            {
+
+
+                "title": "Conferir indicadores-chave",
+
+
+                "description": "Os cards exibem totais, taxas e comparativos. Use o texto de ajuda abaixo dos cards para saber como foi calculado.",
+
+
+                "mediaHint": "Cards de KPI da tela de acidentes."
+
+
+            },
+
+
+            {
+
+
+                "title": "Ler grÃ¡ficos com tooltips",
+
+
+                "description": "Use os botÃµes (i) nos tÃ­tulos para ver o que cada grÃ¡fico representa. Passe o mouse nos pontos/segmentos para ver valores detalhados.",
+
+
+                "mediaHint": "GrÃ¡fico com tooltip e Ã­cone de info."
+
+
+            },
+
+
+            {
+
+
+                "title": "Abrir em tela cheia",
+
+
+                "description": "Clique no botÃ£o de expandir do grÃ¡fico desejado. A visualizaÃ§Ã£o modal permite enxergar mais pontos sem poluiÃ§Ã£o visual.",
+
+
+                "mediaHint": "Modal de grÃ¡fico expandido."
+
+
+            }
+
+
+        ],
+
+
+        "notes": [
+
+
+            "Filtros sÃ£o persistidos enquanto vocÃª navega pelo dashboard.",
+
+
+            "Se nenhum dado aparecer, valide se o perÃ­odo contÃ©m registros de acidentes."
+
+
+        ]
+
+
+    }
+}

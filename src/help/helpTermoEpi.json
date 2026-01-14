@@ -1,0 +1,32 @@
+{
+  "termoEpi": {
+    "title": "Termo de EPI",
+    "summary": "Gere e baixe o termo de responsabilidade de EPI para colaboradores.",
+    "steps": [
+      {
+        "title": "Preencher filtros de busca",
+        "description": "No campo Busca informe matrícula ou nome do colaborador (parcial ou completo) e, se quiser, complete com intervalo de datas de entrega. Não é necessário preencher todos os campos.",
+        "mediaHint": "Formulário de filtros do termo."
+      },
+      {
+        "title": "Gerar documento",
+        "description": "Clique em Gerar termo para montar a pré-visualização. Use Limpar para reiniciar os campos.",
+        "mediaHint": "Botões Gerar termo e Limpar."
+      },
+      {
+        "title": "Analise a pré-visualização",
+        "description": "Revise os dados do colaborador e dos itens entregues no iframe exibido. O badge indica se o documento veio do cache local ou do servidor.",
+        "mediaHint": "Iframe de pré-visualização do termo."
+      },
+      {
+        "title": "Baixar PDF",
+        "description": "Com a pré-visualização carregada, clique em Baixar PDF no cabeçalho da seção para salvar o arquivo.",
+        "mediaHint": "Botão Baixar PDF acima do iframe."
+      }
+    ],
+    "notes": [
+      "Se nenhum HTML for retornado, revise os filtros ou gere novas entregas antes.",
+      "O download só é habilitado depois que o HTML estiver carregado."
+    ]
+  }
+}

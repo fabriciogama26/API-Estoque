@@ -387,6 +387,73 @@
   gap: 0.75rem;
 }
 
+/* Legenda e destaque de troca em Saídas */
+.saidas-legend {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 1rem;
+}
+
+.saidas-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.saidas-legend__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+  border: 1px solid #cbd5e1;
+}
+
+.saidas-legend__dot--limite {
+  background: #f87171; /* vermelho */
+  border-color: #ef4444;
+}
+
+.saidas-legend__dot--alerta {
+  background: #facc15; /* amarelo */
+  border-color: #eab308;
+}
+
+.saidas-legend__dot--atrasada {
+  background: #a855f7; /* roxo */
+  border-color: #9333ea;
+}
+
+.data-table--saidas tbody tr.data-table__row--troca-limite {
+  background: #fef2f2;
+  border-left: 4px solid #ef4444;
+}
+.data-table--saidas tbody tr.data-table__row--troca-limite td {
+  background: #fef2f2;
+}
+
+.data-table--saidas tbody tr.data-table__row--troca-alerta {
+  background: #fffbeb;
+  border-left: 4px solid #eab308;
+}
+.data-table--saidas tbody tr.data-table__row--troca-alerta td {
+  background: #fffbeb;
+}
+
+.data-table--saidas tbody tr.data-table__row--troca-atrasada {
+  background: #f5f3ff;
+  border-left: 4px solid #9333ea;
+}
+.data-table--saidas tbody tr.data-table__row--troca-atrasada td {
+  background: #f5f3ff;
+}
+
+.data-table--saidas tbody tr:nth-child(even):not([class*="data-table__row--troca-"]) {
+  background: transparent;
+}
+
 /* Ajuda - Grupo de material (alinhado ao padrao de Agente) */
 .field__label-row {
   display: inline-flex;

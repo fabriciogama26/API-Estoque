@@ -8,10 +8,8 @@
 --    -> ALERTA para confirmação (BASE_CA_DIFF).
 --
 -- Escopo por owner:
--- - Se p_account_owner_id vier preenchido:
---     compara apenas com registros do mesmo owner ou legados (owner NULL).
--- - Se p_account_owner_id for NULL (master):
---     enxerga todos os registros.
+-- - Se p_account_owner_id vier preenchido: compara somente com esse owner (ou legados owner NULL).
+-- - Se p_account_owner_id for NULL: usa o owner da sessÃ£o (public.my_owner_id()).
 --
 -- Edição:
 -- - Se p_material_id vier preenchido:
@@ -184,10 +182,11 @@ BEGIN
 
     FROM public.materiais m
     WHERE
-      (p_account_owner_id IS NULL
-       OR m.account_owner_id IS NULL
-       OR m.account_owner_id = p_account_owner_id)
-      AND (p_material_id IS NULL OR m.id <> p_material_id)
+      (p_material_id IS NULL OR m.id <> p_material_id)
+      AND (
+        m.account_owner_id IS NULL
+        OR m.account_owner_id = COALESCE(p_account_owner_id, public.my_owner_id())
+      )
   )
 
   --------------------------------------------------------------------

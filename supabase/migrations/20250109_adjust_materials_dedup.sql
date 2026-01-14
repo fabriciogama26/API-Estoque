@@ -33,7 +33,12 @@ $$;
 
 -- Resolve numero (prioriza numeroEspecifico; se vazio, usa numeroCalcado/numeroVestimenta)
 CREATE OR REPLACE FUNCTION public.material_resolve_numero(p_material_id uuid)
-RETURNS text LANGUAGE sql STABLE AS
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off AS
 $$
 SELECT COALESCE(
   NULLIF(m."numeroEspecifico"::text, ''),
@@ -47,6 +52,8 @@ SELECT COALESCE(
 FROM public.materiais m
 WHERE m.id = p_material_id;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.material_resolve_numero(uuid) TO anon, authenticated;
 
 -- Função: hash camada 1 (fabricante + grupo + item + numeroEspecifico)
 CREATE OR REPLACE FUNCTION public.material_hash_base(p_material_id uuid)
@@ -170,7 +177,11 @@ $$ LANGUAGE plpgsql;
 
 -- Trigger para revalidar apos mudancas em cores/caracteristicas
 CREATE OR REPLACE FUNCTION public.verificar_duplicidade_material_relacionado()
-RETURNS trigger AS
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off AS
 $$
 DECLARE
   alvo uuid;
@@ -191,11 +202,14 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Função auxiliar para recalcular hashes em um material
 CREATE OR REPLACE FUNCTION public.atualizar_hashes_material(p_material_id uuid)
-RETURNS void LANGUAGE plpgsql AS
+RETURNS void LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off AS
 $$
 BEGIN
   UPDATE public.materiais
