@@ -24,3 +24,8 @@ export const supabase = supabaseUrl && supabaseAnonKey
 export function isSupabaseConfigured() {
   return Boolean(supabase)
 }
+
+// Exponibiliza o client no navegador para facilitar debug de sessao (ex.: supabase.auth.getSession())
+if (typeof window !== 'undefined' && supabase) {
+  window.supabase = supabase
+}

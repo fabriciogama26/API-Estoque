@@ -1,0 +1,33 @@
+{
+"saidas": {
+    "title": "Saídas de estoque",
+    "summary": "Entrega de EPIs para pessoas, com rastreabilidade e cancelamento.",
+    "steps": [
+      {
+        "title": "Registrar saída",
+        "description": "No campo de busca, digite o nome ou matrícula para achar a pessoa e selecione o material pelo autocomplete. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saída para gravar a entrega.",
+        "mediaHint": "Formulário de cadastro de saídas com busca de pessoa e material."
+      },
+      {
+        "title": "Conferir saldo disponível",
+        "description": "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberações acima do estoque.",
+        "mediaHint": "Bloco de saldo do material ao lado do formulário."
+      },
+      {
+        "title": "Editar ou cancelar",
+        "description": "Clique em Editar para carregar o registro no formulário: ele sobe para o topo, fica amarelo e mostra “Editando...”. Ajuste os campos necessários e clique em Salvar alterações para gravar; se desistir antes de salvar, use Cancelar edição para voltar ao modo de cadastro.",
+        "mediaHint": "Ações de edição e cancelamento na tabela de saídas."
+      },
+      {
+        "title": "Filtrar e paginar",
+        "description": "No campo Busca digite o nome ou matrícula da pessoa, ou nome/descrição/ID do material ou CA, para trazer apenas as saídas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessário e navegue pelas páginas no rodapé.",
+        "mediaHint": "Filtros superiores e paginação inferior do histórico."
+      }
+    ],
+    "notes": [
+      "Saídas canceladas ficam marcadas e não impactam o saldo.",
+      "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já selecionados.",
+      "O histórico detalha quem registrou e quando a entrega foi alterada."
+    ]
+  }
+}

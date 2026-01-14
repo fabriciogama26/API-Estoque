@@ -1,0 +1,22 @@
+{
+  "title": "Materiais",
+  "summary": "Cadastro e manutenção dos materiais (EPI/EPC/itens em geral).",
+  "sections": [
+    {
+      "title": "O que cadastrar",
+      "items": [
+        "Nome/descrição",
+        "Categoria",
+        "Validade/prazo de troca (quando aplicável)",
+        "Ativo/Inativo"
+      ]
+    },
+    {
+      "title": "Boas práticas",
+      "items": [
+        "Padronize a nomenclatura.",
+        "Revise categorias para melhorar filtros e relatórios."
+      ]
+    }
+  ]
+}

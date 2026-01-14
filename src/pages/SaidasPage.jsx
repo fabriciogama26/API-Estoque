@@ -72,10 +72,13 @@ function SaidasContent() {
     paginatedSaidas,
     saidasFiltradas,
     formatCurrency,
+    formatDisplayDateSimple,
+    formatDisplayDate,
     formatDisplayDateTime,
     formatMaterialSummary,
     formatPessoaSummary,
     formatPessoaDetail,
+    trocaPrazoFilterOptions,
     setCancelState,
   } = useSaidasContext()
 
@@ -355,6 +358,17 @@ function SaidasContent() {
             </select>
           </label>
           <label className="field">
+            <span>Prazo de troca</span>
+            <select name="trocaPrazo" value={filters.trocaPrazo} onChange={handleFilterChange}>
+              <option value="">Todos</option>
+              {trocaPrazoFilterOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
             <span>Data inicial</span>
             <input type="date" name="dataInicio" value={filters.dataInicio} onChange={handleFilterChange} />
           </label>
@@ -374,18 +388,38 @@ function SaidasContent() {
       </section>
 
 
+
       <section className="card">
         <header className="card__header">
-          <h2>Histórico de saídas</h2>
-          <button type="button" className="button button--ghost" onClick={() => load(filters, { resetPage: true })} disabled={isLoading}>
+          <h2>Lista de saídas</h2>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => load(filters, { resetPage: true })}
+            disabled={isLoading}
+          >
             Atualizar
           </button>
         </header>
+        <div className="saidas-legend" aria-label="Legenda das datas de troca">
+          <div className="saidas-legend__item">
+            <span className="saidas-legend__dot saidas-legend__dot--limite" aria-hidden="true" />
+            <span>Data limite</span>
+          </div>
+          <div className="saidas-legend__item">
+            <span className="saidas-legend__dot saidas-legend__dot--alerta" aria-hidden="true" />
+            <span>7 dias para o limite da troca</span>
+          </div>
+          <div className="saidas-legend__item">
+            <span className="saidas-legend__dot saidas-legend__dot--atrasada" aria-hidden="true" />
+            <span>Limite passado</span>
+          </div>
+        </div>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
         {!isLoading && saidas.length === 0 ? <p className="feedback">Nenhuma saída registrada.</p> : null}
         {saidas.length > 0 ? (
           <div className="table-wrapper">
-            <table className="data-table">
+            <table className="data-table data-table--saidas">
               <thead>
                 <tr>
                   <th>Pessoa</th>
@@ -408,8 +442,23 @@ function SaidasContent() {
                     saida.usuarioResponsavelNome ||
                     saida.usuarioResponsavel ||
                     'Não informado'
+                  const trocaStatus = saida.trocaPrazo
+                  const rowClassName = [
+                    isSaidaCancelada(saida) ? 'data-table__row--muted' : '',
+                    trocaStatus ? `data-table__row--troca-${trocaStatus.variant}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
                   return (
-                    <tr key={saida.id} className={isSaidaCancelada(saida) ? 'data-table__row--muted' : ''}>
+                    <tr
+                      key={saida.id}
+                      className={rowClassName}
+                title={
+                  trocaStatus && saida.dataTroca
+                    ? `${trocaStatus.label} (${formatDisplayDateSimple(saida.dataTroca)})`
+                    : undefined
+                }
+                    >
                       <td>
                         <strong>{formatPessoaSummary(pessoa) || saida.pessoaId || 'Pessoa removida'}</strong>
                         <p className="data-table__muted">{formatPessoaDetail(pessoa)}</p>
@@ -422,70 +471,77 @@ function SaidasContent() {
                         </p>
                       </td>
                       <td>{saida.quantidade}</td>
-                      <td>{formatDisplayDateTime(saida.dataEntrega)}</td>
+                      <td>
+                        {formatDisplayDateTime(saida.dataEntrega)}
+                        <p className="data-table__muted">
+                          {saida.dataTroca
+                            ? `Troca: ${formatDisplayDateSimple(saida.dataTroca)}`
+                            : 'Troca: não informada'}
+                          {trocaStatus ? ` - ${trocaStatus.label}` : ''}
+                        </p>
+                      </td>
                       <td className={statusLower === 'cancelado' ? 'text-muted' : ''}>{saida.status || 'Registrado'}</td>
                       <td>{registradoPor}</td>
                       <td>{saida.criadoEm ? formatDisplayDateTime(saida.criadoEm) : '-'}</td>
                       <td>
                         <div className="table-actions materiais-data-table__actions">
                           <button
-                            type="button"
-                            className="materiais-table-action-button"
-                            onClick={() => handleOpenDetalhes(saida)}
-                            aria-label={`Ver detalhes da saída ${saida.id}`}
-                            title="Ver detalhes"
-                          >
-                            <Eye size={16} strokeWidth={1.8} />
-                          </button>
-                          {!isSaidaCancelada(saida) ? (
-                            <button
-                              type="button"
-                              className="materiais-table-action-button"
-                              onClick={() => startEditSaida(saida)}
-                              aria-label={`Editar saída ${saida.id}`}
-                              title="Editar saída"
-                            >
-                              <EditIcon size={16} />
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="materiais-table-action-button"
-                            onClick={() => openHistory(saida)}
-                            aria-label={`Histórico da saída ${saida.id}`}
-                            title="Histórico da saída"
-                          >
-                            <HistoryIcon size={16} />
-                          </button>
-                          {!isSaidaCancelada(saida) ? (
-                          <button
-                            type="button"
-                            className="materiais-table-action-button materiais-table-action-button--danger"
-                            onClick={() => openCancelModal(saida)}
-                            aria-label={`Cancelar saída ${saida.id}`}
-                            title="Cancelar saída"
-                          >
-                              <CancelIcon size={16} />
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-        <TablePagination
-          totalItems={saidasFiltradas.length}
-          pageSize={TABLE_PAGE_SIZE}
-          currentPage={currentPage}
-          onPageChange={setCurrentPage}
-        />
-      </section>
-
-      <SaidasHistoryModal state={historyState} onClose={closeHistory} />
+                      type="button"
+                      className="materiais-table-action-button"
+                      onClick={() => handleOpenDetalhes(saida)}
+                      aria-label={`Ver detalhes da sa?da ${saida.id}`}
+                      title="Ver detalhes"
+                    >
+                      <Eye size={16} strokeWidth={1.8} />
+                    </button>
+                    {!isSaidaCancelada(saida) ? (
+                      <button
+                        type="button"
+                        className="materiais-table-action-button"
+                        onClick={() => startEditSaida(saida)}
+                        aria-label={`Editar sa?da ${saida.id}`}
+                        title="Editar sa?da"
+                      >
+                        <EditIcon size={16} />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="materiais-table-action-button"
+                      onClick={() => openHistory(saida)}
+                      aria-label={`Hist?rico da sa?da ${saida.id}`}
+                      title="Hist?rico da sa?da"
+                    >
+                      <HistoryIcon size={16} />
+                    </button>
+                    {!isSaidaCancelada(saida) ? (
+                      <button
+                        type="button"
+                        className="materiais-table-action-button materiais-table-action-button--danger"
+                        onClick={() => openCancelModal(saida)}
+                        aria-label={`Cancelar sa?da ${saida.id}`}
+                        title="Cancelar sa?da"
+                      >
+                        <CancelIcon size={16} />
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  ) : null}
+  <TablePagination
+    totalItems={saidasFiltradas.length}
+    pageSize={TABLE_PAGE_SIZE}
+    currentPage={currentPage}
+    onPageChange={setCurrentPage}
+  />
+</section>
+<SaidasHistoryModal state={historyState} onClose={closeHistory} />
       {detalheState.open && detalheState.saida ? (
         <div className="saida-details__overlay" role="dialog" aria-modal="true" onClick={handleCloseDetalhes}>
           <div className="saida-details__modal" onClick={(event) => event.stopPropagation()}>

@@ -1,19 +1,67 @@
 import { useMemo, useState } from 'react'
-import helpContent from '../../help/helpContent.json'
+import helpAcidentes from '../../help/helpAcidentes.json'
+import helpDashboard from '../../help/helpDashboard.json'
+import helpDashboardAcidentes from '../../help/helpDashboardAcidentes.json'
+import helpEntradas from '../../help/helpEntradas.json'
+import helpEstoque from '../../help/helpEstoque.json'
+import helpMateriais from '../../help/helpMateriais.json'
+import helpPessoas from '../../help/helpPessoas.json'
+import helpSaidas from '../../help/helpSaidas.json'
+import helpHhtMensal from '../../help/helpHhtMensal.json'
+import helpTermoEpi from '../../help/helpTermoEpi.json'
+import helpConfiguracoes from '../../help/helpConfiguracoes.json'
 import { HelpIcon, InfoIcon } from '../icons.jsx'
 import '../../styles/help.css'
 
 const buildFallback = (topic) => ({
   title: 'Ajuda nao configurada',
-  summary: `Adicione o topico "${topic || 'novo-topico'}" em src/help/helpContent.json para personalizar esta tela.`,
+  summary: `Adicione o topico "${topic || 'novo-topico'}" no arquivo de ajuda desta pagina em src/help/.`,
   steps: [],
   notes: [],
   links: [],
 })
 
+const helpByTopic = {
+  acidentes: helpAcidentes,
+  dashboard: helpDashboard,
+  dashboardAcidentes: helpDashboardAcidentes,
+  entradas: helpEntradas,
+  estoque: helpEstoque,
+  materiais: helpMateriais,
+  pessoas: helpPessoas,
+  saidas: helpSaidas,
+  hhtMensal: helpHhtMensal,
+  termoEpi: helpTermoEpi,
+  configuracoes: helpConfiguracoes,
+}
+
+const resolveContent = (topic) => {
+  const candidate = helpByTopic?.[topic]
+  const raw = candidate?.[topic] ?? candidate
+  if (!raw) return null
+
+  const normalized = { ...raw }
+
+  // Se nao houver steps, mas houver sections (arquivo por pagina), converte sections em steps
+  if ((!normalized.steps || !normalized.steps.length) && Array.isArray(normalized.sections)) {
+    normalized.steps = normalized.sections.map((section) => ({
+      title: section.title,
+      items: section.items,
+      description: section.description,
+    }))
+  }
+
+  // Garante arrays
+  if (!Array.isArray(normalized.steps)) normalized.steps = []
+  if (!Array.isArray(normalized.notes)) normalized.notes = normalized.notes ? [normalized.notes] : []
+  if (!Array.isArray(normalized.links)) normalized.links = normalized.links ? [normalized.links].flat() : []
+
+  return normalized
+}
+
 export function HelpButton({ topic, label = 'Ajuda', size = 'md' }) {
   const [open, setOpen] = useState(false)
-  const content = helpContent?.[topic]
+  const content = resolveContent(topic)
 
   const handleClose = () => setOpen(false)
   const handleOpen = () => setOpen(true)

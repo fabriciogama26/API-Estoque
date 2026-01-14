@@ -1,0 +1,138 @@
+  { 
+    "estoque": {
+
+
+        "title": "Estoque atual",
+
+
+        "summary": "Consulta do saldo por material, alertas de estoque minimo, acoes rapidas e resumo financeiro.",
+
+
+        "steps": [
+
+
+            {
+
+
+                "title": "Filtrar materiais",
+
+
+                "description": "No campo Busca digite parte do nome, descricao, ID, cor ou CA do material para reduzir a lista; combine com centro de estoque e faixas de saldo. Clique em Aplicar para refinar ou em Limpar para remover todos os filtros.",
+
+
+                "mediaHint": "Filtros de estoque e botoes Aplicar/Limpar."
+
+
+            },
+
+
+            {
+
+
+                "title": "Monitorar alertas",
+
+
+                "description": "O bloco Alertas de estoque mostra itens abaixo do minimo e o valor estimado para reposicao. Use a lista principal para revisar e ajustar os materiais criticos.",
+
+
+                "mediaHint": "Tabela de alertas com status de atencao."
+
+
+            },
+
+
+            {
+
+
+                "title": "Acoes por material",
+
+
+                "description": "Em cada material, use o grupo Acoes: Entrada (abrir cadastro de entrada), Saida (abrir cadastro de saida), sino (historico de saidas do material) e o botao para alterar o minimo. O sino fica ativo apenas se houver movimentacao para o material.",
+
+
+                "mediaHint": "Botoes circulares de acoes (Entrada, Saida, Sino de historico e Alterar minimo)."
+
+
+            },
+
+
+            {
+
+
+                "title": "Consultar historico de saidas",
+
+
+                "description": "Clique no sino em Acoes para abrir um modal com todas as saidas do material. Use o filtro Mes/Ano para reduzir a lista e veja quem recebeu, quantidade, data e quem autorizou. O botao so ativa quando existe movimentacao registrada. Use o check Apenas com historico de saidas nos filtros para ver so materiais com movimentacao.",
+
+
+                "mediaHint": "Modal em tabela listando saidas com filtro Mes/Ano."
+
+
+            },
+
+
+            {
+
+
+                "title": "Alterar estoque minimo",
+
+
+                "description": "Clique em Alterar minimo para abrir uma janela de edicao. Informe o novo valor e confirme em Salvar. O sistema recarrega os dados apos salvar.",
+
+
+                "mediaHint": "Modal de alteracao do estoque minimo com botoes Cancelar/Salvar."
+
+
+            },
+
+
+            {
+
+
+                "title": "Usar paginacao",
+
+
+                "description": "Navegue pelas paginas no rodape da lista para ver mais itens. O total considera os filtros aplicados.",
+
+
+                "mediaHint": "Controles de pagina na parte inferior da lista."
+
+
+            },
+
+
+            {
+
+
+                "title": "Exportar a lista",
+
+
+                "description": "Clique em Exportar para baixar a tabela filtrada em CSV. O arquivo reflete exatamente o que estiver visivel na tela.",
+
+
+                "mediaHint": "Botao Exportar no cabecalho do Estoque atual."
+
+
+            }
+
+
+        ],
+
+
+        "notes": [
+
+
+            "O resumo financeiro abaixo dos alertas usa o valor unitario cadastrado no material.",
+
+
+            "Se um item nao mostrar centro de estoque, revise as movimentacoes (entradas/saidas) do material.",
+
+
+            "Atalho: ao clicar em Entrada/Saida a partir do Estoque atual, o sistema tenta preencher automaticamente o Centro de estoque e o Material."
+
+
+        ]
+
+
+    }
+  }

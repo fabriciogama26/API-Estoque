@@ -12,11 +12,13 @@ import {
   buildSaidasQuery,
   formatCurrency,
   formatDateToInput,
+  formatDisplayDateSimple,
   formatDisplayDate,
   formatDisplayDateTime,
   formatMaterialSummary,
   formatPessoaDetail,
   formatPessoaSummary,
+  getTrocaPrazoStatus,
   initialSaidaFilters,
   initialSaidaForm,
   materialMatchesTerm,
@@ -581,16 +583,32 @@ export function useSaidasController() {
       .finally(() => setMaterialEstoqueLoading(false))
 }, [form.materialId, form.centroEstoqueId, saidas.length, reportError])
 
+  const saidasComPrazo = useMemo(
+    () =>
+      saidas.map((saida) => ({
+        ...saida,
+        trocaPrazo: getTrocaPrazoStatus(saida.dataTroca),
+      })),
+    [saidas],
+  )
+
+  const saidasFiltradas = useMemo(() => {
+    const { trocaPrazo } = filters
+    if (!trocaPrazo) return saidasComPrazo
+    if (trocaPrazo === 'sem-data') {
+      return saidasComPrazo.filter((s) => !s.trocaPrazo)
+    }
+    return saidasComPrazo.filter((s) => s.trocaPrazo?.variant === trocaPrazo)
+  }, [filters, saidasComPrazo])
+
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(saidas.length / TABLE_PAGE_SIZE))
+    const totalPages = Math.max(1, Math.ceil(saidasFiltradas.length / TABLE_PAGE_SIZE))
     setCurrentPage((prev) => {
       if (prev < 1) return 1
       if (prev > totalPages) return totalPages
       return prev
     })
-  }, [saidas.length])
-
-  const saidasFiltradas = useMemo(() => saidas, [saidas])
+  }, [saidasFiltradas.length])
 
   const statusFilterOptions = useMemo(() => {
     const mapa = new Map()
@@ -665,6 +683,16 @@ export function useSaidasController() {
     return saidasFiltradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
   }, [saidasFiltradas, currentPage])
 
+  const trocaPrazoFilterOptions = useMemo(
+    () => [
+      { id: 'limite', label: 'Data limite' },
+      { id: 'alerta', label: '7 dias para o limite da troca' },
+      { id: 'atrasada', label: 'Limite passado' },
+      { id: 'sem-data', label: 'Sem data de troca' },
+    ],
+    [],
+  )
+
   return {
     form,
     filters,
@@ -726,11 +754,13 @@ export function useSaidasController() {
     paginatedSaidas,
     saidasFiltradas,
     formatCurrency,
+    formatDisplayDateSimple,
     formatDisplayDate,
     formatDisplayDateTime,
     formatMaterialSummary,
     formatPessoaSummary,
     formatPessoaDetail,
+    trocaPrazoFilterOptions,
     setCancelState,
     setHistoryState,
   }

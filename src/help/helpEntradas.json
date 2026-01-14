@@ -1,0 +1,36 @@
+{
+    "entradas": {
+    "title": "Entradas de estoque",
+    "summary": "Registro de novas entradas e consulta histórica.",
+    "steps": [
+      {
+        "title": "Registrar nova entrada",
+        "description": "Primeiro selecione o Centro de estoque (*). O campo Material só é liberado após escolher o centro. Em seguida, use o autocomplete para buscar e selecionar o material por nome ou ID. Preencha quantidade e data e clique em Registrar entrada para salvar. Dica: ao acessar a tela pelo Estoque atual, Centro de estoque e Material podem vir pré-preenchidos.",
+        "mediaHint": "Formulário de cadastro de entradas: Centro de estoque, Material (habilita após selecionar o centro), Quantidade e Data."
+      },
+      {
+        "title": "Aplicar filtros do histórico",
+        "description": "Use o campo Busca para digitar parte do nome, descrição ou ID do material (ou do usuário que registrou) e combine com centro de estoque, status e período para refinar o histórico. Use Limpar para remover todos os filtros.",
+        "mediaHint": "Filtros rápidos do histórico de entradas (inclui status)."
+      },
+      {
+        "title": "Editar, ver histórico ou cancelar",
+        "description": "Na tabela, use os ícones para cada entrada: olho (detalhes), lápis (editar), relógio (histórico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e não exibem os botões de edição/cancelamento. O cancelamento é bloqueado se as saídas ativas ficarem maiores que o saldo sem essa entrada; ajuste/estorne saídas antes.",
+        "mediaHint": "Ícones de detalhes, edição, histórico e cancelamento na linha."
+      },
+      {
+        "title": "Atualizar dados",
+        "description": "Clique em Atualizar no cabeçalho da lista para recarregar dados e sugestões de materiais.",
+        "mediaHint": "Botão Atualizar no topo da seção de histórico."
+      }
+    ],
+    "notes": [
+      "O campo Material aceita ID ou nome parcial; o dropdown mostra ID e descrição.",
+      "Se não houver centros de estoque configurados, o campo vira texto livre para não travar o registro.",
+      "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já preenchidos.",
+      "Status e usuário de edição aparecem em detalhes e histórico; cancelamentos são registrados.",
+      "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrão).",
+      "Não é possível cancelar uma entrada se as saídas vigentes superarem o estoque que restaria sem ela; reduza ou estorne saídas primeiro."
+    ]
+  }
+}

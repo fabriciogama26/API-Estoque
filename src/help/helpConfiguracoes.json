@@ -1,0 +1,44 @@
+{
+  "configuracoes": {
+    "title": "Configurações da conta",
+    "summary": "Gerencie credenciais/páginas de titulares e dependentes com hierarquia por nível (master > admin > operador > estagiário > visitante) e reset de senha.",
+    "steps": [
+      {
+        "title": "Buscar usuário ou dependente",
+        "description": "Digite nome/username/email para trazer titulares (app_users) e dependentes (app_users_dependentes); admins não veem credenciais acima do seu nível (ex.: master).",
+        "mediaHint": "Autocomplete de usuário."
+      },
+      {
+        "title": "Definir credencial e status",
+        "description": "Selecione a credencial (Master aparece apenas para quem já é master) e alterne Ativo/Inativo. Apenas admin/master podem alterar.",
+        "mediaHint": "Seletores de credencial e switch de status."
+      },
+      {
+        "title": "Liberar ou bloquear páginas",
+        "description": "Ative/desative os toggles de cada página; se não houver lista salva, aplicamos o padrão da credencial.",
+        "mediaHint": "Toggles de páginas em duas colunas."
+      },
+      {
+        "title": "Salvar alterações",
+        "description": "Clique em Salvar credencial para registrar (titular ou dependente). Histórico grava credencial/páginas/status (action update).",
+        "mediaHint": "Botão Salvar credencial."
+      },
+      {
+        "title": "Reset de senha (admin)",
+        "description": "Admins/master podem buscar usuário/dependente e enviar e-mail de redefinição (modo local indisponível); registra histórico com action password_reset.",
+        "mediaHint": "Botão de reset de senha."
+      },
+      {
+        "title": "Ver histórico",
+        "description": "Abra o histórico para ver quem alterou credencial/páginas/status ou disparou reset (campo action mostra o tipo).",
+        "mediaHint": "Botão de histórico de credenciais."
+      }
+    ],
+    "notes": [
+      "Busca retorna titulares e dependentes (id do auth) respeitando o nível do usuário logado; master enxerga tudo.",
+      "Em modo local, reset de senha fica indisponível.",
+      "Se page_permissions estiver vazio, aplicamos o padrão da credencial.",
+      "As policies usam o level do catálogo para impedir que usuários vejam/editem credenciais acima do seu nível."
+    ]
+  }
+}

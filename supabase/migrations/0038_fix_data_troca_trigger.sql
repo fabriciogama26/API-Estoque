@@ -1,7 +1,13 @@
 -- Ajusta trigger de dataTroca para usar o nome correto da coluna validadeDias
 
 create or replace function public.set_data_troca()
-returns trigger as $$
+returns trigger
+language plpgsql
+stable
+security definer
+set search_path = public
+set row_security = off as
+$$
 declare
   v_validade integer;
 begin
@@ -18,4 +24,4 @@ begin
 
   return new;
 end;
-$$ language plpgsql stable;
+$$;
