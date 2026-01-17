@@ -1,0 +1,55 @@
+Duplicidade e Preflight - Mapa de funcoes (SQL)
+
+Objetivo
+- Listar funcoes/trigger que verificam duplicidade, hash e preflight.
+- Indicar onde foram criadas/atualizadas em migrations.
+
+Materiais (hash + duplicidade)
+- public.material_hash_base(p_material_id uuid)
+  - Calcula hash base (grupo/item/fabricante/numero/cores/caracteristicas etc.)
+  - Migrations: 0057_update_materiais_dedup_layers.sql, 20250109_adjust_materials_dedup.sql
+
+- public.material_hash_completo(p_material_id uuid)
+  - Calcula hash completo (camada completa, inclui cores/caracteristicas).
+  - Migrations: 0031_create_materials_uniqueness.sql, 0057_update_materiais_dedup_layers.sql, 20250109_adjust_materials_dedup.sql
+
+- public.evitar_duplicidade_material()
+  - Trigger BEFORE INSERT/UPDATE em materiais.
+  - Usa hash_base/hash_completo para bloquear duplicidade.
+  - Migrations: 0031_create_materials_uniqueness.sql, 0057_update_materiais_dedup_layers.sql, 20250108_enforce_material_ca_unique.sql, 20250109_adjust_materials_dedup.sql
+
+- public.verificar_duplicidade_material_relacionado()
+  - Trigger em tabelas de vinculo (cor/caracteristica).
+  - Revalida duplicidade quando mudam cores/caracteristicas.
+  - Migrations: 0057_update_materiais_dedup_layers.sql, 20250109_adjust_materials_dedup.sql
+
+- public.material_preflight_check(...)
+  - RPC de preflight (CA duplicado, base igual + CA vazio, base igual + CA diferente).
+  - Migration: 20250111_material_preflight.sql
+
+- public.evitar_duplicidade_material_update()
+  - Trigger para validar base + CA diff no UPDATE.
+  - Migration: 20250112_base_ca_diff_update.sql
+
+Pessoas (duplicidade)
+- public.pessoas_preflight_check(p_owner uuid, p_nome text, p_matricula text, p_pessoa_id uuid)
+  - RPC de preflight (matricula duplicada; nome igual com matricula diferente).
+  - Migration: 20250114_pessoas_preflight.sql
+
+- public.evitar_duplicidade_pessoa()
+  - Trigger BEFORE INSERT/UPDATE em pessoas.
+  - Migration: 20250114_pessoas_preflight.sql
+
+Saidas (troca)
+- public.rpc_saida_verificar_troca(p_material_id uuid, p_pessoa_id uuid)
+  - RPC para obter ultima saida e sequencia de troca.
+  - Migrations: 20250201_rpc_saida_verificar_troca.sql, 20250202_fix_rpc_saida_verificar_troca_overload.sql
+
+Triggers relacionados
+- public.set_data_troca()
+  - Trigger para preencher dataTroca com base na validade do material.
+  - Migrations: 0035_set_data_troca_trigger.sql, 0038_fix_data_troca_trigger.sql
+
+Notas
+- Existem funcoes/migrations legadas que foram substituidas por ajustes posteriores.
+- Sempre verificar a ultima migration aplicada para saber a versao ativa no banco.

@@ -57,7 +57,9 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 
 ## Regras de estoque (banco)
 
+
 
+- status_saida: SELECT publico e triggers de validacao rodam como SECURITY DEFINER para evitar 42501 em saidas.
 - SaÃ­das jÃ¡ sÃ£o bloqueadas quando excedem o saldo disponÃ­vel (`validar_saldo_saida`).
 
 - Cancelar uma entrada Ã© vetado se o saldo remanescente ficar menor que as saÃ­das ativas (ver `supabase/migrations/0082_prevent_cancel_entrada_negative_stock.sql`).
@@ -71,6 +73,8 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 - Node.js 20+
 - Projeto Supabase (Postgres + Auth + Storage)
 - RBAC/RLS: veja `docs/CredenciaisPermissoes.txt` e `docs/Configuracoes.txt` para detalhes de roles/permissoes e tela de configuracoes (apenas master/admin).
+- Toggles de permissao (Configuracoes): veja `docs/PermissoesToggles.txt` para o motivo dos switches em grupo e o plano de correcao.
+- RLS/RPC (multi-tenant): guia consolidado em `docs/rls-multi-tenant-map.txt` e `docs/rls-policies-guide.txt`.
 
 
 ## Rodar localmente
@@ -154,6 +158,7 @@ Arquivos e docs:
 - Bucket/policies: `supabase/migrations/0077_fix_imports_bucket.sql`
 
 - Documentacao do fluxo: `docs/DesligamentoEmMassa.txt`
+
 
 
 

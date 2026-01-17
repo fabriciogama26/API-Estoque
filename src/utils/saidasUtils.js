@@ -21,6 +21,7 @@ export const initialSaidaFilters = {
   dataInicio: '',
   dataFim: '',
   trocaPrazo: '',
+  trocaOnly: false,
 }
 
 // Limites de busca e debounce

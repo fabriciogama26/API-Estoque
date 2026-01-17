@@ -24,6 +24,9 @@ const formatValue = (value) => {
   if (value === undefined || value === null || value === '') {
     return 'Nao informado'
   }
+  if (typeof value === 'boolean') {
+    return value ? 'Sim' : 'Nao'
+  }
   if (value instanceof Date) {
     return formatDateTime(value)
   }
@@ -48,6 +51,9 @@ const buildChanges = (currentSnapshot, previousSnapshot) => {
     { key: 'centroServico', label: 'Centro de servico' },
     { key: 'dataEntrega', label: 'Data de entrega' },
     { key: 'dataTroca', label: 'Data de troca' },
+    { key: 'isTroca', label: 'Troca' },
+    { key: 'trocaSequencia', label: 'Sequencia de troca' },
+    { key: 'trocaDeSaida', label: 'Troca de saida' },
   ]
   const prev = previousSnapshot || {}
   return fields

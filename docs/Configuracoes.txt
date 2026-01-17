@@ -1,6 +1,9 @@
-Tela: Configuracoes
-===================
-
+Tela: Configuracoes
+
+===================
+
+
+
 Visao geral
 -----------
 - Pagina React: src/pages/Configuracoes.jsx.
@@ -19,7 +22,8 @@ Componentes e funcoes
   - Autocomplete em `app_users` e envio de reset via supabase.auth.resetPasswordForEmail.
   - Registra historico (action password_reset) para o alvo escolhido.
 - syncAuthUserBan(userId, isActive): helper no front que executa RPC sync_user_ban_with_status (Supabase) para manter banimento do Auth sincronizado com app_users. Falhas sao apenas logadas para nao travar a tela.
-
+
+
 Fluxos principais
 -----------------
 - Edicao de permissoes:
@@ -36,13 +40,26 @@ Fluxos principais
 Integracao com Supabase
 -----------------------
 - Leitura/escrita: tabelas app_users, user_roles, user_permission_overrides, app_users_credential_history.
-- Policies recomendadas: leitura/edicao permitidas somente quando level do alvo <= level do usuario logado; service_role liberado para tudo.
-- RPC exigida: sync_user_ban_with_status(p_user_id uuid, p_active boolean) com SECURITY DEFINER e grants para anon/authenticated. Atualiza auth.users.banned_until para bloquear ou liberar login conforme ativo/inativo.
-- Em modo local ou sem Supabase, a tela usa apenas o usuario atual como fallback e nao grava nada remoto.
-
-Notas de UX
------------
-- Busca autocomplete substitui dropdown; retorna titulares e dependentes pelo id do auth; filtra opcoes de credencial por level.
-- Master aparece somente quando o usuario logado e master; admins nao veem/alteram master.
-- Status toggles usam texto Ativo/Inativo e feedback textual.
-- Ajuda contextual: HelpButton top-right, conteudo na chave "configuracoes" de src/help/helpContent.json; assets em public/help/configuracoes/.
+- Policies recomendadas: leitura/edicao permitidas somente quando level do alvo <= level do usuario logado; service_role liberado para tudo.
+
+- RPC exigida: sync_user_ban_with_status(p_user_id uuid, p_active boolean) com SECURITY DEFINER e grants para anon/authenticated. Atualiza auth.users.banned_until para bloquear ou liberar login conforme ativo/inativo.
+
+- Em modo local ou sem Supabase, a tela usa apenas o usuario atual como fallback e nao grava nada remoto.
+
+
+
+Notas de UX
+
+-----------
+
+- Busca autocomplete substitui dropdown; retorna titulares e dependentes pelo id do auth; filtra opcoes de credencial por level.
+
+- Master aparece somente quando o usuario logado e master; admins nao veem/alteram master.
+
+- Status toggles usam texto Ativo/Inativo e feedback textual.
+
+
+- Toggles de permissao usam PERMISSION_GROUPS. Como algumas keys sao compartilhadas, alguns switches ligam/desligam juntos. Ver detalhes em docs/PermissoesToggles.txt.
+
+- Ajuda contextual: HelpButton top-right, conteudo em src/help/helpConfiguracoes.json; assets em public/help/configuracoes/.
+
