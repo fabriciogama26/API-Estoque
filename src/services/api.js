@@ -666,6 +666,30 @@ const normalizeDomainOptions = (lista) =>
     })
     .filter(Boolean)
 
+const normalizeDedupeKey = (value) => {
+  const texto = trim(value)
+  if (!texto) {
+    return ''
+  }
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+}
+
+const dedupeDomainOptionsByName = (lista) => {
+  const seen = new Set()
+  return (Array.isArray(lista) ? lista : []).filter((item) => {
+    const key = normalizeDedupeKey(item?.nome ?? '')
+    if (!key || seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+}
+
 const normalizeEntradaInput = (payload = {}) => {
   const materialId = trim(payload.materialId)
   if (!materialId) {
@@ -896,6 +920,29 @@ async function resolveStatusHhtDefaultId() {
   return null
 }
 
+const statusHhtNomeCache = new Map()
+async function resolveStatusHhtNome(statusId) {
+  const alvo = normalizeOptionId(statusId)
+  if (!alvo) {
+    return ''
+  }
+  if (statusHhtNomeCache.has(alvo)) {
+    return statusHhtNomeCache.get(alvo) || ''
+  }
+  try {
+    const registro = await executeMaybeSingle(
+      supabase.from('status_hht').select('status').eq('id', alvo).limit(1),
+      'Falha ao consultar status_hht.'
+    )
+    const nome = resolveTextValue(registro?.status ?? '')
+    statusHhtNomeCache.set(alvo, nome)
+    return nome
+  } catch (error) {
+    reportClientError('Nao foi possivel resolver status_hht.', error, { statusId: alvo })
+    return ''
+  }
+}
+
 const toStartOfDayUtcIso = (value) => toDateOnlyIso(value)
 
 const toEndOfDayUtcIso = (value) => {
@@ -1015,6 +1062,24 @@ async function resolveCentroCustoNome(valor, { tipo = 'estoque' } = {}) {
     return resolveTextValue(registro?.almox ?? '') || raw
   } catch (error) {
     reportClientError('Nao foi possivel resolver centro de estoque.', error, { valor: raw, tipo })
+    return raw
+  }
+}
+
+async function resolveCentroServicoNome(valor) {
+  const raw = trim(valor)
+  if (!raw) {
+    return ''
+  }
+  if (!UUID_REGEX.test(raw)) {
+    return raw
+  }
+  try {
+    const lista = await carregarCentrosServico()
+    const encontrado = (lista ?? []).find((item) => item?.id === raw)
+    return resolveTextValue(encontrado?.nome ?? '') || raw
+  } catch (error) {
+    reportClientError('Nao foi possivel resolver centro de servico.', error, { valor: raw })
     return raw
   }
 }
@@ -2130,6 +2195,9 @@ function mapSaidaRecord(record) {
     local: resolveTextValue(record.local ?? ''),
     dataEntrega: record.dataEntrega ?? record.data_entrega ?? null,
     dataTroca: record.dataTroca ?? record.data_troca ?? null,
+    isTroca: record.isTroca ?? record.is_troca ?? false,
+    trocaDeSaida: record.trocaDeSaida ?? record.troca_de_saida ?? null,
+    trocaSequencia: record.trocaSequencia ?? record.troca_sequencia ?? 0,
     statusId,
     status: statusTexto || statusRaw,
     statusNome: statusRelNome || statusTexto || statusRaw,
@@ -2208,6 +2276,9 @@ async function buildSaidaSnapshot(saida) {
     statusNome: statusNome || statusId || '',
     dataEntrega: saida.dataEntrega,
     dataTroca: saida.dataTroca,
+    isTroca: Boolean(saida.isTroca),
+    trocaDeSaida: saida.trocaDeSaida || null,
+    trocaSequencia: Number.isFinite(Number(saida.trocaSequencia)) ? Number(saida.trocaSequencia) : 0,
     usuarioResponsavel: saida.usuarioResponsavelNome || saida.usuarioResponsavel || '',
   }
 }
@@ -2248,6 +2319,9 @@ async function registrarSaidaHistoricoSupabase(saidaAtual, saidaAnterior = null,
       'centroServico',
       'dataEntrega',
       'dataTroca',
+      'isTroca',
+      'trocaDeSaida',
+      'trocaSequencia',
     ]
     const mudou = (campo) => {
       if (!snapshotAnterior) {
@@ -2618,7 +2692,7 @@ async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
 
 async function carregarCentrosCusto() {
   const data = await execute(
-    supabase.from(CENTROS_CUSTO_TABLE).select('id, nome').order('nome', { ascending: true }),
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_custo' }),
     'Falha ao listar centros de custo.'
   )
   return normalizeDomainOptions(data ?? [])
@@ -2629,13 +2703,16 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
   if (!termo) {
     return []
   }
-  const like = `%${termo.replace(/\s+/g, '%')}%`
   try {
     const registros = await execute(
-      supabase.from(CENTRO_ESTOQUE_TABLE).select('id').ilike('almox', like).limit(50),
+      supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
       'Falha ao consultar centros de estoque.'
     )
-    return (registros ?? []).map((item) => item?.id).filter(Boolean)
+    const like = normalizeSearchTerm(termo)
+    return (registros ?? [])
+      .filter((item) => normalizeSearchTerm(item?.nome).includes(like))
+      .map((item) => item?.id)
+      .filter(Boolean)
   } catch (error) {
     reportClientError('Falha ao filtrar centros de estoque por nome.', error, { termo })
     return []
@@ -2644,21 +2721,16 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
 
 async function carregarCentrosEstoqueCatalogo() {
   const data = await execute(
-    supabase.from(CENTRO_ESTOQUE_TABLE).select('id, almox').order('almox', { ascending: true }),
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
     'Falha ao listar centros de estoque.'
   )
-  return normalizeDomainOptions(
-    (data ?? []).map((item) => ({
-      id: item?.id ?? null,
-      nome: resolveTextValue(item?.almox ?? ''),
-    }))
-  )
+  return dedupeDomainOptionsByName(normalizeDomainOptions(data ?? []))
 }
 
 async function carregarCentrosServico() {
   const data = await execute(
-    supabase.from('centros_servico').select('id, nome').order('nome'),
-    'Falha ao listar centros de servi├ºo.'
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
+    'Falha ao listar centros de servico.'
   )
   return normalizeDomainOptions(data ?? [])
 }
@@ -3267,16 +3339,12 @@ async function carregarSaidas(params = {}) {
             `
               id,
               nome,
+              matricula,
               centro_servico_id,
-              centros_servico ( id, nome ),
               setor_id,
-              setores ( id, nome ),
               cargo_id,
-              cargos ( id, nome ),
               centro_custo_id,
-              centros_custo ( id, nome ),
-              tipo_execucao_id,
-              tipo_execucao ( id, nome )
+              tipo_execucao_id
             `
           ),
         'Falha ao listar pessoas.'
@@ -3697,7 +3765,6 @@ export const api = {
       if (!usuarioId) {
         throw new Error('Sessao invalida, usuario nao identificado.')
       }
-      const agora = new Date().toISOString()
       const referencias = await resolvePessoaReferencias(dados)
       if (!dados.dataAdmissao) {
         throw new Error('Informe a data de admissao no formato dd/MM/yyyy.')
@@ -3732,46 +3799,20 @@ export const api = {
       }
 
       const registro = await executeSingle(
-        supabase
-          .from('pessoas')
-          .insert({
-            nome: dados.nome,
-            matricula: dados.matricula,
-            observacao: dados.observacao,
-            centro_servico_id: referencias.centroServicoId,
-            setor_id: referencias.setorId,
-            cargo_id: referencias.cargoId,
-            centro_custo_id: referencias.centroCustoId,
-            tipo_execucao_id: referencias.tipoExecucaoId,
-            dataAdmissao: dados.dataAdmissao,
-            dataDemissao: dados.dataDemissao,
-            usuarioCadastro: usuarioId,
-            criadoEm: agora,
-            atualizadoEm: null,
-            ativo: dados.ativo !== false,
-          })
-          .select(`
-            id,
-            nome,
-            matricula,
-            "dataAdmissao",
-            "dataDemissao",
-            "usuarioCadastro",
-            "usuarioEdicao",
-            "criadoEm",
-            "atualizadoEm",
-            ativo,
-            centro_servico_id,
-            setor_id,
-            cargo_id,
-            centro_custo_id,
-            tipo_execucao_id,
-            centros_servico ( id, nome ),
-            setores ( id, nome ),
-            cargos ( id, nome ),
-            centros_custo ( id, nome ),
-            tipo_execucao ( id, nome )
-          `),
+        supabase.rpc('rpc_pessoas_create_full', {
+          p_nome: dados.nome,
+          p_matricula: dados.matricula,
+          p_observacao: dados.observacao,
+          p_data_admissao: dados.dataAdmissao,
+          p_data_demissao: dados.dataDemissao,
+          p_centro_servico_id: referencias.centroServicoId,
+          p_setor_id: referencias.setorId,
+          p_cargo_id: referencias.cargoId,
+          p_centro_custo_id: referencias.centroCustoId,
+          p_tipo_execucao_id: referencias.tipoExecucaoId,
+          p_ativo: dados.ativo !== false,
+          p_usuario_id: usuarioId,
+        }),
         'Falha ao criar pessoa.'
       )
 
@@ -3802,12 +3843,7 @@ export const api = {
             setor_id,
             cargo_id,
             centro_custo_id,
-            tipo_execucao_id,
-            centros_servico ( id, nome ),
-            setores ( id, nome ),
-            cargos ( id, nome ),
-            centros_custo ( id, nome ),
-            tipo_execucao ( id, nome )
+            tipo_execucao_id
           `)
           .eq('id', id),
         'Falha ao obter pessoa.'
@@ -3826,7 +3862,6 @@ export const api = {
         reportClientError('Falha ao resolver account_owner_id; prosseguindo sem owner.', err, { usuarioId })
         effective = null
       }
-      const agora = new Date().toISOString()
       if (!dados.dataAdmissao) {
         throw new Error('Informe a data de admissao no formato dd/MM/yyyy.')
       }
@@ -3869,20 +3904,6 @@ export const api = {
         }
       })
 
-      if (camposAlterados.length > 0) {
-        await execute(
-          supabase
-            .from('pessoas_historico')
-            .insert({
-              pessoa_id: id,
-              data_edicao: agora,
-              usuario_responsavel: usuarioId,
-              campos_alterados: camposAlterados,
-            }),
-          'Falha ao registrar historico de edicao.'
-        )
-      }
-
       const referencias = await resolvePessoaReferencias(dados)
 
       const preflight = await executeMaybeSingle(
@@ -3906,55 +3927,24 @@ export const api = {
         throw err
       }
 
-      await execute(
-          supabase
-            .from('pessoas')
-            .update({
-              nome: dados.nome,
-              matricula: dados.matricula,
-              observacao: dados.observacao,
-              centro_servico_id: referencias.centroServicoId,
-              setor_id: referencias.setorId,
-              cargo_id: referencias.cargoId,
-              centro_custo_id: referencias.centroCustoId,
-              tipo_execucao_id: referencias.tipoExecucaoId,
-            dataAdmissao: dados.dataAdmissao,
-            dataDemissao: dados.dataDemissao,
-            atualizadoEm: agora,
-            usuarioEdicao: usuarioId,
-            ativo: dados.ativo !== false,
-          })
-          .eq('id', id),
-        'Falha ao atualizar pessoa.'
-      )
-
       const registro = await executeSingle(
-        supabase
-          .from('pessoas')
-          .select(`
-            id,
-            nome,
-            matricula,
-            "dataAdmissao",
-            "dataDemissao",
-            "usuarioCadastro",
-            "usuarioEdicao",
-            "criadoEm",
-            "atualizadoEm",
-            ativo,
-            centro_servico_id,
-            setor_id,
-            cargo_id,
-            centro_custo_id,
-            tipo_execucao_id,
-            centros_servico ( id, nome ),
-            setores ( id, nome ),
-            cargos ( id, nome ),
-            centros_custo ( id, nome ),
-            tipo_execucao ( id, nome )
-          `)
-          .eq('id', id),
-        'Falha ao obter pessoa.'
+        supabase.rpc('rpc_pessoas_update_full', {
+          p_id: id,
+          p_nome: dados.nome,
+          p_matricula: dados.matricula,
+          p_observacao: dados.observacao,
+          p_data_admissao: dados.dataAdmissao,
+          p_data_demissao: dados.dataDemissao,
+          p_centro_servico_id: referencias.centroServicoId,
+          p_setor_id: referencias.setorId,
+          p_cargo_id: referencias.cargoId,
+          p_centro_custo_id: referencias.centroCustoId,
+          p_tipo_execucao_id: referencias.tipoExecucaoId,
+          p_ativo: dados.ativo !== false,
+          p_usuario_id: usuarioId,
+          p_campos_alterados: camposAlterados,
+        }),
+        'Falha ao atualizar pessoa.'
       )
 
       return mapPessoaRecord(registro)
@@ -4562,16 +4552,14 @@ export const api = {
       const usuarioId = await resolveUsuarioIdOrThrow()
       const dados = normalizeEntradaInput(payload)
       const registro = await executeSingle(
-        supabase
-          .from('entradas')
-          .insert({
-            materialId: dados.materialId,
-            quantidade: dados.quantidade,
-            centro_estoque: dados.centroCusto,
-            dataEntrada: dados.dataEntrada,
-            usuarioResponsavel: usuarioId,
-          })
-          .select(),
+        supabase.rpc('rpc_entradas_create_full', {
+          p_material_id: dados.materialId,
+          p_quantidade: dados.quantidade,
+          p_centro_estoque: dados.centroCusto,
+          p_data_entrada: dados.dataEntrada,
+          p_status: normalizeUuid(payload.statusId ?? payload.status ?? null),
+          p_usuario_id: usuarioId,
+        }),
         'Falha ao registrar entrada.'
       )
       const entradaNormalizada = mapEntradaRecord(registro)
@@ -4590,19 +4578,15 @@ export const api = {
       const usuarioId = await resolveUsuarioIdOrThrow()
       const dados = normalizeEntradaInput(payload)
       const registro = await executeSingle(
-        supabase
-          .from('entradas')
-          .update({
-            materialId: dados.materialId,
-            quantidade: dados.quantidade,
-            centro_estoque: dados.centroCusto,
-            dataEntrada: dados.dataEntrada,
-            usuarioResponsavel: usuarioId,
-            usuario_edicao: usuarioId,
-            atualizado_em: new Date().toISOString(),
-          })
-          .eq('id', id)
-          .select(),
+        supabase.rpc('rpc_entradas_update_full', {
+          p_id: id,
+          p_material_id: dados.materialId,
+          p_quantidade: dados.quantidade,
+          p_centro_estoque: dados.centroCusto,
+          p_data_entrada: dados.dataEntrada,
+          p_status: normalizeUuid(payload.statusId ?? payload.status ?? null),
+          p_usuario_id: usuarioId,
+        }),
         'Falha ao atualizar entrada.'
       )
       const entradaNormalizada = mapEntradaRecord(registro)
@@ -4728,21 +4712,39 @@ export const api = {
 
       const dataEntregaIso = dataEntregaDate.toISOString()
 
+      const trocaPreflight = await executeMaybeSingle(
+        supabase.rpc('rpc_saida_verificar_troca', {
+          p_material_id: materialId,
+          p_pessoa_id: pessoaId,
+        }),
+        'Falha ao verificar troca da saida.'
+      )
+      if (trocaPreflight?.tem_saida && !payload.forceTroca) {
+        const err = new Error('TROCA_CONFIRM')
+        err.code = 'TROCA_CONFIRM'
+        err.details = {
+          ultimaSaidaId: trocaPreflight?.ultima_saida_id ?? null,
+          trocaSequencia: trocaPreflight?.troca_sequencia ?? 0,
+        }
+        throw err
+      }
+
+      const trocaSequencia = Number(trocaPreflight?.troca_sequencia ?? 0)
       const registro = await executeSingle(
-        supabase
-          .from('saidas')
-          .insert({
-            pessoaId,
-            materialId,
-            quantidade,
-            centro_estoque: centroEstoqueIdFinal,
-            centro_custo: centroCustoIdFinal,
-            centro_servico: centroServicoIdFinal,
-            dataEntrega: dataEntregaIso,
-            status,
-            usuarioResponsavel: usuarioId,
-          })
-          .select(),
+        supabase.rpc('rpc_saidas_create_full', {
+          p_pessoa_id: pessoaId,
+          p_material_id: materialId,
+          p_quantidade: quantidade,
+          p_centro_estoque: centroEstoqueIdFinal,
+          p_centro_custo: centroCustoIdFinal,
+          p_centro_servico: centroServicoIdFinal,
+          p_data_entrega: dataEntregaIso,
+          p_status: status,
+          p_usuario_id: usuarioId,
+          p_is_troca: trocaPreflight?.tem_saida && payload.forceTroca ? true : false,
+          p_troca_de_saida: trocaPreflight?.tem_saida && payload.forceTroca ? trocaPreflight?.ultima_saida_id ?? null : null,
+          p_troca_sequencia: trocaPreflight?.tem_saida && payload.forceTroca ? (trocaSequencia > 0 ? trocaSequencia : 1) : null,
+        }),
         'Falha ao registrar saida.'
       )
 
@@ -4833,21 +4835,18 @@ export const api = {
         STATUS_ENTREGUE_ID
 
       const registro = await executeSingle(
-        supabase
-          .from('saidas')
-          .update({
-            pessoaId,
-            materialId,
-            quantidade,
-            centro_estoque: centroEstoqueIdFinal,
-            centro_custo: centroCustoIdFinal,
-            centro_servico: centroServicoIdFinal,
-            dataEntrega: dataEntregaIso,
-            status: statusValor,
-            usuarioResponsavel: usuarioId,
-          })
-          .eq('id', id)
-          .select(),
+        supabase.rpc('rpc_saidas_update_full', {
+          p_id: id,
+          p_pessoa_id: pessoaId,
+          p_material_id: materialId,
+          p_quantidade: quantidade,
+          p_centro_estoque: centroEstoqueIdFinal,
+          p_centro_custo: centroCustoIdFinal,
+          p_centro_servico: centroServicoIdFinal,
+          p_data_entrega: dataEntregaIso,
+          p_status: statusValor,
+          p_usuario_id: usuarioId,
+        }),
         'Falha ao atualizar saida.'
       )
 
@@ -5185,18 +5184,28 @@ export const api = {
         ...resto
       } = dados
       const registro = await executeSingle(
-        supabase
-          .from('acidentes')
-          .insert({
-            ...resto,
-            centro_servico: centroServicoDb,
-            partes_lesionadas: partesPayload,
-            data_esocial: dataEsocial,
-            sesmt,
-            data_sesmt: dataSesmt,
-            registradoPor: usuario,
-          })
-          .select(),
+        supabase.rpc('rpc_acidentes_create_full', {
+          p_matricula: resto.matricula,
+          p_nome: resto.nome,
+          p_cargo: resto.cargo,
+          p_data: resto.data,
+          p_dias_perdidos: resto.diasPerdidos,
+          p_dias_debitados: resto.diasDebitados,
+          p_tipo: resto.tipo,
+          p_agente: resto.agente,
+          p_cid: resto.cid,
+          p_centro_servico: centroServicoDb,
+          p_local: resto.local,
+          p_cat: resto.cat,
+          p_observacao: resto.observacao,
+          p_partes_lesionadas: partesPayload,
+          p_lesoes: lesoes,
+          p_data_esocial: dataEsocial,
+          p_sesmt: sesmt,
+          p_data_sesmt: dataSesmt,
+          p_hht: resto.hht,
+          p_registrado_por: usuario,
+        }),
         'Falha ao registrar acidente.'
       )
       return mapAcidenteRecord(registro)
@@ -5334,17 +5343,6 @@ export const api = {
           })
         }
       })
-      const agora = new Date().toISOString()
-      const historicoRegistro =
-        camposAlterados.length > 0
-          ? {
-              acidente_id: id,
-              data_edicao: agora,
-              usuario_responsavel: usuario,
-              campos_alterados: camposAlterados,
-            }
-          : null
-
       const {
         centroServico: centroServicoDb,
         partesLesionadas: partesPayload,
@@ -5358,29 +5356,33 @@ export const api = {
         ...resto
       } = dados
       const registro = await executeSingle(
-        supabase
-          .from('acidentes')
-          .update({
-            ...resto,
-            centro_servico: centroServicoDb,
-            partes_lesionadas: partesPayload,
-            data_esocial: dataEsocial,
-            sesmt,
-            data_sesmt: dataSesmt,
-            atualizadoPor: usuario,
-            atualizadoEm: agora,
-          })
-          .eq('id', id)
-          .select(),
+        supabase.rpc('rpc_acidentes_update_full', {
+          p_id: id,
+          p_matricula: resto.matricula,
+          p_nome: resto.nome,
+          p_cargo: resto.cargo,
+          p_data: resto.data,
+          p_dias_perdidos: resto.diasPerdidos,
+          p_dias_debitados: resto.diasDebitados,
+          p_tipo: resto.tipo,
+          p_agente: resto.agente,
+          p_cid: resto.cid,
+          p_centro_servico: centroServicoDb,
+          p_local: resto.local,
+          p_cat: resto.cat,
+          p_observacao: resto.observacao,
+          p_partes_lesionadas: partesPayload,
+          p_lesoes: lesoes,
+          p_data_esocial: dataEsocial,
+          p_sesmt: sesmt,
+          p_data_sesmt: dataSesmt,
+          p_hht: toNullableNumber(payload.hht ?? atual.hht),
+          p_atualizado_por: usuario,
+          p_campos_alterados: camposAlterados,
+        }),
         'Falha ao atualizar acidente.'
       )
       await ensureAcidentePartes(partes)
-      if (historicoRegistro) {
-        await execute(
-          supabase.from('acidente_historico').insert(historicoRegistro),
-          'Falha ao registrar hist├│rico do acidente.'
-        )
-      }
       return mapAcidenteRecord(registro)
     },
     async cancel(id, payload = {}) {
@@ -5661,67 +5663,38 @@ export const api = {
       }
 
       const registro = await executeSingle(
-        supabase
-          .from('hht_mensal')
-          .insert({
-            mes_ref: mesRef,
-            centro_servico_id: centroServicoId,
-            status_hht_id: statusHhtId,
-            qtd_pessoas: toNumber(payload.qtdPessoas ?? payload.qtd_pessoas, 0),
-            horas_mes_base: toNumber(payload.horasMesBase ?? payload.horas_mes_base, 0),
-            escala_factor: toNumber(payload.escalaFactor ?? payload.escala_factor, 1),
-            horas_afastamento: toNumber(payload.horasAfastamento ?? payload.horas_afastamento, 0),
-            horas_ferias: toNumber(payload.horasFerias ?? payload.horas_ferias, 0),
-            horas_treinamento: toNumber(payload.horasTreinamento ?? payload.horas_treinamento, 0),
-            horas_outros_descontos: toNumber(
-              payload.horasOutrosDescontos ?? payload.horas_outros_descontos,
-              0,
-            ),
-            horas_extras: toNumber(payload.horasExtras ?? payload.horas_extras, 0),
-            modo: trim(payload.modo),
-            hht_informado: toNullableNumber(payload.hhtInformado ?? payload.hht_informado),
-          })
-          .select(
-            `
-            id,
-            mes_ref,
-            centro_servico_id,
-            status_hht_id,
-            qtd_pessoas,
-            horas_mes_base,
-            escala_factor,
-            horas_afastamento,
-            horas_ferias,
-            horas_treinamento,
-            horas_outros_descontos,
-            horas_extras,
-            modo,
-            hht_informado,
-            hht_calculado,
-            hht_final,
-            created_at,
-            created_by,
-            updated_at,
-            updated_by,
-            centros_servico (id, nome),
-            status_hht (id, status)
-          `
+        supabase.rpc('rpc_hht_mensal_create_full', {
+          p_mes_ref: mesRef,
+          p_centro_servico_id: centroServicoId,
+          p_status_hht_id: statusHhtId,
+          p_qtd_pessoas: toNumber(payload.qtdPessoas ?? payload.qtd_pessoas, 0),
+          p_horas_mes_base: toNumber(payload.horasMesBase ?? payload.horas_mes_base, 0),
+          p_escala_factor: toNumber(payload.escalaFactor ?? payload.escala_factor, 1),
+          p_horas_afastamento: toNumber(payload.horasAfastamento ?? payload.horas_afastamento, 0),
+          p_horas_ferias: toNumber(payload.horasFerias ?? payload.horas_ferias, 0),
+          p_horas_treinamento: toNumber(payload.horasTreinamento ?? payload.horas_treinamento, 0),
+          p_horas_outros_descontos: toNumber(
+            payload.horasOutrosDescontos ?? payload.horas_outros_descontos,
+            0,
           ),
+          p_horas_extras: toNumber(payload.horasExtras ?? payload.horas_extras, 0),
+          p_modo: trim(payload.modo),
+          p_hht_informado: toNullableNumber(payload.hhtInformado ?? payload.hht_informado),
+        }),
         'Falha ao criar HHT mensal.'
       )
 
-      if (
-        Number.isFinite(registro?.hht_final) &&
-        (registro?.status_hht?.status || '').toLowerCase() !== 'cancelado'
-      ) {
+      const statusHhtNome = await resolveStatusHhtNome(registro?.status_hht_id ?? statusHhtId)
+      if (Number.isFinite(registro?.hht_final) && statusHhtNome.toLowerCase() !== 'cancelado') {
         await syncAcidentesHht(registro.centro_servico_id, registro.mes_ref, registro.hht_final)
       }
+      const centroServicoNome = await resolveCentroServicoNome(registro?.centro_servico_id ?? centroServicoId)
 
       return {
         id: registro.id,
         mesRef: registro.mes_ref ?? null,
         centroServicoId: registro.centro_servico_id ?? null,
-        centroServicoNome: resolveTextValue(registro?.centros_servico?.nome ?? ''),
+        centroServicoNome,
         qtdPessoas: toNumber(registro.qtd_pessoas, 0),
         horasMesBase: toNumber(registro.horas_mes_base, 0),
         escalaFactor: toNumber(registro.escala_factor, 1),
@@ -5757,64 +5730,36 @@ export const api = {
       }
 
       const registro = await executeSingle(
-        supabase
-          .from('hht_mensal')
-          .update({
-            mes_ref: mesRef,
-            centro_servico_id: centroServicoId,
-            status_hht_id: statusHhtId,
-            qtd_pessoas: payload.qtdPessoas ?? payload.qtd_pessoas,
-            horas_mes_base: payload.horasMesBase ?? payload.horas_mes_base,
-            escala_factor: payload.escalaFactor ?? payload.escala_factor,
-            horas_afastamento: payload.horasAfastamento ?? payload.horas_afastamento,
-            horas_ferias: payload.horasFerias ?? payload.horas_ferias,
-            horas_treinamento: payload.horasTreinamento ?? payload.horas_treinamento,
-            horas_outros_descontos: payload.horasOutrosDescontos ?? payload.horas_outros_descontos,
-            horas_extras: payload.horasExtras ?? payload.horas_extras,
-            modo: payload.modo,
-            hht_informado: payload.hhtInformado ?? payload.hht_informado,
-          })
-          .eq('id', id)
-          .select(
-            `
-            id,
-            mes_ref,
-            centro_servico_id,
-            qtd_pessoas,
-            horas_mes_base,
-            escala_factor,
-            horas_afastamento,
-            horas_ferias,
-            horas_treinamento,
-            horas_outros_descontos,
-            horas_extras,
-            modo,
-            hht_informado,
-            hht_calculado,
-            hht_final,
-            created_at,
-            created_by,
-            updated_at,
-            updated_by,
-            centros_servico (id, nome),
-            status_hht (id, status)
-          `
-          ),
+        supabase.rpc('rpc_hht_mensal_update_full', {
+          p_id: id,
+          p_mes_ref: mesRef ?? null,
+          p_centro_servico_id: centroServicoId ?? null,
+          p_status_hht_id: statusHhtId ?? null,
+          p_qtd_pessoas: payload.qtdPessoas ?? payload.qtd_pessoas ?? null,
+          p_horas_mes_base: payload.horasMesBase ?? payload.horas_mes_base ?? null,
+          p_escala_factor: payload.escalaFactor ?? payload.escala_factor ?? null,
+          p_horas_afastamento: payload.horasAfastamento ?? payload.horas_afastamento ?? null,
+          p_horas_ferias: payload.horasFerias ?? payload.horas_ferias ?? null,
+          p_horas_treinamento: payload.horasTreinamento ?? payload.horas_treinamento ?? null,
+          p_horas_outros_descontos: payload.horasOutrosDescontos ?? payload.horas_outros_descontos ?? null,
+          p_horas_extras: payload.horasExtras ?? payload.horas_extras ?? null,
+          p_modo: payload.modo ?? null,
+          p_hht_informado: payload.hhtInformado ?? payload.hht_informado ?? null,
+        }),
         'Falha ao atualizar HHT mensal.'
       )
 
-      if (
-        Number.isFinite(registro?.hht_final) &&
-        (registro?.status_hht?.status || '').toLowerCase() !== 'cancelado'
-      ) {
+      const statusHhtNome = await resolveStatusHhtNome(registro?.status_hht_id ?? statusHhtId)
+      if (Number.isFinite(registro?.hht_final) && statusHhtNome.toLowerCase() !== 'cancelado') {
         await syncAcidentesHht(registro.centro_servico_id, registro.mes_ref, registro.hht_final)
       }
+      const centroServicoNome = await resolveCentroServicoNome(registro?.centro_servico_id ?? centroServicoId)
 
       return {
         id: registro.id,
         mesRef: registro.mes_ref ?? null,
         centroServicoId: registro.centro_servico_id ?? null,
-        centroServicoNome: resolveTextValue(registro?.centros_servico?.nome ?? ''),
+        centroServicoNome,
         qtdPessoas: toNumber(registro.qtd_pessoas, 0),
         horasMesBase: toNumber(registro.horas_mes_base, 0),
         escalaFactor: toNumber(registro.escala_factor, 1),
@@ -5957,19 +5902,19 @@ export const api = {
     async pessoas() {
       const [centros, setores, cargos, tipos] = await Promise.all([
         execute(
-          supabase.from('centros_servico').select('id, nome').order('nome'),
+          supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
           'Falha ao carregar centros de servico.'
         ),
         execute(
-          supabase.from('setores').select('id, nome').order('nome'),
+          supabase.rpc('rpc_catalog_list', { p_table: 'setores' }),
           'Falha ao carregar setores.'
         ),
         execute(
-          supabase.from('cargos').select('id, nome').order('nome'),
+          supabase.rpc('rpc_catalog_list', { p_table: 'cargos' }),
           'Falha ao carregar cargos.'
         ),
         execute(
-          supabase.from('tipo_execucao').select('id, nome').order('nome'),
+          supabase.rpc('rpc_catalog_list', { p_table: 'tipo_execucao' }),
           'Falha ao carregar tipos de execucao.'
         ),
       ])
@@ -6100,27 +6045,11 @@ async function resolveReferenceId(table, value, errorMessage) {
     throw new Error(errorMessage ?? ('Informe um valor para ' + table + '.'))
   }
 
-  const consulta = () => supabase.from(table).select('id').eq('nome', nome).limit(1)
-  let data = await execute(consulta(), 'Falha ao consultar ' + table + '.')
-  let encontrado = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
-
-  if (!encontrado) {
-    data = await execute(
-      supabase.from(table).select('id').ilike('nome', nome).limit(1),
-      'Falha ao consultar ' + table + '.'
-    )
-    encontrado = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
-  }
-
-  if (!encontrado) {
-    data = await execute(
-      supabase.from(table).select('id').ilike('nome', `%${nome}%`).limit(1),
-      'Falha ao consultar ' + table + '.'
-    )
-    encontrado = Array.isArray(data) && data.length ? data[0]?.id ?? null : null
-  }
-
-  if (!encontrado) {
+  const encontrado = await execute(
+    supabase.rpc('rpc_catalog_resolve', { p_table: table, p_nome: nome }),
+    'Falha ao consultar ' + table + '.'
+  )
+  if (!encontrado || !isUuidValue(encontrado)) {
     throw new Error(errorMessage ?? ('Valor "' + nome + '" nao encontrado.'))
   }
   return encontrado
@@ -6128,31 +6057,24 @@ async function resolveReferenceId(table, value, errorMessage) {
 
 async function resolveCentroCustoId(dados, centroServicoId) {
   const nome = trim(dados.centroCusto ?? dados.centro_custo ?? '')
-  const consultas = []
 
-  // Se o centro de servico tem FK para centro de custo, usa diretamente.
   if (centroServicoId) {
-    consultas.push(
-      supabase.from('centros_servico').select('centro_custo_id').eq('id', centroServicoId).limit(1)
+    const centroCustoDireto = await execute(
+      supabase.rpc('rpc_centro_servico_centro_custo', { p_centro_servico_id: centroServicoId }),
+      'Falha ao consultar centros de custo.'
     )
-  }
-
-  // Se o nome foi informado, tenta pelos nomes.
-  if (nome) {
-    consultas.push(supabase.from('centros_custo').select('id').eq('nome', nome).limit(1))
-    consultas.push(supabase.from('centros_custo').select('id').ilike('nome', nome).limit(1))
-    consultas.push(supabase.from('centros_custo').select('id').ilike('nome', `%${nome}%`).limit(1))
-  }
-
-  for (const query of consultas) {
-    const data = await execute(query, 'Falha ao consultar centros de custo.')
-    if (!data) {
-      continue
+    if (centroCustoDireto && isUuidValue(centroCustoDireto)) {
+      return centroCustoDireto
     }
-    const registro = Array.isArray(data) ? data[0] : data
-    const id = registro?.centro_custo_id ?? registro?.id ?? null
-    if (id && isUuidValue(id)) {
-      return id
+  }
+
+  if (nome) {
+    const centroCustoId = await execute(
+      supabase.rpc('rpc_catalog_resolve', { p_table: 'centros_custo', p_nome: nome }),
+      'Falha ao consultar centros de custo.'
+    )
+    if (centroCustoId && isUuidValue(centroCustoId)) {
+      return centroCustoId
     }
   }
 
@@ -6214,4 +6136,5 @@ async function carregarPessoasViewDetalhes(ids) {
     return new Map()
   }
 }
+
 

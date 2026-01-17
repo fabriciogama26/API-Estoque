@@ -1,0 +1,36 @@
+Problema: toggles na tela Configuracoes nao sao independentes
+
+Sintoma:
+- Ao marcar Entradas, outros modulos (Estoque, Saidas, Materiais, Termo EPI) tambem mudam.
+- Ao marcar Dashboard Acidentes, Cadastro de Acidentes muda junto.
+
+Causa (front):
+- PERMISSION_GROUPS compartilha keys entre grupos (ex.: estoque.read / estoque.write e acidentes.read).
+- O toggle liga/desliga todas as keys do grupo.
+- Como as keys sao reutilizadas por outros grupos, eles aparecem como ligados/desligados juntos.
+
+Arquivos:
+- src/config/permissions.js (PERMISSION_GROUPS, PAGE_REQUIRED_PERMISSION)
+- src/pages/Configuracoes.jsx (logica de toggle usando group.keys)
+
+Plano de correção (recomendado):
+1) Separar keys por modulo:
+   - entradas -> estoque.entradas
+   - saidas -> estoque.saidas
+   - materiais -> estoque.materiais
+   - termo -> estoque.termo
+   - dashboard acidentes -> acidentes.dashboard
+   - cadastro acidentes -> acidentes.cadastro (exemplo)
+2) Atualizar PAGE_REQUIRED_PERMISSION para usar as keys novas.
+3) Atualizar RLS/RPC (has_permission) para checar keys especificas do modulo.
+4) Migrar role_permissions para incluir as novas keys.
+
+Observacao:
+- Se mantiver keys compartilhadas, a UI nao consegue ter toggles 100% independentes.
+
+Pendencias confirmadas (para estudo/execucao)
+---------------------------------------------
+- Separar keys por modulo em permissions.js (sem estoque.read/write compartilhado).
+- Atualizar PAGE_REQUIRED_PERMISSION para as novas keys.
+- Ajustar RLS/RPC (checks de has_permission) para as novas keys.
+- Migrar permissions/role_permissions no banco para incluir as novas keys.

@@ -40,3 +40,12 @@ Atualizacao 2025-12 (dependentes/configuracoes)
 ---------------------------------------------
 - Configuracoes: autocomplete traz app_users e app_users_dependentes; master visivel para admin/master.
 - Policies: preferir authenticated/service_role; avoid recursao (use claims ou service_role).
+
+Atualizacao 2026-01 (RLS/RPC)
+-----------------------------
+- RLS padrao: tabelas tenant com account_owner_id usam owner + permissao (has_permission).
+- Catalogos sem account_owner_id: SELECT publico apenas; sem INSERT/UPDATE/DELETE via app.
+- RPCs de catalogo (rpc_catalog_list/resolve) para evitar SELECT direto no front.
+- Funcoes de dedup/preflight que leem tabelas tenant devem filtrar owner e/ou rodar com SECURITY DEFINER + row_security off.
+- Materiais: RPC full (create/update) grava material + vinculos em uma transacao.
+- Pendencia: separar keys por modulo (ver docs/PermissoesToggles.txt) e atualizar RLS/RPC.

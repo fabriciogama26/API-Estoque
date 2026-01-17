@@ -1,0 +1,159 @@
+RLS / Multi-tenant map (pessoas, materiais, entradas, saidas)
+=============================================================
+
+Objetivo
+--------
+- Cada tenant (owner + dependentes) enxerga apenas seus dados.
+- Master enxerga tudo.
+- Tabelas com account_owner_id sao tenant.
+- Catalogos (sem account_owner_id) sao leitura publica (SELECT) apenas.
+- Nenhum DELETE via app.
+
+Fluxo de owner (como o banco identifica o tenant)
+-------------------------------------------------
+- auth.uid() vem do token do frontend.
+- current_account_owner_id() resolve o owner:
+  1) app_users_dependentes.auth_user_id -> owner_app_user_id
+  2) caso contrario: app_users.parent_user_id ou app_users.id
+- my_owner_id() deve delegar para current_account_owner_id().
+
+Funcoes base (backend)
+----------------------
+- supabase/migrations/20250101_security_rpc_rls.sql
+  - current_account_owner_id()
+  - has_role(), is_master(), is_admin()
+- supabase/migrations/20250208_add_current_actor_is_master.sql
+  - current_actor_is_master() (fallback para master via app_users/user_roles)
+- supabase/migrations/20250210_fix_my_owner_id.sql
+  - my_owner_id() -> current_account_owner_id()
+
+Politicas RLS tenant (limpeza e padrao)
+---------------------------------------
+- supabase/migrations/20250204_tenant_rls_hard_reset.sql
+  - remove todas policies das tabelas tenant
+  - recria: select/insert/update por owner + permissao
+  - inclui saidas/entradas/materiais/pessoas/hht/acidentes
+- supabase/migrations/20250207_secure_internal_tables.sql
+  - limpa e recria policies das tabelas internas:
+    app_users, app_users_dependentes, app_users_credential_history,
+    app_credentials_catalog, app_errors, api_errors, roles, user_roles,
+    planos_users
+- supabase/migrations/20250205_catalog_public_select_only.sql
+  - catalogos sem account_owner_id: SELECT publico apenas
+  - remove todas policies DELETE no banco
+
+Catalogos tenant (com account_owner_id)
+---------------------------------------
+- centros_servico, setores, cargos, centros_custo, centros_estoque, fabricantes
+- supabase/migrations/20250206_catalog_select_no_ativo.sql
+  - remove filtro ativo da policy SELECT
+- supabase/migrations/20250209_fix_catalog_select_owner.sql
+  - garante SELECT com owner + master (sem ativo)
+
+RPCs de catalogo (evitar SELECT direto no front)
+------------------------------------------------
+- supabase/migrations/20250211_catalog_rpc.sql
+  - rpc_catalog_list(p_table)
+  - rpc_catalog_resolve(p_table, p_nome)
+  - rpc_centro_servico_centro_custo(p_centro_servico_id)
+  - SECURITY DEFINER + row_security off
+  - filtra owner internamente (exceto master)
+
+Frontend (uso de RPCs de catalogo)
+----------------------------------
+- src/services/api.js
+  - resolveReferenceId -> rpc_catalog_resolve
+  - resolveCentroCustoId -> rpc_centro_servico_centro_custo + rpc_catalog_resolve
+  - carregarCentrosCusto / carregarCentrosServico / carregarCentrosEstoqueCatalogo
+    -> rpc_catalog_list
+  - references.pessoas() -> rpc_catalog_list para centros/setores/cargos/tipo_execucao
+
+Pessoas (cadastro)
+-----------------
+Backend
+- supabase/migrations/20250114_pessoas_preflight.sql
+  - pessoas_preflight_check: bloqueia matricula duplicada e alerta nome igual
+- supabase/migrations/0020_link_pessoas_reference_tables.sql
+  - trigger sync_pessoas_referencias usa _ensure_item para criar/obter
+    centros_servico, setores, cargos, centros_custo, tipo_execucao
+- supabase/migrations/20250203_pessoas_ensure_item_owner.sql
+  - _ensure_item SECURITY DEFINER + row_security off
+  - filtra por owner e valida permissao pessoas.write
+
+Frontend
+- src/services/api.js: api.pessoas.create()
+  - resolvePessoaReferencias() -> resolveReferenceId()/resolveCentroCustoId()
+  - pessoas_preflight_check (modal de nome igual)
+  - insert em pessoas (RLS owner + pessoas.write)
+
+Materiais (cadastro)
+--------------------
+Backend
+- supabase/migrations/20250109_adjust_materials_dedup.sql
+  - material_resolve_numero / material_hash_base / material_hash_completo
+  - verificar_duplicidade_material_relacionado / atualizar_hashes_material
+  - SECURITY DEFINER + row_security off (somente leitura interna)
+- supabase/migrations/20250111_material_preflight.sql
+  - material_preflight_check (CA duplicado/base igual)
+- supabase/migrations/20250129_material_create_full_rpc.sql
+  - rpc material_create_full (insere material + vinculos)
+- supabase/migrations/20250130_material_update_full_rpc.sql
+  - rpc material_update_full
+- supabase/migrations/20250128_material_relations_owner.sql
+  - triggers para setar account_owner_id em vinculos
+
+Frontend
+- src/services/api.js: api.materiais.create/update()
+  - preflight -> modal (BASE_CA_DIFF)
+  - cria/atualiza via RPC full (evita inserts separados)
+
+Saidas (cadastro + troca)
+-------------------------
+Backend
+- supabase/migrations/20250201_rpc_saida_verificar_troca.sql
+  - rpc_saida_verificar_troca (busca ultima saida da pessoa/material)
+- supabase/migrations/20250202_fix_rpc_saida_verificar_troca_overload.sql
+  - remove overload antigo
+- triggers historicos / data troca:
+  - 0035_set_data_troca_trigger.sql / 0038_fix_data_troca_trigger.sql
+  - 0039_prevent_saida_negative_stock.sql / 0040_fix_validar_saldo_saida.sql
+
+Frontend
+- src/services/api.js: api.saidas.create()
+  - rpc_saida_verificar_troca -> modal de troca
+  - insert em saidas + historico
+
+Entradas (cadastro)
+-------------------
+Backend
+- RLS owner + permissoes em entradas (20250204_tenant_rls_hard_reset.sql)
+- triggers de saldo/validacao (0039/0040)
+
+Frontend
+- src/services/api.js: api.entradas.create()/update()
+  - insert direto com RLS owner + entradas.write/estoque.write
+
+Estado atual e problemas observados
+-----------------------------------
+- Materiais: funcionando via RPC full + preflight.
+- Pessoas: ainda pode ocorrer 42501 se:
+  - RPCs de catalogo nao estiverem aplicados, ou
+  - front ainda chamar SELECT direto (ver api.js),
+  - ou owner resolver NULL (dependente sem vinculo em app_users_dependentes).
+- Saidas/Entradas: dependem de RLS owner e permissao correta.
+
+Pendencias (permissoes por modulo)
+----------------------------------
+- Separar keys por modulo em permissions.js (sem estoque.read/write compartilhado).
+- Atualizar PAGE_REQUIRED_PERMISSION para as novas keys.
+- Ajustar RLS/RPC (checks de has_permission) para as novas keys.
+- Migrar permissions/role_permissions no banco para incluir as novas keys.
+- Ver detalhes em docs/PermissoesToggles.txt.
+
+Checklist de validacao
+----------------------
+1) current_account_owner_id() nao pode retornar NULL.
+2) my_owner_id() deve delegar para current_account_owner_id().
+3) is_master() deve retornar true para o master.
+4) RPCs de catalogo aplicados e front usando rpc_catalog_*.
+5) Sem DELETE via app (policies removidas).

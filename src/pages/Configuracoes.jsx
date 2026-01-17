@@ -1425,43 +1425,22 @@ function AdminResetPasswordSection() {
 
 
       try {
-
-        const userIdForHistory = selectedUser.owner_app_user_id || selectedUser.id
-
-        await supabase.from('app_users_credential_history').insert({
-
-          user_id: userIdForHistory,
-
-          target_auth_user_id: selectedUser.id,
-
-          owner_app_user_id: selectedUser.owner_app_user_id || null,
-
-          target_dependent_id: selectedUser.dependent_id || null,
-
+        await supabase.rpc('rpc_admin_write_credential_history', {
+          target_user_id: selectedUser.id,
+          owner_user_id: selectedUser.owner_app_user_id || selectedUser.id,
+          dependent_id: selectedUser.dependent_id || null,
           user_username:
-
             selectedUser.username || selectedUser.display_name || selectedUser.email || selectedUser.id,
-
           changed_by: null,
-
           changed_by_username: 'Sistema (reset)',
-
-          action: 'password_reset',
-
-          before_credential: selectedUser.credential || 'admin',
-
-          after_credential: selectedUser.credential || 'admin',
-
           before_pages: Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : [],
-
           after_pages: Array.isArray(selectedUser.page_permissions) ? selectedUser.page_permissions : [],
-
+          p_action: 'password_reset',
+          p_before_credential: selectedUser.credential || 'admin',
+          p_after_credential: selectedUser.credential || 'admin',
         })
-
       } catch (historyErr) {
-
         reportError(historyErr, { stage: 'history_reset', userId: selectedUser.id })
-
       }
 
     } catch (err) {

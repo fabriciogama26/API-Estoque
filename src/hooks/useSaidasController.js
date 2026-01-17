@@ -59,6 +59,12 @@ const CANCEL_INITIAL = {
   error: null,
 }
 
+const TROCA_PROMPT_INITIAL = {
+  open: false,
+  payload: null,
+  details: null,
+}
+
 export function useSaidasController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('saidas')
@@ -80,6 +86,7 @@ export function useSaidasController() {
   const [currentPage, setCurrentPage] = useState(1)
   const [historyState, setHistoryState] = useState(HISTORY_INITIAL)
   const [cancelState, setCancelState] = useState(CANCEL_INITIAL)
+  const [trocaPrompt, setTrocaPrompt] = useState(TROCA_PROMPT_INITIAL)
 
   const [materialSearchValue, setMaterialSearchValue] = useState('')
   const [materialEstoque, setMaterialEstoque] = useState(null)
@@ -226,6 +233,29 @@ export function useSaidasController() {
     setError(null)
   }, [resetFormState])
 
+  const closeTrocaPrompt = useCallback(() => {
+    setTrocaPrompt(TROCA_PROMPT_INITIAL)
+  }, [])
+
+  const confirmTroca = useCallback(async () => {
+    if (!trocaPrompt.open || !trocaPrompt.payload) {
+      closeTrocaPrompt()
+      return
+    }
+    setIsSaving(true)
+    try {
+      await createSaida({ ...trocaPrompt.payload, forceTroca: true })
+      cancelEditSaida()
+      await load(filters, { resetPage: true })
+      closeTrocaPrompt()
+    } catch (err) {
+      setError(err.message)
+      reportError(err, { area: 'saidas_submit_troca' })
+    } finally {
+      setIsSaving(false)
+    }
+  }, [cancelEditSaida, closeTrocaPrompt, filters, load, reportError, trocaPrompt])
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError(null)
@@ -250,7 +280,20 @@ export function useSaidasController() {
       if (editingSaida) {
         await updateSaida(editingSaida.id, payload)
       } else {
-        await createSaida(payload)
+        try {
+          await createSaida(payload)
+        } catch (err) {
+          if (err?.code === 'TROCA_CONFIRM') {
+            setTrocaPrompt({
+              open: true,
+              payload,
+              details: err?.details ?? null,
+            })
+            setIsSaving(false)
+            return
+          }
+          throw err
+        }
       }
       cancelEditSaida()
       await load(filters, { resetPage: !editingSaida })
@@ -263,8 +306,8 @@ export function useSaidasController() {
   }
 
   const handleFilterChange = (event) => {
-    const { name, value } = event.target
-    setFilters((prev) => ({ ...prev, [name]: value }))
+    const { name, value, type, checked } = event.target
+    setFilters((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleFilterSubmit = (event) => {
@@ -593,12 +636,16 @@ export function useSaidasController() {
   )
 
   const saidasFiltradas = useMemo(() => {
-    const { trocaPrazo } = filters
-    if (!trocaPrazo) return saidasComPrazo
-    if (trocaPrazo === 'sem-data') {
-      return saidasComPrazo.filter((s) => !s.trocaPrazo)
+    const { trocaPrazo, trocaOnly } = filters
+    let lista = saidasComPrazo
+    if (trocaOnly) {
+      lista = lista.filter((s) => Boolean(s.isTroca))
     }
-    return saidasComPrazo.filter((s) => s.trocaPrazo?.variant === trocaPrazo)
+    if (!trocaPrazo) return lista
+    if (trocaPrazo === 'sem-data') {
+      return lista.filter((s) => !s.trocaPrazo)
+    }
+    return lista.filter((s) => s.trocaPrazo?.variant === trocaPrazo)
   }, [filters, saidasComPrazo])
 
   useEffect(() => {
@@ -715,6 +762,7 @@ export function useSaidasController() {
     setCurrentPage,
     historyState,
     cancelState,
+    trocaPrompt,
     materialSearchValue,
     materialSuggestions,
     materialDropdownOpen,
@@ -742,6 +790,8 @@ export function useSaidasController() {
     openCancelModal,
     closeCancelModal,
     handleCancelSubmit,
+    confirmTroca,
+    closeTrocaPrompt,
     handleMaterialInputChange,
     handleMaterialSelect,
     handleMaterialFocus,

@@ -33,6 +33,7 @@ function SaidasContent() {
     setCurrentPage,
     historyState,
     cancelState,
+    trocaPrompt,
     materialSearchValue,
     materialSuggestions,
     materialDropdownOpen,
@@ -60,6 +61,8 @@ function SaidasContent() {
     openCancelModal,
     closeCancelModal,
     handleCancelSubmit,
+    confirmTroca,
+    closeTrocaPrompt,
     handleMaterialInputChange,
     handleMaterialSelect,
     handleMaterialFocus,
@@ -376,6 +379,15 @@ function SaidasContent() {
             <span>Data final</span>
             <input type="date" name="dataFim" value={filters.dataFim} onChange={handleFilterChange} />
           </label>
+          <label className="field field--checkbox field--checkbox-accent">
+            <input
+              type="checkbox"
+              name="trocaOnly"
+              checked={Boolean(filters.trocaOnly)}
+              onChange={handleFilterChange}
+            />
+            <span>Apenas trocas</span>
+          </label>
           <div className="form__actions">
             <button type="submit" className="button button--ghost">
               Aplicar
@@ -687,6 +699,37 @@ function SaidasContent() {
                 disabled={cancelState.isSubmitting || !cancelState.motivo.trim()}
               >
                 {cancelState.isSubmitting ? 'Cancelando...' : 'Confirmar cancelamento'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+      {trocaPrompt.open ? (
+        <div className="modal__overlay" role="dialog" aria-modal="true" onClick={closeTrocaPrompt}>
+          <div className="modal__content" onClick={(event) => event.stopPropagation()}>
+            <header className="modal__header">
+              <h3>Saida com troca</h3>
+              <button type="button" className="modal__close" onClick={closeTrocaPrompt} aria-label="Fechar">
+                <CancelIcon size={18} />
+              </button>
+            </header>
+            <div className="modal__body">
+              <p>
+                Ja existe uma saida deste material para esta pessoa. Deseja marcar esta nova saida como troca?
+              </p>
+              {trocaPrompt.details?.ultimaSaidaId ? (
+                <p className="feedback">ID anterior: {trocaPrompt.details.ultimaSaidaId}</p>
+              ) : null}
+              {trocaPrompt.details?.trocaSequencia ? (
+                <p className="feedback">Sequencia da troca: {trocaPrompt.details.trocaSequencia}</p>
+              ) : null}
+            </div>
+            <footer className="modal__footer">
+              <button type="button" className="button button--ghost" onClick={closeTrocaPrompt} disabled={isSaving}>
+                Cancelar
+              </button>
+              <button type="button" className="button button--primary" onClick={confirmTroca} disabled={isSaving}>
+                Considerar troca
               </button>
             </footer>
           </div>
