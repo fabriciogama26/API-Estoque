@@ -26,6 +26,8 @@ Campos e fluxos
 Desligamento em massa (novo)
 ----------------------------
 - Existe um botao "Desligamento" na tela de Pessoas que abre um modal para importacao em massa via XLSX.
+- A planilha exige matricula e data_demissao (dd/MM/yyyy); ativo sempre fica false.
+- Se a pessoa ja estiver inativa, ela aparece na lista de "ja inativos" no retorno.
 - O fluxo completo (frontend + Supabase + Edge Functions + Storage) esta documentado em:
   - docs/DesligamentoEmMassa.txt
 

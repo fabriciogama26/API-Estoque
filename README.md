@@ -135,8 +135,6 @@ supabase db push
 
 ## Desligamento em massa (Pessoas)
 
-
-
 Fluxo:
 
 1) Usuario seleciona um arquivo XLSX no modal de Pessoas.
@@ -144,6 +142,12 @@ Fluxo:
 2) Front faz upload do XLSX no Storage (bucket `imports`) e chama a Edge Function `desligamento-import` passando `{ path }`.
 
 3) A Edge Function baixa o arquivo, valida linhas, atualiza `public.pessoas`, registra `public.pessoas_historico` e remove o XLSX enviado (best-effort).
+
+Regras:
+
+- A planilha exige `matricula` e `data_demissao` (dd/MM/yyyy).
+- `ativo` e automatico (sempre false) no desligamento em massa.
+- Se a pessoa ja estiver inativa, a linha nao atualiza e entra na lista de "ja inativos".
 
 
 

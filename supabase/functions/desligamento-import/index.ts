@@ -7,6 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Expose-Headers": "x-deno-execution-id, x-sb-request-id",
 }
 
 let stage = "init"
@@ -20,7 +21,7 @@ const errorsBucket = Deno.env.get("ERRORS_BUCKET") || "imports"
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
 const supabaseAuth = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } })
 
-type Linha = { matricula?: string; data_demissao?: string; ativo?: string }
+type Linha = { matricula?: string; data_demissao?: string }
 
 // Aceita texto dd/MM/yyyy, serial do Excel ou objeto Date.
 const parseDate = (valor?: unknown) => {
@@ -75,6 +76,20 @@ const resolveField = (row: Record<string, unknown>, target: string) => {
   return undefined
 }
 
+const normalizeIsoDate = (value?: unknown) => {
+  if (value === null || value === undefined) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (match) return match[1]
+  const date = new Date(raw)
+  if (isNaN(date.getTime())) return null
+  const yyyy = String(date.getUTCFullYear()).padStart(4, "0")
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0")
+  const dd = String(date.getUTCDate()).padStart(2, "0")
+  return `${yyyy}-${mm}-${dd}`
+}
+
 Deno.serve(async (req) => {
   try {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
@@ -90,6 +105,18 @@ Deno.serve(async (req) => {
     const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(accessToken)
     if (userErr || !userData?.user?.id) return new Response("Unauthorized", { status: 401, headers: corsHeaders })
     const importUserId = userData.user.id
+
+    stage = "resolve_owner"
+    const supabaseUser = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { persistSession: false },
+    })
+    const { data: ownerId, error: ownerErr } = await supabaseUser.rpc("current_account_owner_id")
+    const owner =
+      typeof ownerId === "string" ? ownerId : (ownerId as { account_owner_id?: string } | null)?.account_owner_id
+    if (ownerErr || !owner) {
+      return new Response("Owner nao encontrado", { status: 403, headers: corsHeaders })
+    }
 
     stage = "read_body"
     let body: any = {}
@@ -137,7 +164,7 @@ Deno.serve(async (req) => {
     // Busca apenas as matrículas presentes no arquivo (em blocos para evitar limites de IN)
     stage = "db_select_pessoas"
     let pessoasCount = 0
-    const matriculaMap = new Map<string, string>()
+    const matriculaMap = new Map<string, { id: string; ativo: boolean | null; dataDemissao: string | null }>()
     if (matriculasArquivo.size > 0) {
       const chunkSize = 100
       const matriculasArray = Array.from(matriculasArquivo)
@@ -145,18 +172,31 @@ Deno.serve(async (req) => {
         const slice = matriculasArray.slice(i, i + chunkSize)
         const { data: pessoas, error: pessoasErr, count } = await supabaseAdmin
           .from("pessoas")
-          .select("id, matricula", { count: "exact" })
+          .select("id, matricula, ativo, dataDemissao", { count: "exact" })
+          .eq("account_owner_id", owner)
           .in("matricula", slice)
         if (pessoasErr) return new Response(pessoasErr.message, { status: 500, headers: corsHeaders })
         if (count && count > pessoasCount) pessoasCount = count
         ;(pessoas || []).forEach((p) => {
-          buildMatriculaKeys(p.matricula).forEach((key) => matriculaMap.set(key, p.id))
+          const item = {
+            id: p.id,
+            ativo: typeof p.ativo === "boolean" ? p.ativo : null,
+            dataDemissao: p.dataDemissao ?? null,
+          }
+          buildMatriculaKeys(p.matricula).forEach((key) => matriculaMap.set(key, item))
         })
       }
     }
     const sampleMatriculas = Array.from(matriculaMap.keys()).slice(0, 5)
 
     const updates: { id: string; ativo: boolean; dataDemissao: string | null; matricula: string }[] = []
+    const skippedAlreadyInactive: {
+      line: number
+      id: string
+      matricula: string
+      dataDemissaoArquivo: string
+      dataDemissaoAtual: string | null
+    }[] = []
     const pushError = (line: number, col: string, motivo: string) => {
       errors += 1
       errorLines.push(`${line},${col},"${motivo}"`)
@@ -168,69 +208,97 @@ Deno.serve(async (req) => {
       const linha = rows[i]
 
       const matriculaValor = resolveField(linha as Record<string, unknown>, "matricula")
-      const ativoValor = resolveField(linha as Record<string, unknown>, "ativo")
       const dataDemissaoValor = resolveField(linha as Record<string, unknown>, "data_demissao")
 
+      const matriculaTexto = (matriculaValor ?? "").toString().trim()
       const matriculaKeys = buildMatriculaKeys(matriculaValor as string | number | null)
       if (!matriculaKeys.length) {
         pushError(idx, "matricula", "obrigatoria")
         continue
       }
-      const pessoaId = matriculaKeys.map((k) => matriculaMap.get(k)).find(Boolean)
-      if (!pessoaId) {
+      const pessoaData = matriculaKeys.map((k) => matriculaMap.get(k)).find(Boolean)
+      if (!pessoaData) {
         pushError(idx, "matricula", `inexistente (${matriculaKeys.join("/") || "vazio"})`)
         continue
       }
 
-      const ativoTexto = (ativoValor ?? "").toString().trim().toLowerCase()
-      if (!["true", "false"].includes(ativoTexto)) {
-        pushError(idx, "ativo", "deve ser true/false")
+      const dataDemissaoTexto = dataDemissaoValor === null || dataDemissaoValor === undefined
+        ? ""
+        : String(dataDemissaoValor).trim()
+      if (!dataDemissaoTexto) {
+        pushError(idx, "data_demissao", "obrigatoria")
         continue
       }
 
       const dataDemissaoIso = parseDate(dataDemissaoValor)
-      if (dataDemissaoValor && !dataDemissaoIso) {
+      if (!dataDemissaoIso) {
         pushError(idx, "data_demissao", "invalida")
         continue
       }
 
+      const currentDate = normalizeIsoDate(pessoaData.dataDemissao)
+      if (pessoaData.ativo === false) {
+        skippedAlreadyInactive.push({
+          line: idx,
+          id: pessoaData.id,
+          matricula: matriculaTexto,
+          dataDemissaoArquivo: dataDemissaoIso,
+          dataDemissaoAtual: currentDate,
+        })
+        continue
+      }
+
       updates.push({
-        id: pessoaId,
-        ativo: ativoTexto === "true",
+        id: pessoaData.id,
+        ativo: false,
         dataDemissao: dataDemissaoIso,
-        matricula: (matriculaValor ?? "").toString().trim(),
+        matricula: matriculaTexto,
       })
     }
 
     if (updates.length) {
-      stage = "db_upsert_pessoas"
+      stage = "db_update_pessoas"
       const now = new Date().toISOString()
-      const { error: updErr } = await supabaseAdmin
-        .from("pessoas")
-        .upsert(
-          updates.map((u) => ({
-            id: u.id,
-            ativo: u.ativo,
-            dataDemissao: u.dataDemissao,
-            atualizadoEm: now,
-            usuarioEdicao: importUserId,
-          })),
-          { onConflict: "id" },
+      const updateRows = updates.map((u) => ({
+        id: u.id,
+        data: {
+          ativo: u.ativo,
+          dataDemissao: u.dataDemissao,
+          atualizadoEm: now,
+          usuarioEdicao: importUserId,
+          account_owner_id: owner,
+        },
+      }))
+      const chunkSize = 25
+      for (let i = 0; i < updateRows.length; i += chunkSize) {
+        const slice = updateRows.slice(i, i + chunkSize)
+        const results = await Promise.all(
+          slice.map((row) => supabaseAdmin.from("pessoas").update(row.data).eq("id", row.id)),
         )
-      if (updErr) return new Response(updErr.message, { status: 500, headers: corsHeaders })
+        const firstErr = results.find((r) => r.error)
+        if (firstErr?.error) {
+          return new Response(firstErr.error.message, { status: 500, headers: corsHeaders })
+        }
+      }
 
       stage = "db_insert_historico"
       const historicoRows = updates.map((u) => ({
         pessoa_id: u.id,
         data_edicao: now,
         usuario_responsavel: importUserId,
+        account_owner_id: owner,
         campos_alterados: [
           { campo: "matricula", para: u.matricula, de: "" },
           { campo: "ativo", para: u.ativo ? "Ativo" : "Inativo", de: "" },
           { campo: "dataDemissao", para: u.dataDemissao || "", de: "" },
         ],
       }))
-      await supabaseAdmin.from("pessoas_historico").insert(historicoRows).catch(() => {})
+      try {
+        const { error: histErr } = await supabaseAdmin.from("pessoas_historico").insert(historicoRows)
+        if (histErr) console.error("pessoas_historico insert error", histErr.message)
+      } catch (err) {
+        console.error("pessoas_historico insert exception", err)
+      }
       success = updates.length
     }
 
@@ -268,6 +336,7 @@ Deno.serve(async (req) => {
           processed,
           success,
           errors,
+          skipped: skippedAlreadyInactive,
           errorsUrl,
           firstError: errorLines[1],
           errorSamples,
@@ -289,6 +358,7 @@ Deno.serve(async (req) => {
         processed,
         success,
         errors,
+        skipped: skippedAlreadyInactive,
         errorsUrl: null,
         firstError: null,
         errorSamples: [],

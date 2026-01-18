@@ -8,6 +8,36 @@ export function PessoasFilters({
   onSubmit,
   onClear,
 }) {
+  const normalizeOptions = (values, current) => {
+    const map = new Map()
+    const addValue = (value) => {
+      if (value === undefined || value === null) {
+        return
+      }
+      const trimmed = String(value).trim()
+      if (!trimmed) {
+        return
+      }
+      const key = trimmed.toLowerCase()
+      if (!map.has(key)) {
+        map.set(key, trimmed)
+      }
+    }
+
+    if (Array.isArray(values)) {
+      values.forEach(addValue)
+    }
+    if (current && current !== 'todos') {
+      addValue(current)
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
+  }
+
+  const centrosServicoOptions = normalizeOptions(centrosServico, filters.centroServico)
+  const setoresOptions = normalizeOptions(setores, filters.setor)
+  const cargosOptions = normalizeOptions(cargos, filters.cargo)
+  const tiposExecucaoOptions = normalizeOptions(tiposExecucao, filters.tipoExecucao)
   return (
     <section className="card">
       <header className="card__header">
@@ -27,8 +57,8 @@ export function PessoasFilters({
           <span>Centro de serviço</span>
           <select name="centroServico" value={filters.centroServico} onChange={onChange}>
             <option value="todos">Todos</option>
-            {centrosServico.map((centro) => (
-              <option key={centro} value={centro}>
+            {centrosServicoOptions.map((centro, index) => (
+              <option key={`${centro}-${index}`} value={centro}>
                 {centro}
               </option>
             ))}
@@ -38,8 +68,8 @@ export function PessoasFilters({
           <span>Setor</span>
           <select name="setor" value={filters.setor} onChange={onChange}>
             <option value="todos">Todos</option>
-            {setores.map((setor) => (
-              <option key={setor} value={setor}>
+            {setoresOptions.map((setor, index) => (
+              <option key={`${setor}-${index}`} value={setor}>
                 {setor}
               </option>
             ))}
@@ -49,8 +79,8 @@ export function PessoasFilters({
           <span>Cargo</span>
           <select name="cargo" value={filters.cargo} onChange={onChange}>
             <option value="todos">Todos</option>
-            {cargos.map((cargo) => (
-              <option key={cargo} value={cargo}>
+            {cargosOptions.map((cargo, index) => (
+              <option key={`${cargo}-${index}`} value={cargo}>
                 {cargo}
               </option>
             ))}
@@ -60,8 +90,8 @@ export function PessoasFilters({
           <span>Tipo de execução</span>
           <select name="tipoExecucao" value={filters.tipoExecucao} onChange={onChange}>
             <option value="todos">Todos</option>
-            {tiposExecucao.map((tipo) => (
-              <option key={tipo} value={tipo}>
+            {tiposExecucaoOptions.map((tipo, index) => (
+              <option key={`${tipo}-${index}`} value={tipo}>
                 {tipo}
               </option>
             ))}

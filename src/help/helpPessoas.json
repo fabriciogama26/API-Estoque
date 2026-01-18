@@ -1,122 +1,46 @@
-
-  {
+{
   "pessoas": {
-
-
-        "title": "Cadastro de pessoas",
-
-
-        "summary": "Registro de colaboradores com data de admissao obrigatoria, demissao opcional e historico.",
-
-
-        "steps": [
-
-
-            {
-
-
-                "title": "Cadastrar ou atualizar colaborador",
-
-
-                "description": "Preencha nome, matricula, centro de servico, setor, cargo e DATA DE ADMISSAO (obrigatoria, dd/MM/yyyy). Ao editar, o formulario fica destacado; use Salvar para concluir.",
-
-
-                "mediaHint": "Formulario principal de pessoas."
-
-
-            },
-
-
-            {
-
-
-                "title": "Registrar demissao / status",
-
-
-                "description": "Se preencher a DATA DE DEMISSAO, o backend desativa automaticamente o colaborador (ativo=false). Deixar vazia volta para ativo=true.",
-
-
-                "mediaHint": "Campos de datas; o status acompanha a data de demissao."
-
-
-            },
-
-
-            {
-
-
-                "title": "Cancelar / reativar",
-
-
-                "description": "Use o botao de cancelar na tabela para marcar inativo: exige observacao, salva historico e fecha a edicao. Para reativar, edite a pessoa cancelada e marque Ativar.",
-
-
-                "mediaHint": "Botoes de acao na linha: detalhes, editar, historico, cancelar."
-
-
-            },
-
-
-            {
-
-
-                "title": "Filtrar lista",
-
-
-                "description": "No campo Busca digite nome ou matricula (parcial) e combine com centro de servico, setor, cargo, status e intervalo de cadastro; clique em Aplicar. Limpar remove todos os filtros (aplicados no frontend).",
-
-
-                "mediaHint": "Filtros e chips acima da tabela de pessoas."
-
-
-            },
-
-
-            {
-
-
-                "title": "Ler resumo rapido",
-
-
-                "description": "Os cards de resumo mostram quantidade por centro e setores mais frequentes conforme o filtro aplicado.",
-
-
-                "mediaHint": "Cards de resumo logo apÇüs os filtros."
-
-
-            },
-
-
-            {
-
-
-                "title": "Ver historico de alteracoes",
-
-
-                "description": "Na tabela, clique no botao de relogio (Historico) para ver quem alterou dados do colaborador e quando (layout padrao Materiais).",
-
-
-                "mediaHint": "Modal de historico de pessoas."
-
-
-            }
-
-
-        ],
-
-        "notes": [
-
-            "DATA DE ADMISSAO e obrigatoria; DATA DE DEMISSAO e opcional. Formato aceito: dd/MM/yyyy.",
-
-            "Se a data de demissao for preenchida, o backend marca ativo=false; se vazia, ativo=true (trigger Supabase).",
-
-            "Cancelamento exige observacao e grava no historico (modal segue padrao Materiais).",
-
-            "Use o botao Atualizar na tabela para recarregar dados do servidor; filtros aplicam somente no frontend.",
-
-            "Matricula duplicada e bloqueada; nome igual com matricula diferente gera alerta de confirmacao."
-
-        ]
-
-    }
+    "title": "Cadastro de pessoas",
+    "summary": "Registro de colaboradores com data de admissao obrigatoria, demissao opcional e historico.",
+    "steps": [
+      {
+        "title": "Cadastrar ou atualizar colaborador",
+        "description": "Preencha nome, matricula, centro de servico, setor, cargo e data de admissao (obrigatoria, dd/MM/yyyy). Ao editar, o formulario fica destacado; use Salvar para concluir.",
+        "mediaHint": "Formulario principal de pessoas."
+      },
+      {
+        "title": "Registrar demissao / status",
+        "description": "Se preencher a data de demissao, o backend desativa automaticamente o colaborador (ativo=false). Deixar vazia volta para ativo=true.",
+        "mediaHint": "Campos de datas; o status acompanha a data de demissao."
+      },
+      {
+        "title": "Desligamento em massa",
+        "description": "Use o botao Desligamento para importar uma planilha XLSX. A planilha exige matricula e data_demissao; o ativo sempre vira false.",
+        "mediaHint": "Modal de desligamento em massa com upload de XLSX."
+      },
+      {
+        "title": "Cancelar / reativar",
+        "description": "Use o botao de cancelar na tabela para marcar inativo: exige observacao, salva historico e fecha a edicao. Para reativar, edite a pessoa cancelada e marque Ativar.",
+        "mediaHint": "Botoes de acao na linha: detalhes, editar, historico, cancelar."
+      },
+      {
+        "title": "Filtrar lista",
+        "description": "No campo Busca digite nome ou matricula (parcial) e combine com centro de servico, setor, cargo, status e intervalo de cadastro; clique em Aplicar. Limpar remove todos os filtros (aplicados no frontend).",
+        "mediaHint": "Filtros e chips acima da tabela de pessoas."
+      },
+      {
+        "title": "Ver historico de alteracoes",
+        "description": "Na tabela, clique no botao de relogio (Historico) para ver quem alterou dados do colaborador e quando (layout padrao Materiais).",
+        "mediaHint": "Modal de historico de pessoas."
+      }
+    ],
+    "notes": [
+      "Data de admissao e obrigatoria; data de demissao e opcional. Formato aceito: dd/MM/yyyy.",
+      "Se a data de demissao for preenchida, o backend marca ativo=false; se vazia, ativo=true (trigger Supabase).",
+      "No desligamento em massa, data_demissao e obrigatoria e ativo sempre false; registros ja inativos retornam como ja inativos.",
+      "Cancelamento exige observacao e grava no historico (modal segue padrao Materiais).",
+      "Use o botao Atualizar na tabela para recarregar dados do servidor; filtros aplicam somente no frontend.",
+      "Matricula duplicada e bloqueada; nome igual com matricula diferente gera alerta de confirmacao."
+    ]
   }
+}
