@@ -15,11 +15,29 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
   } = options || {}
 
   const buildOptionsWithCurrent = (lista = [], atual) => {
-    const items = Array.isArray(lista) ? lista.slice() : []
-    if (atual && !items.includes(atual)) {
-      items.push(atual)
+    const map = new Map()
+    const addValue = (value) => {
+      if (value === undefined || value === null) {
+        return
+      }
+      const trimmed = String(value).trim()
+      if (!trimmed) {
+        return
+      }
+      const key = trimmed.toLowerCase()
+      if (!map.has(key)) {
+        map.set(key, trimmed)
+      }
     }
-    return items.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
+
+    if (Array.isArray(lista)) {
+      lista.forEach(addValue)
+    }
+    if (atual) {
+      addValue(atual)
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
   }
 
   const centrosServicoOptions = buildOptionsWithCurrent(centrosServico, filters.centroServico)
@@ -62,8 +80,8 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
             <span>Centro de servico</span>
             <select name="centroServico" value={filters.centroServico ?? ''} onChange={onChange}>
               <option value="">Todos</option>
-              {centrosServicoOptions.map((value) => (
-                <option key={value} value={value}>
+              {centrosServicoOptions.map((value, index) => (
+                <option key={`${value}-${index}`} value={value}>
                   {value}
                 </option>
               ))}
@@ -74,8 +92,8 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
             <span>Tipo</span>
             <select name="tipo" value={filters.tipo ?? ''} onChange={onChange}>
               <option value="">Todos</option>
-              {tiposOptions.map((value) => (
-                <option key={value} value={value}>
+              {tiposOptions.map((value, index) => (
+                <option key={`${value}-${index}`} value={value}>
                   {value}
                 </option>
               ))}
@@ -86,8 +104,8 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
             <span>Lesao</span>
             <select name="lesao" value={filters.lesao ?? ''} onChange={onChange}>
               <option value="">Todas</option>
-              {lesoesOptions.map((value) => (
-                <option key={value} value={value}>
+              {lesoesOptions.map((value, index) => (
+                <option key={`${value}-${index}`} value={value}>
                   {value}
                 </option>
               ))}
@@ -98,8 +116,8 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
             <span>Parte lesionada</span>
             <select name="parteLesionada" value={filters.parteLesionada ?? ''} onChange={onChange}>
               <option value="">Todas</option>
-              {partesLesionadasLista.map((value) => (
-                <option key={value} value={value}>
+              {partesLesionadasLista.map((value, index) => (
+                <option key={`${value}-${index}`} value={value}>
                   {value}
                 </option>
               ))}
@@ -110,8 +128,8 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
             <span>Agente</span>
             <select name="agente" value={filters.agente ?? ''} onChange={onChange}>
               <option value="">Todos</option>
-              {agentesOptions.map((value) => (
-                <option key={value} value={value}>
+              {agentesOptions.map((value, index) => (
+                <option key={`${value}-${index}`} value={value}>
                   {value}
                 </option>
               ))}
@@ -122,8 +140,8 @@ export function FiltrosDashboard({ filters, options, onChange, onSubmit, onReset
             <span>Cargo</span>
             <select name="cargo" value={filters.cargo ?? ''} onChange={onChange}>
               <option value="">Todos</option>
-              {cargosOptions.map((value) => (
-                <option key={value} value={value}>
+              {cargosOptions.map((value, index) => (
+                <option key={`${value}-${index}`} value={value}>
                   {value}
                 </option>
               ))}

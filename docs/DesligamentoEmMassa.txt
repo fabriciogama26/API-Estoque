@@ -3,7 +3,7 @@ Desligamento em massa (Pessoas)
 
 Objetivo
 --------
-Permitir marcar colaboradores como desligados (ou reativados) em massa, a partir de uma planilha XLSX, registrando:
+Permitir marcar colaboradores como desligados em massa, a partir de uma planilha XLSX, registrando:
 - Atualizacao na tabela public.pessoas (ativo e dataDemissao)
 - Auditoria na tabela public.pessoas_historico (usuario_responsavel = usuario logado)
 
@@ -12,10 +12,7 @@ Formato da planilha (XLSX)
 --------------------------
 Colunas obrigatorias (cabecalho na 1a linha):
 - matricula (obrigatoria)
-- ativo (obrigatoria) -> true / false
-
-Coluna opcional:
-- data_demissao (opcional) -> dd/MM/yyyy
+- data_demissao (obrigatoria) -> dd/MM/yyyy
 
 Observacoes importantes:
 - O arquivo deve ser .xlsx (nao CSV).
@@ -37,6 +34,7 @@ Como usar (passo a passo)
    - quantos registros foram processados
    - quantos foram importados
    - quantos tiveram erro
+   - quantos ja estavam inativos (nao atualizados)
    - (se houver) um exemplo de erro e a opcao de baixar relatorio CSV
 
 
@@ -45,19 +43,17 @@ Regras de importacao
 - matricula obrigatoria:
   - Se estiver vazia: erro na coluna matricula.
   - Se nao existir no banco: erro "inexistente (<valor>)".
-- ativo obrigatoria:
-  - Aceita apenas true/false (case-insensitive).
-- data_demissao opcional:
-  - Se vier vazia: permitido.
-  - Se vier preenchida e for invalida: erro na coluna data_demissao.
+- ativo automatico:
+  - A importacao de desligamento sempre define `ativo = false`.
+- data_demissao obrigatoria:
+  - Se vier vazia: erro na coluna data_demissao.
+  - Se for invalida: erro na coluna data_demissao.
+- ja inativo:
+  - Se a pessoa ja estiver com ativo=false, a linha nao atualiza e entra em "ja inativos".
 
 Impacto no banco:
-- Se ativo = false:
-  - public.pessoas.ativo = false
-  - public.pessoas.dataDemissao = <data> (ou null se vier vazio)
-- Se ativo = true:
-  - public.pessoas.ativo = true
-  - public.pessoas.dataDemissao = <data> (ou null)
+- public.pessoas.ativo = false
+- public.pessoas.dataDemissao = <data>
 
 
 Mapa do fluxo (frontend -> Supabase)
@@ -79,7 +75,7 @@ Edge Function (Supabase)
   - Valida o usuario logado via JWT (Authorization Bearer)
   - Faz download do arquivo XLSX no Storage (bucket "imports")
   - Le a planilha e valida cada linha
-  - Atualiza public.pessoas (upsert por id) e registra public.pessoas_historico
+  - Atualiza public.pessoas (update por id) e registra public.pessoas_historico
   - (Se houver erros) gera um CSV com as linhas invalidas
   - Remove o arquivo XLSX enviado (best-effort), para nao acumular no Storage
 
@@ -102,6 +98,7 @@ Quando houver erros, a Edge Function retorna:
 - errorsUrl: URL assinada para baixar o CSV (se configurado)
 - firstError: primeira linha de erro
 - errorSamples: amostras de erros
+- skipped: lista de registros ja inativos (id, matricula, data_demissao)
 
 Formato do CSV:
 linha,coluna,motivo

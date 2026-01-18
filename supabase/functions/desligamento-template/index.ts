@@ -6,6 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Expose-Headers": "x-deno-execution-id, x-sb-request-id",
 }
 
 Deno.serve((req) => {
@@ -23,8 +24,8 @@ Deno.serve((req) => {
   }
 
   const data = [
-    ["matricula", "data_demissao", "ativo"],
-    ["12345", "31/12/2025", "false"],
+    ["matricula", "data_demissao"],
+    ["12345", "31/12/2025"],
   ]
   const ws = XLSX.utils.aoa_to_sheet(data)
   const wb = XLSX.utils.book_new()

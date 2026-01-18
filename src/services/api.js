@@ -11,6 +11,7 @@ import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
 import { resolveEffectiveAppUser } from './effectiveUserService.js'
 
 const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const GENERIC_ERROR = 'Falha ao comunicar com o Supabase.'
 
@@ -4040,34 +4041,103 @@ export const api = {
     },
 
     async importDesligamentoPlanilha(file) {
-      if (!file) {
-        throw new Error('Selecione um arquivo XLSX.')
-      }
-      if (!isSupabaseConfigured) {
-        throw new Error('Supabase nao configurado.')
-      }
+      try {
+        if (!file) {
+          throw new Error('Selecione um arquivo XLSX.')
+        }
+        if (!isSupabaseConfigured) {
+          throw new Error('Supabase nao configurado.')
+        }
 
-      const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
-      const path = `desligamento/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+        const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
+        const path = `desligamento/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
 
-      // 1) Upload para o Storage
-      const upload = await supabase.storage.from(importsBucket).upload(path, file, {
-        contentType:
-          file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        upsert: false,
-      })
-      if (upload.error) {
-        throw new Error(upload.error.message || 'Falha ao enviar arquivo para o Storage.')
-      }
+        // 1) Upload para o Storage
+        const upload = await supabase.storage.from(importsBucket).upload(path, file, {
+          contentType:
+            file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          upsert: false,
+        })
+        if (upload.error) {
+          throw new Error(upload.error.message || 'Falha ao enviar arquivo para o Storage.')
+        }
 
-      // 2) Invoca a Edge Function passando apenas o path
-      const { data, error } = await supabase.functions.invoke('desligamento-import', {
-        body: { path },
-      })
-      if (error) {
-        throw new Error(error.message || 'Falha ao importar planilha.')
+        if (!FUNCTIONS_URL) {
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
+        }
+
+        const headers = await buildAuthHeaders({
+          'Content-Type': 'application/json',
+          ...(SUPABASE_ANON_KEY ? { apikey: SUPABASE_ANON_KEY } : {}),
+        })
+        const resp = await fetch(`${FUNCTIONS_URL}/desligamento-import`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ path }),
+        })
+        const status = resp.status
+        const requestId =
+          resp.headers.get('x-deno-execution-id') ||
+          resp.headers.get('x-sb-request-id') ||
+          null
+        let responseText = null
+        try {
+          responseText = await resp.text()
+        } catch (_) {
+          responseText = null
+        }
+        let responseJson = null
+        try {
+          responseJson = responseText ? JSON.parse(responseText) : null
+        } catch (_) {
+          responseJson = null
+        }
+        if (!resp.ok) {
+          const stage = responseJson?.stage || null
+          const responseMessage = responseJson?.message || responseJson?.error || responseText
+          const suffixParts = []
+          if (stage) suffixParts.push(`stage=${stage}`)
+          if (requestId) suffixParts.push(`req=${requestId}`)
+          const suffix = suffixParts.length ? ` (${suffixParts.join(', ')})` : ''
+          const friendly =
+            responseMessage && String(responseMessage).trim()
+              ? `Falha ao importar planilha (${status || 'sem status'}): ${responseMessage}${suffix}`
+              : `Falha ao importar planilha (${status || 'sem status'})${suffix}.`
+
+          const enriched = new Error(friendly)
+          enriched.details = {
+            status,
+            stage,
+            requestId,
+            response: responseMessage,
+            function: 'desligamento-import',
+            bucket: importsBucket,
+            path,
+          }
+          throw enriched
+        }
+        return responseJson || {}
+      } catch (err) {
+        const details = err?.details || {}
+        reportClientError(
+          'Falha ao importar desligamento.',
+          err,
+          {
+            feature: 'pessoas',
+            action: 'desligamento-import',
+            status: details.status,
+            code: details.code,
+            stage: details.stage,
+            function: details.function,
+            bucket: details.bucket,
+            path: details.path,
+            response: details.response,
+            requestId: details.requestId,
+          },
+          'error'
+        )
+        throw err
       }
-      return data
     },
   },
   materiais: {

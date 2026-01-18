@@ -17,7 +17,7 @@ import {
   updatePessoaPayload,
 } from '../rules/PessoasRules.js'
 import { resolveUsuarioNome } from '../utils/pessoasUtils.js'
-import { buildPessoasQuery, formatDateInputValue, mapOptionsById } from '../utils/pessoasUtils.js'
+import { buildPessoasQuery, formatDateInputValue, mapOptionsById, uniqueSorted } from '../utils/pessoasUtils.js'
 import {
   createPessoa,
   getPessoaHistory,
@@ -423,25 +423,25 @@ export function usePessoasController() {
 
   const centrosServico = useMemo(() => {
     const referenciasNomes = (referencias.centrosServico ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return referenciasNomes
+    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
     return extractCentrosServico(pessoasOptions)
   }, [referencias.centrosServico, pessoasOptions])
 
   const setores = useMemo(() => {
     const referenciasNomes = (referencias.setores ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return referenciasNomes
+    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
     return extractSetores(pessoasOptions)
   }, [referencias.setores, pessoasOptions])
 
   const cargos = useMemo(() => {
     const referenciasNomes = (referencias.cargos ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return referenciasNomes
+    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
     return extractCargos(pessoasOptions)
   }, [referencias.cargos, pessoasOptions])
 
   const tiposExecucao = useMemo(() => {
     const referenciasNomes = (referencias.tiposExecucao ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return referenciasNomes
+    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
     return extractTiposExecucao(pessoasOptions)
   }, [referencias.tiposExecucao, pessoasOptions])
 

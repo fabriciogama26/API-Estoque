@@ -17,7 +17,12 @@ export function PessoasDesligamentoModal({
   const resolvedInfo = useMemo(() => info ?? null, [info])
   const stats = resolvedInfo?.stats
   const hasStats =
-    stats && (stats.processed !== undefined || stats.success !== undefined || stats.errors !== undefined)
+    stats &&
+    (stats.processed !== undefined ||
+      stats.success !== undefined ||
+      stats.errors !== undefined ||
+      stats.skipped !== undefined)
+  const skippedList = Array.isArray(resolvedInfo?.skipped) ? resolvedInfo.skipped.slice(0, 5) : []
 
   if (!open) return null
 
@@ -71,7 +76,7 @@ export function PessoasDesligamentoModal({
               <div className="desligamento-help__badge">1</div>
               <div>
                 <h4>Baixe o modelo</h4>
-                <p className="desligamento-help__text">Use este modelo obrigatório.</p>
+                <p className="desligamento-help__text">Use este modelo obrigatorio.</p>
               </div>
             </div>
             <button type="button" className="button button--ghost" onClick={onDownloadTemplate}>
@@ -84,13 +89,13 @@ export function PessoasDesligamentoModal({
               <div className="desligamento-help__badge">2</div>
               <div>
                 <h4>Preencha a planilha</h4>
-                <p className="desligamento-help__text">Campos mínimos:</p>
+                <p className="desligamento-help__text">Campos minimos:</p>
               </div>
             </div>
             <ul className="desligamento-help__bullets">
-              <li>matricula — obrigatória</li>
-              <li>data_demissao (dd/MM/yyyy) — opcional</li>
-              <li>ativo (true / false) — obrigatória</li>
+              <li>matricula - obrigatoria</li>
+              <li>data_demissao (dd/MM/yyyy) - obrigatoria</li>
+              <li>ativo - automatico (sempre false)</li>
             </ul>
           </section>
 
@@ -119,7 +124,7 @@ export function PessoasDesligamentoModal({
               />
               <p className="desligamento-help__drop-title">Arraste o arquivo aqui ou clique para selecionar</p>
               <p className="desligamento-help__drop-sub">Formato XLSX</p>
-              {file ? <p className="desligamento-help__drop-file">✔ {file.name}</p> : null}
+              {file ? <p className="desligamento-help__drop-file">OK {file.name}</p> : null}
             </div>
 
             <button
@@ -133,12 +138,13 @@ export function PessoasDesligamentoModal({
           </section>
 
           <details className="desligamento-help__rules" open={rulesOpen} onToggle={(e) => setRulesOpen(e.target.open)}>
-            <summary>⚠️ Regras de importação</summary>
+            <summary>Regras de importacao</summary>
             <ul>
-              <li>Formato: XLSX obrigatório.</li>
-              <li>Data inválida → linha rejeitada (data_demissao é opcional, mas dd/MM/yyyy se preenchida).</li>
-              <li>Matrícula inexistente → erro.</li>
-              <li>ativo = false → marca desligamento e grava histórico.</li>
+              <li>Formato: XLSX obrigatorio.</li>
+              <li>data_demissao vazia ou invalida: linha rejeitada.</li>
+              <li>Matricula inexistente: erro.</li>
+              <li>ativo = false: marca desligamento e grava historico.</li>
+              <li>Ja inativo: nao atualiza e entra na lista de ja inativos.</li>
             </ul>
           </details>
 
@@ -150,6 +156,7 @@ export function PessoasDesligamentoModal({
                   {stats.processed !== undefined ? <span>{stats.processed} processados</span> : null}
                   {stats.success !== undefined ? <span>{stats.success} importados</span> : null}
                   {stats.errors !== undefined ? <span>{stats.errors} com erro</span> : null}
+                  {stats.skipped !== undefined ? <span>{stats.skipped} ja inativos</span> : null}
                 </div>
               ) : null}
               {resolvedInfo.firstError ? (
@@ -164,13 +171,27 @@ export function PessoasDesligamentoModal({
                   ))}
                 </ul>
               ) : null}
+              {skippedList.length ? (
+                <>
+                  <p className="desligamento-help__info-text desligamento-help__info-hint">
+                    Ja inativos (amostra):
+                  </p>
+                  <ul className="desligamento-help__errors-list">
+                    {skippedList.map((item) => (
+                      <li key={item.id || item.matricula || item.line}>
+                        {item.matricula || '-'} | {item.id || '-'}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
               {resolvedInfo.errorsUrl ? (
                 <button
                   type="button"
                   className="button button--ghost desligamento-help__errors"
                   onClick={() => window.open(resolvedInfo.errorsUrl, '_blank', 'noopener,noreferrer')}
                 >
-                  Baixar relatório de erros (CSV)
+                  Baixar relatorio de erros (CSV)
                 </button>
               ) : null}
             </div>
@@ -180,4 +201,3 @@ export function PessoasDesligamentoModal({
     </div>
   )
 }
-
