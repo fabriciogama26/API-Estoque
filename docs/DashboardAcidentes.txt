@@ -130,3 +130,7 @@ Atualizacao 2026-01
 - TF/TG/IA/IAG/IRA calculadas na view com HHT mensal do centro/mes; acidentes cancelados nao entram nos calculos.
 
 
+
+Atualizacao 2026-01 (UI)
+- Modal de expansao isolado em src/components/Dashboard/ChartExpandModal.jsx.
+- Ajuda: src/help/helpDashboardAcidentes.json.

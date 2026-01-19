@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MovementIcon, RevenueIcon, StockIcon, AlertIcon, DashboardIcon } from '../components/icons.jsx'
+import { MovementIcon, RevenueIcon, StockIcon, AlertIcon, DashboardIcon, TrendIcon } from '../components/icons.jsx'
 import { fetchDashboardEstoque } from '../services/dashboardEstoqueApi.js'
 import {
   initialDashboardEstoqueFilters,
@@ -14,6 +14,9 @@ import {
   montarTopCentrosServico,
   montarTopSetores,
   montarTopPessoas,
+  montarTopTrocasMateriais,
+  montarTopTrocasSetores,
+  montarTopTrocasPessoas,
 } from '../utils/dashboardEstoqueUtils.js'
 
 export function useDashboardEstoque(onError) {
@@ -135,6 +138,55 @@ export function useDashboardEstoque(onError) {
     [data, termoNormalizado],
   )
 
+  const parseDateWithoutTimezone = (value) => {
+    if (!value) return null
+    const str = String(value).trim()
+    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+      const [, year, month, day] = match
+      const date = new Date(Number(year), Number(month) - 1, Number(day))
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+    const dt = new Date(value)
+    return Number.isNaN(dt.getTime()) ? null : dt
+  }
+
+  const isSaidaCancelada = (saida) => {
+    const raw = (saida?.statusNome || saida?.status || '').toString().trim().toLowerCase()
+    return raw === 'cancelado'
+  }
+
+  const trocaResumo = useMemo(() => {
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    const limiteMs = 1000 * 60 * 60 * 24
+    let feitas = 0
+    let atrasadas = 0
+    let aVencer = 0
+    saidasDetalhadasFiltradas.forEach((saida) => {
+      if (!saida || isSaidaCancelada(saida)) {
+        return
+      }
+      if (saida.isTroca) {
+        feitas += 1
+      }
+      if (!saida.dataTroca) {
+        return
+      }
+      const dataTroca = parseDateWithoutTimezone(saida.dataTroca)
+      if (!dataTroca) {
+        return
+      }
+      const diffDias = Math.floor((dataTroca.getTime() - hoje.getTime()) / limiteMs)
+      if (diffDias < 0) {
+        atrasadas += 1
+      } else if (diffDias <= 7) {
+        aVencer += 1
+      }
+    })
+    return { feitas, atrasadas, aVencer }
+  }, [saidasDetalhadasFiltradas])
+
   const calcularQuantidadeTotal = (lista) => lista.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
   const calcularValorTotal = (lista) =>
     lista.reduce(
@@ -202,6 +254,21 @@ export function useDashboardEstoque(onError) {
   const topCentrosServicoTop = useMemo(() => topCentrosServico.slice(0, 8), [topCentrosServico])
   const topSetoresTop = useMemo(() => topSetores.slice(0, 8), [topSetores])
   const topPessoasTop = useMemo(() => topPessoas.slice(0, 8), [topPessoas])
+  const topTrocasMateriais = useMemo(
+    () => montarTopTrocasMateriais(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
+  )
+  const topTrocasSetores = useMemo(
+    () => montarTopTrocasSetores(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
+  )
+  const topTrocasPessoas = useMemo(
+    () => montarTopTrocasPessoas(saidasDetalhadasFiltradas, ''),
+    [saidasDetalhadasFiltradas],
+  )
+  const topTrocasMateriaisTop = useMemo(() => topTrocasMateriais.slice(0, 10), [topTrocasMateriais])
+  const topTrocasSetoresTop = useMemo(() => topTrocasSetores.slice(0, 10), [topTrocasSetores])
+  const topTrocasPessoasTop = useMemo(() => topTrocasPessoas.slice(0, 10), [topTrocasPessoas])
 
   const totalMovimentacoes = resumoEntradas.quantidade + resumoSaidas.quantidade
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
@@ -252,6 +319,15 @@ export function useDashboardEstoque(onError) {
         tooltip: 'Materiais cujo estoque esta abaixo do minimo configurado.',
       },
       {
+        id: 'trocas',
+        title: 'Trocas (periodo)',
+        value: `${trocaResumo.feitas} / ${trocaResumo.atrasadas} / ${trocaResumo.aVencer}`,
+        helper: 'Feitas / Atrasadas / A vencer',
+        icon: TrendIcon,
+        tone: 'blue',
+        tooltip: 'Totais de trocas no periodo filtrado (feitas, atrasadas e a vencer em ate 7 dias).',
+      },
+      {
         id: 'materiais',
         title: 'Materiais monitorados',
         value: totalMateriais,
@@ -261,7 +337,16 @@ export function useDashboardEstoque(onError) {
         tooltip: 'Contagem de materiais que possuem saldo registrado no estoque.',
       },
     ],
-    [materiaisEmAlerta, resumoEntradas.quantidade, resumoEntradas.valor, resumoSaidas.quantidade, resumoSaidas.valor, totalItensEstoque, totalMateriais],
+    [
+      materiaisEmAlerta,
+      resumoEntradas.quantidade,
+      resumoEntradas.valor,
+      resumoSaidas.quantidade,
+      resumoSaidas.valor,
+      totalItensEstoque,
+      totalMateriais,
+      trocaResumo,
+    ],
   )
 
   return {
@@ -286,6 +371,9 @@ export function useDashboardEstoque(onError) {
     topCentrosServicoTop,
     topSetoresTop,
     topPessoasTop,
+    topTrocasMateriaisTop,
+    topTrocasSetoresTop,
+    topTrocasPessoasTop,
     highlightCards,
     formatPeriodoLabel,
     formatCurrency,

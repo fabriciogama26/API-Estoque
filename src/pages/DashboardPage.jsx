@@ -1,4 +1,4 @@
-﻿import { useMemo } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import {
   DashboardIcon,
@@ -18,6 +18,7 @@ import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts
 import { EstoquePorMaterialChart } from '../components/charts/EstoqueCharts.jsx'
 import { EstoquePorCategoriaChart } from '../components/charts/EstoqueCategoriaChart.jsx'
 import { DashboardEstoqueProvider, useDashboardEstoqueContext } from '../context/DashboardEstoqueContext.jsx'
+import { ChartExpandModal } from '../components/Dashboard/ChartExpandModal.jsx'
 
 import '../styles/DashboardPage.css'
 
@@ -134,15 +135,48 @@ function ChartsGrid() {
     setExpandedChartId,
     seriesHistorica,
     valorMovimentadoSeries,
-    estoquePorMaterialTop,
     estoquePorCategoria,
+    estoquePorMaterialTop,
     rankingFabricantesTop,
     topCentrosServicoTop,
     topSetoresTop,
     topPessoasTop,
+    topTrocasMateriaisTop,
+    topTrocasSetoresTop,
+    topTrocasPessoasTop,
     formatPeriodoLabel,
     formatCurrency,
   } = useDashboardEstoqueContext()
+
+  const [trocaViews, setTrocaViews] = useState({
+    materiais: false,
+    setores: false,
+    pessoas: false,
+  })
+
+  const toggleTrocaView = (key) => {
+    setTrocaViews((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+
+  const materiaisChart = {
+    active: trocaViews.materiais,
+    title: trocaViews.materiais ? 'Top materiais (trocas)' : 'Top materiais',
+    infoKey: trocaViews.materiais ? 'topTrocasMateriais' : 'estoqueMaterial',
+    data: trocaViews.materiais ? topTrocasMateriaisTop : estoquePorMaterialTop,
+  }
+  const setoresChart = {
+    active: trocaViews.setores,
+    title: trocaViews.setores ? 'Top setores (trocas)' : 'Top setores',
+    infoKey: trocaViews.setores ? 'topTrocasSetores' : 'topSetores',
+    data: trocaViews.setores ? topTrocasSetoresTop : topSetoresTop,
+  }
+  const pessoasChart = {
+    active: trocaViews.pessoas,
+    title: trocaViews.pessoas ? 'Top pessoas (trocas)' : 'Top pessoas',
+    infoKey: trocaViews.pessoas ? 'topTrocasPessoas' : 'topPessoas',
+    data: trocaViews.pessoas ? topTrocasPessoasTop : topPessoasTop,
+  }
 
   const handleChartSelect = (value, source) => {
     applyChartFilter(value, source)
@@ -166,10 +200,10 @@ function ChartsGrid() {
         ),
       },
       estoqueMaterial: {
-        title: 'Top materiais',
+        title: materiaisChart.title,
         render: () => (
           <EstoquePorMaterialChart
-            data={estoquePorMaterialTop}
+            data={materiaisChart.data}
             height={520}
             onItemClick={(item) => handleChartSelect(item?.filtro || item?.descricao || item?.nome, 'material')}
           />
@@ -196,7 +230,7 @@ function ChartsGrid() {
         ),
       },
       topCentros: {
-        title: 'Top centro de serviÃ§os',
+        title: 'Top centro de servicos',
         render: () => (
           <EstoquePorMaterialChart
             data={topCentrosServicoTop}
@@ -206,20 +240,20 @@ function ChartsGrid() {
         ),
       },
       topSetores: {
-        title: 'Top setores',
+        title: setoresChart.title,
         render: () => (
           <EstoquePorMaterialChart
-            data={topSetoresTop}
+            data={setoresChart.data}
             height={520}
             onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'setor')}
           />
         ),
       },
       topPessoas: {
-        title: 'Top pessoas',
+        title: pessoasChart.title,
         render: () => (
           <EstoquePorMaterialChart
-            data={topPessoasTop}
+            data={pessoasChart.data}
             height={520}
             onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'pessoa')}
           />
@@ -228,15 +262,15 @@ function ChartsGrid() {
     }),
     [
       estoquePorCategoria,
-      estoquePorMaterialTop,
       expandedChartId,
       formatCurrency,
       formatPeriodoLabel,
+      materiaisChart,
+      pessoasChart,
       rankingFabricantesTop,
       seriesHistorica,
+      setoresChart,
       topCentrosServicoTop,
-      topPessoasTop,
-      topSetoresTop,
       valorMovimentadoSeries,
     ],
   )
@@ -300,17 +334,28 @@ function ChartsGrid() {
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="estoqueMaterial" label="Informacoes sobre o grafico Top materiais" />
+              <ChartInfoButton
+                infoKey={materiaisChart.infoKey}
+                label={`Informacoes sobre o grafico ${materiaisChart.title}`}
+              />
               <h2 className="dashboard-card__title">
-                <StockIcon size={20} /> <span>Top materiais</span>
+                <StockIcon size={20} /> <span>{materiaisChart.title}</span>
               </h2>
             </div>
             <div className="dashboard-card__actions">
               <button
                 type="button"
+                className={`dashboard-card__toggle${materiaisChart.active ? ' dashboard-card__toggle--active' : ''}`}
+                onClick={() => toggleTrocaView('materiais')}
+                aria-pressed={materiaisChart.active}
+              >
+                Troca
+              </button>
+              <button
+                type="button"
                 className="dashboard-card__expand"
                 onClick={() => setExpandedChartId('estoqueMaterial')}
-                aria-label="Expandir grafico Top materiais"
+                aria-label={`Expandir grafico ${materiaisChart.title}`}
               >
                 <ExpandIcon size={16} />
               </button>
@@ -318,7 +363,7 @@ function ChartsGrid() {
           </header>
           <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EstoquePorMaterialChart
-              data={estoquePorMaterialTop}
+              data={materiaisChart.data}
               onItemClick={(item) => handleChartSelect(item?.filtro || item?.descricao || item?.nome, 'material')}
             />
           </ChartContainer>
@@ -385,7 +430,7 @@ function ChartsGrid() {
             <div className="dashboard-card__title-group">
               <ChartInfoButton infoKey="topCentros" label="Informacoes sobre o grafico Top centro de servicos" />
               <h2 className="dashboard-card__title">
-                <DashboardIcon size={20} /> <span>Top centro de serviÃ§os</span>
+                <DashboardIcon size={20} /> <span>Top centro de servicos</span>
               </h2>
             </div>
             <div className="dashboard-card__actions">
@@ -393,7 +438,7 @@ function ChartsGrid() {
                 type="button"
                 className="dashboard-card__expand"
                 onClick={() => setExpandedChartId('topCentros')}
-                aria-label="Expandir grafico Top centro de serviÃ§os"
+                aria-label="Expandir grafico Top centro de servicos"
               >
                 <ExpandIcon size={16} />
               </button>
@@ -412,17 +457,28 @@ function ChartsGrid() {
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="topSetores" label="Informacoes sobre o grafico Top setores" />
+              <ChartInfoButton
+                infoKey={setoresChart.infoKey}
+                label={`Informacoes sobre o grafico ${setoresChart.title}`}
+              />
               <h2 className="dashboard-card__title">
-                <BarsIcon size={20} /> <span>Top setores</span>
+                <BarsIcon size={20} /> <span>{setoresChart.title}</span>
               </h2>
             </div>
             <div className="dashboard-card__actions">
               <button
                 type="button"
+                className={`dashboard-card__toggle${setoresChart.active ? ' dashboard-card__toggle--active' : ''}`}
+                onClick={() => toggleTrocaView('setores')}
+                aria-pressed={setoresChart.active}
+              >
+                Troca
+              </button>
+              <button
+                type="button"
                 className="dashboard-card__expand"
                 onClick={() => setExpandedChartId('topSetores')}
-                aria-label="Expandir grafico Top setores"
+                aria-label={`Expandir grafico ${setoresChart.title}`}
               >
                 <ExpandIcon size={16} />
               </button>
@@ -430,7 +486,7 @@ function ChartsGrid() {
           </header>
           <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EstoquePorMaterialChart
-              data={topSetoresTop}
+              data={setoresChart.data}
               onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'setor')}
             />
           </ChartContainer>
@@ -439,17 +495,28 @@ function ChartsGrid() {
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="topPessoas" label="Informacoes sobre o grafico Top pessoas" />
+              <ChartInfoButton
+                infoKey={pessoasChart.infoKey}
+                label={`Informacoes sobre o grafico ${pessoasChart.title}`}
+              />
               <h2 className="dashboard-card__title">
-                <PersonIcon size={20} /> <span>Top pessoas</span>
+                <PersonIcon size={20} /> <span>{pessoasChart.title}</span>
               </h2>
             </div>
             <div className="dashboard-card__actions">
               <button
                 type="button"
+                className={`dashboard-card__toggle${pessoasChart.active ? ' dashboard-card__toggle--active' : ''}`}
+                onClick={() => toggleTrocaView('pessoas')}
+                aria-pressed={pessoasChart.active}
+              >
+                Troca
+              </button>
+              <button
+                type="button"
                 className="dashboard-card__expand"
                 onClick={() => setExpandedChartId('topPessoas')}
-                aria-label="Expandir grafico Top pessoas"
+                aria-label={`Expandir grafico ${pessoasChart.title}`}
               >
                 <ExpandIcon size={16} />
               </button>
@@ -457,35 +524,18 @@ function ChartsGrid() {
           </header>
           <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
             <EstoquePorMaterialChart
-              data={topPessoasTop}
+              data={pessoasChart.data}
               onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'pessoa')}
             />
           </ChartContainer>
         </section>
       </div>
 
-      {activeChart ? (
-        <div className="chart-modal__overlay" role="dialog" aria-modal="true" onClick={closeChartModal}>
-          <div className="chart-modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="chart-modal__header">
-              <h3 className="chart-modal__title">{activeChart.title}</h3>
-              <button
-                type="button"
-                className="chart-modal__close"
-                onClick={closeChartModal}
-                aria-label="Fechar grafico expandido"
-              >
-                <CancelIcon size={18} />
-              </button>
-            </header>
-            <div className="chart-modal__body">
-              <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
-                {activeChart.render()}
-              </ChartContainer>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ChartExpandModal open={Boolean(activeChart)} title={activeChart?.title} onClose={closeChartModal}>
+        <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
+          {activeChart?.render()}
+        </ChartContainer>
+      </ChartExpandModal>
     </>
   )
 }

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TablePagination } from '../../TablePagination.jsx'
 import { formatCurrency, formatDateTimeValue, formatInteger } from '../../../utils/estoqueUtils.js'
-import { CancelIcon, EntryIcon, ExitIcon, NotificationIcon, SaveIcon } from '../../icons.jsx'
+import { EntryIcon, ExitIcon, NotificationIcon, SaveIcon } from '../../icons.jsx'
 import { listSaidas } from '../../../services/saidasService.js'
+import { EstoqueSaidaModal } from '../Modal/EstoqueSaidaModal.jsx'
+import { EstoqueMinStockModal } from '../Modal/EstoqueMinStockModal.jsx'
 
 export function EstoqueList({
   itens,
@@ -136,9 +138,6 @@ export function EstoqueList({
   const hasSaidaModal = saidaModal.open && Boolean(saidaModalItem)
   const saidaPage = saidaModal.page || 1
   const saidaPageSize = 5
-  const saidaTotalPages =
-    saidaRegistros.length > 0 ? Math.max(1, Math.ceil(saidaRegistros.length / saidaPageSize)) : 1
-  const saidaPaginados = saidaRegistros.slice((saidaPage - 1) * saidaPageSize, saidaPage * saidaPageSize)
 
   const handleModalSave = async () => {
     if (!modalItem || modalIsSaving) return
@@ -284,180 +283,35 @@ export function EstoqueList({
         })}
       </div>
 
-      {hasSaidaModal ? (
-        <div
-          className="estoque-saida-modal__overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Detalhes da ultima saída"
-          onClick={closeSaidaModal}
-        >
-          <div className="estoque-saida-modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="estoque-saida-modal__header">
-              <div>
-                <p className="estoque-saida-modal__eyebrow">Última saída</p>
-                <h3 className="estoque-saida-modal__title">
-                  {saidaModalItem?.resumo || saidaModalItem?.nome || 'Material'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                className="estoque-saida-modal__close"
-                onClick={closeSaidaModal}
-                aria-label="Fechar"
-              >
-                <CancelIcon size={18} />
-              </button>
-            </header>
+      <EstoqueSaidaModal
+        open={hasSaidaModal}
+        item={saidaModalItem}
+        registros={saidaRegistros}
+        isLoading={saidaIsLoading}
+        error={saidaError}
+        filtroMes={saidaModal.filtroMes}
+        onFilterChange={handleSaidaFilterChange}
+        onFilterSubmit={handleSaidaFilterSubmit}
+        onFilterClear={handleSaidaFilterClear}
+        page={saidaPage}
+        pageSize={saidaPageSize}
+        onPageChange={(page) => setSaidaModal((prev) => ({ ...prev, page }))}
+        onClose={closeSaidaModal}
+        formatDateTimeValue={formatDateTimeValue}
+        formatInteger={formatInteger}
+      />
 
-            <form className="estoque-saida-modal__filters" onSubmit={handleSaidaFilterSubmit}>
-              <label className="field">
-                <span>Mês/ano</span>
-                <input
-                  type="month"
-                  value={saidaModal.filtroMes}
-                  onChange={handleSaidaFilterChange}
-                  aria-label="Filtrar por mês e ano"
-                />
-              </label>
-              <div className="estoque-saida-modal__filters-actions">
-                <button type="submit" className="button button--primary" disabled={saidaIsLoading}>
-                  Filtrar
-                </button>
-                <button type="button" className="button button--ghost" onClick={handleSaidaFilterClear} disabled={saidaIsLoading}>
-                  Limpar
-                </button>
-              </div>
-            </form>
-
-            {saidaIsLoading ? (
-              <p className="feedback">Carregando saídas...</p>
-            ) : saidaError ? (
-              <p className="feedback feedback--error">{saidaError}</p>
-            ) : saidaRegistros.length === 0 ? (
-              <p className="feedback">Nenhuma saída encontrada.</p>
-            ) : (
-              <>
-                <table className="estoque-saida-modal__table">
-                  <thead>
-                    <tr>
-                      <th>Colaborador</th>
-                      <th>Quantidade</th>
-                      <th>Data</th>
-                      <th>Autorizado por</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {saidaPaginados.map((registro) => {
-                      const nome =
-                        registro?.pessoa?.nome ||
-                        registro?.pessoaNome ||
-                        registro?.nome ||
-                        'Não informado'
-                      const matricula = registro?.pessoa?.matricula || registro?.pessoaMatricula || '-'
-                      const quantidade = formatInteger(registro?.quantidade ?? 0)
-                      const dataEntrega = formatDateTimeValue(registro?.dataEntrega || registro?.data_entrega)
-                      const autorizado =
-                        registro?.usuarioResponsavelNome ||
-                        registro?.usuarioResponsavel ||
-                        registro?.usuario_responsavel ||
-                        'Não informado'
-                      return (
-                        <tr key={registro.id || `${registro.materialId}-${registro.dataEntrega}-${quantidade}`}>
-                          <td>
-                            <div className="estoque-saida-modal__cell-main">{nome}</div>
-                            <div className="estoque-saida-modal__cell-sub">Matrícula: {matricula || '-'}</div>
-                          </td>
-                          <td>
-                            <div className="estoque-saida-modal__cell-main">{quantidade}</div>
-                          </td>
-                          <td>
-                            <div className="estoque-saida-modal__cell-main">{dataEntrega}</div>
-                          </td>
-                          <td>
-                            <div className="estoque-saida-modal__cell-main">{autorizado}</div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-                {saidaTotalPages > 1 ? (
-                  <div className="estoque-saida-modal__pagination">
-                    <TablePagination
-                      currentPage={saidaPage}
-                      totalItems={saidaRegistros.length}
-                      pageSize={saidaPageSize}
-                      onPageChange={(page) => setSaidaModal((prev) => ({ ...prev, page }))}
-                    />
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {minStockModal.open && modalItem ? (
-        <div
-          className="estoque-min-stock-modal__overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Alterar estoque mínimo"
-          onClick={closeMinStockModal}
-        >
-          <div className="estoque-min-stock-modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="estoque-min-stock-modal__header">
-              <div>
-                <p className="estoque-min-stock-modal__eyebrow">Material</p>
-                <h3 className="estoque-min-stock-modal__title">{modalItem.resumo || modalItem.nome || '-'}</h3>
-              </div>
-              <button
-                type="button"
-                className="estoque-min-stock-modal__close"
-                onClick={closeMinStockModal}
-                aria-label="Fechar"
-              >
-                <CancelIcon size={18} />
-              </button>
-            </header>
-
-            <div className="estoque-min-stock-modal__body">
-              <label className="field">
-                <span>Novo estoque mínimo</span>
-                <input
-                  ref={minStockInputRef}
-                  type="number"
-                  min="0"
-                  value={modalDraftValue}
-                  onChange={(event) => onMinStockChange(modalMaterialId, event.target.value)}
-                  disabled={modalIsSaving}
-                />
-              </label>
-              {modalError ? <p className="feedback feedback--error">{modalError}</p> : null}
-            </div>
-
-            <footer className="estoque-min-stock-modal__footer">
-              <button
-                type="button"
-                className="button button--ghost"
-                onClick={closeMinStockModal}
-                disabled={modalIsSaving}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={handleModalSave}
-                disabled={modalIsSaving}
-              >
-                {modalIsSaving ? 'Salvando...' : 'Salvar'}
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
+      <EstoqueMinStockModal
+        open={minStockModal.open}
+        item={modalItem}
+        draftValue={modalDraftValue}
+        error={modalError}
+        isSaving={modalIsSaving}
+        inputRef={minStockInputRef}
+        onClose={closeMinStockModal}
+        onChange={(value) => onMinStockChange(modalMaterialId, value)}
+        onSave={handleModalSave}
+      />
 
       {totalItems > pageSize ? (
         <div className="estoque-alerts-pagination">

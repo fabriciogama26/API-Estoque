@@ -62,3 +62,6 @@ Ajuda contextual
 - Botão 'Ajuda' no cabeçalho abre modal com passos/notas desta página.
 - Conteudo em src/help/helpMateriais.json; edite titulos/steps/notes e midias (/public/help/materiais/*).
 
+
+Atualizacao 2026-01 (UI)
+- Modais dedicados: src/components/Materiais/Modal/MaterialBaseDiffModal.jsx e src/components/Materiais/Modal/MaterialDetailsModal.jsx.

@@ -5,6 +5,8 @@ import { MateriaisForm } from '../components/Materiais/MateriaisForm.jsx'
 import { MateriaisFilters } from '../components/Materiais/MateriaisFilters.jsx'
 import { MateriaisTable } from '../components/Materiais/MateriaisTable.jsx'
 import { MateriaisHistoryModal } from '../components/Materiais/MateriaisHistoryModal.jsx'
+import { MaterialBaseDiffModal } from '../components/Materiais/Modal/MaterialBaseDiffModal.jsx'
+import { MaterialDetailsModal } from '../components/Materiais/Modal/MaterialDetailsModal.jsx'
 import { MateriaisProvider, useMateriaisContext } from '../context/MateriaisContext.jsx'
 import { formatDisplayDateTime } from '../utils/saidasUtils.js'
 import { formatCurrency } from '../utils/MateriaisUtils.js'
@@ -156,168 +158,19 @@ function MateriaisContent() {
       </section>
 
       <MateriaisHistoryModal modal={historyModal} onClose={closeHistoryModal} />
-      {baseDiffPrompt.open ? (
-        <div className="modal__overlay" role="dialog" aria-modal="true">
-          <div className="modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="modal__header">
-              <h3>Material com CA diferente</h3>
-              <button type="button" className="modal__close" onClick={cancelBaseDiff} aria-label="Fechar">
-                x
-              </button>
-            </header>
-            <div className="modal__body">
-              <p className="feedback feedback--warning">
-                Já existe material com mesmo grupo, item, fabricante, numeração, cores e características, mas com outro
-                C.A. Deseja salvar mesmo assim usando este C.A. diferente?
-              </p>
-              {Array.isArray(baseDiffPrompt.details) && baseDiffPrompt.details.length ? (
-                <div className="card card--muted" style={{ marginTop: '0.5rem' }}>
-                  <strong>IDs encontrados:</strong>
-                  <ul style={{ margin: '0.5rem 0 0 1rem' }}>
-                    {baseDiffPrompt.details.map((id) => (
-                      <li key={id} style={{ wordBreak: 'break-all' }}>
-                        {id}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-            <footer className="modal__footer" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-              <button type="button" className="button button--ghost" onClick={cancelBaseDiff}>
-                Cancelar
-              </button>
-              <button type="button" className="button" onClick={confirmBaseDiff}>
-                Usar CA diferente
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
-      {detalhe.open && detalhe.material ? (
-        <div className="saida-details__overlay" role="dialog" aria-modal="true" onClick={handleCloseDetalhe}>
-          <div className="saida-details__modal" onClick={(event) => event.stopPropagation()}>
-            <header className="saida-details__header">
-              <div>
-                <p className="saida-details__eyebrow">ID do material</p>
-                <h3 className="saida-details__title">{detalhe.material.id || 'ID não informado'}</h3>
-              </div>
-              <button
-                type="button"
-                className="saida-details__close"
-                onClick={handleCloseDetalhe}
-                aria-label="Fechar detalhes"
-              >
-                x
-              </button>
-            </header>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Dados principais</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Material</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.nomeItemRelacionado || detalhe.material.nome || '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Grupo</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.grupoMaterialNome || detalhe.material.grupoMaterial || '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Tamanho</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.numeroCalcadoNome ||
-                      detalhe.material.numeroVestimentaNome ||
-                      detalhe.material.numeroCalcado ||
-                      detalhe.material.numeroVestimenta ||
-                      '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">CA</span>
-                  <p className="saida-details__value">{detalhe.material.ca || '-'}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Validade (dias)</span>
-                  <p className="saida-details__value">
-                    {(detalhe.material.validadeDias ?? detalhe.material.validade) || '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Valor unitário</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.valorUnitario ? formatCurrency(detalhe.material.valorUnitario) : '-'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Características</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Cores</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.coresTexto ||
-                      (Array.isArray(detalhe.material.coresNomes) && detalhe.material.coresNomes.length
-                        ? detalhe.material.coresNomes.join(', ')
-                        : detalhe.material.corMaterial || '-')}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Características</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.caracteristicasTexto ||
-                      (Array.isArray(detalhe.material.caracteristicasNomes) && detalhe.material.caracteristicasNomes.length
-                        ? detalhe.material.caracteristicasNomes.join(', ')
-                        : detalhe.material.caracteristicaEpi || '-')}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Fabricante</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.fabricanteNome || detalhe.material.fabricante || '-'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Registro</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Registrado por</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.usuarioCadastroUsername ||
-                      detalhe.material.registradoPor ||
-                      detalhe.material.usuarioCadastroNome ||
-                      detalhe.material.usuarioCadastro ||
-                      '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Cadastrado em</span>
-                  <p className="saida-details__value">
-                    {detalhe.material.criadoEm || detalhe.material.created_at || detalhe.material.createdAt
-                      ? formatDisplayDateTime(detalhe.material.criadoEm || detalhe.material.created_at || detalhe.material.createdAt)
-                      : '-'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <footer className="saida-details__footer">
-              <button type="button" className="button button--ghost" onClick={handleCloseDetalhe}>
-                Fechar
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
+      <MaterialBaseDiffModal
+        open={baseDiffPrompt.open}
+        details={baseDiffPrompt.details}
+        onCancel={cancelBaseDiff}
+        onConfirm={confirmBaseDiff}
+      />
+      <MaterialDetailsModal
+        open={detalhe.open}
+        material={detalhe.material}
+        onClose={handleCloseDetalhe}
+        formatCurrency={formatCurrency}
+        formatDisplayDateTime={formatDisplayDateTime}
+      />
     </div>
   )
 }

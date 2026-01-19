@@ -4,6 +4,8 @@ import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { EntryIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
 import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModal.jsx'
+import { EntradaDetailsModal } from '../components/Entradas/Modal/EntradaDetailsModal.jsx'
+import { EntradaCancelModal } from '../components/Entradas/Modal/EntradaCancelModal.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { EntradasProvider, useEntradasContext } from '../context/EntradasContext.jsx'
@@ -437,140 +439,34 @@ function EntradasContent() {
           onPageChange={setCurrentPage}
         />
       </section>
-      {detalheEntrada ? (
-        <div className="saida-details__overlay" role="dialog" aria-modal="true" onClick={handleCloseDetalhes}>
-          <div className="saida-details__modal" onClick={(event) => event.stopPropagation()}>
-            <header className="saida-details__header">
-              <div>
-                <p className="saida-details__eyebrow">ID da entrada</p>
-                <h3 className="saida-details__title">{detalheEntrada.id || 'ID nao informado'}</h3>
-              </div>
-              <button
-                type="button"
-                className="saida-details__close"
-                onClick={handleCloseDetalhes}
-                aria-label="Fechar detalhes da entrada"
-              >
-                <CancelIcon size={18} />
-              </button>
-            </header>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Dados principais</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Material</span>
-                  <p className="saida-details__value">{detalheMaterialResumo || detalheMaterialId || 'Material removido'}</p>
-                  <p className="data-table__muted">ID: {detalheMaterialId || 'Nao informado'}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Descricao</span>
-                  <p className="saida-details__value">{detalheDescricaoMaterial}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Quantidade</span>
-                  <p className="saida-details__value">{detalheEntrada.quantidade ?? '-'}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Centro de estoque</span>
-                  <p className="saida-details__value">{detalheCentroCustoLabel}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Data da entrada</span>
-                  <p className="saida-details__value">{formatDisplayDate(detalheEntrada.dataEntrada)}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Status</span>
-                  <p className="saida-details__value">{detalheStatusLabel}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Valores</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Valor unitario</span>
-                  <p className="saida-details__value">{formatCurrency(detalheValorUnitario)}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Valor total</span>
-                  <p className="saida-details__value">{formatCurrency(detalheValorTotal)}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Registro</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Registrado por</span>
-                  <p className="saida-details__value">{detalheRegistradoPor || 'Nao informado'}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Cadastrado em</span>
-                  <p className="saida-details__value">
-                    {detalheCadastradoEm ? formatDisplayDateTime(detalheCadastradoEm) : 'Nao informado'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Atualizado em</span>
-                  <p className="saida-details__value">
-                    {detalheAtualizadoEm ? formatDisplayDateTime(detalheAtualizadoEm) : 'Nao informado'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Usuário edição</span>
-                  <p className="saida-details__value">{detalheUsuarioEdicao || 'Nao informado'}</p>
-                </div>
-              </div>
-            </div>
-
-            <footer className="saida-details__footer">
-              <button type="button" className="button button--ghost" onClick={handleCloseDetalhes}>
-                Fechar
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
-      {cancelState.open ? (
-        <div className="modal__overlay" role="dialog" aria-modal="true" onClick={closeCancelModal}>
-          <div className="modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="modal__header">
-              <h3>Cancelar entrada</h3>
-              <button type="button" className="modal__close" onClick={closeCancelModal} aria-label="Fechar">
-                <CancelIcon size={18} />
-              </button>
-            </header>
-            <div className="modal__body">
-              <p>Informe um motivo para cancelamento:</p>
-              <textarea
-                className="modal__textarea"
-                rows={3}
-                value={cancelState.motivo}
-                onChange={(e) => setCancelState((prev) => ({ ...prev, motivo: e.target.value }))}
-                placeholder="Descreva o motivo do cancelamento"
-              />
-              {cancelState.error ? <p className="feedback feedback--error">{cancelState.error}</p> : null}
-            </div>
-            <footer className="modal__footer">
-              <button type="button" className="button button--ghost" onClick={closeCancelModal} disabled={cancelState.isSubmitting}>
-                Fechar
-              </button>
-              <button
-                type="button"
-                className="button button--danger"
-                onClick={handleCancelSubmit}
-                disabled={cancelState.isSubmitting || !cancelState.motivo.trim()}
-              >
-                {cancelState.isSubmitting ? 'Cancelando...' : 'Confirmar cancelamento'}
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
-      <EntradasHistoryModal state={historyState} onClose={closeHistory} />
+      <EntradaDetailsModal
+        open={Boolean(detalheEntrada)}
+        entrada={detalheEntrada}
+        materialResumo={detalheMaterialResumo}
+        materialId={detalheMaterialId}
+        descricaoMaterial={detalheDescricaoMaterial}
+        centroCustoLabel={detalheCentroCustoLabel}
+        dataEntrada={detalheEntrada?.dataEntrada}
+        statusLabel={detalheStatusLabel}
+        valorUnitario={detalheValorUnitario}
+        valorTotal={detalheValorTotal}
+        registradoPor={detalheRegistradoPor}
+        cadastradoEm={detalheCadastradoEm}
+        atualizadoEm={detalheAtualizadoEm}
+        usuarioEdicao={detalheUsuarioEdicao}
+        onClose={handleCloseDetalhes}
+        formatCurrency={formatCurrency}
+        formatDisplayDate={formatDisplayDate}
+        formatDisplayDateTime={formatDisplayDateTime}
+      />
+      <EntradaCancelModal
+        state={cancelState}
+        onClose={closeCancelModal}
+        onConfirm={handleCancelSubmit}
+        onMotivoChange={(value) => setCancelState((prev) => ({ ...prev, motivo: value }))}
+        isSaving={cancelState.isSubmitting}
+      />
+            <EntradasHistoryModal state={historyState} onClose={closeHistory} />
     </div>
   )
 }

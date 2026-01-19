@@ -7,14 +7,17 @@ export const initialDashboardEstoqueFilters = {
 }
 
 export const chartInfoMessagesEstoque = {
-  entradas: 'Comparativo mensal entre entradas e saídas considerando os filtros atuais.',
-  valor: 'Evolução do valor financeiro movimentado (entradas x saídas) no período filtrado.',
-  estoqueMaterial: 'Ranking dos materiais com maior volume de saídas dentro do período filtrado.',
-  estoqueCategoria: 'Categorias dos materiais que mais geraram saídas no período.',
-  topFabricantes: 'Fabricantes com maior movimentação (entradas + saídas) dentro do período.',
-  topCentros: 'Total de EPIs entregues por centro de serviço de acordo com as saídas filtradas.',
-  topSetores: 'Total de entregas por setor considerando as saídas filtradas.',
-  topPessoas: 'Colaboradores que mais receberam EPIs no período filtrado.',
+  entradas: 'Comparativo mensal entre entradas e saidas considerando os filtros atuais.',
+  valor: 'Evolucao do valor financeiro movimentado (entradas x saidas) no periodo filtrado.',
+  estoqueMaterial: 'Ranking dos materiais com maior volume de saidas dentro do periodo filtrado.',
+  estoqueCategoria: 'Categorias dos materiais que mais geraram saidas no periodo.',
+  topFabricantes: 'Fabricantes com maior movimentacao (entradas + saidas) dentro do periodo.',
+  topCentros: 'Total de EPIs entregues por centro de servico de acordo com as saidas filtradas.',
+  topSetores: 'Total de entregas por setor considerando as saidas filtradas.',
+  topPessoas: 'Colaboradores que mais receberam EPIs no periodo filtrado.',
+  topTrocasMateriais: 'Materiais com maior volume de trocas realizadas no periodo filtrado.',
+  topTrocasSetores: 'Setores com maior volume de trocas realizadas no periodo filtrado.',
+  topTrocasPessoas: 'Pessoas que mais realizaram trocas de EPIs no periodo filtrado.',
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -80,6 +83,13 @@ export function resolvePessoaDisplay(saida = {}) {
     }
   }
   return 'Nao informado'
+}
+
+const normalizeStatusText = (value) => sanitizeDisplayText(value).toLowerCase()
+
+const isSaidaCancelada = (saida = {}) => {
+  const status = normalizeStatusText(saida.statusNome || saida.status)
+  return status === 'cancelado'
 }
 
 export function formatEstoqueMaterialLabel(item = {}) {
@@ -357,6 +367,88 @@ export const montarTopSetores = (saidas = [], termoNormalizado) => {
 export const montarTopPessoas = (saidas = [], termoNormalizado) => {
   const pessoas = new Map()
   saidas.forEach((saida) => {
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const pessoaNome = resolvePessoaDisplay(saida)
+    const pessoaId = saida.pessoaId || pessoaNome
+    const atual = pessoas.get(pessoaId) ?? {
+      id: pessoaId,
+      nome: pessoaNome,
+      descricao: pessoaNome,
+      filtro: pessoaNome,
+      quantidade: 0,
+    }
+    atual.quantidade += Number(saida.quantidade ?? 0)
+    pessoas.set(pessoaId, atual)
+  })
+  return Array.from(pessoas.values())
+    .filter((item) => item.quantidade > 0)
+    .sort((a, b) => b.quantidade - a.quantidade)
+}
+export const montarTopTrocasMateriais = (saidas = [], termoNormalizado) => {
+  const materiais = new Map()
+  saidas.forEach((saida) => {
+    if (!saida?.isTroca || isSaidaCancelada(saida)) {
+      return
+    }
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const material = saida.material
+    if (!material) {
+      return
+    }
+    const nome = formatEstoqueMaterialLabel(material)
+    const chave = material.id || nome
+    const descricao = material.resumo || [material.nome, resolveFabricanteDisplay(material)].filter(Boolean).join(' | ')
+    const atual = materiais.get(chave) ?? {
+      materialId: material.id ?? chave,
+      nome,
+      descricao: descricao || nome,
+      filtro: nome,
+      quantidade: 0,
+    }
+    atual.quantidade += Number(saida.quantidade ?? 0)
+    materiais.set(chave, atual)
+  })
+  return Array.from(materiais.values())
+    .filter((item) => item.quantidade > 0)
+    .sort((a, b) => b.quantidade - a.quantidade)
+}
+
+export const montarTopTrocasSetores = (saidas = [], termoNormalizado) => {
+  const setores = new Map()
+  saidas.forEach((saida) => {
+    if (!saida?.isTroca || isSaidaCancelada(saida)) {
+      return
+    }
+    if (!combinaSaidaComTermo(saida, termoNormalizado)) {
+      return
+    }
+    const setorNome = resolveSetorDisplay(saida)
+    const setorId = saida.setorId || setorNome
+    const atual = setores.get(setorId) ?? {
+      id: setorId,
+      nome: setorNome,
+      descricao: setorNome,
+      filtro: setorNome,
+      quantidade: 0,
+    }
+    atual.quantidade += Number(saida.quantidade ?? 0)
+    setores.set(setorId, atual)
+  })
+  return Array.from(setores.values())
+    .filter((item) => item.quantidade > 0)
+    .sort((a, b) => b.quantidade - a.quantidade)
+}
+
+export const montarTopTrocasPessoas = (saidas = [], termoNormalizado) => {
+  const pessoas = new Map()
+  saidas.forEach((saida) => {
+    if (!saida?.isTroca || isSaidaCancelada(saida)) {
+      return
+    }
     if (!combinaSaidaComTermo(saida, termoNormalizado)) {
       return
     }

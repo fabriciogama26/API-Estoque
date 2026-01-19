@@ -78,3 +78,7 @@ Ajuda contextual
 
 
 
+
+Atualizacao 2026-01 (UI)
+- Modais dedicados: src/components/Saidas/Modal/SaidaTrocaModal.jsx, SaidaDetailsModal.jsx, SaidaCancelModal.jsx.
+- Ajuda: src/help/helpSaidas.json.

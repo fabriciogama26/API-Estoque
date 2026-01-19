@@ -116,7 +116,7 @@ Funcoes principais
   - Responsavel por: compartilhar estado/handlers do controller com os componentes.
 - MateriaisForm/Filters/Table/History (variacoes para entradas)
   - Tipo: componentes de UI
-  - Caminho: src/components/Entradas/*
+  - Caminho: src/components/Entradas/* (formulario/filtros/tabela/historico) e src/components/Entradas/Modal/*
   - Responsavel por: UI de filtros, form, tabela e historico consumindo o controller.
 
 Constantes e configuracoes
@@ -143,6 +143,5 @@ Servicos e integracoes externas
 Ajuda contextual
 ----------------
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
-- Conteudo vem de src/help/helpContent.json (chave 'entradas'); edite ali para ajustar titulos/steps/notes.
-- Para imagens, salve em public/help/entradas/ e aponte no campo 'media' do passo (ex.: /help/entradas/exemplo.webp).
+- Conteudo vem de src/help/helpEntradas.json; edite titulos/steps/notes e midias (/public/help/entradas/*).
 
