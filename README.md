@@ -166,6 +166,35 @@ Arquivos e docs:
 
 - Documentacao do fluxo: `docs/DesligamentoEmMassa.txt`
 
+## Cadastro em massa (Pessoas)
+
+Fluxo:
+
+1) Usuario seleciona um arquivo XLSX no modal de Pessoas.
+
+2) Front faz upload do XLSX no Storage (bucket `imports`) e chama a Edge Function `cadastro-import` passando `{ path, mode }` (`mode=insert` para importar ou `mode=update` para atualizar).
+
+3) A Edge Function baixa o arquivo, valida linhas, insere/atualiza em `public.pessoas` e remove o XLSX enviado (best-effort).
+
+Regras:
+
+- A planilha exige `matricula`, `nome`, `centro_servico`, `setor`, `cargo`, `tipo_execucao` e `data_admissao`.
+- Campos de texto sao convertidos para MAIUSCULO.
+- `centro_custo` e preenchido via `centro_servico`.
+- Importar: matricula ja existente (mesma familia) gera erro.
+- Atualizar: matricula nao encontrada gera erro.
+
+Arquivos e docs:
+
+- UI: `src/components/Pessoas/PessoasCadastroMassaModal.jsx`
+
+- Service: `src/services/api.js` (`api.pessoas.importCadastroPlanilha`)
+
+- Edge Functions: `supabase/functions/cadastro-import` e `supabase/functions/cadastro-template`
+
+- Bucket/policies: `supabase/migrations/0077_fix_imports_bucket.sql`
+
+- Documentacao do fluxo: `docs/CadastroEmMassa.txt`
 
 
 

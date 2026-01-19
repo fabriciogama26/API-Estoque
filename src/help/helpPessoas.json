@@ -9,6 +9,11 @@
         "mediaHint": "Formulario principal de pessoas."
       },
       {
+        "title": "Cadastro em massa",
+        "description": "Use o botao Cadastrar em massa ao lado do Salvar pessoa para importar uma planilha XLSX com matricula, nome, centro_servico, setor, cargo, tipo_execucao e data_admissao. No modal, Importar insere novos registros e Atualizar altera os existentes.",
+        "mediaHint": "Modal de cadastro em massa com upload de XLSX."
+      },
+      {
         "title": "Registrar demissao / status",
         "description": "Se preencher a data de demissao, o backend desativa automaticamente o colaborador (ativo=false). Deixar vazia volta para ativo=true.",
         "mediaHint": "Campos de datas; o status acompanha a data de demissao."
@@ -36,6 +41,7 @@
     ],
     "notes": [
       "Data de admissao e obrigatoria; data de demissao e opcional. Formato aceito: dd/MM/yyyy.",
+      "No cadastro em massa, textos sao convertidos para MAIUSCULO e centro_custo vem do centro_servico. Importar bloqueia matricula ja existente; Atualizar exige matricula existente.",
       "Se a data de demissao for preenchida, o backend marca ativo=false; se vazia, ativo=true (trigger Supabase).",
       "No desligamento em massa, data_demissao e obrigatoria e ativo sempre false; registros ja inativos retornam como ja inativos.",
       "Cancelamento exige observacao e grava no historico (modal segue padrao Materiais).",

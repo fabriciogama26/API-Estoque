@@ -1,19 +1,25 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { PeopleIcon } from '../components/icons.jsx'
+import { PeopleIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { PessoasForm } from '../components/Pessoas/PessoasForm.jsx'
 import { PessoasFilters } from '../components/Pessoas/PessoasFilters.jsx'
 import { PessoasTable } from '../components/Pessoas/PessoasTable.jsx'
 import { PessoasHistoryModal } from '../components/Pessoas/PessoasHistoryModal.jsx'
 import { PessoasDesligamentoModal } from '../components/Pessoas/PessoasDesligamentoModal.jsx'
+import { PessoasCadastroMassaModal } from '../components/Pessoas/PessoasCadastroMassaModal.jsx'
 import { PessoaNomeIgualModal } from '../components/Pessoas/Modal/PessoaNomeIgualModal.jsx'
 import { PessoaDetailsModal } from '../components/Pessoas/Modal/PessoaDetailsModal.jsx'
 import { PessoaCancelModal } from '../components/Pessoas/Modal/PessoaCancelModal.jsx'
 import { PessoasResumoCards } from '../components/PessoasResumoCards.jsx'
 import { PessoasProvider, usePessoasContext } from '../context/PessoasContext.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
-import { downloadDesligamentoTemplate, importDesligamentoPlanilha } from '../services/pessoasService.js'
-import { formatDate, formatDateTime } from '../utils/pessoasUtils.js'
+import {
+  downloadDesligamentoTemplate,
+  importDesligamentoPlanilha,
+  downloadCadastroTemplate,
+  importCadastroPlanilha,
+} from '../services/pessoasService.js'
+import { downloadPessoasCsv, formatDate, formatDateTime } from '../utils/pessoasUtils.js'
 
 import '../styles/PessoasPage.css'
 import '../styles/MateriaisPage.css'
@@ -23,6 +29,10 @@ function PessoasContent() {
   const [desligamentoOpen, setDesligamentoOpen] = useState(false)
   const [desligamentoInfo, setDesligamentoInfo] = useState(null)
   const [desligamentoLoading, setDesligamentoLoading] = useState(false)
+  const [cadastroMassaOpen, setCadastroMassaOpen] = useState(false)
+  const [cadastroMassaInfo, setCadastroMassaInfo] = useState(null)
+  const [cadastroMassaLoading, setCadastroMassaLoading] = useState(false)
+  const [cadastroMassaAction, setCadastroMassaAction] = useState(null)
 
   const {
     form,
@@ -45,7 +55,6 @@ function PessoasContent() {
     handleFilterChange,
     handleFilterSubmit,
     handleFilterClear,
-    resetForm,
     startEdit,
     cancelEdit,
     openHistory,
@@ -63,6 +72,10 @@ function PessoasContent() {
 
   const handleOpenDetalhes = (pessoa) => setDetalheState({ open: true, pessoa })
   const handleCloseDetalhes = () => setDetalheState({ open: false, pessoa: null })
+  const handleExportCsv = () => {
+    const filename = `pessoas-${new Date().toISOString().slice(0, 10)}.csv`
+    downloadPessoasCsv(pessoasOrdenadas, { filename })
+  }
 
   return (
     <div className="stack">
@@ -83,6 +96,7 @@ function PessoasContent() {
         error={error}
         options={formOptions}
         onOpenDesligamento={() => setDesligamentoOpen(true)}
+        onOpenCadastroMassa={() => setCadastroMassaOpen(true)}
       />
 
       <PessoasFilters
@@ -106,9 +120,21 @@ function PessoasContent() {
       <section className="card">
         <header className="card__header">
           <h2>Lista de pessoas</h2>
-          <button type="button" className="button button--ghost" onClick={() => loadPessoas(filters, true)} disabled={isLoading}>
-            Atualizar
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleExportCsv}
+              aria-label="Exportar lista de pessoas em CSV"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SpreadsheetIcon size={16} />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+            <button type="button" className="button button--ghost" onClick={() => loadPessoas(filters, true)} disabled={isLoading}>
+              Atualizar
+            </button>
+          </div>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
         <PessoasTable
@@ -202,6 +228,100 @@ function PessoasContent() {
             })
           } finally {
             setDesligamentoLoading(false)
+          }
+        }}
+      />
+      <PessoasCadastroMassaModal
+        open={cadastroMassaOpen}
+        onClose={() => {
+          setCadastroMassaOpen(false)
+          setCadastroMassaInfo(null)
+          setCadastroMassaLoading(false)
+          setCadastroMassaAction(null)
+        }}
+        info={cadastroMassaInfo}
+        disabled={cadastroMassaLoading}
+        loading={cadastroMassaLoading}
+        loadingAction={cadastroMassaAction}
+        onDownloadTemplate={async () => {
+          setCadastroMassaInfo({ status: 'info', message: 'Baixando modelo...' })
+          try {
+            const { blob, filename } = await downloadCadastroTemplate()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename || 'cadastro_template.xlsx'
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+            setCadastroMassaInfo({ status: 'success', message: 'Modelo baixado com sucesso.' })
+          } catch (err) {
+            setCadastroMassaInfo({ status: 'error', message: err.message || 'Falha ao baixar modelo.' })
+          }
+        }}
+        onUploadFile={async (file) => {
+          if (!file) return
+          setCadastroMassaAction('insert')
+          setCadastroMassaLoading(true)
+          setCadastroMassaInfo({ status: 'info', message: 'Enviando planilha...' })
+          try {
+            const result = await importCadastroPlanilha(file, { mode: 'insert' })
+            setCadastroMassaInfo({
+              status: 'success',
+              message: 'Importacao concluida.',
+              mode: 'insert',
+              stats: {
+                processed: result?.processed ?? result?.total ?? 0,
+                success: result?.success ?? result?.imported ?? 0,
+                errors: result?.errors ?? result?.failed ?? 0,
+              },
+              errorsUrl: result?.errorsUrl ?? null,
+              firstError: result?.firstError ?? null,
+              errorSamples: result?.errorSamples ?? [],
+            })
+            await loadPessoas(filters, true)
+          } catch (err) {
+            setCadastroMassaInfo({
+              status: 'error',
+              message: err.message || 'Falha ao importar planilha.',
+              mode: 'insert',
+            })
+          } finally {
+            setCadastroMassaLoading(false)
+            setCadastroMassaAction(null)
+          }
+        }}
+        onUpdateFile={async (file) => {
+          if (!file) return
+          setCadastroMassaAction('update')
+          setCadastroMassaLoading(true)
+          setCadastroMassaInfo({ status: 'info', message: 'Enviando planilha...' })
+          try {
+            const result = await importCadastroPlanilha(file, { mode: 'update' })
+            setCadastroMassaInfo({
+              status: 'success',
+              message: 'Atualizacao concluida.',
+              mode: 'update',
+              stats: {
+                processed: result?.processed ?? result?.total ?? 0,
+                success: result?.success ?? result?.imported ?? 0,
+                errors: result?.errors ?? result?.failed ?? 0,
+              },
+              errorsUrl: result?.errorsUrl ?? null,
+              firstError: result?.firstError ?? null,
+              errorSamples: result?.errorSamples ?? [],
+            })
+            await loadPessoas(filters, true)
+          } catch (err) {
+            setCadastroMassaInfo({
+              status: 'error',
+              message: err.message || 'Falha ao atualizar planilha.',
+              mode: 'update',
+            })
+          } finally {
+            setCadastroMassaLoading(false)
+            setCadastroMassaAction(null)
           }
         }}
       />
