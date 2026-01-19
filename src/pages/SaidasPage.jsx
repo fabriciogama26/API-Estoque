@@ -7,6 +7,9 @@ import { ExitIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { SaidasHistoryModal } from '../components/Saidas/SaidasHistoryModal.jsx'
+import { SaidaCancelModal } from '../components/Saidas/Modal/SaidaCancelModal.jsx'
+import { SaidaTrocaModal } from '../components/Saidas/Modal/SaidaTrocaModal.jsx'
+import { SaidaDetailsModal } from '../components/Saidas/Modal/SaidaDetailsModal.jsx'
 import { SaidasProvider, useSaidasContext } from '../context/SaidasContext.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
@@ -554,187 +557,32 @@ function SaidasContent() {
   />
 </section>
 <SaidasHistoryModal state={historyState} onClose={closeHistory} />
-      {detalheState.open && detalheState.saida ? (
-        <div className="saida-details__overlay" role="dialog" aria-modal="true" onClick={handleCloseDetalhes}>
-          <div className="saida-details__modal" onClick={(event) => event.stopPropagation()}>
-            <header className="saida-details__header">
-              <div>
-                <p className="saida-details__eyebrow">ID da saída</p>
-                <h3 className="saida-details__title">{detalheState.saida.id || 'ID não informado'}</h3>
-              </div>
-              <button type="button" className="saida-details__close" onClick={handleCloseDetalhes} aria-label="Fechar detalhes">
-                <CancelIcon size={18} />
-              </button>
-            </header>
+      <SaidaDetailsModal
+        open={detalheState.open}
+        saida={detalheState.saida}
+        pessoa={detalheState.pessoa}
+        material={detalheState.material}
+        onClose={handleCloseDetalhes}
+        formatPessoaSummary={formatPessoaSummary}
+        formatMaterialSummary={formatMaterialSummary}
+        formatDisplayDateTime={formatDisplayDateTime}
+        resolveCentroEstoqueNome={resolveCentroEstoqueNome}
+      />
+      <SaidaCancelModal
+        state={cancelState}
+        onClose={closeCancelModal}
+        onConfirm={handleCancelSubmit}
+        onMotivoChange={(value) => setCancelState((prev) => ({ ...prev, motivo: value }))}
+        isSaving={cancelState.isSubmitting}
+      />
+      <SaidaTrocaModal
+        open={trocaPrompt.open}
+        details={trocaPrompt.details}
+        onClose={closeTrocaPrompt}
+        onConfirm={confirmTroca}
+        isSaving={isSaving}
+      />
 
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Dados principais</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Pessoa</span>
-                  <p className="saida-details__value">
-                    {formatPessoaSummary(detalheState.pessoa) || detalheState.saida.pessoaId || '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Material</span>
-                  <p className="saida-details__value">
-                    {formatMaterialSummary(detalheState.material) || detalheState.saida.materialId || '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Quantidade</span>
-                  <p className="saida-details__value">{detalheState.saida.quantidade ?? '-'}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Status</span>
-                  <p className="saida-details__value">{detalheState.saida.status || 'Registrado'}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Data de entrega</span>
-                  <p className="saida-details__value">{formatDisplayDateTime(detalheState.saida.dataEntrega)}</p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Data de troca</span>
-                  <p className="saida-details__value">
-                    {detalheState.saida.dataTroca ? formatDisplayDateTime(detalheState.saida.dataTroca) : '-'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Centros</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Centro de estoque</span>
-                  <p className="saida-details__value">
-                    {resolveCentroEstoqueNome(detalheState.saida.centroEstoque || detalheState.saida.centroEstoqueId)}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Centro de custo</span>
-                  <p className="saida-details__value">
-                    {detalheState.saida.centroCusto || detalheState.saida.centroCustoId || '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Centro de serviço</span>
-                  <p className="saida-details__value">
-                    {detalheState.saida.centroServico || detalheState.saida.centroServicoId || '-'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="saida-details__section">
-              <h4 className="saida-details__section-title">Registro</h4>
-              <div className="saida-details__grid">
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Registrado por</span>
-                  <p className="saida-details__value">
-                    {detalheState.saida.usuarioResponsavelNome ||
-                      detalheState.saida.usuarioResponsavel ||
-                      detalheState.saida.usuarioResponsavelId ||
-                      'Não informado'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Cadastrado em</span>
-                  <p className="saida-details__value">
-                    {detalheState.saida.criadoEm ? formatDisplayDateTime(detalheState.saida.criadoEm) : '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Atualizado em</span>
-                  <p className="saida-details__value">
-                    {detalheState.saida.atualizadoEm ? formatDisplayDateTime(detalheState.saida.atualizadoEm) : '-'}
-                  </p>
-                </div>
-                <div className="saida-details__item">
-                  <span className="saida-details__label">Usuário edição</span>
-                  <p className="saida-details__value">
-                    {detalheState.saida.usuarioEdicao || detalheState.saida.usuarioEdicaoId || '-'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <footer className="saida-details__footer">
-              <button type="button" className="button button--ghost" onClick={handleCloseDetalhes}>
-                Fechar
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
-      {cancelState.open ? (
-        <div className="modal__overlay" role="dialog" aria-modal="true" onClick={closeCancelModal}>
-          <div className="modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="modal__header">
-              <h3>Cancelar saída</h3>
-              <button type="button" className="modal__close" onClick={closeCancelModal} aria-label="Fechar">
-                <CancelIcon size={18} />
-              </button>
-            </header>
-            <div className="modal__body">
-              <p>Informe um motivo para cancelamento:</p>
-              <textarea
-                className="modal__textarea"
-                rows={3}
-                value={cancelState.motivo}
-                onChange={(e) => setCancelState((prev) => ({ ...prev, motivo: e.target.value }))}
-                placeholder="Descreva o motivo do cancelamento"
-              />
-              {cancelState.error ? <p className="feedback feedback--error">{cancelState.error}</p> : null}
-            </div>
-            <footer className="modal__footer">
-              <button type="button" className="button button--ghost" onClick={closeCancelModal} disabled={cancelState.isSubmitting}>
-                Fechar
-              </button>
-              <button
-                type="button"
-                className="button button--danger"
-                onClick={handleCancelSubmit}
-                disabled={cancelState.isSubmitting || !cancelState.motivo.trim()}
-              >
-                {cancelState.isSubmitting ? 'Cancelando...' : 'Confirmar cancelamento'}
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
-      {trocaPrompt.open ? (
-        <div className="modal__overlay" role="dialog" aria-modal="true" onClick={closeTrocaPrompt}>
-          <div className="modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="modal__header">
-              <h3>Saida com troca</h3>
-              <button type="button" className="modal__close" onClick={closeTrocaPrompt} aria-label="Fechar">
-                <CancelIcon size={18} />
-              </button>
-            </header>
-            <div className="modal__body">
-              <p>
-                Ja existe uma saida deste material para esta pessoa. Deseja marcar esta nova saida como troca?
-              </p>
-              {trocaPrompt.details?.ultimaSaidaId ? (
-                <p className="feedback">ID anterior: {trocaPrompt.details.ultimaSaidaId}</p>
-              ) : null}
-              {trocaPrompt.details?.trocaSequencia ? (
-                <p className="feedback">Sequencia da troca: {trocaPrompt.details.trocaSequencia}</p>
-              ) : null}
-            </div>
-            <footer className="modal__footer">
-              <button type="button" className="button button--ghost" onClick={closeTrocaPrompt} disabled={isSaving}>
-                Cancelar
-              </button>
-              <button type="button" className="button button--primary" onClick={confirmTroca} disabled={isSaving}>
-                Considerar troca
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

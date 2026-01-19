@@ -103,6 +103,10 @@ Funcoes principais
   - Tipo: contexto
   - Caminho: src/context/EstoqueContext.jsx
   - Responsavel por: compartilhar filtros, alertas, tamanhos de pagina, loading e handlers de recarga para cards.
+- Modais do Estoque (saidas e estoque minimo)
+  - Tipo: componentes de UI
+  - Caminho: src/components/Estoque/Modal/EstoqueSaidaModal.jsx e src/components/Estoque/Modal/EstoqueMinStockModal.jsx
+  - Responsavel por: exibir historico de saidas e ajustar estoque minimo.
 - useDashboardEstoque
   - Tipo: hook de dados/dashboard
   - Caminho: src/hooks/useDashboardEstoque.js
@@ -137,6 +141,5 @@ Servicos e integracoes externas
 Ajuda contextual
 ----------------
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
-- Conteudo vem de src/help/helpContent.json (chave 'estoque'); edite ali para ajustar titulos/steps/notes.
-- Para imagens, salve em public/help/estoque/ e aponte no campo 'media' do passo (ex.: /help/estoque/exemplo.webp).
+- Conteudo vem de src/help/helpEstoque.json; edite titulos/steps/notes e midias (/public/help/estoque/*).
 

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { AlertIcon, BarsIcon, PieIcon, TrendIcon, InfoIcon, ExpandIcon, CancelIcon } from '../components/icons.jsx'
+import { AlertIcon, BarsIcon, PieIcon, TrendIcon, InfoIcon, ExpandIcon } from '../components/icons.jsx'
 import { DashboardCards } from '../components/DashboardCards.jsx'
 import { ChartTendencia } from '../components/charts/ChartTendencia.jsx'
 import { ChartTipos } from '../components/charts/ChartTipos.jsx'
@@ -12,6 +12,7 @@ import { FiltrosDashboard } from '../components/FiltrosDashboard.jsx'
 import { DashboardAcidentesProvider, useDashboardAcidentesContext } from '../context/DashboardAcidentesContext.jsx'
 import { CHART_INFO_MESSAGES } from '../utils/dashboardAcidentesUtils.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
+import { ChartExpandModal } from '../components/Dashboard/ChartExpandModal.jsx'
 
 import '../styles/DashboardPage.css'
 
@@ -270,24 +271,9 @@ function DashboardAcidentesContent() {
         </section>
       </div>
 
-     {activeChart ? (
-        <div className="chart-modal__overlay" role="dialog" aria-modal="true" onClick={closeChartModal}>
-          <div className="chart-modal__content" onClick={(event) => event.stopPropagation()}>
-            <header className="chart-modal__header">
-              <h3 className="chart-modal__title">{activeChart.title}</h3>
-              <button
-                type="button"
-                className="chart-modal__close"
-                onClick={closeChartModal}
-                aria-label="Fechar grafico expandido"
-              >
-                <CancelIcon size={18} />
-              </button>
-            </header>
-            <div className="chart-modal__body">{activeChart.render()}</div>
-          </div>
-        </div>
-      ) : null}
+      <ChartExpandModal open={Boolean(activeChart)} title={activeChart?.title} onClose={closeChartModal}>
+        {activeChart?.render()}
+      </ChartExpandModal>
     </div>
   )
 }

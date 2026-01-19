@@ -77,3 +77,7 @@ Ajuda contextual
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
 - Conteudo vem de src/help/helpContent.json (chave 'pessoas').
 
+
+Atualizacao 2026-01 (UI)
+- Modais dedicados: src/components/Pessoas/Modal/PessoaNomeIgualModal.jsx, PessoaDetailsModal.jsx, PessoaCancelModal.jsx.
+- Ajuda: src/help/helpPessoas.json (helpContent.json removido).

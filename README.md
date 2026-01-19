@@ -167,3 +167,9 @@ Arquivos e docs:
 
 
 
+
+## Modais (UI)
+
+- Modais de confirmacao/detalhes foram separados em src/components/*/Modal (Materiais, Pessoas, Saidas, Entradas, Estoque).
+- Modal de expansao de graficos: src/components/Dashboard/ChartExpandModal.jsx.
+- Ajuda por pagina: src/help/help<Pagina>.json (helpContent.json removido).

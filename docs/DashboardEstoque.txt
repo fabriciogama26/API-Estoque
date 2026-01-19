@@ -120,3 +120,8 @@ Ajuda contextual
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
 - Conteudo vem de src/help/helpContent.json (chave 'dashboard'); edite ali para ajustar titulos/steps/notes.
 - Para imagens, salve em public/help/dashboard/ e aponte no campo 'media' do passo (ex.: /help/dashboard/exemplo.webp).
+
+Atualizacao 2026-01 (UI)
+- Botao "Troca" alterna Top materiais/setores/pessoas para dados de troca (sem substituir graficos).
+- Modal de expansao isolado em src/components/Dashboard/ChartExpandModal.jsx.
+- Ajuda: src/help/helpDashboard.json.
