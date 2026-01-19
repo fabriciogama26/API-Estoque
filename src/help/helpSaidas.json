@@ -1,33 +1,34 @@
 {
-"saidas": {
-    "title": "Saídas de estoque",
+  "saidas": {
+    "title": "Saidas de estoque",
     "summary": "Entrega de EPIs para pessoas, com rastreabilidade e cancelamento.",
     "steps": [
       {
-        "title": "Registrar saída",
-        "description": "No campo de busca, digite o nome ou matrícula para achar a pessoa e selecione o material pelo autocomplete. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saída para gravar a entrega.",
-        "mediaHint": "Formulário de cadastro de saídas com busca de pessoa e material."
+        "title": "Registrar saida",
+        "description": "No campo de busca, digite o nome ou matricula para achar a pessoa e selecione o material pelo autocomplete por nome, ID ou CA. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saida para gravar a entrega.",
+        "mediaHint": "Formulario de cadastro de saidas com busca de pessoa e material."
       },
       {
-        "title": "Conferir saldo disponível",
-        "description": "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberações acima do estoque.",
-        "mediaHint": "Bloco de saldo do material ao lado do formulário."
+        "title": "Conferir saldo disponivel",
+        "description": "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberacoes acima do estoque.",
+        "mediaHint": "Bloco de saldo do material ao lado do formulario."
       },
       {
         "title": "Editar ou cancelar",
-        "description": "Clique em Editar para carregar o registro no formulário: ele sobe para o topo, fica amarelo e mostra “Editando...”. Ajuste os campos necessários e clique em Salvar alterações para gravar; se desistir antes de salvar, use Cancelar edição para voltar ao modo de cadastro.",
-        "mediaHint": "Ações de edição e cancelamento na tabela de saídas."
+        "description": "Clique em Editar para carregar o registro no formulario: ele sobe para o topo e mostra o modo de edicao. Ajuste os campos necessarios e clique em Salvar alteracoes para gravar; se desistir, use Cancelar edicao para voltar ao modo de cadastro.",
+        "mediaHint": "Acoes de edicao e cancelamento na tabela de saidas."
       },
       {
         "title": "Filtrar e paginar",
-        "description": "No campo Busca digite o nome ou matrícula da pessoa, ou nome/descrição/ID do material ou CA, para trazer apenas as saídas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessário e navegue pelas páginas no rodapé.",
-        "mediaHint": "Filtros superiores e paginação inferior do histórico."
+        "description": "No campo Busca digite o nome ou matricula da pessoa, ou nome/descricao/ID/CA do material, para trazer apenas as saidas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessario e navegue pelas paginas no rodape.",
+        "mediaHint": "Filtros superiores e paginacao inferior do historico."
       }
     ],
     "notes": [
-      "Saídas canceladas ficam marcadas e não impactam o saldo.",
-      "Atalho: vindo do Estoque atual, o formulário pode abrir com Centro de estoque e Material já selecionados.",
-      "O histórico detalha quem registrou e quando a entrega foi alterada."
+      "Saidas canceladas ficam marcadas e nao impactam o saldo.",
+      "Atalho: vindo do Estoque atual, o formulario pode abrir com Centro de estoque e Material ja selecionados.",
+      "O filtro de Busca aceita ID do material.",
+      "O historico detalha quem registrou e quando a entrega foi alterada."
     ]
   }
 }

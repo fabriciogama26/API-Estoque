@@ -73,6 +73,44 @@ export function parsePeriodo(params = {}) {
   return Object.keys(periodoSimples).length ? periodoSimples : null
 }
 
+export function resolvePeriodoSaldo(periodo) {
+  if (!periodo) {
+    return null
+  }
+
+  if (periodo.inicio || periodo.fim) {
+    const ref = periodo.fim || periodo.inicio
+    if (!ref) {
+      return null
+    }
+    const ano = toNumber(ref.ano)
+    if (ano === null) {
+      return null
+    }
+    const saldo = { fim: { ano } }
+    const mes = ref.mes !== undefined ? toNumber(ref.mes) : null
+    if (mes !== null) {
+      saldo.fim.mes = mes
+    }
+    return saldo
+  }
+
+  if (periodo.ano !== undefined || periodo.mes !== undefined) {
+    const ano = toNumber(periodo.ano)
+    if (ano === null) {
+      return null
+    }
+    const saldo = { fim: { ano } }
+    const mes = periodo.mes !== undefined ? toNumber(periodo.mes) : null
+    if (mes !== null) {
+      saldo.fim.mes = mes
+    }
+    return saldo
+  }
+
+  return null
+}
+
 export function resolvePeriodoRange(periodo) {
   if (!periodo) {
     return null

@@ -66,6 +66,9 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 
 
 
+Melhoria possivel (Estoque atual)
+- Criar um RPC no Supabase para calcular o saldo por material (com corte por data fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
+
 ## Requisitos
 
 

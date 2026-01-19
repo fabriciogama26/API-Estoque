@@ -4,6 +4,7 @@ import {
   montarEstoqueAtual,
   montarDashboard,
   parsePeriodo,
+  resolvePeriodoSaldo,
   resolvePeriodoRange,
   calcularSaldoMaterial,
 } from '../lib/estoque.js'
@@ -2825,6 +2826,8 @@ async function carregarEntradas(params = {}) {
         material?.nome,
         material?.materialItemNome,
         material?.fabricante,
+        material?.id,
+        entrada.materialId,
         entrada.centroCusto,
         entrada.centroCustoId,
         entrada.usuarioResponsavel,
@@ -3367,6 +3370,8 @@ async function carregarSaidas(params = {}) {
         materialResumo,
         material?.nome ?? '',
         material?.materialItemNome ?? '',
+        material?.id ?? '',
+        saida.materialId ?? '',
         pessoa?.nome ?? '',
         pessoa?.cargo ?? '',
       ]
@@ -4980,12 +4985,18 @@ export const api = {
   },
   estoque: {
     async current(params = {}) {
+      const periodo = parsePeriodo(params)
+      const periodoSaldo = resolvePeriodoSaldo(periodo)
+      const periodoRange = resolvePeriodoRange(periodoSaldo)
+      const dataFim = periodoRange?.end ? periodoRange.end.toISOString() : null
+      const hasExplicitDate = Boolean(params.dataInicio || params.dataFim)
+      const queryParams = !hasExplicitDate && dataFim ? { ...params, dataFim } : params
       const [materiais, entradas, saidas] = await Promise.all([
         carregarMateriais(),
-        carregarEntradas(params),
-        carregarSaidas(params),
+        carregarEntradas(queryParams),
+        carregarSaidas(queryParams),
       ])
-      return montarEstoqueAtual(materiais, entradas, saidas, parsePeriodo(params))
+      return montarEstoqueAtual(materiais, entradas, saidas, periodoSaldo)
     },
     async saldo(materialId) {
       return obterSaldoMaterial(materialId)

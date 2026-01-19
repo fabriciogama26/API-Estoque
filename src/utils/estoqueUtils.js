@@ -115,9 +115,14 @@ export const parsePeriodoRange = (inicio, fim) => {
   return { start, end }
 }
 
-export const filterEstoqueItens = (itens = [], filters = {}, periodoFiltro = {}) => {
+export const filterEstoqueItens = (itens = [], filters = {}) => {
   const termoNormalizado = normalizeTerm(filters.termo)
   const centroFiltro = (filters.centroCusto ?? '').trim().toLowerCase()
+  const quantidadeMinFiltro = (filters.quantidadeMax ?? '').trim()
+  const quantidadeMinNumero =
+    quantidadeMinFiltro !== '' && !Number.isNaN(Number(quantidadeMinFiltro))
+      ? Number(quantidadeMinFiltro)
+      : null
   const estoqueMinimoFiltro = (filters.estoqueMinimo ?? '').trim()
   const estoqueMinimoNumero =
     estoqueMinimoFiltro !== '' && !Number.isNaN(Number(estoqueMinimoFiltro))
@@ -126,6 +131,7 @@ export const filterEstoqueItens = (itens = [], filters = {}, periodoFiltro = {})
   const aplicarEstoqueMinimo = estoqueMinimoNumero !== null
   const apenasAlertas = Boolean(filters.apenasAlertas)
   const apenasSaidas = Boolean(filters.apenasSaidas)
+  const apenasZerado = Boolean(filters.apenasZerado)
 
   return itens.filter((item) => {
     if (centroFiltro) {
@@ -136,22 +142,16 @@ export const filterEstoqueItens = (itens = [], filters = {}, periodoFiltro = {})
       }
     }
 
-    if (periodoFiltro.start || periodoFiltro.end) {
-      const ultimaAtualizacao = item.ultimaAtualizacao ? new Date(item.ultimaAtualizacao) : null
-      if (!ultimaAtualizacao || Number.isNaN(ultimaAtualizacao.getTime())) {
-        return false
-      }
-      if (periodoFiltro.start && ultimaAtualizacao < periodoFiltro.start) {
-        return false
-      }
-      if (periodoFiltro.end && ultimaAtualizacao > periodoFiltro.end) {
+    if (aplicarEstoqueMinimo) {
+      const minimoConfigurado = Number(item.estoqueMinimo ?? 0)
+      if (Number.isNaN(minimoConfigurado) || minimoConfigurado < estoqueMinimoNumero) {
         return false
       }
     }
 
-    if (aplicarEstoqueMinimo) {
-      const minimoConfigurado = Number(item.estoqueMinimo ?? 0)
-      if (Number.isNaN(minimoConfigurado) || minimoConfigurado < estoqueMinimoNumero) {
+    if (quantidadeMinNumero !== null) {
+      const quantidade = Number(item.quantidade ?? item.estoqueAtual ?? 0)
+      if (!Number.isNaN(quantidade) && quantidade < quantidadeMinNumero) {
         return false
       }
     }
@@ -164,6 +164,13 @@ export const filterEstoqueItens = (itens = [], filters = {}, periodoFiltro = {})
       const temSaidaFlag = Boolean(item.temSaida || item.ultimaSaida)
       const totalSaidas = Number(item.totalSaidas ?? 0)
       if (!temSaidaFlag && totalSaidas <= 0) {
+        return false
+      }
+    }
+
+    if (apenasZerado) {
+      const quantidade = Number(item.quantidade ?? item.estoqueAtual ?? 0)
+      if (Number.isNaN(quantidade) || quantidade !== 0) {
         return false
       }
     }

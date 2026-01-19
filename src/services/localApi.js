@@ -3,6 +3,7 @@ import {
   montarEstoqueAtual,
   montarDashboard,
   parsePeriodo,
+  resolvePeriodoSaldo,
   calcularSaldoMaterial,
 } from '../lib/estoque.js'
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
@@ -1788,6 +1789,7 @@ function filterLocalEntradas(entradas, params = {}, state) {
     const alvo = [
       material?.nome || '',
       material?.fabricante || '',
+      entrada.materialId || '',
       entrada.centroCusto || '',
       entrada.usuarioResponsavel || '',
     ]
@@ -1859,6 +1861,7 @@ function filterLocalSaidas(saidas, params = {}, state) {
     const alvo = [
       material?.nome || '',
       material?.fabricante || '',
+      saida.materialId || '',
       pessoa?.nome || '',
       (pessoa?.centroServico ?? pessoa?.local) || '',
       saida.centroCusto || '',
@@ -2601,7 +2604,7 @@ const localApi = {
   },
   estoque: {
     async current(params = {}) {
-      const periodo = parsePeriodo(params)
+      const periodo = resolvePeriodoSaldo(parsePeriodo(params))
       return readState((state) => {
         const pessoasMap = new Map((state.pessoas ?? []).map((pessoa) => [pessoa.id, mapLocalPessoaRecord(pessoa)]))
         const saidasEnriquecidas = (state.saidas ?? []).map((saida) => {

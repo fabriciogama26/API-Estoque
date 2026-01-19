@@ -5,7 +5,6 @@ import {
   formatCurrency,
   formatInteger,
   filterEstoqueItens,
-  parsePeriodoRange,
 } from '../utils/estoqueUtils.js'
 
 export const ALERTAS_PAGE_SIZE = 6
@@ -22,14 +21,9 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     [estoque.itens],
   )
 
-  const periodoFiltro = useMemo(
-    () => parsePeriodoRange(appliedFilters.periodoInicio, appliedFilters.periodoFim),
-    [appliedFilters.periodoInicio, appliedFilters.periodoFim],
-  )
-
   const itensFiltrados = useMemo(
-    () => filterEstoqueItens(estoque.itens, appliedFilters, periodoFiltro),
-    [estoque.itens, appliedFilters, periodoFiltro],
+    () => filterEstoqueItens(estoque.itens, appliedFilters),
+    [estoque.itens, appliedFilters],
   )
 
   const alertasFiltrados = useMemo(
