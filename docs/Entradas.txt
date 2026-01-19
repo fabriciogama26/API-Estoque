@@ -46,7 +46,7 @@ Cadastro
 Filtros, auto-complete e listagem
 ---------------------------------
 - Filtros:
-  - Termo livre (material, fabricante, usuario).
+- Termo livre (material, fabricante, usuario, ID do material).
   - Registrado por (usuario).
   - Centro de estoque/custo.
   - Faixa de datas.

@@ -50,6 +50,17 @@ export function EstoqueFilters({
             placeholder="Mínimo configurado >= valor"
           />
         </label>
+        <label className="field">
+          <span>Quantidade</span>
+          <input
+            type="number"
+            min="0"
+            name="quantidadeMax"
+            value={filters.quantidadeMax}
+            onChange={onChange}
+            placeholder="Quantidade >= valor"
+          />
+        </label>
         <label className="field field--checkbox field--checkbox-accent">
           <input
             type="checkbox"
@@ -67,6 +78,15 @@ export function EstoqueFilters({
             onChange={onChange}
           />
           <span>Apenas saídas</span>
+        </label>
+        <label className="field field--checkbox field--checkbox-accent">
+          <input
+            type="checkbox"
+            name="apenasZerado"
+            checked={Boolean(filters.apenasZerado)}
+            onChange={onChange}
+          />
+          <span>Apenas zerado</span>
         </label>
         <div className="form__actions">
           <button type="submit" className="button button--primary">

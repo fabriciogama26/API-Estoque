@@ -63,6 +63,14 @@ function EstoquePageContent() {
         actions={<HelpButton topic="estoque" />}
       />
 
+      <EstoqueFilters
+        filters={filters}
+        centrosCusto={centrosCustoDisponiveis}
+        onSubmit={handleSubmit}
+        onChange={handleFilterChange}
+        onClear={resetFilters}
+      />
+
       <section className="card">
         <header className="card__header">
           <h2>Resumo</h2>
@@ -83,14 +91,6 @@ function EstoquePageContent() {
           totalAlertas={totalAlertas}
         />
       </section>
-
-      <EstoqueFilters
-        filters={filters}
-        centrosCusto={centrosCustoDisponiveis}
-        onSubmit={handleSubmit}
-        onChange={handleFilterChange}
-        onClear={resetFilters}
-      />
 
       {error ? <p className="feedback feedback--error">{error}</p> : null}
 

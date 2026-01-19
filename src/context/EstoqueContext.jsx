@@ -11,9 +11,11 @@ const INITIAL_FILTERS = {
   periodoFim: '',
   termo: '',
   centroCusto: '',
+  quantidadeMax: '',
   estoqueMinimo: '',
   apenasAlertas: false,
   apenasSaidas: false,
+  apenasZerado: false,
 }
 
 export function EstoqueProvider({ children }) {

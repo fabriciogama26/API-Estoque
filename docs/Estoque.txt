@@ -25,10 +25,13 @@ Arquitetura (modular)
 
 Filtros
 -------
-- Periodo inicial/final (mes/ano), para analisar saldo dentro de um contexto.
+- Periodo inicial/final (mes/ano) calcula o saldo fisico acumulado ate o fim do periodo.
 - Termo de busca (nome do material, fabricante, centro).
 - Centro de estoque/servico.
+- Quantidade (>= valor) para filtrar por saldo minimo exibido.
 - Checkboxes:
+  - "Apenas zerado": mantem somente materiais com quantidade 0.
+  - "Apenas saidas": mantem somente materiais com movimentacao de saida registrada (sino ativo).
   - "Apenas alertas": mantém somente materiais com alerta ativo.
   - "Apenas com histórico de saídas": mantém somente materiais que já possuem movimentação de saída (sino ativo). Útil para focar em itens que já foram entregues pelo menos uma vez.
 - Botoes:
@@ -78,7 +81,11 @@ Boas praticas
 -------------
 - Configurar politicas no Supabase para permitir update de `estoque_minimo` apenas por usuarios autenticados/autorizados.
 - Manter `localApi.estoque.current` (modo local) alinhado com a estrutura esperada (`alertas` + `itens`) para facilitar testes.
-- Utilizar filtros de periodo para auditar movimentacoes antes de gerar relatorios oficiais.
+- Utilizar filtros de periodo para inspecionar o saldo fisico ao fim do periodo antes de gerar relatorios oficiais.
+
+Melhoria possivel
+-----------------
+- Criar um RPC no Supabase para calcular o saldo do Estoque atual (com corte por data fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
 
 Atualizacao 2025-12
 -------------------
