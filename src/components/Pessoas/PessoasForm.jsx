@@ -8,6 +8,7 @@ export function PessoasForm({
   error,
   options = {},
   onOpenDesligamento = () => {},
+  onOpenCadastroMassa = () => {},
 }) {
   const normalizeValue = (valor) => (typeof valor === 'string' ? valor.trim() : '')
 
@@ -161,8 +162,13 @@ export function PessoasForm({
       <div className="form__actions form__actions--split">
         <div className="form__actions-group">
           <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? 'Salvando...' : editingPessoa ? 'Salvar alteracoes' : 'Salvar pessoa'}
+            {isSaving ? 'Salvando...' : editingPessoa ? 'Salvar alterações' : 'Cadastrar'}
           </button>
+          {!editingPessoa ? (
+            <button type="button" className="button button--ghost" onClick={onOpenCadastroMassa} disabled={isSaving}>
+              Cadastrar em massa
+            </button>
+          ) : null}
           {editingPessoa ? (
             <button type="button" className="button button--ghost" onClick={onCancel} disabled={isSaving}>
               Cancelar edicao
@@ -170,7 +176,7 @@ export function PessoasForm({
           ) : null}
         </div>
         <button type="button" className="button button--ghost" onClick={onOpenDesligamento}>
-          Desligamento
+          Desligamento em massa
         </button>
       </div>
       </form>

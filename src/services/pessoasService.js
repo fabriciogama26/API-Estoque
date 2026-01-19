@@ -16,6 +16,13 @@ export const downloadDesligamentoTemplate = () => {
   return Promise.reject(new Error('Endpoint de download de modelo nao configurado.'))
 }
 
+export const downloadCadastroTemplate = () => {
+  if (api?.pessoas?.downloadCadastroTemplate) {
+    return api.pessoas.downloadCadastroTemplate()
+  }
+  return Promise.reject(new Error('Endpoint de download de modelo nao configurado.'))
+}
+
 export const importDesligamentoPlanilha = (file) => {
   if (!file) {
     return Promise.reject(new Error('Selecione um arquivo XLSX.'))
@@ -24,4 +31,14 @@ export const importDesligamentoPlanilha = (file) => {
     return api.pessoas.importDesligamentoPlanilha(file)
   }
   return Promise.reject(new Error('Endpoint de importacao de desligamento nao configurado.'))
+}
+
+export const importCadastroPlanilha = (file, options = {}) => {
+  if (!file) {
+    return Promise.reject(new Error('Selecione um arquivo XLSX.'))
+  }
+  if (api?.pessoas?.importCadastroPlanilha) {
+    return api.pessoas.importCadastroPlanilha(file, options)
+  }
+  return Promise.reject(new Error('Endpoint de importacao de cadastro nao configurado.'))
 }

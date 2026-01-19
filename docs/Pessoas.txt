@@ -31,6 +31,16 @@ Desligamento em massa (novo)
 - O fluxo completo (frontend + Supabase + Edge Functions + Storage) esta documentado em:
   - docs/DesligamentoEmMassa.txt
 
+Cadastro em massa (novo)
+------------------------
+- Existe um botao "Cadastrar em massa" ao lado do Salvar pessoa.
+- A planilha exige matricula, nome, centro_servico, setor, cargo, tipo_execucao e data_admissao.
+- Campos de texto sao convertidos para MAIUSCULO; centro_custo vem do centro_servico.
+- O modal tem dois botoes: Importar planilha (insere novos registros) e Atualizar planilha (atualiza existentes).
+- Importar bloqueia matriculas ja existentes; Atualizar exige matriculas existentes.
+- O fluxo completo esta documentado em:
+  - docs/CadastroEmMassa.txt
+
 Boas praticas
 -------------
 - Usar matricula como chave; manter catalogos de centro/setor/cargo atualizados.

@@ -1514,6 +1514,26 @@ async function execute(builder, fallbackMessage) {
   return data
 }
 
+async function executePaged(buildQuery, fallbackMessage, options = {}) {
+  const pageSize = Number(options.pageSize ?? 1000) || 1000
+  const maxPages = Number(options.maxPages ?? 50) || 50
+  let from = 0
+  let result = []
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const query = buildQuery().range(from, from + pageSize - 1)
+    const data = await execute(query, fallbackMessage)
+    const chunk = Array.isArray(data) ? data : []
+    result = result.concat(chunk)
+    if (chunk.length < pageSize) {
+      break
+    }
+    from += pageSize
+  }
+
+  return result
+}
+
 async function executeSingle(builder, fallbackMessage) {
   ensureSupabase()
   const { data, error } = await builder.single()
@@ -3686,16 +3706,20 @@ export const api = {
       }
 
       try {
-        let query = buildQuery()
-        if (termo) {
-          const like = `%${termo}%`
-          query = applyPessoaSearchFilters(query, like)
+        const buildFilteredQuery = () => {
+          let query = buildQuery()
+          if (termo) {
+            const like = `%${termo}%`
+            query = applyPessoaSearchFilters(query, like)
+          }
+          return query
         }
-        const data = await execute(query, 'Falha ao listar pessoas.')
+        const data = await executePaged(buildFilteredQuery, 'Falha ao listar pessoas.')
         let registros = (data ?? []).map(mapPessoaRecord)
         if ((!registros || registros.length === 0) && !termo) {
-          const fallbackDados = await execute(
-            supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).order('nome', { ascending: true }),
+          const fallbackDados = await executePaged(
+            () =>
+              supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).order('nome', { ascending: true }),
             'Falha ao listar pessoas (fallback view).'
           )
           registros = (fallbackDados ?? []).map(mapPessoaRecord)
@@ -3708,7 +3732,7 @@ export const api = {
         reportClientError('Erro ao aplicar filtro remoto por termo em pessoas, usando filtro local.', error, {
           termo,
         })
-        const fallbackData = await execute(buildQuery(), 'Falha ao listar pessoas.')
+        const fallbackData = await executePaged(buildQuery, 'Falha ao listar pessoas.')
         const registros = (fallbackData ?? []).map(mapPessoaRecord)
         return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
       }
@@ -4045,6 +4069,19 @@ export const api = {
       return { blob, filename: 'desligamento_template.xlsx' }
     },
 
+    async downloadCadastroTemplate() {
+      if (!FUNCTIONS_URL) {
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
+      }
+      const headers = await buildAuthHeaders()
+      const resp = await fetch(`${FUNCTIONS_URL}/cadastro-template`, { headers })
+      if (!resp.ok) {
+        throw new Error('Falha ao baixar modelo de cadastro em massa.')
+      }
+      const blob = await resp.blob()
+      return { blob, filename: 'cadastro_template.xlsx' }
+    },
+
     async importDesligamentoPlanilha(file) {
       try {
         if (!file) {
@@ -4138,6 +4175,111 @@ export const api = {
             path: details.path,
             response: details.response,
             requestId: details.requestId,
+          },
+          'error'
+        )
+        throw err
+      }
+    },
+
+    async importCadastroPlanilha(file, options = {}) {
+      try {
+        if (!file) {
+          throw new Error('Selecione um arquivo XLSX.')
+        }
+        if (!isSupabaseConfigured) {
+          throw new Error('Supabase nao configurado.')
+        }
+
+        const modeRaw = typeof options?.mode === 'string' ? options.mode.trim().toLowerCase() : 'insert'
+        const mode = modeRaw === 'update' ? 'update' : 'insert'
+
+        const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
+        const path = `cadastro/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+
+        const upload = await supabase.storage.from(importsBucket).upload(path, file, {
+          contentType:
+            file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          upsert: false,
+        })
+        if (upload.error) {
+          throw new Error(upload.error.message || 'Falha ao enviar arquivo para o Storage.')
+        }
+
+        if (!FUNCTIONS_URL) {
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
+        }
+
+        const headers = await buildAuthHeaders({
+          'Content-Type': 'application/json',
+          ...(SUPABASE_ANON_KEY ? { apikey: SUPABASE_ANON_KEY } : {}),
+        })
+        const resp = await fetch(`${FUNCTIONS_URL}/cadastro-import`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ path, mode }),
+        })
+        const status = resp.status
+        const requestId =
+          resp.headers.get('x-deno-execution-id') ||
+          resp.headers.get('x-sb-request-id') ||
+          null
+        let responseText = null
+        try {
+          responseText = await resp.text()
+        } catch (_) {
+          responseText = null
+        }
+        let responseJson = null
+        try {
+          responseJson = responseText ? JSON.parse(responseText) : null
+        } catch (_) {
+          responseJson = null
+        }
+        if (!resp.ok) {
+          const stage = responseJson?.stage || null
+          const responseMessage = responseJson?.message || responseJson?.error || responseText
+          const suffixParts = []
+          if (stage) suffixParts.push(`stage=${stage}`)
+          if (requestId) suffixParts.push(`req=${requestId}`)
+          const suffix = suffixParts.length ? ` (${suffixParts.join(', ')})` : ''
+          const friendly =
+            responseMessage && String(responseMessage).trim()
+              ? `Falha ao importar planilha (${status || 'sem status'}): ${responseMessage}${suffix}`
+              : `Falha ao importar planilha (${status || 'sem status'})${suffix}.`
+
+          const enriched = new Error(friendly)
+          enriched.details = {
+            status,
+            stage,
+            requestId,
+            response: responseMessage,
+            function: 'cadastro-import',
+            bucket: importsBucket,
+            path,
+            mode,
+          }
+          throw enriched
+        }
+        return responseJson || {}
+      } catch (err) {
+        const details = err?.details || {}
+        const modeLabel = details.mode === 'update' ? 'atualizacao' : 'importacao'
+        reportClientError(
+          `Falha ao ${modeLabel} de cadastro em massa.`,
+          err,
+          {
+            feature: 'pessoas',
+            action: 'cadastro-import',
+            status: details.status,
+            code: details.code,
+            stage: details.stage,
+            function: details.function,
+            bucket: details.bucket,
+            path: details.path,
+            response: details.response,
+            requestId: details.requestId,
+            mode: details.mode || mode,
           },
           'error'
         )

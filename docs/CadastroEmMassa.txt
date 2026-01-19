@@ -1,0 +1,119 @@
+Cadastro em massa (Pessoas)
+==========================
+
+Objetivo
+--------
+Cadastrar colaboradores em massa a partir de uma planilha XLSX, registrando:
+- Insercao na tabela public.pessoas
+- UsuarioCadastro e account_owner_id com o usuario logado
+
+Formato da planilha (XLSX)
+--------------------------
+Colunas obrigatorias (cabecalho na 1a linha):
+- matricula (obrigatoria, apenas numeros)
+- nome (obrigatoria)
+- centro_servico (obrigatoria, texto)
+- setor (obrigatoria, texto)
+- cargo (obrigatoria, texto)
+- tipo_execucao (obrigatoria, texto)
+- data_admissao (obrigatoria) -> dd/MM/yyyy
+
+Observacoes importantes:
+- O arquivo deve ser .xlsx (nao CSV).
+- Campos de texto sao convertidos para MAIUSCULO no backend.
+- centro_custo e preenchido automaticamente a partir do centro_servico.
+- A data pode vir como texto (dd/MM/yyyy), serial do Excel ou Date.
+
+Como usar (passo a passo)
+-------------------------
+1) Abra a tela de Cadastro de Pessoas.
+2) Clique em "Cadastrar em massa" ao lado do botao Salvar pessoa.
+3) (Opcional) Clique em "Baixar modelo (.xlsx)".
+4) Preencha a planilha seguindo as regras.
+5) Selecione o arquivo XLSX (drag-and-drop ou clique para selecionar).
+6) Clique em:
+   - "Importar planilha" para INSERIR novos registros.
+   - "Atualizar planilha" para ATUALIZAR registros existentes.
+7) Ao final, o modal mostra:
+   - quantos registros foram processados
+   - quantos foram importados/atualizados
+   - quantos tiveram erro
+   - (se houver) um exemplo de erro e a opcao de baixar relatorio CSV
+
+Regras de importacao
+--------------------
+- matricula obrigatoria:
+  - Se estiver vazia: erro na coluna matricula.
+  - Se tiver letras/simbolos: erro "deve ser numerica".
+  - Importar: se ja existir na mesma familia (account_owner_id), gera erro.
+  - Atualizar: se nao existir, gera erro.
+- nome/centro_servico/setor/cargo/tipo_execucao obrigatorios:
+  - Se vazio: erro.
+  - Se nao encontrar referencia por nome: erro.
+- data_admissao obrigatoria:
+  - Se vazia: erro.
+  - Se invalida: erro.
+
+Impacto no banco:
+- public.pessoas.ativo = true
+- public.pessoas.dataAdmissao = <data>
+- public.pessoas.dataDemissao = null
+- public.pessoas.usuarioCadastro = <usuario logado>
+- public.pessoas.account_owner_id = <owner>
+No modo Atualizar:
+- Atualiza nome, matricula, centro_servico_id, setor_id, cargo_id, centro_custo_id, tipo_execucao_id e dataAdmissao.
+- Define usuarioEdicao e atualizadoEm.
+- Mantem ativo/dataDemissao inalterados.
+
+Mapa do fluxo (frontend -> Supabase)
+------------------------------------
+UI (Modal)
+- src/components/Pessoas/PessoasCadastroMassaModal.jsx
+  - recebe o arquivo XLSX e chama o service de importacao
+
+Service (frontend)
+- src/services/api.js
+  - api.pessoas.importCadastroPlanilha(file)
+    1) Faz upload do XLSX no Storage (bucket "imports")
+       path: cadastro/<uuid>-<nome-do-arquivo>.xlsx
+    2) Chama a Edge Function "cadastro-import" com body JSON:
+       { "path": "<path-do-arquivo-no-bucket>", "mode": "insert|update" }
+
+Edge Function (Supabase)
+- supabase/functions/cadastro-import/index.ts
+  - Valida usuario logado via JWT (Authorization Bearer)
+  - Faz download do arquivo XLSX no Storage (bucket "imports")
+  - Le a planilha e valida cada linha
+  - Insere em public.pessoas
+  - (Se houver erros) gera um CSV com as linhas invalidas
+  - Remove o arquivo XLSX enviado (best-effort)
+
+Template (baixar modelo)
+- supabase/functions/cadastro-template/index.ts
+  - Retorna um XLSX com as colunas e um exemplo.
+
+Relatorio de erros (CSV)
+------------------------
+Quando houver erros, a Edge Function retorna:
+- errorsUrl: URL assinada para baixar o CSV (se configurado)
+- firstError: primeira linha de erro
+- errorSamples: amostras de erros
+
+Formato do CSV:
+linha,coluna,motivo
+
+Problemas comuns (checklist)
+----------------------------
+- "Body precisa ser JSON: { path: string }"
+  - O frontend ainda esta chamando a function com FormData.
+
+- "Bucket not found"
+  - O bucket "imports" nao existe no projeto Supabase.
+  - Rode a migration `supabase/migrations/0077_fix_imports_bucket.sql` no projeto remoto.
+
+- "Falha ao baixar arquivo"
+  - O path enviado nao existe no bucket ou o upload falhou.
+  - Confirme o path exibido e verifique no Storage > Buckets > imports.
+
+- Referencias nao encontradas
+  - Verifique se o texto da coluna bate com os nomes cadastrados nos catalogos.
