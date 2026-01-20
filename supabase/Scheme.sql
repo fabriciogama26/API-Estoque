@@ -16,7 +16,7 @@ CREATE TABLE public.acidente_historico (
   usuario_responsavel text NOT NULL DEFAULT ''::text,
   campos_alterados jsonb NOT NULL DEFAULT '[]'::jsonb,
   user_id uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT acidente_historico_pkey PRIMARY KEY (id),
   CONSTRAINT acidente_historico_acidente_id_fkey FOREIGN KEY (acidente_id) REFERENCES public.acidentes(id),
   CONSTRAINT acidente_historico_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.app_users(id),
@@ -103,7 +103,7 @@ CREATE TABLE public.acidentes (
   data_esocial timestamp with time zone,
   sesmt boolean DEFAULT false,
   data_sesmt timestamp with time zone,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   ativo boolean DEFAULT true,
   cancel_motivo text text,
   CONSTRAINT acidentes_pkey PRIMARY KEY (id),
@@ -227,7 +227,7 @@ CREATE TABLE public.cargos (
   ordem smallint NOT NULL,
   ativo boolean NOT NULL DEFAULT true,
   criado_em timestamp with time zone NOT NULL DEFAULT now(),
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT cargos_pkey PRIMARY KEY (id),
   CONSTRAINT cargos_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
 );
@@ -237,7 +237,7 @@ CREATE TABLE public.centros_custo (
   ordem smallint NOT NULL,
   ativo boolean NOT NULL DEFAULT true,
   criado_em timestamp with time zone NOT NULL DEFAULT now(),
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT centros_custo_pkey PRIMARY KEY (id),
   CONSTRAINT centros_custo_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
 );
@@ -247,7 +247,7 @@ CREATE TABLE public.centros_estoque (
   centro_custo uuid,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   ativo boolean DEFAULT true,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT centros_estoque_pkey PRIMARY KEY (id),
   CONSTRAINT centros_estoque_centro_custo_fkey FOREIGN KEY (centro_custo) REFERENCES public.centros_custo(id),
   CONSTRAINT centros_estoque_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
@@ -259,7 +259,7 @@ CREATE TABLE public.centros_servico (
   ativo boolean NOT NULL DEFAULT true,
   criado_em timestamp with time zone NOT NULL DEFAULT now(),
   centro_custo_id uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT centros_servico_pkey PRIMARY KEY (id),
   CONSTRAINT centros_servico_centro_custo_id_fkey FOREIGN KEY (centro_custo_id) REFERENCES public.centros_custo(id),
   CONSTRAINT centros_servico_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
@@ -277,7 +277,7 @@ CREATE TABLE public.entrada_historico (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   usuarioResponsavel uuid,
   entrada_id uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT entrada_historico_pkey PRIMARY KEY (id),
   CONSTRAINT entrada_historico_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.materiais(id),
   CONSTRAINT entrada_historico_usuarioResponsavel_fkey FOREIGN KEY (usuarioResponsavel) REFERENCES public.app_users(id),
@@ -294,7 +294,7 @@ CREATE TABLE public.entradas (
   status uuid DEFAULT '82f86834-5b97-4bf0-9801-1372b6d1bd37'::uuid,
   atualizado_em timestamp with time zone DEFAULT now(),
   usuario_edicao uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT entradas_pkey PRIMARY KEY (id),
   CONSTRAINT entradas_material_id_fkey FOREIGN KEY (materialId) REFERENCES public.materiais(id),
   CONSTRAINT entradas_centro_estoque_fkey FOREIGN KEY (centro_estoque) REFERENCES public.centros_estoque(id),
@@ -313,7 +313,7 @@ CREATE TABLE public.fabricantes (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   fabricante text NOT NULL,
   ativo boolean DEFAULT true,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT fabricantes_pkey PRIMARY KEY (id),
   CONSTRAINT fabricantes_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
 );
@@ -356,7 +356,7 @@ CREATE TABLE public.hht_mensal (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_by uuid,
   status_hht_id uuid NOT NULL DEFAULT '3a9aec3f-a1d2-40fd-9ec8-917d88dc2353'::uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT hht_mensal_pkey PRIMARY KEY (id),
   CONSTRAINT hht_mensal_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id),
   CONSTRAINT hht_mensal_centro_servico_id_fkey FOREIGN KEY (centro_servico_id) REFERENCES public.centros_servico(id),
@@ -372,7 +372,7 @@ CREATE TABLE public.hht_mensal_hist (
   depois jsonb,
   motivo text,
   status_hht_nome text,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT hht_mensal_hist_pkey PRIMARY KEY (id),
   CONSTRAINT hht_mensal_hist_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id),
   CONSTRAINT hht_mensal_hist_hht_mensal_id_fkey FOREIGN KEY (hht_mensal_id) REFERENCES public.hht_mensal(id)
@@ -395,7 +395,7 @@ CREATE TABLE public.materiais (
   numeroCalcado uuid,
   numeroVestimenta uuid,
   numeroEspecifico text,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   hash_base text,
   hash_completo text,
   CONSTRAINT materiais_pkey PRIMARY KEY (id),
@@ -412,17 +412,21 @@ CREATE TABLE public.material_grupo_caracteristica_epi (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   material_id uuid NOT NULL,
   grupo_caracteristica_epi uuid NOT NULL,
+  account_owner_id uuid NOT NULL,
   CONSTRAINT material_grupo_caracteristica_epi_pkey PRIMARY KEY (id),
   CONSTRAINT material_grupo_caracteristica_epi_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.materiais(id),
-  CONSTRAINT material_grupo_caracteristica_epi_gurpo_caracteristica_epi_fkey FOREIGN KEY (grupo_caracteristica_epi) REFERENCES public.caracteristica_epi(id)
+  CONSTRAINT material_grupo_caracteristica_epi_gurpo_caracteristica_epi_fkey FOREIGN KEY (grupo_caracteristica_epi) REFERENCES public.caracteristica_epi(id),
+  CONSTRAINT material_grupo_carac_owner_fk FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
 );
 CREATE TABLE public.material_grupo_cor (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   material_id uuid NOT NULL,
   grupo_material_cor uuid NOT NULL,
+  account_owner_id uuid NOT NULL,
   CONSTRAINT material_grupo_cor_pkey PRIMARY KEY (id),
   CONSTRAINT material_grupo_cor_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.materiais(id),
-  CONSTRAINT material_grupo_cor_gurpo_material_cor_fkey FOREIGN KEY (grupo_material_cor) REFERENCES public.cor(id)
+  CONSTRAINT material_grupo_cor_gurpo_material_cor_fkey FOREIGN KEY (grupo_material_cor) REFERENCES public.cor(id),
+  CONSTRAINT material_grupo_cor_owner_fk FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
 );
 CREATE TABLE public.material_price_history (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -431,7 +435,7 @@ CREATE TABLE public.material_price_history (
   criadoEm timestamp with time zone NOT NULL DEFAULT now(),
   usuarioResponsavel text NOT NULL DEFAULT 'sistema'::text,
   campos_alterados jsonb NOT NULL DEFAULT '[]'::jsonb,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT material_price_history_pkey PRIMARY KEY (id),
   CONSTRAINT precos_historico_material_id_fkey FOREIGN KEY (materialId) REFERENCES public.materiais(id),
   CONSTRAINT material_price_history_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)
@@ -472,7 +476,7 @@ CREATE TABLE public.pessoas (
   tipo_execucao_id uuid NOT NULL,
   ativo boolean NOT NULL DEFAULT true,
   dataDemissao timestamp with time zone,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   observacao text,
   CONSTRAINT pessoas_pkey PRIMARY KEY (id),
   CONSTRAINT pessoas_usuario_cadastro_fk FOREIGN KEY (usuarioCadastro) REFERENCES public.app_users(id),
@@ -490,7 +494,7 @@ CREATE TABLE public.pessoas_historico (
   data_edicao timestamp with time zone NOT NULL DEFAULT now(),
   usuario_responsavel uuid NOT NULL,
   campos_alterados jsonb NOT NULL DEFAULT '[]'::jsonb,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT pessoas_historico_pkey PRIMARY KEY (id),
   CONSTRAINT pessoas_historico_usuario_responsavel_fkey FOREIGN KEY (usuario_responsavel) REFERENCES public.app_users(id),
   CONSTRAINT pessoas_historico_pessoa_id_fkey FOREIGN KEY (pessoa_id) REFERENCES public.pessoas(id),
@@ -542,7 +546,7 @@ CREATE TABLE public.saidas (
   criadoEm timestamp with time zone DEFAULT now(),
   atualizadoEm timestamp with time zone DEFAULT now(),
   usuarioEdicao uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   isTroca boolean NOT NULL DEFAULT false,
   trocaDeSaida uuid,
   trocaSequencia integer NOT NULL DEFAULT 0,
@@ -565,7 +569,7 @@ CREATE TABLE public.saidas_historico (
   material_id uuid,
   material_saida jsonb,
   usuarioResponsavel uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT saidas_historico_pkey PRIMARY KEY (id),
   CONSTRAINT saidas_historico_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.materiais(id),
   CONSTRAINT saidas_historico_usuarioResponsavel_fkey FOREIGN KEY (usuarioResponsavel) REFERENCES public.app_users(id),
@@ -578,7 +582,7 @@ CREATE TABLE public.setores (
   ativo boolean NOT NULL DEFAULT true,
   criado_em timestamp with time zone NOT NULL DEFAULT now(),
   centro_servico_id uuid,
-  account_owner_id uuid,
+  account_owner_id uuid NOT NULL DEFAULT my_owner_id(),
   CONSTRAINT setores_pkey PRIMARY KEY (id),
   CONSTRAINT setores_centro_servico_id_fkey FOREIGN KEY (centro_servico_id) REFERENCES public.centros_servico(id),
   CONSTRAINT setores_account_owner_id_fkey FOREIGN KEY (account_owner_id) REFERENCES public.app_users(id)

@@ -102,6 +102,22 @@ Quando houver erros, a Edge Function retorna:
 Formato do CSV:
 linha,coluna,motivo
 
+Limpeza automatica dos arquivos de erro
+--------------------------------------
+Os arquivos de erro sao gravados no bucket `imports` com nome no padrao:
+*_erros_<uuid>.csv
+
+Existe a Edge Function `cleanup-import-errors` que remove arquivos mais antigos
+que `ERRORS_RETENTION_DAYS` (padrao 7 dias). Ela roda via cron externo (pg_cron),
+chamando a function com `x-cron-secret`.
+
+Exemplo (domingo 03:00 horario de Brasilia):
+- Cron (UTC): 0 6 * * 0
+- URL: https://<project-ref>.supabase.co/functions/v1/cleanup-import-errors
+
+Payload de chamada:
+{ "dryRun": false }
+
 Problemas comuns (checklist)
 ----------------------------
 - "Body precisa ser JSON: { path: string }"

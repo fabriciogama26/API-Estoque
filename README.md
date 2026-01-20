@@ -196,6 +196,13 @@ Arquivos e docs:
 
 - Documentacao do fluxo: `docs/CadastroEmMassa.txt`
 
+## Limpeza automatica de arquivos de erro (imports)
+
+- Edge Function: `cleanup-import-errors`
+- Remove arquivos `*_erros_*.csv` mais antigos que `ERRORS_RETENTION_DAYS` (padrao 7).
+- Agenda via pg_cron chamando HTTP com `x-cron-secret`.
+- Cron para domingo 03:00 (Brasilia) => `0 6 * * 0` (UTC).
+
 
 
 
