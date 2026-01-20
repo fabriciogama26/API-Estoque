@@ -1,0 +1,30 @@
+MIGRATIONS REBUILD SUMMARY
+
+Scope
+- Rebuild Supabase schema with English snake_case naming.
+- Prepare clean migrations for a new Supabase project reset.
+- No frontend or Vercel changes applied.
+
+Paths
+- Migrations: supabase/migrations_rebuild/*.sql
+- Rename map: docs/migrations_rebuild_rename_map.md
+
+Migration files
+- 0001_extensions.sql
+- 0002_tables.sql
+- 0003_constraints.sql
+- 0004_indexes.sql
+- 0005_functions.sql
+- 0006_triggers.sql
+- 0007_views.sql
+- 0008_rls.sql
+- 0009_storage.sql
+- 0010_seed_core.sql
+
+Notes
+- 0002_tables.sql defines the new table names and columns.
+- 0005_functions.sql aligns RPCs/triggers with new names (rpc_people_full returns English columns).
+- 0007_views.sql updates people_view, materials_view, stock_entry_materials_view, hht_monthly_view.
+- 0008_rls.sql and 0009_storage.sql include policies and storage setup.
+- 0010_seed_core.sql contains reference data inserts (no sample data).
+
