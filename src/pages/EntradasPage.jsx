@@ -70,17 +70,13 @@ function EntradasContent() {
     const centroParam = (searchParams.get('centroEstoque') || searchParams.get('centroCusto') || '').trim()
     if (!centroParam) return
     if (isEditing) return
-    if (hasCentrosCusto && (!centrosCusto || centrosCusto.length === 0)) return
+    if (!hasCentrosCusto) return
 
     const currentCentro = (form.centroCusto || '').toString().trim()
-    if (hasCentrosCusto) {
-      const alreadyValid = (centrosCusto || []).some(
-        (item) => String(item?.id ?? item?.nome ?? '').trim() === currentCentro,
-      )
-      if (alreadyValid) {
-        return
-      }
-    } else if (currentCentro) {
+    const alreadyValid = (centrosCusto || []).some(
+      (item) => String(item?.id ?? item?.nome ?? '').trim() === currentCentro,
+    )
+    if (alreadyValid) {
       return
     }
 
@@ -91,12 +87,7 @@ function EntradasContent() {
       return value === centroParam || normalizeSearchValue(nome) === normalizedCentro
     })
 
-    if (!centro) {
-      if (!hasCentrosCusto) {
-        handleChange({ target: { name: 'centroCusto', value: centroParam } })
-      }
-      return
-    }
+    if (!centro) return
 
     handleChange({ target: { name: 'centroCusto', value: String(centro.id ?? centro.nome) } })
   }, [centrosCusto, form.centroCusto, handleChange, hasCentrosCusto, isEditing, searchParams])
@@ -166,24 +157,22 @@ function EntradasContent() {
           <div className="form__grid form__grid--two">
           <label className="field">
             <span>Centro de estoque <span className="asterisco">*</span></span>
-            {hasCentrosCusto ? (
-              <select name="centroCusto" value={form.centroCusto} onChange={handleChange} required>
-                <option value="">Selecione um centro de estoque</option>
-                {centrosCusto.map((item) => (
-                  <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
-                    {item.nome}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                name="centroCusto"
-                value={form.centroCusto}
-                onChange={handleChange}
-                required
-                placeholder="Informe o centro de estoque"
-              />
-            )}
+            <select
+              name="centroCusto"
+              value={form.centroCusto}
+              onChange={handleChange}
+              required
+              disabled={!hasCentrosCusto}
+            >
+              <option value="">
+                {hasCentrosCusto ? 'Selecione um centro de estoque' : 'Nenhum centro de estoque cadastrado'}
+              </option>
+              {centrosCusto.map((item) => (
+                <option key={item.id ?? item.nome} value={item.id ?? item.nome}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field autocomplete">
             <span>Material <span className="asterisco">*</span> </span>

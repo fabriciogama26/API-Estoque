@@ -7,6 +7,17 @@ import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../ser
 
 const STORAGE_KEY = 'api-estoque-auth'
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
+
+const resolveAuthStorage = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
 // Credenciais locais só são carregadas em ambiente de desenvolvimento.
 const LOCAL_AUTH = import.meta.env.DEV
   ? {
@@ -37,6 +48,7 @@ function buildLocalUser(identifier) {
 export function AuthProvider({ children }) {
   const hasSupabase = !isLocalMode && isSupabaseConfigured()
   const { reportError } = useErrorLogger('auth')
+  const authStorage = useMemo(() => resolveAuthStorage(), [])
 
   const parseSupabaseUser = useCallback((user) => {
     if (!user) {
@@ -121,11 +133,11 @@ export function AuthProvider({ children }) {
   )
 
   const [user, setUser] = useState(() => {
-    if (typeof window === 'undefined') {
+    if (!authStorage) {
       return null
     }
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
+      const raw = authStorage.getItem(STORAGE_KEY)
       if (raw) {
         return JSON.parse(raw)
       }
@@ -154,14 +166,14 @@ export function AuthProvider({ children }) {
       if (sessionError) {
         reportError(sessionError, { stage: 'get_session' })
         setUser(null)
-        window.localStorage.removeItem(STORAGE_KEY)
+        authStorage?.removeItem(STORAGE_KEY)
         return
       }
 
       const session = sessionData?.session
       if (!session) {
         setUser(null)
-        window.localStorage.removeItem(STORAGE_KEY)
+        authStorage?.removeItem(STORAGE_KEY)
         return
       }
 
@@ -170,20 +182,20 @@ export function AuthProvider({ children }) {
         if (effective?.active === false) {
           await supabase.auth.signOut()
           setUser(null)
-          window.localStorage.removeItem(STORAGE_KEY)
-          return
-        }
-        setUser(resolvedUser)
-        if (resolvedUser) {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
-        } else {
-          window.localStorage.removeItem(STORAGE_KEY)
-        }
-      } catch (error) {
-        reportError(error, { stage: 'sync_user_profile' })
-        setUser(null)
-        window.localStorage.removeItem(STORAGE_KEY)
+        authStorage?.removeItem(STORAGE_KEY)
+        return
       }
+      setUser(resolvedUser)
+      if (resolvedUser) {
+        authStorage?.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
+      } else {
+        authStorage?.removeItem(STORAGE_KEY)
+      }
+    } catch (error) {
+      reportError(error, { stage: 'sync_user_profile' })
+      setUser(null)
+      authStorage?.removeItem(STORAGE_KEY)
+    }
     }
 
     syncUser()
@@ -193,7 +205,7 @@ export function AuthProvider({ children }) {
         const currentSessionUser = session?.user
         if (!currentSessionUser) {
           setUser(null)
-          window.localStorage.removeItem(STORAGE_KEY)
+          authStorage?.removeItem(STORAGE_KEY)
           return
         }
         try {
@@ -201,19 +213,19 @@ export function AuthProvider({ children }) {
           if (effective?.active === false) {
             await supabase.auth.signOut()
             setUser(null)
-            window.localStorage.removeItem(STORAGE_KEY)
+            authStorage?.removeItem(STORAGE_KEY)
             return
           }
           setUser(resolvedUser)
           if (resolvedUser) {
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
+            authStorage?.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
           } else {
-            window.localStorage.removeItem(STORAGE_KEY)
+            authStorage?.removeItem(STORAGE_KEY)
           }
         } catch (error) {
           reportError(error, { stage: 'auth_state_change' })
           setUser(null)
-          window.localStorage.removeItem(STORAGE_KEY)
+          authStorage?.removeItem(STORAGE_KEY)
         }
       }
       applySessionUser()
@@ -223,7 +235,7 @@ export function AuthProvider({ children }) {
       active = false
       listener?.subscription?.unsubscribe?.()
     }
-  }, [buildResolvedUser, hasSupabase, reportError])
+  }, [authStorage, buildResolvedUser, hasSupabase, reportError])
 
   const login = useCallback(
     async ({ username, password }) => {
@@ -241,7 +253,7 @@ export function AuthProvider({ children }) {
         }
         const localUser = buildLocalUser(identifier)
         setUser(localUser)
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(localUser))
+        authStorage?.setItem(STORAGE_KEY, JSON.stringify(localUser))
         return localUser
       }
 
@@ -268,19 +280,19 @@ export function AuthProvider({ children }) {
       if (effective?.active === false) {
         await supabase.auth.signOut()
         setUser(null)
-        window.localStorage.removeItem(STORAGE_KEY)
+        authStorage?.removeItem(STORAGE_KEY)
         throw new Error('Usuario inativo. Procure um administrador.')
       }
 
       setUser(resolvedUser)
       if (resolvedUser) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
+        authStorage?.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
       } else {
-        window.localStorage.removeItem(STORAGE_KEY)
+        authStorage?.removeItem(STORAGE_KEY)
       }
       return resolvedUser
     },
-    [buildResolvedUser, hasSupabase]
+    [authStorage, buildResolvedUser, hasSupabase]
   )
 
   const recoverPassword = useCallback(
@@ -317,8 +329,8 @@ export function AuthProvider({ children }) {
     }
     invalidateEffectiveAppUserCache()
     setUser(null)
-    window.localStorage.removeItem(STORAGE_KEY)
-  }, [hasSupabase])
+    authStorage?.removeItem(STORAGE_KEY)
+  }, [authStorage, hasSupabase])
 
   useEffect(() => {
     if (typeof window === 'undefined') {

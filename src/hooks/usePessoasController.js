@@ -21,7 +21,6 @@ import { buildPessoasQuery, formatDateInputValue, mapOptionsById, uniqueSorted }
 import {
   createPessoa,
   getPessoaHistory,
-  getPessoasResumo,
   listPessoas,
   listPessoasReferences,
   updatePessoa,
@@ -38,13 +37,16 @@ const CANCEL_INITIAL = {
 export function usePessoasController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('pessoas')
+  const isMasterUser = useMemo(() => {
+    const cred = (user?.metadata?.credential ?? '').toString().toLowerCase()
+    return cred === 'master'
+  }, [user])
 
   const [form, setForm] = useState(() => ({ ...PESSOAS_FORM_DEFAULT }))
   const [filters, setFilters] = useState(() => ({ ...PESSOAS_FILTER_DEFAULT }))
   const [pessoas, setPessoas] = useState([])
   const [pessoasOptions, setPessoasOptions] = useState([])
   const pessoasOptionsRef = useRef([])
-  const [resumo, setResumo] = useState({ totalGeral: 0, porCentro: [], porSetor: [] })
 
   const [editingPessoa, setEditingPessoa] = useState(null)
   const [historyCache, setHistoryCache] = useState({})
@@ -67,6 +69,16 @@ export function usePessoasController() {
     tiposExecucao: [],
   })
   const referenciasRef = useRef(referencias)
+  const normalizeOptionKey = useCallback((value) => {
+    if (value === undefined || value === null) {
+      return ''
+    }
+    return String(value)
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+  }, [])
 
   useEffect(() => {
     pessoasOptionsRef.current = pessoasOptions
@@ -178,12 +190,6 @@ export function usePessoasController() {
     refreshReferencias()
   }, [loadPessoas, refreshReferencias])
 
-  useEffect(() => {
-    getPessoasResumo()
-      .then((data) => setResumo(data ?? { totalGeral: 0, porCentro: [], porSetor: [] }))
-      .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
-  }, [])
-
   const handleFormChange = (event) => {
     const { name, value, type, checked } = event.target
     if (name === 'ativo') {
@@ -291,9 +297,6 @@ export function usePessoasController() {
       setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
       await loadPessoas(filters, true)
       await refreshReferencias()
-      getPessoasResumo()
-        .then((data) => setResumo(data ?? { totalGeral: 0, porCentro: [], porSetor: [] }))
-        .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
     } catch (err) {
       setError(err.message)
       reportError(err, { area: 'pessoas_submit', editing: Boolean(editingPessoa) })
@@ -367,9 +370,6 @@ export function usePessoasController() {
       setHistoryCache({})
       closeCancelModal()
       await loadPessoas(filters, true)
-      getPessoasResumo()
-        .then((data) => setResumo(data ?? { totalGeral: 0, porCentro: [], porSetor: [] }))
-        .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
     } catch (err) {
       setCancelState((prev) => ({
         ...prev,
@@ -405,9 +405,6 @@ export function usePessoasController() {
       setHistoryState({ ...PESSOAS_HISTORY_DEFAULT })
       await loadPessoas(filters, true)
       await refreshReferencias()
-      getPessoasResumo()
-        .then((data) => setResumo(data ?? { totalGeral: 0, porCentro: [], porSetor: [] }))
-        .catch(() => setResumo({ totalGeral: 0, porCentro: [], porSetor: [] }))
     } catch (err) {
       setError(err.message)
       reportError(err, { area: 'pessoas_submit_nome_conflict', editing: nomeDiffPrompt.editing })
@@ -421,29 +418,73 @@ export function usePessoasController() {
 
   const pessoasAtivas = useMemo(() => pessoas.filter((pessoa) => pessoa?.ativo !== false), [pessoas])
 
+  const resumo = useMemo(() => {
+    const porCentroMap = new Map()
+    const porSetorMap = new Map()
+    pessoasAtivas.forEach((pessoa) => {
+      const centro = pessoa?.centroServico ?? pessoa?.local ?? ''
+      const centroKey = normalizeOptionKey(centro)
+      if (centroKey) {
+        const atual = porCentroMap.get(centroKey) ?? { centro_servico: centro, total: 0 }
+        atual.total += 1
+        porCentroMap.set(centroKey, atual)
+      }
+      const setor = pessoa?.setor ?? ''
+      const setorKey = normalizeOptionKey(setor)
+      if (setorKey) {
+        const atual = porSetorMap.get(setorKey) ?? { setor, total: 0 }
+        atual.total += 1
+        porSetorMap.set(setorKey, atual)
+      }
+    })
+    const porCentro = Array.from(porCentroMap.values()).sort((a, b) =>
+      String(a?.centro_servico ?? '').localeCompare(String(b?.centro_servico ?? ''), 'pt-BR')
+    )
+    const porSetor = Array.from(porSetorMap.values()).sort((a, b) =>
+      String(a?.setor ?? '').localeCompare(String(b?.setor ?? ''), 'pt-BR')
+    )
+    return { totalGeral: pessoasAtivas.length, porCentro, porSetor }
+  }, [normalizeOptionKey, pessoasAtivas])
+
+  const centrosServicoBase = useMemo(() => extractCentrosServico(pessoasOptions), [pessoasOptions])
+  const setoresBase = useMemo(() => extractSetores(pessoasOptions), [pessoasOptions])
+  const cargosBase = useMemo(() => extractCargos(pessoasOptions), [pessoasOptions])
+  const tiposExecucaoBase = useMemo(() => extractTiposExecucao(pessoasOptions), [pessoasOptions])
+
+  const resolveScopedOptions = useCallback(
+    (referenciasLista = [], baseOptions = []) => {
+      const referenciasNomes = (referenciasLista ?? []).map((item) => item?.nome ?? '').filter(Boolean)
+      if (isMasterUser) {
+        return referenciasNomes.length > 0 ? uniqueSorted(referenciasNomes) : baseOptions
+      }
+      if (!baseOptions || baseOptions.length === 0) {
+        return uniqueSorted(referenciasNomes)
+      }
+      const allowed = new Set(baseOptions.map(normalizeOptionKey).filter(Boolean))
+      const filtrados = referenciasNomes.filter((nome) => allowed.has(normalizeOptionKey(nome)))
+      if (filtrados.length > 0) {
+        return uniqueSorted(filtrados)
+      }
+      return baseOptions
+    },
+    [isMasterUser, normalizeOptionKey],
+  )
+
   const centrosServico = useMemo(() => {
-    const referenciasNomes = (referencias.centrosServico ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
-    return extractCentrosServico(pessoasOptions)
-  }, [referencias.centrosServico, pessoasOptions])
+    return resolveScopedOptions(referencias.centrosServico, centrosServicoBase)
+  }, [centrosServicoBase, referencias.centrosServico, resolveScopedOptions])
 
   const setores = useMemo(() => {
-    const referenciasNomes = (referencias.setores ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
-    return extractSetores(pessoasOptions)
-  }, [referencias.setores, pessoasOptions])
+    return resolveScopedOptions(referencias.setores, setoresBase)
+  }, [referencias.setores, resolveScopedOptions, setoresBase])
 
   const cargos = useMemo(() => {
-    const referenciasNomes = (referencias.cargos ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
-    return extractCargos(pessoasOptions)
-  }, [referencias.cargos, pessoasOptions])
+    return resolveScopedOptions(referencias.cargos, cargosBase)
+  }, [cargosBase, referencias.cargos, resolveScopedOptions])
 
   const tiposExecucao = useMemo(() => {
-    const referenciasNomes = (referencias.tiposExecucao ?? []).map((item) => item?.nome ?? '').filter(Boolean)
-    if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
-    return extractTiposExecucao(pessoasOptions)
-  }, [referencias.tiposExecucao, pessoasOptions])
+    return resolveScopedOptions(referencias.tiposExecucao, tiposExecucaoBase)
+  }, [referencias.tiposExecucao, resolveScopedOptions, tiposExecucaoBase])
 
   const formOptions = useMemo(
     () => ({
