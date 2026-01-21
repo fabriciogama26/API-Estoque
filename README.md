@@ -57,7 +57,8 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 
 ## Regras de estoque (banco)
 
-
+
+
 
 - status_saida: SELECT publico e triggers de validacao rodam como SECURITY DEFINER para evitar 42501 em saidas.
 - SaÃ­das jÃ¡ sÃ£o bloqueadas quando excedem o saldo disponÃ­vel (`validar_saldo_saida`).
@@ -134,6 +135,13 @@ supabase db push
 
 ```
 
+## Supabase (migrations rebuild)
+
+Migrations de rebuild (snake_case em ingles) ficam em `supabase/migrations_rebuild/`.
+Resumo e mapa de renome: `docs/migrations_rebuild_report.txt` e `docs/migrations_rebuild_rename_map.md`.
+Use este conjunto somente para recriar o projeto do zero.
+
+
 
 
 ## Desligamento em massa (Pessoas)
@@ -195,6 +203,13 @@ Arquivos e docs:
 - Bucket/policies: `supabase/migrations/0077_fix_imports_bucket.sql`
 
 - Documentacao do fluxo: `docs/CadastroEmMassa.txt`
+
+## Limpeza automatica de arquivos de erro (imports)
+
+- Edge Function: `cleanup-import-errors`
+- Remove arquivos `*_erros_*.csv` mais antigos que `ERRORS_RETENTION_DAYS` (padrao 7).
+- Agenda via pg_cron chamando HTTP com `x-cron-secret`.
+- Cron para domingo 03:00 (Brasilia) => `0 6 * * 0` (UTC).
 
 
 

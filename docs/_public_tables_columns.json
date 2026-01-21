@@ -1,0 +1,496 @@
+{
+  "acidentes": [
+    "id",
+    "matricula",
+    "nome",
+    "cargo",
+    "data",
+    "diasPerdidos",
+    "diasDebitados",
+    "tipo",
+    "agente",
+    "cid",
+    "centro_servico",
+    "local",
+    "cat",
+    "observacao",
+    "criadoEm",
+    "atualizadoEm",
+    "registradoPor",
+    "atualizadoPor",
+    "hht",
+    "partes_lesionadas",
+    "lesoes",
+    "data_esocial",
+    "sesmt",
+    "data_sesmt",
+    "account_owner_id",
+    "ativo",
+    "cancel_motivo text"
+  ],
+  "entradas": [
+    "id",
+    "materialId",
+    "quantidade",
+    "dataEntrada",
+    "usuarioResponsavel",
+    "centro_estoque",
+    "create_at",
+    "status",
+    "atualizado_em",
+    "usuario_edicao",
+    "account_owner_id"
+  ],
+  "hht_mensal": [
+    "id",
+    "mes_ref",
+    "centro_servico_id",
+    "qtd_pessoas",
+    "horas_mes_base",
+    "escala_factor",
+    "horas_afastamento",
+    "horas_ferias",
+    "horas_treinamento",
+    "horas_outros_descontos",
+    "horas_extras",
+    "modo",
+    "hht_informado",
+    "hht_calculado",
+    "hht_final",
+    "created_at",
+    "created_by",
+    "updated_at",
+    "updated_by",
+    "status_hht_id",
+    "account_owner_id"
+  ],
+  "app_users": [
+    "id",
+    "username",
+    "display_name",
+    "created_at",
+    "updated_at",
+    "email",
+    "ativo",
+    "credential",
+    "page_permissions",
+    "plan_id",
+    "start_date",
+    "end_date",
+    "status_plan",
+    "payment_status",
+    "parent_user_id",
+    "perm_version"
+  ],
+  "cargos": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em",
+    "account_owner_id"
+  ],
+  "centros_custo": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em",
+    "account_owner_id"
+  ],
+  "centros_servico": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em",
+    "centro_custo_id",
+    "account_owner_id"
+  ],
+  "pessoas": [
+    "id",
+    "nome",
+    "matricula",
+    "usuarioCadastro",
+    "criadoEm",
+    "usuarioEdicao",
+    "atualizadoEm",
+    "dataAdmissao",
+    "centro_servico_id",
+    "setor_id",
+    "cargo_id",
+    "centro_custo_id",
+    "tipo_execucao_id",
+    "ativo",
+    "dataDemissao",
+    "account_owner_id",
+    "observacao"
+  ],
+  "setores": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em",
+    "centro_servico_id",
+    "account_owner_id"
+  ],
+  "tipo_execucao": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em"
+  ],
+  "saidas": [
+    "id",
+    "materialId",
+    "pessoaId",
+    "quantidade",
+    "dataEntrega",
+    "dataTroca",
+    "status",
+    "usuarioResponsavel",
+    "centro_custo",
+    "centro_servico",
+    "centro_estoque",
+    "criadoEm",
+    "atualizadoEm",
+    "usuarioEdicao",
+    "account_owner_id",
+    "isTroca",
+    "trocaDeSaida",
+    "trocaSequencia"
+  ],
+  "acidente_agentes": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em"
+  ],
+  "acidente_historico": [
+    "id",
+    "acidente_id",
+    "data_edicao",
+    "usuario_responsavel",
+    "campos_alterados",
+    "user_id",
+    "account_owner_id"
+  ],
+  "acidente_lesoes": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em",
+    "agente_id"
+  ],
+  "acidente_locais": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em"
+  ],
+  "acidente_partes": [
+    "id",
+    "nome",
+    "grupo",
+    "subgrupo",
+    "ordem",
+    "ativo",
+    "criado_em"
+  ],
+  "acidente_partes_grupo": [
+    "id",
+    "nome",
+    "ativo",
+    "criado_em",
+    "ordem"
+  ],
+  "acidente_partes_sub_grupo": [
+    "id",
+    "nome",
+    "ativo",
+    "criado_em",
+    "grupo_id"
+  ],
+  "acidente_tipos": [
+    "id",
+    "agente_id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em"
+  ],
+  "api_errors": [
+    "id",
+    "created_at",
+    "environment",
+    "service",
+    "method",
+    "path",
+    "status",
+    "code",
+    "user_id",
+    "message",
+    "stack",
+    "context",
+    "severity",
+    "fingerprint"
+  ],
+  "app_credentials_catalog": [
+    "id",
+    "id_text",
+    "label",
+    "description",
+    "created_at",
+    "updated_at",
+    "level"
+  ],
+  "app_errors": [
+    "id",
+    "created_at",
+    "environment",
+    "page",
+    "user_id",
+    "message",
+    "stack",
+    "context",
+    "severity",
+    "fingerprint",
+    "status",
+    "resolved_at",
+    "resolved_by"
+  ],
+  "app_users_credential_history": [
+    "id",
+    "user_id",
+    "user_username",
+    "changed_by",
+    "changed_by_username",
+    "before_credential",
+    "after_credential",
+    "before_pages",
+    "after_pages",
+    "created_at",
+    "action",
+    "target_auth_user_id",
+    "owner_app_user_id",
+    "target_dependent_id"
+  ],
+  "app_users_dependentes": [
+    "id",
+    "auth_user_id",
+    "owner_app_user_id",
+    "username",
+    "display_name",
+    "email",
+    "credential",
+    "page_permissions",
+    "ativo",
+    "created_at",
+    "updated_at"
+  ],
+  "caracteristica_epi": [
+    "id",
+    "caracteristica_material",
+    "ativo"
+  ],
+  "centros_estoque": [
+    "id",
+    "almox",
+    "centro_custo",
+    "created_at",
+    "ativo",
+    "account_owner_id"
+  ],
+  "cor": [
+    "id",
+    "cor",
+    "ativo"
+  ],
+  "entrada_historico": [
+    "id",
+    "material_id",
+    "material_ent",
+    "created_at",
+    "usuarioResponsavel",
+    "entrada_id",
+    "account_owner_id"
+  ],
+  "fabricantes": [
+    "id",
+    "fabricante",
+    "ativo",
+    "account_owner_id"
+  ],
+  "grupos_material": [
+    "id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em"
+  ],
+  "grupos_material_itens": [
+    "id",
+    "grupo_id",
+    "nome",
+    "ordem",
+    "ativo",
+    "criado_em"
+  ],
+  "materiais": [
+    "id",
+    "nome",
+    "fabricante",
+    "validadeDias",
+    "ca",
+    "valorUnitario",
+    "estoqueMinimo",
+    "ativo",
+    "usuarioCadastro",
+    "dataCadastro",
+    "usuarioAtualizacao",
+    "atualizadoEm",
+    "descricao",
+    "grupoMaterial",
+    "numeroCalcado",
+    "numeroVestimenta",
+    "numeroEspecifico",
+    "account_owner_id",
+    "hash_base",
+    "hash_completo"
+  ],
+  "material_grupo_caracteristica_epi": [
+    "id",
+    "material_id",
+    "grupo_caracteristica_epi",
+    "account_owner_id"
+  ],
+  "material_grupo_cor": [
+    "id",
+    "material_id",
+    "grupo_material_cor",
+    "account_owner_id"
+  ],
+  "medidas_calcado": [
+    "id",
+    "numero_calcado",
+    "ativo"
+  ],
+  "medidas_vestimentas": [
+    "id",
+    "medidas",
+    "ativo"
+  ],
+  "epi_classe": [
+    "id",
+    "class_epi",
+    "ativo"
+  ],
+  "hht_mensal_hist": [
+    "id",
+    "hht_mensal_id",
+    "acao",
+    "alterado_em",
+    "alterado_por",
+    "antes",
+    "depois",
+    "motivo",
+    "status_hht_nome",
+    "account_owner_id"
+  ],
+  "status_hht": [
+    "id",
+    "status",
+    "ativo",
+    "created_at"
+  ],
+  "material_price_history": [
+    "id",
+    "materialId",
+    "valorUnitario",
+    "criadoEm",
+    "usuarioResponsavel",
+    "campos_alterados",
+    "account_owner_id"
+  ],
+  "permissions": [
+    "id",
+    "key",
+    "description",
+    "created_at",
+    "updated_at"
+  ],
+  "pessoas_historico": [
+    "id",
+    "pessoa_id",
+    "data_edicao",
+    "usuario_responsavel",
+    "campos_alterados",
+    "account_owner_id"
+  ],
+  "planos_users": [
+    "id",
+    "planos",
+    "description",
+    "price",
+    "billing_period",
+    "max_clients",
+    "max_orders",
+    "max_users",
+    "features",
+    "is_active",
+    "created_at",
+    "updated_at"
+  ],
+  "role_permissions": [
+    "role_id",
+    "permission_id",
+    "created_at",
+    "updated_at"
+  ],
+  "roles": [
+    "id",
+    "name",
+    "created_at",
+    "updated_at"
+  ],
+  "saidas_historico": [
+    "id",
+    "created_at",
+    "saida_id",
+    "material_id",
+    "material_saida",
+    "usuarioResponsavel",
+    "account_owner_id"
+  ],
+  "status_entrada": [
+    "id",
+    "status",
+    "ativo",
+    "created_at"
+  ],
+  "status_saida": [
+    "id",
+    "status",
+    "created_at",
+    "ativo"
+  ],
+  "user_permission_overrides": [
+    "user_id",
+    "permission_key",
+    "allowed",
+    "created_at",
+    "updated_at"
+  ],
+  "user_roles": [
+    "user_id",
+    "role_id",
+    "scope_parent_user_id",
+    "created_at",
+    "updated_at"
+  ]
+}

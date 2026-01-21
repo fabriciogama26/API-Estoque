@@ -138,7 +138,7 @@ function MateriaisContent() {
 
       <section className="card">
         <header className="card__header">
-          <h2>Materiais cadastrados</h2>
+          <h2>Lista de Materiais</h2>
           <button type="button" className="button button--ghost" onClick={loadMateriais} disabled={isLoading}>
             Atualizar
           </button>
