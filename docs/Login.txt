@@ -8,7 +8,7 @@ Arquitetura (modular)
 
 - Hooks: useLoginForm (estado, submit, recuperacao), useResetPassword (restaura sessao do link, valida senhas, envia update).
 - Servicos: authService (resetPasswordForEmail, updateUser, restoreResetSession) usando supabaseClient; errorLogService registra falhas em app_errors.
-- Contexto: AuthContext fornece user, login, recoverPassword, logout; suporta persistSession e autoRefresh.
+- Contexto: AuthContext fornece user, login, recoverPassword, logout; persistSession usa sessionStorage (sessao expira ao fechar o app) e autoRefresh.
 
 Fluxos
 

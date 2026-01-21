@@ -85,6 +85,7 @@ Fluxos principais
 Carregamento de dados
 ---------------------
 - Pessoas, locais, agentes, tipos, lesoes e partes sao carregados em paralelo, cada catalogo com seu proprio `isLoading` e `error`.
+- Locais exibidos no formulario sao filtrados pelos locais/centros presentes nas pessoas carregadas (escopo do owner).
 - Campo Matricula usa busca com debounce (searchPessoas quando disponivel, fallback local), exibe feedback de carregamento/erro no dropdown e so abre sugestoes quando nao ha matricula ja selecionada.
 - A lista principal `useAcidentes` atualiza apos:
   - Criar ou editar um acidente.

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { AlertIcon } from '../components/icons.jsx'
 import { AcidentesForm } from '../components/Acidentes/Form/AcidentesForm.jsx'
@@ -16,6 +16,7 @@ import { useAcidenteForm } from '../hooks/useAcidenteForm.js'
 import { AcidentesProvider, useAcidentesContext } from '../context/AcidentesContext.jsx'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
+import { normalizeText } from '../utils/acidentesUtils.js'
 
 import '../styles/AcidentesPage.css'
 import '../styles/AcidentesTableStatus.css'
@@ -54,6 +55,33 @@ function AcidentesPageContent() {
   const [historyState, setHistoryState] = useState(() => ({ ...ACIDENTES_HISTORY_DEFAULT }))
   const [detailsState, setDetailsState] = useState({ open: false, acidente: null })
   const [cancelState, setCancelState] = useState({ open: false, acidente: null, error: null, isSaving: false })
+
+  const locaisFiltrados = useMemo(() => {
+    const baseLocais = Array.isArray(locais) ? locais : []
+    const listaPessoas = Array.isArray(pessoas) ? pessoas : []
+    if (!baseLocais.length || !listaPessoas.length) {
+      return []
+    }
+    const permitidos = new Set()
+    listaPessoas.forEach((pessoa) => {
+      ;[pessoa?.local, pessoa?.centroServico, pessoa?.setor].forEach((valor) => {
+        const texto = normalizeText(valor)
+        if (texto) {
+          permitidos.add(texto.toLocaleLowerCase('pt-BR'))
+        }
+      })
+    })
+    if (!permitidos.size) {
+      return []
+    }
+    return baseLocais.filter((local) => {
+      const texto = normalizeText(local)
+      if (!texto) {
+        return false
+      }
+      return permitidos.has(texto.toLocaleLowerCase('pt-BR'))
+    })
+  }, [locais, pessoas])
 
   const {
     form,
@@ -174,7 +202,7 @@ function AcidentesPageContent() {
         error={formError}
         pessoasError={pessoasError}
         isLoadingPessoas={isLoadingPessoas}
-        locais={locais}
+        locais={locaisFiltrados}
         locaisError={locaisError}
         isLoadingLocais={isLoadingLocais}
         agentes={agenteOpcoesNomes}

@@ -3580,6 +3580,9 @@ const localApi = {
       }
     },
   },
+  catalogCache: {
+    clear: () => {},
+  },
   documentos: {
     async termoEpiContext(params = {}) {
       return obterContextoTermoEpiLocal(params)
