@@ -23,7 +23,7 @@ Tabelas principais
 Tabelas de referência
 ---------------------
 - **Catálogos operacionais**: `centros_servico`, `setores`, `cargos`, `centros_custo`, `tipo_execucao`.
-- **Catálogos de acidentes**: `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`.
+- **Catálogos de acidentes**: `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`, `acidente_locais` (publicos)`.
 - **Catálogo de materiais**: `grupos_material`, `grupos_material_itens`, `grupos_material_cor`, `grupos_material_caracteristica_epi`.
 - Todas devem ter RLS habilitado e políticas de leitura para `authenticated` (ver migration `0013_rls_reference_tables.sql`).【F:supabase/migrations/0013_rls_reference_tables.sql†L1-L36】
 

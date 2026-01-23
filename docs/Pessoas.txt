@@ -13,6 +13,7 @@ Arquitetura (modular)
 ---------------------
 - Hooks: usePessoasController (formulario/filtros/tabela), useErrorLogger('pessoas').
 - Servicos: pessoasService (listar, historico, resumo) via dataClient (modo local/remoto).
+- Regras: pessoaFilters centraliza filtro de pessoas ativas em buscas/dropdowns.
 - Erros: log em app_errors via useErrorLogger.
 
 Campos e fluxos
@@ -20,6 +21,11 @@ Campos e fluxos
 - Campos principais: matricula, nome, centro_servico_id/centro_custo_id, setor_id, cargo_id, tipo_execucao_id, dataAdmissao, dataDemissao, ativo.
 - Historico: timeline com alteracoes (usuario, data, campos modificados).
 - Filtros: termo livre, centro de servico, setor, cargo, ativo, cadastrado de/ate; aplicados apenas no frontend (backend jÃ¡ filtra por `account_owner_id`).
+- Buscas (search/listByIds) retornam apenas pessoas ativas por padrao; use includeInactive para listar todas.
+- Listagem/busca de pessoas aplica escopo por `centro_servico_id` do owner quando a credencial nao e master.
+- Listas de centros/setores/cargos/tipos sao filtradas por owner quando a credencial nao e master.
+- Catalogos de centros/setores/cargos usam cache leve (30s) no service; invalide com `dataClient.catalogCache.clear(...)` ao cadastrar.
+- Escopo de centros para pessoas usa RPC de catalogo; se vier vazio, a listagem cai para o filtro padrao por RLS.
 - Tabela: paginacao local; a coluna "Registrado por" usa os campos retornados pela view/RPC de pessoas.
 - Historico: modal no padrÃ£o Materiais, mostrando campo a campo (inclui Observacao).
 

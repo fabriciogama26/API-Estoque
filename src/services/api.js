@@ -586,6 +586,157 @@ const normalizeNameList = (nomes) =>
     .map((nome) => trim(nome))
     .filter(Boolean)
 
+async function resolveCatalogScope() {
+  ensureSupabase()
+  const { data } = await supabase.auth.getSession()
+  const user = data?.session?.user
+  if (!user?.id) {
+    return { ownerId: null, isMaster: false }
+  }
+  try {
+    const effective = await resolveEffectiveAppUser(user.id)
+    const cred = (effective?.credential || '').toString().toLowerCase()
+    return {
+      ownerId: effective?.appUserId || user.id,
+      isMaster: cred === 'master',
+    }
+  } catch (error) {
+    reportClientError('Falha ao resolver owner para catalogo.', error, { userId: user.id })
+    return { ownerId: null, isMaster: false }
+  }
+}
+
+const CATALOG_CACHE_TTL_MS = 30 * 1000
+const catalogCache = new Map()
+
+const buildCatalogCacheKey = ({ table, nameColumn, ownerScoped, ownerId, isMaster }) => {
+  const scopeLabel = ownerScoped ? (isMaster ? 'master' : ownerId || 'unknown') : 'global'
+  return `${table}|${nameColumn}|${ownerScoped ? 'scoped' : 'global'}|${scopeLabel}`
+}
+
+let pessoasOwnerScopeCache = null
+
+const clearCatalogCache = (tables = null) => {
+  if (!tables) {
+    catalogCache.clear()
+    pessoasOwnerScopeCache = null
+    return
+  }
+  const lista = Array.isArray(tables) ? tables : [tables]
+  const targets = new Set(lista.map((item) => String(item ?? '').trim()).filter(Boolean))
+  if (!targets.size) {
+    catalogCache.clear()
+    pessoasOwnerScopeCache = null
+    return
+  }
+  if (targets.has('centros_servico')) {
+    pessoasOwnerScopeCache = null
+  }
+  Array.from(catalogCache.keys()).forEach((key) => {
+    const table = key.split('|')[0]
+    if (targets.has(table)) {
+      catalogCache.delete(key)
+    }
+  })
+}
+
+const readCatalogCache = (key) => {
+  const cached = catalogCache.get(key)
+  if (!cached) {
+    return null
+  }
+  if (Date.now() - cached.at > CATALOG_CACHE_TTL_MS) {
+    catalogCache.delete(key)
+    return null
+  }
+  return cached.data
+}
+
+const writeCatalogCache = (key, data) => {
+  catalogCache.set(key, { at: Date.now(), data })
+}
+
+async function resolvePessoasOwnerScope() {
+  const scope = await resolveCatalogScope()
+  if (scope.isMaster) {
+    pessoasOwnerScopeCache = {
+      ownerId: scope.ownerId ?? null,
+      isMaster: true,
+      centroServicoIds: null,
+      strict: true,
+    }
+    return pessoasOwnerScopeCache
+  }
+  if (!scope.ownerId) {
+    pessoasOwnerScopeCache = null
+    return { ownerId: null, isMaster: false, centroServicoIds: [], strict: false }
+  }
+  if (pessoasOwnerScopeCache?.ownerId === scope.ownerId && !pessoasOwnerScopeCache.isMaster) {
+    return pessoasOwnerScopeCache
+  }
+  try {
+    const centros = await loadCatalogList({
+      table: 'centros_servico',
+      nameColumn: 'nome',
+      errorMessage: 'Falha ao aplicar escopo de centros de servico.',
+    })
+    const ids = (centros ?? []).map((item) => item?.id).filter(Boolean)
+    const strict = ids.length > 0
+    if (!strict) {
+      reportClientError('Centros de servico vazios no escopo de pessoas; aplicando fallback por RLS.', new Error('centros_servico_empty'), {
+        ownerId: scope.ownerId,
+      })
+    }
+    pessoasOwnerScopeCache = {
+      ownerId: scope.ownerId,
+      isMaster: false,
+      centroServicoIds: ids,
+      strict,
+    }
+    return pessoasOwnerScopeCache
+  } catch (error) {
+    reportClientError('Falha ao resolver escopo de pessoas.', error, { ownerId: scope.ownerId })
+    return { ownerId: scope.ownerId, isMaster: false, centroServicoIds: [], strict: false }
+  }
+}
+
+async function loadCatalogList({ table, nameColumn = 'nome', ownerScoped = true, errorMessage }) {
+  if (!ownerScoped) {
+    const cacheKey = buildCatalogCacheKey({ table, nameColumn, ownerScoped, ownerId: null, isMaster: false })
+    const cached = readCatalogCache(cacheKey)
+    if (cached) {
+      return cached
+    }
+    const data = await execute(
+      supabase.rpc('rpc_catalog_list', { p_table: table }),
+      errorMessage
+    )
+    const normalized = normalizeDomainOptions(data ?? [])
+    writeCatalogCache(cacheKey, normalized)
+    return normalized
+  }
+
+  const scope = await resolveCatalogScope()
+  const cacheKey = buildCatalogCacheKey({
+    table,
+    nameColumn,
+    ownerScoped,
+    ownerId: scope.ownerId,
+    isMaster: scope.isMaster,
+  })
+  const cached = readCatalogCache(cacheKey)
+  if (cached) {
+    return cached
+  }
+  const data = await execute(
+    supabase.rpc('rpc_catalog_list', { p_table: table }),
+    errorMessage
+  )
+  const normalized = normalizeDomainOptions(data ?? [])
+  writeCatalogCache(cacheKey, normalized)
+  return normalized
+}
+
 async function resolveCatalogoIdsByNames({ table, nameColumn, nomes, errorMessage }) {
   const lista = normalizeNameList(nomes)
   if (!lista.length) {
@@ -1246,7 +1397,6 @@ async function ensureAcidentePartes(nomes) {
             nome,
             grupo: '',
             subgrupo: '',
-            ordem: 1000 + index,
             ativo: true,
           })),
           { onConflict: 'grupo,subgrupo,nome' },
@@ -1347,8 +1497,7 @@ async function loadAgenteCatalog(forceReload = false) {
   ensureSupabase()
   const { data, error } = await supabase
     .from('acidente_agentes')
-    .select('id, nome, ativo, ordem')
-    .order('ordem', { ascending: true, nullsFirst: false })
+    .select('id, nome, ativo')
     .order('nome', { ascending: true })
   if (error) {
     throw mapSupabaseError(error, 'Falha ao carregar agentes de acidente.')
@@ -1358,17 +1507,9 @@ async function loadAgenteCatalog(forceReload = false) {
     .map((item) => ({
       id: item.id ?? null,
       nome: trim(item.nome),
-      ordem: item.ordem ?? null,
     }))
     .filter((item) => Boolean(item.nome))
-    .sort((a, b) => {
-      const ordemA = a.ordem ?? Number.MAX_SAFE_INTEGER
-      const ordemB = b.ordem ?? Number.MAX_SAFE_INTEGER
-      if (ordemA !== ordemB) {
-        return ordemA - ordemB
-      }
-      return a.nome.localeCompare(b.nome, 'pt-BR')
-    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   const map = new Map()
   lista.forEach((item) => {
     const chave = normalizeAgenteLookupKey(item.nome)
@@ -3630,6 +3771,14 @@ export const api = {
   },
   pessoas: {
     async list(params = {}) {
+      const ownerScope = await resolvePessoasOwnerScope()
+      if (
+        !ownerScope.isMaster &&
+        ownerScope.strict &&
+        (!ownerScope.centroServicoIds || ownerScope.centroServicoIds.length === 0)
+      ) {
+        return []
+      }
       const filtros = {
         centroServicoId: null,
         setorId: null,
@@ -3681,6 +3830,9 @@ export const api = {
       const buildQuery = () => {
         let builder = buildPessoasViewQuery().order('nome', { ascending: true })
 
+        if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
+          builder = builder.in('centro_servico_id', ownerScope.centroServicoIds)
+        }
         if (filtros.centroServicoId) {
           builder = builder.eq('centro_servico_id', filtros.centroServicoId)
         }
@@ -3737,10 +3889,27 @@ export const api = {
         return registros.filter((pessoa) => pessoaMatchesSearch(pessoa, termo))
       }
     },
-    async listByIds(ids = []) {
+    async listByIds(ids = [], options = {}) {
+      const { includeInactive = false } = options
       const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)))
       if (!uniqueIds.length) {
         return []
+      }
+      const ownerScope = await resolvePessoasOwnerScope()
+      if (
+        !ownerScope.isMaster &&
+        ownerScope.strict &&
+        (!ownerScope.centroServicoIds || ownerScope.centroServicoIds.length === 0)
+      ) {
+        return []
+      }
+      let query = buildPessoasViewQuery().in('id', uniqueIds)
+      if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
+        query = query.in('centro_servico_id', ownerScope.centroServicoIds)
+      }
+      // Filtrar apenas pessoas ativas por padrão (regra centralizada)
+      if (!includeInactive) {
+        query = query.eq('ativo', true)
       }
       const data = await execute(
         buildPessoasViewQuery().in('id', uniqueIds),
@@ -3751,12 +3920,29 @@ export const api = {
     async search(params = {}) {
       const termo = trim(params.termo ?? params.q ?? params.query ?? '')
       const limit = Number(params.limit ?? 10) || 10
+      const includeInactive = Boolean(params.includeInactive)
       if (!termo) {
+        return []
+      }
+      const ownerScope = await resolvePessoasOwnerScope()
+      if (
+        !ownerScope.isMaster &&
+        ownerScope.strict &&
+        (!ownerScope.centroServicoIds || ownerScope.centroServicoIds.length === 0)
+      ) {
         return []
       }
       const like = `%${termo}%`
       try {
-        const query = applyPessoaSearchFilters(buildPessoasViewQuery().order('nome'), like).limit(limit)
+        let query = buildPessoasViewQuery().order('nome')
+        if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
+          query = query.in('centro_servico_id', ownerScope.centroServicoIds)
+        }
+        // Filtrar apenas pessoas ativas por padrão (regra centralizada)
+        if (!includeInactive) {
+          query = query.eq('ativo', true)
+        }
+        query = applyPessoaSearchFilters(query, like).limit(limit)
         const data = await execute(query, 'Falha ao buscar pessoas.')
         return (data ?? []).map(mapPessoaRecord)
       } catch (error) {
@@ -3764,7 +3950,15 @@ export const api = {
           termo,
           limit,
         })
-        const todos = await execute(buildPessoasViewQuery().order('nome'), 'Falha ao listar pessoas.')
+        let fallbackQuery = buildPessoasViewQuery().order('nome')
+        if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
+          fallbackQuery = fallbackQuery.in('centro_servico_id', ownerScope.centroServicoIds)
+        }
+        // Aplicar filtro de ativo também no fallback
+        if (!includeInactive) {
+          fallbackQuery = fallbackQuery.eq('ativo', true)
+        }
+        const todos = await execute(fallbackQuery, 'Falha ao listar pessoas.')
         const lista = (todos ?? []).map(mapPessoaRecord)
         return lista.filter((pessoa) => pessoaMatchesSearch(pessoa, termo)).slice(0, limit)
       }
@@ -5200,8 +5394,7 @@ export const api = {
       const data = await execute(
         supabase
           .from('acidente_agentes')
-          .select('id, nome, ativo, ordem')
-          .order('ordem', { ascending: true, nullsFirst: false })
+          .select('id, nome, ativo')
           .order('nome', { ascending: true }),
         'Falha ao listar agentes de acidente.'
       )
@@ -5218,10 +5411,9 @@ export const api = {
       const data = await execute(
         supabase
           .from('acidente_partes')
-          .select('nome, grupo, subgrupo, ativo, ordem')
+          .select('nome, grupo, subgrupo, ativo')
           .order('grupo', { ascending: true })
           .order('subgrupo', { ascending: true })
-          .order('ordem', { ascending: true, nullsFirst: false })
           .order('nome', { ascending: true }),
         'Falha ao listar partes lesionadas.',
       )
@@ -5247,8 +5439,7 @@ export const api = {
       const alvoNormalizado = filtrarPorNome ? normalizeAgenteLookupKey(nomeAgente) : ''
       let query = supabase
         .from('acidente_lesoes')
-        .select('agente_id, nome, ativo, ordem, agente:acidente_agentes(nome)')
-        .order('ordem', { ascending: true, nullsFirst: false })
+        .select('agente_id, nome, ativo, agente:acidente_agentes(nome)')
         .order('nome', { ascending: true })
       if (agenteId) {
         query = query.eq('agente_id', agenteId)
@@ -5288,8 +5479,7 @@ export const api = {
       const alvoNormalizado = filtrarPorNome ? normalizeAgenteLookupKey(nomeAgente) : ''
       let query = supabase
         .from('acidente_tipos')
-        .select('nome, ativo, ordem, agente_id, agente:acidente_agentes(nome)')
-        .order('ordem', { ascending: true, nullsFirst: false })
+        .select('nome, ativo, agente_id, agente:acidente_agentes(nome)')
         .order('nome', { ascending: true })
       if (agenteId) {
         query = query.eq('agente_id', agenteId)
@@ -5315,8 +5505,7 @@ export const api = {
       const data = await execute(
         supabase
           .from('acidente_locais')
-          .select('nome, ativo, ordem')
-          .order('ordem', { ascending: true, nullsFirst: false })
+          .select('nome, ativo')
           .order('nome', { ascending: true }),
         'Falha ao listar locais de acidente.'
       )

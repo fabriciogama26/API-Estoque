@@ -16,7 +16,7 @@ export const listStatusSaida = () =>
         { id: 'cancelado', status: 'Cancelado' },
       ])
 
-export const listPessoas = () => api.pessoas.list()
+export const listPessoas = () => api.pessoas.list({ status: 'ativo' })
 export const listPessoasByIds = (ids = []) => (api?.pessoas?.listByIds ? api.pessoas.listByIds(ids) : Promise.resolve([]))
 
 export const listMateriais = () =>
