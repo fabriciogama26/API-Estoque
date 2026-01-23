@@ -194,7 +194,7 @@ const PESSOAS_VIEW_SELECT = `
   tipo_execucao
 `
 
-const buildPessoasViewQuery = () => supabase.from('pessoas_view').select('*')
+const buildPessoasViewQuery = () => supabase.rpc('rpc_pessoas_completa')
 
 const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_material_cor']
 const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
@@ -585,162 +585,6 @@ const normalizeNameList = (nomes) =>
   (Array.isArray(nomes) ? nomes : [])
     .map((nome) => trim(nome))
     .filter(Boolean)
-
-async function resolveCatalogScope() {
-  ensureSupabase()
-  const { data } = await supabase.auth.getSession()
-  const user = data?.session?.user
-  if (!user?.id) {
-    return { ownerId: null, isMaster: false }
-  }
-  try {
-    const effective = await resolveEffectiveAppUser(user.id)
-    const cred = (effective?.credential || '').toString().toLowerCase()
-    return {
-      ownerId: effective?.appUserId || user.id,
-      isMaster: cred === 'master',
-    }
-  } catch (error) {
-    reportClientError('Falha ao resolver owner para catalogo.', error, { userId: user.id })
-    return { ownerId: null, isMaster: false }
-  }
-}
-
-const CATALOG_CACHE_TTL_MS = 30 * 1000
-const catalogCache = new Map()
-
-const buildCatalogCacheKey = ({ table, nameColumn, ownerScoped, ownerId, isMaster }) => {
-  const scopeLabel = ownerScoped ? (isMaster ? 'master' : ownerId || 'unknown') : 'global'
-  return `${table}|${nameColumn}|${ownerScoped ? 'scoped' : 'global'}|${scopeLabel}`
-}
-
-let pessoasOwnerScopeCache = null
-
-const clearCatalogCache = (tables = null) => {
-  if (!tables) {
-    catalogCache.clear()
-    pessoasOwnerScopeCache = null
-    return
-  }
-  const lista = Array.isArray(tables) ? tables : [tables]
-  const targets = new Set(lista.map((item) => String(item ?? '').trim()).filter(Boolean))
-  if (!targets.size) {
-    catalogCache.clear()
-    pessoasOwnerScopeCache = null
-    return
-  }
-  if (targets.has('centros_servico')) {
-    pessoasOwnerScopeCache = null
-  }
-  Array.from(catalogCache.keys()).forEach((key) => {
-    const table = key.split('|')[0]
-    if (targets.has(table)) {
-      catalogCache.delete(key)
-    }
-  })
-}
-
-const readCatalogCache = (key) => {
-  const cached = catalogCache.get(key)
-  if (!cached) {
-    return null
-  }
-  if (Date.now() - cached.at > CATALOG_CACHE_TTL_MS) {
-    catalogCache.delete(key)
-    return null
-  }
-  return cached.data
-}
-
-const writeCatalogCache = (key, data) => {
-  catalogCache.set(key, { at: Date.now(), data })
-}
-
-async function resolvePessoasOwnerScope() {
-  const scope = await resolveCatalogScope()
-  if (scope.isMaster) {
-    pessoasOwnerScopeCache = { ownerId: scope.ownerId ?? null, isMaster: true, centroServicoIds: null }
-    return pessoasOwnerScopeCache
-  }
-  if (!scope.ownerId) {
-    pessoasOwnerScopeCache = null
-    return { ownerId: null, isMaster: false, centroServicoIds: [] }
-  }
-  if (pessoasOwnerScopeCache?.ownerId === scope.ownerId && !pessoasOwnerScopeCache.isMaster) {
-    return pessoasOwnerScopeCache
-  }
-  try {
-    const data = await execute(
-      supabase.from('centros_servico').select('id').eq('account_owner_id', scope.ownerId),
-      'Falha ao aplicar escopo de centros de servico.'
-    )
-    const ids = (data ?? []).map((item) => item?.id).filter(Boolean)
-    pessoasOwnerScopeCache = { ownerId: scope.ownerId, isMaster: false, centroServicoIds: ids }
-    return pessoasOwnerScopeCache
-  } catch (error) {
-    reportClientError('Falha ao resolver escopo de pessoas.', error, { ownerId: scope.ownerId })
-    return { ownerId: scope.ownerId, isMaster: false, centroServicoIds: [] }
-  }
-}
-
-async function loadCatalogList({ table, nameColumn = 'nome', ownerScoped = true, errorMessage }) {
-  if (!ownerScoped) {
-    const cacheKey = buildCatalogCacheKey({ table, nameColumn, ownerScoped, ownerId: null, isMaster: false })
-    const cached = readCatalogCache(cacheKey)
-    if (cached) {
-      return cached
-    }
-    const data = await execute(
-      supabase.rpc('rpc_catalog_list', { p_table: table }),
-      errorMessage
-    )
-    const normalized = normalizeDomainOptions(data ?? [])
-    writeCatalogCache(cacheKey, normalized)
-    return normalized
-  }
-
-  const scope = await resolveCatalogScope()
-  if (!scope.isMaster && !scope.ownerId) {
-    reportClientError('Owner nao resolvido para catalogo.', new Error('owner_not_resolved'), { table })
-    return []
-  }
-  const cacheKey = buildCatalogCacheKey({
-    table,
-    nameColumn,
-    ownerScoped,
-    ownerId: scope.ownerId,
-    isMaster: scope.isMaster,
-  })
-  const cached = readCatalogCache(cacheKey)
-  if (cached) {
-    return cached
-  }
-  if (scope.isMaster) {
-    const data = await execute(
-      supabase.rpc('rpc_catalog_list', { p_table: table }),
-      errorMessage
-    )
-    const normalized = normalizeDomainOptions(data ?? [])
-    writeCatalogCache(cacheKey, normalized)
-    return normalized
-  }
-
-  const data = await execute(
-    supabase
-      .from(table)
-      .select(`id, ${nameColumn}`)
-      .eq('account_owner_id', scope.ownerId)
-      .order(nameColumn),
-    errorMessage
-  )
-  const mapped = (data ?? []).map((item) => ({
-    id: item?.id ?? null,
-    nome: resolveTextValue(item?.[nameColumn] ?? ''),
-  }))
-  const normalized = normalizeDomainOptions(mapped)
-  writeCatalogCache(cacheKey, normalized)
-  return normalized
-}
 
 async function resolveCatalogoIdsByNames({ table, nameColumn, nomes, errorMessage }) {
   const lista = normalizeNameList(nomes)
@@ -2869,11 +2713,11 @@ async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
 }
 
 async function carregarCentrosCusto() {
-  return loadCatalogList({
-    table: 'centros_custo',
-    nameColumn: 'nome',
-    errorMessage: 'Falha ao listar centros de custo.',
-  })
+  const data = await execute(
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_custo' }),
+    'Falha ao listar centros de custo.'
+  )
+  return normalizeDomainOptions(data ?? [])
 }
 
 async function buscarCentrosEstoqueIdsPorTermo(valor) {
@@ -2882,7 +2726,10 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
     return []
   }
   try {
-    const registros = await carregarCentrosEstoqueCatalogo()
+    const registros = await execute(
+      supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
+      'Falha ao consultar centros de estoque.'
+    )
     const like = normalizeSearchTerm(termo)
     return (registros ?? [])
       .filter((item) => normalizeSearchTerm(item?.nome).includes(like))
@@ -2895,20 +2742,19 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
 }
 
 async function carregarCentrosEstoqueCatalogo() {
-  const data = await loadCatalogList({
-    table: 'centros_estoque',
-    nameColumn: 'almox',
-    errorMessage: 'Falha ao listar centros de estoque.',
-  })
-  return dedupeDomainOptionsByName(data ?? [])
+  const data = await execute(
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
+    'Falha ao listar centros de estoque.'
+  )
+  return dedupeDomainOptionsByName(normalizeDomainOptions(data ?? []))
 }
 
 async function carregarCentrosServico() {
-  return loadCatalogList({
-    table: 'centros_servico',
-    nameColumn: 'nome',
-    errorMessage: 'Falha ao listar centros de servico.',
-  })
+  const data = await execute(
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
+    'Falha ao listar centros de servico.'
+  )
+  return normalizeDomainOptions(data ?? [])
 }
 
 async function carregarPessoas() {
@@ -3784,10 +3630,6 @@ export const api = {
   },
   pessoas: {
     async list(params = {}) {
-      const ownerScope = await resolvePessoasOwnerScope()
-      if (!ownerScope.isMaster && (!ownerScope.centroServicoIds || ownerScope.centroServicoIds.length === 0)) {
-        return []
-      }
       const filtros = {
         centroServicoId: null,
         setorId: null,
@@ -3839,9 +3681,6 @@ export const api = {
       const buildQuery = () => {
         let builder = buildPessoasViewQuery().order('nome', { ascending: true })
 
-        if (!ownerScope.isMaster) {
-          builder = builder.in('centro_servico_id', ownerScope.centroServicoIds)
-        }
         if (filtros.centroServicoId) {
           builder = builder.eq('centro_servico_id', filtros.centroServicoId)
         }
@@ -3879,7 +3718,8 @@ export const api = {
         let registros = (data ?? []).map(mapPessoaRecord)
         if ((!registros || registros.length === 0) && !termo) {
           const fallbackDados = await executePaged(
-            () => buildQuery(),
+            () =>
+              supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).order('nome', { ascending: true }),
             'Falha ao listar pessoas (fallback view).'
           )
           registros = (fallbackDados ?? []).map(mapPessoaRecord)
@@ -3902,16 +3742,8 @@ export const api = {
       if (!uniqueIds.length) {
         return []
       }
-      const ownerScope = await resolvePessoasOwnerScope()
-      if (!ownerScope.isMaster && (!ownerScope.centroServicoIds || ownerScope.centroServicoIds.length === 0)) {
-        return []
-      }
-      let query = buildPessoasViewQuery().in('id', uniqueIds)
-      if (!ownerScope.isMaster) {
-        query = query.in('centro_servico_id', ownerScope.centroServicoIds)
-      }
       const data = await execute(
-        query,
+        buildPessoasViewQuery().in('id', uniqueIds),
         'Falha ao listar pessoas pelos ids informados.'
       )
       return (data ?? []).map(mapPessoaRecord)
@@ -3922,17 +3754,9 @@ export const api = {
       if (!termo) {
         return []
       }
-      const ownerScope = await resolvePessoasOwnerScope()
-      if (!ownerScope.isMaster && (!ownerScope.centroServicoIds || ownerScope.centroServicoIds.length === 0)) {
-        return []
-      }
       const like = `%${termo}%`
       try {
-        let query = buildPessoasViewQuery().order('nome')
-        if (!ownerScope.isMaster) {
-          query = query.in('centro_servico_id', ownerScope.centroServicoIds)
-        }
-        query = applyPessoaSearchFilters(query, like).limit(limit)
+        const query = applyPessoaSearchFilters(buildPessoasViewQuery().order('nome'), like).limit(limit)
         const data = await execute(query, 'Falha ao buscar pessoas.')
         return (data ?? []).map(mapPessoaRecord)
       } catch (error) {
@@ -3940,11 +3764,7 @@ export const api = {
           termo,
           limit,
         })
-        let fallbackQuery = buildPessoasViewQuery().order('nome')
-        if (!ownerScope.isMaster) {
-          fallbackQuery = fallbackQuery.in('centro_servico_id', ownerScope.centroServicoIds)
-        }
-        const todos = await execute(fallbackQuery, 'Falha ao listar pessoas.')
+        const todos = await execute(buildPessoasViewQuery().order('nome'), 'Falha ao listar pessoas.')
         const lista = (todos ?? []).map(mapPessoaRecord)
         return lista.filter((pessoa) => pessoaMatchesSearch(pessoa, termo)).slice(0, limit)
       }
@@ -6304,38 +6124,30 @@ export const api = {
   references: {
     async pessoas() {
       const [centros, setores, cargos, tipos] = await Promise.all([
-        loadCatalogList({
-          table: 'centros_servico',
-          nameColumn: 'nome',
-          errorMessage: 'Falha ao carregar centros de servico.',
-        }),
-        loadCatalogList({
-          table: 'setores',
-          nameColumn: 'nome',
-          errorMessage: 'Falha ao carregar setores.',
-        }),
-        loadCatalogList({
-          table: 'cargos',
-          nameColumn: 'nome',
-          errorMessage: 'Falha ao carregar cargos.',
-        }),
-        loadCatalogList({
-          table: 'tipo_execucao',
-          nameColumn: 'nome',
-          ownerScoped: false,
-          errorMessage: 'Falha ao carregar tipos de execucao.',
-        }),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
+          'Falha ao carregar centros de servico.'
+        ),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'setores' }),
+          'Falha ao carregar setores.'
+        ),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'cargos' }),
+          'Falha ao carregar cargos.'
+        ),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'tipo_execucao' }),
+          'Falha ao carregar tipos de execucao.'
+        ),
       ])
       return {
-        centrosServico: centros ?? [],
-        setores: setores ?? [],
-        cargos: cargos ?? [],
-        tiposExecucao: tipos ?? [],
+        centrosServico: normalizeDomainOptions(centros),
+        setores: normalizeDomainOptions(setores),
+        cargos: normalizeDomainOptions(cargos),
+        tiposExecucao: normalizeDomainOptions(tipos),
       }
     },
-  },
-  catalogCache: {
-    clear: clearCatalogCache,
   },
   centrosEstoque: {
     async list() {
@@ -6449,8 +6261,6 @@ export const api = {
     },
   },
 }
-
-export { clearCatalogCache }
 
 async function resolveReferenceId(table, value, errorMessage) {
   const nome = trim(value)
