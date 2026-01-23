@@ -21,7 +21,6 @@ Arquitetura
   - `entradasService` concentra:
     - `list`, `create`, `update`, `history` de entradas.
     - Busca/listagem de materiais e centros de estoque/custo.
-- Catalogos (centros de estoque/custo) usam cache leve (30s) no service; invalide com `dataClient.catalogCache.clear(...)` ao cadastrar.
 - Erros:
   - `useErrorLogger('entradas')` registra falhas de carga, submit, filtros, historico e erros de busca de materiais.
 
@@ -88,7 +87,7 @@ Atalhos (vindo do Estoque atual)
   - `?materialId=<id-do-material>`
   - `?centroCusto=<centro>` (ou `?centroEstoque=<centro>`)
 - Quando o campo "Centro de estoque" for um select, a tela tenta casar o texto do centro com as opcoes carregadas e selecionar automaticamente.
-- Se nao houver centros configurados, o select fica desabilitado e nao ha preenchimento automatico (evita texto livre).
+- Se nao houver centros configurados (campo texto livre), o valor e preenchido diretamente.
  - Mesmo com atalho, o Material so e selecionado automaticamente quando o Centro de estoque ja estiver definido.
 
 Atualizacao 2025-12

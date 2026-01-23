@@ -210,9 +210,6 @@ export function useDashboardEstoque(onError) {
     [saidasDetalhadasFiltradas],
   )
 
-  const totalEntradasRegistros = entradasDetalhadasFiltradas.length
-  const totalSaidasRegistros = saidasDetalhadasFiltradas.length
-
   const seriesHistorica = useMemo(
     () => agruparPorPeriodo(entradasDetalhadasFiltradas, saidasDetalhadasFiltradas),
     [entradasDetalhadasFiltradas, saidasDetalhadasFiltradas],
@@ -273,8 +270,12 @@ export function useDashboardEstoque(onError) {
   const topTrocasSetoresTop = useMemo(() => topTrocasSetores.slice(0, 10), [topTrocasSetores])
   const topTrocasPessoasTop = useMemo(() => topTrocasPessoas.slice(0, 10), [topTrocasPessoas])
 
-  const totalMovimentacoes = totalEntradasRegistros + totalSaidasRegistros
+  const totalMovimentacoes = resumoEntradas.quantidade + resumoSaidas.quantidade
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
+  const totalItensEstoque = useMemo(
+    () => (data?.estoqueAtual?.itens ?? []).reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0),
+    [data],
+  )
   const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
   const totalMateriais = data?.estoqueAtual?.itens?.length ?? 0
 
@@ -284,7 +285,7 @@ export function useDashboardEstoque(onError) {
         id: 'movimentacoes',
         title: 'Movimentacoes',
         value: totalMovimentacoes,
-        helper: `${totalEntradasRegistros} entradas / ${totalSaidasRegistros} saidas`,
+        helper: `${resumoEntradas.quantidade} entradas / ${resumoSaidas.quantidade} saidas`,
         icon: MovementIcon,
         tone: 'blue',
         tooltip: 'Quantidade total de registros de entrada e saida no periodo filtrado.',
@@ -300,12 +301,13 @@ export function useDashboardEstoque(onError) {
       },
       {
         id: 'estoque',
-        title: 'Entradas / Saida',
-        value: `${resumoEntradas.quantidade} / ${resumoSaidas.quantidade}`,
-        helper: 'Soma das quantidades (entradas / saidas)',
+        title: 'Em estoque / Saida',
+        value: `${totalItensEstoque} / ${resumoSaidas.quantidade}`,
+        helper: 'Disponivel agora / Saidas no periodo filtrado.',
         icon: StockIcon,
         tone: 'orange',
-        tooltip: 'Soma das quantidades em entradas e saidas no periodo filtrado.',
+        tooltip:
+          'Mostra a quantidade fisica em estoque seguida do total de saidas registradas considerando os filtros aplicados.',
       },
       {
         id: 'alertas',
@@ -329,23 +331,20 @@ export function useDashboardEstoque(onError) {
         id: 'materiais',
         title: 'Materiais monitorados',
         value: totalMateriais,
-        helper: 'Materiais com saldo > 0 ou entradas no periodo.',
+        helper: 'Quantidade de itens com saldo registrado.',
         icon: DashboardIcon,
         tone: 'slate',
-        tooltip: 'Conta materiais com saldo atual ou que tiveram entradas no periodo filtrado.',
+        tooltip: 'Contagem de materiais que possuem saldo registrado no estoque.',
       },
     ],
     [
       materiaisEmAlerta,
-      resumoEntradas.valor,
       resumoEntradas.quantidade,
+      resumoEntradas.valor,
       resumoSaidas.quantidade,
       resumoSaidas.valor,
+      totalItensEstoque,
       totalMateriais,
-      totalEntradasRegistros,
-      totalMovimentacoes,
-      totalValorMovimentado,
-      totalSaidasRegistros,
       trocaResumo,
     ],
   )

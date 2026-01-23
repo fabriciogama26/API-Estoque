@@ -194,7 +194,7 @@ const PESSOAS_VIEW_SELECT = `
   tipo_execucao
 `
 
-const buildPessoasViewQuery = () => supabase.from('pessoas_view').select('*')
+const buildPessoasViewQuery = () => supabase.rpc('rpc_pessoas_completa')
 
 const MATERIAL_COR_RELATION_ID_COLUMNS = ['grupo_material_cor']
 const MATERIAL_COR_RELATION_TEXT_COLUMNS = []
@@ -2854,11 +2854,11 @@ async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
 }
 
 async function carregarCentrosCusto() {
-  return loadCatalogList({
-    table: 'centros_custo',
-    nameColumn: 'nome',
-    errorMessage: 'Falha ao listar centros de custo.',
-  })
+  const data = await execute(
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_custo' }),
+    'Falha ao listar centros de custo.'
+  )
+  return normalizeDomainOptions(data ?? [])
 }
 
 async function buscarCentrosEstoqueIdsPorTermo(valor) {
@@ -2867,7 +2867,10 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
     return []
   }
   try {
-    const registros = await carregarCentrosEstoqueCatalogo()
+    const registros = await execute(
+      supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
+      'Falha ao consultar centros de estoque.'
+    )
     const like = normalizeSearchTerm(termo)
     return (registros ?? [])
       .filter((item) => normalizeSearchTerm(item?.nome).includes(like))
@@ -2880,20 +2883,19 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
 }
 
 async function carregarCentrosEstoqueCatalogo() {
-  const data = await loadCatalogList({
-    table: 'centros_estoque',
-    nameColumn: 'almox',
-    errorMessage: 'Falha ao listar centros de estoque.',
-  })
-  return dedupeDomainOptionsByName(data ?? [])
+  const data = await execute(
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
+    'Falha ao listar centros de estoque.'
+  )
+  return dedupeDomainOptionsByName(normalizeDomainOptions(data ?? []))
 }
 
 async function carregarCentrosServico() {
-  return loadCatalogList({
-    table: 'centros_servico',
-    nameColumn: 'nome',
-    errorMessage: 'Falha ao listar centros de servico.',
-  })
+  const data = await execute(
+    supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
+    'Falha ao listar centros de servico.'
+  )
+  return normalizeDomainOptions(data ?? [])
 }
 
 async function carregarPessoas() {
@@ -3868,7 +3870,8 @@ export const api = {
         let registros = (data ?? []).map(mapPessoaRecord)
         if ((!registros || registros.length === 0) && !termo) {
           const fallbackDados = await executePaged(
-            () => buildQuery(),
+            () =>
+              supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).order('nome', { ascending: true }),
             'Falha ao listar pessoas (fallback view).'
           )
           registros = (fallbackDados ?? []).map(mapPessoaRecord)
@@ -3909,7 +3912,7 @@ export const api = {
         query = query.eq('ativo', true)
       }
       const data = await execute(
-        query,
+        buildPessoasViewQuery().in('id', uniqueIds),
         'Falha ao listar pessoas pelos ids informados.'
       )
       return (data ?? []).map(mapPessoaRecord)
@@ -6310,38 +6313,30 @@ export const api = {
   references: {
     async pessoas() {
       const [centros, setores, cargos, tipos] = await Promise.all([
-        loadCatalogList({
-          table: 'centros_servico',
-          nameColumn: 'nome',
-          errorMessage: 'Falha ao carregar centros de servico.',
-        }),
-        loadCatalogList({
-          table: 'setores',
-          nameColumn: 'nome',
-          errorMessage: 'Falha ao carregar setores.',
-        }),
-        loadCatalogList({
-          table: 'cargos',
-          nameColumn: 'nome',
-          errorMessage: 'Falha ao carregar cargos.',
-        }),
-        loadCatalogList({
-          table: 'tipo_execucao',
-          nameColumn: 'nome',
-          ownerScoped: false,
-          errorMessage: 'Falha ao carregar tipos de execucao.',
-        }),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
+          'Falha ao carregar centros de servico.'
+        ),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'setores' }),
+          'Falha ao carregar setores.'
+        ),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'cargos' }),
+          'Falha ao carregar cargos.'
+        ),
+        execute(
+          supabase.rpc('rpc_catalog_list', { p_table: 'tipo_execucao' }),
+          'Falha ao carregar tipos de execucao.'
+        ),
       ])
       return {
-        centrosServico: centros ?? [],
-        setores: setores ?? [],
-        cargos: cargos ?? [],
-        tiposExecucao: tipos ?? [],
+        centrosServico: normalizeDomainOptions(centros),
+        setores: normalizeDomainOptions(setores),
+        cargos: normalizeDomainOptions(cargos),
+        tiposExecucao: normalizeDomainOptions(tipos),
       }
     },
-  },
-  catalogCache: {
-    clear: clearCatalogCache,
   },
   centrosEstoque: {
     async list() {
@@ -6455,8 +6450,6 @@ export const api = {
     },
   },
 }
-
-export { clearCatalogCache }
 
 async function resolveReferenceId(table, value, errorMessage) {
   const nome = trim(value)
