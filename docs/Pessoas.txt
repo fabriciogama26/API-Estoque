@@ -20,12 +20,8 @@ Campos e fluxos
 - Campos principais: matricula, nome, centro_servico_id/centro_custo_id, setor_id, cargo_id, tipo_execucao_id, dataAdmissao, dataDemissao, ativo.
 - Historico: timeline com alteracoes (usuario, data, campos modificados).
 - Filtros: termo livre, centro de servico, setor, cargo, ativo, cadastrado de/ate; aplicados apenas no frontend (backend jÃ¡ filtra por `account_owner_id`).
-- Listagem/busca de pessoas aplica escopo por `centro_servico_id` do owner quando a credencial nao e master.
-- Listas de centros/setores/cargos/tipos sao filtradas por owner quando a credencial nao e master.
-- Catalogos de centros/setores/cargos usam cache leve (30s) no service; invalide com `dataClient.catalogCache.clear(...)` ao cadastrar.
 - Tabela: paginacao local; a coluna "Registrado por" usa os campos retornados pela view/RPC de pessoas.
 - Historico: modal no padrÃ£o Materiais, mostrando campo a campo (inclui Observacao).
-- Resumo (cards): calculado no frontend a partir de pessoas ativas, evitando `rpc_pessoas_resumo` para nao misturar familias.
 
 Desligamento em massa (novo)
 ----------------------------

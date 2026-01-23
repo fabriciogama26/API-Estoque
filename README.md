@@ -36,11 +36,6 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 - Cancelar pessoa exige observacao e registra no historico (modal no padrão Materiais).
 - Filtros da lista (status, datas de cadastro, etc.) são aplicados no frontend; o backend já filtra por `account_owner_id`.
 
-## Cache leve de catalogos
-
-- Catalogos de centros de servico, almoxarifado, cargos e setores usam cache em memoria (TTL 30s) no service.
-- Para atualizar imediatamente apos cadastro/edicao, use `dataClient.catalogCache.clear([...])` e recarregue a lista.
-
 ## Historicos (UI)
 
 - Todos os modais de historico (Entradas, Saidas, Materiais, Pessoas, Acidentes e HHT mensal) usam paginacao de 5 registros por pagina via `useHistoryPagination` + `TablePagination`.
