@@ -117,7 +117,7 @@ Validated mapping per latest choices.
 - cargo -> job_role
 - cat -> cat_number
 - centro_servico -> service_center
-- cid -> icd_code
+- cid -> cid_code
 - criadoEm -> created_at
 - data -> accident_date
 - data_esocial -> esocial_date

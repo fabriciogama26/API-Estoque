@@ -40,6 +40,7 @@ Politicas RLS tenant (limpeza e padrao)
     planos_users
 - supabase/migrations/20250205_catalog_public_select_only.sql
   - catalogos sem account_owner_id: SELECT publico apenas
+    - acidente_agentes, acidente_tipos, acidente_partes, acidente_lesoes, acidente_locais
   - remove todas policies DELETE no banco
 
 Catalogos tenant (com account_owner_id)

@@ -19,6 +19,7 @@ Arquitetura (modular)
 Fluxos principais
 
 - Formulário: pessoa, centro de estoque (filtra materiais), material (autocomplete por nome/ID/descrição/CA), quantidade, datas; centros de custo/serviço preenchidos pela pessoa; campo "Em estoque" destacado (sem linha de resumo abaixo); cancelar saída com motivo obrigatório (modal).
+- Busca/lista de pessoas considera apenas ativos por padrao (use includeInactive para listar desligados quando necessario).
 - Filtros: período, centros (estoque/serviço), status dinâmico resolvido por id do catálogo status_saida (aceita nome se id não vier), termo livre (nome/matrícula de pessoa ou nome/descrição/ID/CA de material); "Aplicar" consulta na API; limpar restaura defaults e recarrega a lista.
 - Busca por termo aceita ID do material no filtro do histórico.
   - Checkbox "Apenas trocas" filtra saidas marcadas com isTroca=true.

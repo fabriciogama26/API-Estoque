@@ -85,8 +85,9 @@ Fluxos principais
 Carregamento de dados
 ---------------------
 - Pessoas, locais, agentes, tipos, lesoes e partes sao carregados em paralelo, cada catalogo com seu proprio `isLoading` e `error`.
-- Locais exibidos no formulario sao filtrados pelos locais/centros presentes nas pessoas carregadas (escopo do owner).
+- Catalogos de acidentes (agentes/partes/lesoes/tipos/locais) sao publicos, sem filtro por owner.
 - Campo Matricula usa busca com debounce (searchPessoas quando disponivel, fallback local), exibe feedback de carregamento/erro no dropdown e so abre sugestoes quando nao ha matricula ja selecionada.
+- Busca de pessoas retorna apenas ativos por padrao (includeInactive=true para sobrescrever).
 - A lista principal `useAcidentes` atualiza apos:
   - Criar ou editar um acidente.
   - Acionar o botao "Atualizar".
@@ -108,6 +109,7 @@ Regras e validacoes
 Boas praticas
 -------------
 - Garantir que catalogos (agentes, tipos, lesoes, partes) estejam criados/populados antes de liberar a tela para os usuarios.
+- Ordenacao de agentes/locais/partes/lesoes/tipos e alfabetica (coluna ordem removida).
 - Preferir matricula como chave em imports e integracoes; nome e cargo sao derivados da tabela de pessoas.
 - Usar o historico como ferramenta de auditoria, principalmente quando ha ajustes manuais de dados.
 - HHT nao e campo do formulario; o dashboard cruza data + centro com `hht_mensal` ativo do mes para calcular taxas.

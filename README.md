@@ -41,6 +41,11 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 - Catalogos de centros de servico, almoxarifado, cargos e setores usam cache em memoria (TTL 30s) no service.
 - Para atualizar imediatamente apos cadastro/edicao, use `dataClient.catalogCache.clear([...])` e recarregue a lista.
 
+## Acidentes (catalogos)
+
+- Catalogos de acidentes sao publicos: agentes, locais, partes, lesoes e tipos (sem filtro por owner).
+- Agentes/locais/partes/lesoes/tipos sao ordenados por nome (coluna `ordem` removida).
+
 ## Historicos (UI)
 
 - Todos os modais de historico (Entradas, Saidas, Materiais, Pessoas, Acidentes e HHT mensal) usam paginacao de 5 registros por pagina via `useHistoryPagination` + `TablePagination`.

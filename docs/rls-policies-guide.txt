@@ -9,7 +9,7 @@ Habilitando RLS
 ---------------
 - A migration `0002_enable_rls.sql` liga o RLS nas tabelas base e cria políticas mínimas: leitura para `authenticated`, escrita restrita ao `service_role` (para seeds/funções). A política `app_users read own` agora compara `auth.uid() = id`, refletindo o novo formato da tabela.【F:supabase/migrations/0002_enable_rls.sql†L1-L38】
 - Migration `0009_allow_authenticated_writes.sql` expande permissões permitindo `INSERT/UPDATE` para usuários autenticados em `entradas`, `saidas` e `acidentes` (necessário para o frontend).【F:supabase/migrations/0009_allow_authenticated_writes.sql†L1-L72】
-- Tabelas de referência (`grupos_material`, `acidente_locais`, etc.) têm RLS habilitado e leitura liberada para `authenticated`/`anon`, mantendo manutenção apenas com `service_role`.【F:supabase/migrations/0013_rls_reference_tables.sql†L1-L36】
+- Tabelas de referência (`grupos_material`, `acidente_agentes`, `acidente_tipos`, `acidente_partes`, `acidente_lesoes`, `acidente_locais`, etc.) têm RLS habilitado e leitura liberada para `authenticated`/`anon`, mantendo manutenção apenas com `service_role`.【F:supabase/migrations/0013_rls_reference_tables.sql†L1-L36】
 
 Checklist pós-deploy
 --------------------
