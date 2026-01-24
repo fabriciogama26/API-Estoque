@@ -270,8 +270,16 @@ export function useDashboardEstoque(onError) {
   const topTrocasSetoresTop = useMemo(() => topTrocasSetores.slice(0, 10), [topTrocasSetores])
   const topTrocasPessoasTop = useMemo(() => topTrocasPessoas.slice(0, 10), [topTrocasPessoas])
 
+<<<<<<< HEAD
   const totalMovimentacoes = entradasDetalhadasFiltradas.length + saidasDetalhadasFiltradas.length
+=======
+  const totalMovimentacoes = resumoEntradas.quantidade + resumoSaidas.quantidade
+>>>>>>> 3ac6fcf5e296609b6c0cd8c3b7463eeeb5bdb0f5
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
+  const totalItensEstoque = useMemo(
+    () => (data?.estoqueAtual?.itens ?? []).reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0),
+    [data],
+  )
   const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
   const totalMateriais = data?.estoqueAtual?.itens?.length ?? 0
 
@@ -334,13 +342,17 @@ export function useDashboardEstoque(onError) {
     ],
     [
       materiaisEmAlerta,
-      resumoEntradas.valor,
       resumoEntradas.quantidade,
+      resumoEntradas.valor,
       resumoSaidas.quantidade,
       resumoSaidas.valor,
+      totalItensEstoque,
       totalMateriais,
+<<<<<<< HEAD
       totalMovimentacoes,
       totalValorMovimentado,
+=======
+>>>>>>> 3ac6fcf5e296609b6c0cd8c3b7463eeeb5bdb0f5
       trocaResumo,
       entradasDetalhadasFiltradas.length,
       saidasDetalhadasFiltradas.length,
