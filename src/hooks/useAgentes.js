@@ -29,6 +29,7 @@ export function useAgentes() {
               return {
                 id: item.id ?? item.agenteId ?? null,
                 nome,
+                label: item.label ?? nome,
               }
             })
             .filter(Boolean)

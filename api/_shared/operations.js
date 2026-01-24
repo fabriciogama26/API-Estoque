@@ -310,12 +310,13 @@ function mapAcidenteRecord(record) {
   if (!record || typeof record !== 'object') {
     return record
   }
-  const centroServico = record.centroServico ?? record.setor ?? ''
+  const centroServico = record.centro_servico ?? record.centroServico ?? record.setor ?? ''
+  const local = record.local ?? record.local_nome ?? centroServico
   return {
     ...record,
     centroServico,
     setor: record.setor ?? centroServico,
-    local: record.local ?? centroServico,
+    local,
   }
 }
 
@@ -1156,20 +1157,54 @@ function sanitizeNonNegativeInteger(value, { defaultValue = 0, allowNull = false
 }
 
 function sanitizeAcidentePayload(payload = {}) {
-  const centroServico = trim(payload.centroServico ?? payload.setor)
-  const local = trim(payload.local)
+  const pessoaId = extractUuidFromCandidate(
+    payload.pessoaId ?? payload.pessoa_id ?? payload.peopleId ?? payload.people_id
+  )
+  if (pessoaId === undefined) {
+    throw createHttpError(400, 'Pessoa invalida.')
+  }
+  const agenteId = extractUuidFromCandidate(payload.agenteId ?? payload.agente_id ?? payload.agente)
+  if (agenteId === undefined) {
+    throw createHttpError(400, 'Agente invalido.')
+  }
+  const centroServicoId = extractUuidFromCandidate(
+    payload.centroServicoId ?? payload.centro_servico_id ?? payload.centroServico_id
+  )
+  if (centroServicoId === undefined) {
+    throw createHttpError(400, 'Centro de servico invalido.')
+  }
+  const localId = extractUuidFromCandidate(payload.localId ?? payload.local_id)
+  if (localId === undefined) {
+    throw createHttpError(400, 'Local invalido.')
+  }
+  const tiposIds = collectUuidListFromPayload(
+    payload,
+    ['tiposIds', 'tipos_ids', 'tipoIds', 'tipo_ids', 'tipos'],
+    'tipos'
+  )
+  const lesoesIds = collectUuidListFromPayload(
+    payload,
+    ['lesoesIds', 'lesoes_ids', 'lesaoIds', 'lesao_ids', 'lesoes'],
+    'lesoes'
+  )
+  const partesIds = collectUuidListFromPayload(
+    payload,
+    ['partesIds', 'partes_ids', 'partesLesionadasIds', 'partes_lesionadas_ids', 'partes', 'partesLesionadas'],
+    'partes'
+  )
   const cat = sanitizeOptionalIntegerString(payload.cat, 'CAT')
   return {
+    pessoaId: pessoaId ?? null,
+    agenteId: agenteId ?? null,
+    centroServicoId: centroServicoId ?? null,
+    localId: localId ?? null,
+    tiposIds,
+    lesoesIds,
+    partesIds,
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
     cargo: trim(payload.cargo),
     data: payload.data ? new Date(payload.data).toISOString() : '',
-    tipo: trim(payload.tipo),
-    agente: trim(payload.agente),
-    lesao: trim(payload.lesao),
-    parteLesionada: trim(payload.parteLesionada),
-    centroServico,
-    local: local || centroServico,
     diasPerdidos: sanitizeNonNegativeInteger(payload.diasPerdidos, {
       defaultValue: 0,
       fieldName: 'Dias perdidos',
@@ -1178,25 +1213,35 @@ function sanitizeAcidentePayload(payload = {}) {
       defaultValue: 0,
       fieldName: 'Dias debitados',
     }),
-    hht: sanitizeNonNegativeInteger(payload.hht, {
-      allowNull: true,
-      fieldName: 'HHT',
-    }),
     cid: sanitizeOptional(payload.cid),
     cat: cat ?? null,
     observacao: sanitizeOptional(payload.observacao),
+    dataEsocial: payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null,
+    sesmt: Boolean(payload.sesmt),
+    dataSesmt: payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null,
+    esocial: payload.esocial !== undefined ? Boolean(payload.esocial) : Boolean(payload.dataEsocial),
   }
 }
 
 function validateAcidentePayload(payload) {
-  if (!payload.matricula) throw createHttpError(400, 'Matricula obrigatoria')
-  if (!payload.nome) throw createHttpError(400, 'Nome obrigatorio')
-  if (!payload.cargo) throw createHttpError(400, 'Cargo obrigatorio')
-  if (!payload.tipo) throw createHttpError(400, 'Tipo de acidente obrigatorio')
-  if (!payload.agente) throw createHttpError(400, 'Agente causador obrigatorio')
-  if (!payload.lesao) throw createHttpError(400, 'Lesao obrigatoria')
-  if (!payload.parteLesionada) throw createHttpError(400, 'Parte lesionada obrigatoria')
-  if (!payload.centroServico) throw createHttpError(400, 'Centro de servico obrigatorio')
+  if (!payload.pessoaId && !payload.matricula) {
+    throw createHttpError(400, 'Pessoa obrigatoria')
+  }
+  if (!payload.centroServicoId) throw createHttpError(400, 'Centro de servico obrigatorio')
+  if (!payload.localId) throw createHttpError(400, 'Local obrigatorio')
+  if (!payload.agenteId) throw createHttpError(400, 'Agente causador obrigatorio')
+  if (!payload.tiposIds || payload.tiposIds.length === 0) {
+    throw createHttpError(400, 'Tipo de acidente obrigatorio')
+  }
+  if (!payload.lesoesIds || payload.lesoesIds.length === 0) {
+    throw createHttpError(400, 'Lesao obrigatoria')
+  }
+  if (!payload.partesIds || payload.partesIds.length === 0) {
+    throw createHttpError(400, 'Parte lesionada obrigatoria')
+  }
+  if (payload.tiposIds.length !== payload.lesoesIds.length) {
+    throw createHttpError(400, 'Tipos e lesoes devem ter a mesma quantidade')
+  }
   if (!payload.data || Number.isNaN(Date.parse(payload.data))) {
     throw createHttpError(400, 'Data do acidente obrigatoria')
   }
@@ -1205,11 +1250,6 @@ function validateAcidentePayload(payload) {
   }
   if (!Number.isInteger(Number(payload.diasDebitados)) || Number(payload.diasDebitados) < 0) {
     throw createHttpError(400, 'Dias debitados deve ser zero ou positivo')
-  }
-  if (payload.hht !== undefined && payload.hht !== null) {
-    if (!Number.isInteger(Number(payload.hht)) || Number(payload.hht) < 0) {
-      throw createHttpError(400, 'HHT deve ser zero ou positivo')
-    }
   }
   if (payload.cat && !/^[0-9]+$/.test(String(payload.cat))) {
     throw createHttpError(400, 'CAT deve conter apenas numeros inteiros')
@@ -2300,7 +2340,7 @@ export const AcidentesOperations = {
   async list() {
     const acidentes =
       (await execute(
-        supabaseAdmin.from('acidentes').select('*').order('data', { ascending: false }),
+        supabaseAdmin.from('vw_acidentes').select('*').order('data', { ascending: false }),
         'Falha ao listar acidentes.'
       )) ?? []
     return acidentes.map(mapAcidenteRecord)
@@ -2309,46 +2349,46 @@ export const AcidentesOperations = {
     const dados = sanitizeAcidentePayload(payload)
     validateAcidentePayload(dados)
 
-    const pessoa = await obterPessoaPorMatricula(dados.matricula)
-    if (!pessoa) {
-      throw createHttpError(404, 'Pessoa n�o encontrada para a matr�cula informada.')
+    let pessoaId = dados.pessoaId
+    if (!pessoaId) {
+      const pessoa = await obterPessoaPorMatricula(dados.matricula)
+      if (!pessoa) {
+        throw createHttpError(404, 'Pessoa nao encontrada para a matricula informada.')
+      }
+      pessoaId = pessoa.id
     }
 
-    const centroServicoBase = dados.centroServico || pessoa.centroServico || pessoa.setor || pessoa.local || ''
-    const localBase = dados.local || pessoa.local || pessoa.centroServico || ''
-    const agora = nowIso()
     const usuario = resolveUsuarioNome(user)
 
     const acidente = await executeSingle(
-      supabaseAdmin
-        .from('acidentes')
-        .insert({
-          id: randomId(),
-          matricula: dados.matricula,
-          nome: dados.nome,
-          cargo: dados.cargo,
-          data: dados.data,
-          tipo: dados.tipo,
-          agente: dados.agente,
-          lesao: dados.lesao,
-          parteLesionada: dados.parteLesionada,
-          setor: centroServicoBase,
-          local: localBase,
-          diasPerdidos: dados.diasPerdidos,
-          diasDebitados: dados.diasDebitados,
-          hht: dados.hht,
-          cid: dados.cid,
-          cat: dados.cat,
-          observacao: dados.observacao,
-          criadoEm: agora,
-          atualizadoEm: null,
-          registradoPor: usuario,
-        })
-        .select(),
+      supabaseAdmin.rpc('rpc_acidentes_create_full', {
+        p_pessoa_id: pessoaId,
+        p_data: dados.data,
+        p_dias_perdidos: dados.diasPerdidos,
+        p_dias_debitados: dados.diasDebitados,
+        p_cid: dados.cid,
+        p_centro_servico_id: dados.centroServicoId,
+        p_local_id: dados.localId,
+        p_cat: dados.cat,
+        p_observacao: dados.observacao,
+        p_data_esocial: dados.dataEsocial,
+        p_esocial: dados.esocial,
+        p_sesmt: dados.sesmt,
+        p_data_sesmt: dados.dataSesmt,
+        p_agente_id: dados.agenteId,
+        p_tipos_ids: dados.tiposIds,
+        p_lesoes_ids: dados.lesoesIds,
+        p_partes_ids: dados.partesIds,
+        p_registrado_por: usuario,
+      }),
       'Falha ao registrar acidente.'
     )
 
-    return mapAcidenteRecord(acidente)
+    const completo = await executeMaybeSingle(
+      supabaseAdmin.from('vw_acidentes').select('*').eq('id', acidente.id),
+      'Falha ao obter acidente.'
+    )
+    return mapAcidenteRecord(completo ?? acidente)
   },
 
 }

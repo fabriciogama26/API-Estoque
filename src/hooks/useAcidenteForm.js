@@ -36,6 +36,7 @@ export function useAcidenteForm({
   pessoas = [],
   locais = [],
   agenteOpcoes = [],
+  acidentes = [],
   onSaved,
   onError,
 }) {
@@ -61,9 +62,10 @@ export function useAcidenteForm({
   const [pessoaSearchError, setPessoaSearchError] = useState(null)
   const pessoaSearchTimeoutRef = useRef(null)
   const pessoaBlurTimeoutRef = useRef(null)
+  const [centrosServicoOptions, setCentrosServicoOptions] = useState([])
   const [centrosServicoMap, setCentrosServicoMap] = useState(new Map())
 
-  const normalizeCentroKey = useCallback((valor) => {
+  const normalizeLookupKey = useCallback((valor) => {
     if (!valor) return ''
     return String(valor)
       .trim()
@@ -84,6 +86,9 @@ export function useAcidenteForm({
   }, [pessoas])
 
   const centrosServicoPessoas = useMemo(() => {
+    if (centrosServicoOptions.length) {
+      return centrosServicoOptions.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    }
     const valores = new Set()
     pessoas.forEach((pessoa) => {
       const centro = (pessoa?.centroServico ?? pessoa?.setor ?? '').trim()
@@ -92,29 +97,96 @@ export function useAcidenteForm({
       }
       valores.add(centro)
     })
-    return Array.from(valores).sort((a, b) => a.localeCompare(b))
-  }, [pessoas])
+    return Array.from(valores)
+      .map((nome) => ({ id: null, nome, label: nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [centrosServicoOptions, pessoas])
 
-  const resolveLocalDisponivel = useCallback(
-    (valor) => {
-      const alvo = valor?.trim()
-      if (!alvo) {
+  const resolveCentroServicoId = useCallback(
+    (nome, fallbackId) => {
+      const direto = fallbackId ? String(fallbackId).trim() : ''
+      if (direto) {
+        return direto
+      }
+      const chave = normalizeLookupKey(nome)
+      if (!chave) {
         return ''
       }
-      const matchDireto = locais.find((item) => item === alvo)
-      if (matchDireto) {
-        return matchDireto
-      }
-      const normalizar = (texto) =>
-        texto
-          .trim()
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-      const alvoNormalizado = normalizar(alvo)
-      return locais.find((item) => normalizar(item) === alvoNormalizado) ?? ''
+      return centrosServicoMap.get(chave) ?? ''
     },
-    [locais],
+    [centrosServicoMap, normalizeLookupKey],
+  )
+
+  const resolveCentroServicoOption = useCallback(
+    (valor) => {
+      const alvo = valor !== undefined && valor !== null ? String(valor).trim() : ''
+      if (!alvo) {
+        return null
+      }
+      const lista = Array.isArray(centrosServicoOptions) ? centrosServicoOptions : []
+      const matchId = lista.find((item) => String(item?.id ?? '') === alvo)
+      if (matchId) {
+        return {
+          id: matchId.id ?? null,
+          nome: String(matchId.nome ?? matchId.label ?? alvo).trim(),
+        }
+      }
+      const alvoNormalizado = normalizeLookupKey(alvo)
+      const matchNome = lista.find((item) => {
+        const nome = String(item?.nome ?? item?.label ?? item ?? '').trim()
+        return nome && normalizeLookupKey(nome) === alvoNormalizado
+      })
+      if (matchNome) {
+        return {
+          id: matchNome.id ?? null,
+          nome: String(matchNome.nome ?? matchNome.label ?? alvo).trim(),
+        }
+      }
+      return { id: null, nome: alvo }
+    },
+    [centrosServicoOptions, normalizeLookupKey],
+  )
+
+  const resolveLocalOption = useCallback(
+    (valor) => {
+      const alvo = valor !== undefined && valor !== null ? String(valor).trim() : ''
+      if (!alvo) {
+        return null
+      }
+      const lista = Array.isArray(locais) ? locais : []
+      const direto = lista.find((item) => String(item?.id ?? item ?? '') === alvo)
+      if (direto) {
+        const nome = String(direto?.nome ?? direto?.label ?? direto ?? '').trim()
+        return {
+          id: direto?.id ?? null,
+          nome: nome || alvo,
+        }
+      }
+      const alvoNormalizado = normalizeLookupKey(alvo)
+      const match = lista.find((item) => {
+        const nome = String(item?.nome ?? item?.label ?? item ?? '').trim()
+        return nome && normalizeLookupKey(nome) === alvoNormalizado
+      })
+      if (match) {
+        const nome = String(match?.nome ?? match?.label ?? match ?? '').trim()
+        return {
+          id: match?.id ?? null,
+          nome: nome || alvo,
+        }
+      }
+      return { id: null, nome: alvo }
+    },
+    [locais, normalizeLookupKey],
+  )
+
+  const resolveLocalDisponivel = useCallback(
+    (valor) => resolveLocalOption(valor)?.nome ?? '',
+    [resolveLocalOption],
+  )
+
+  const resolveLocalId = useCallback(
+    (valor) => resolveLocalOption(valor)?.id ?? null,
+    [resolveLocalOption],
   )
 
   const dedupePessoas = useCallback((lista = []) => {
@@ -144,12 +216,15 @@ export function useAcidenteForm({
   const clearPessoaSelection = useCallback(() => {
     setForm((prev) => ({
       ...prev,
+      pessoaId: '',
       matricula: '',
       nome: '',
       cargo: '',
       centroServico: '',
+      centroServicoId: '',
       setor: '',
       local: '',
+      localId: '',
     }))
     setPessoaSearchValue('')
     setPessoaSuggestions([])
@@ -164,6 +239,7 @@ export function useAcidenteForm({
       }
       setForm((prev) => {
         const next = { ...prev }
+        next.pessoaId = pessoa?.id ?? ''
         const matricula =
           pessoa?.matricula !== undefined && pessoa?.matricula !== null ? String(pessoa.matricula) : ''
         next.matricula = matricula
@@ -171,9 +247,12 @@ export function useAcidenteForm({
         next.cargo = pessoa?.cargo ?? ''
         const centroServico = pessoa?.centroServico ?? pessoa?.setor ?? ''
         next.centroServico = centroServico
+        next.centroServicoId =
+          resolveCentroServicoId(centroServico, pessoa?.centroServicoId ?? pessoa?.centro_servico_id) || ''
         next.setor = centroServico
         const localBase = pessoa?.local ?? centroServico
         next.local = resolveLocalDisponivel(localBase)
+        next.localId = resolveLocalId(localBase) || ''
         return next
       })
       const resumo = formatPessoaSummary(pessoa)
@@ -184,7 +263,7 @@ export function useAcidenteForm({
       setPessoaDropdownOpen(false)
       setPessoaSearchError(null)
     },
-    [resolveLocalDisponivel],
+    [resolveCentroServicoId, resolveLocalDisponivel, resolveLocalId],
   )
 
   const selectPessoaPorMatricula = useCallback(
@@ -196,18 +275,29 @@ export function useAcidenteForm({
       }
       setForm((prev) => ({
         ...prev,
+        pessoaId: '',
         matricula,
         nome: '',
         cargo: '',
         centroServico: '',
+        centroServicoId: '',
         setor: '',
         local: '',
+        localId: '',
       }))
     },
     [applyPessoaToForm, pessoasPorMatricula],
   )
 
   const agenteSelecionadoInfo = useMemo(() => {
+    const agenteId = String(form.agenteId ?? '').trim()
+    if (agenteId) {
+      return (
+        agenteOpcoes.find(
+          (item) => item && String(item.id ?? item.agenteId ?? '') === agenteId,
+        ) ?? { id: agenteId, nome: form.agente ?? '' }
+      )
+    }
     const alvo = normalizeAgenteKey(form.agente ?? '')
     if (!alvo) {
       return null
@@ -221,7 +311,7 @@ export function useAcidenteForm({
         return normalizeAgenteKey(nomeItem) === alvo
       }) ?? null
     )
-  }, [agenteOpcoes, form.agente])
+  }, [agenteOpcoes, form.agente, form.agenteId])
 
   const agenteAtualPayload = useMemo(() => {
     const nome = normalizeAgenteNome(form.agente)
@@ -232,14 +322,14 @@ export function useAcidenteForm({
       const payloadNome = nomeOficial || nome
       return {
         nome: payloadNome,
-        id: agenteSelecionadoInfo.id ?? agenteSelecionadoInfo.agenteId ?? null,
+        id: agenteSelecionadoInfo.id ?? agenteSelecionadoInfo.agenteId ?? form.agenteId ?? null,
       }
     }
     if (nome) {
-      return { nome, id: null }
+      return { nome, id: form.agenteId ?? null }
     }
     return null
-  }, [agenteSelecionadoInfo, form.agente])
+  }, [agenteSelecionadoInfo, form.agente, form.agenteId])
 
   useEffect(() => {
     let cancelado = false
@@ -337,6 +427,31 @@ export function useAcidenteForm({
         selectPessoaPorMatricula(value)
         return
       }
+      if (name === 'agenteId') {
+        let agenteAlterado = false
+        setForm((prev) => {
+          const atualId = String(prev.agenteId ?? '')
+          const novoId = String(value ?? '')
+          agenteAlterado = atualId !== novoId
+          const next = { ...prev, agenteId: novoId }
+          if (!novoId || agenteAlterado) {
+            next.tipos = []
+            next.tipo = ''
+            next.tiposIds = []
+            next.lesoes = []
+            next.lesao = ''
+            next.lesoesIds = []
+          }
+          return next
+        })
+        if (!value || agenteAlterado) {
+          setTipoOpcoes([])
+          setTiposError(null)
+          setLesaoOpcoes([])
+          setLesoesError(null)
+        }
+        return
+      }
       if (name === 'agentes') {
         const lista = Array.isArray(value)
           ? value
@@ -353,8 +468,14 @@ export function useAcidenteForm({
           if (!lista.length) {
             next.tipos = []
             next.tipo = ''
+            next.tiposIds = []
             next.lesoes = []
             next.lesao = ''
+            next.lesoesIds = []
+          }
+          if (agenteAlterado) {
+            next.tiposIds = []
+            next.lesoesIds = []
           }
           return next
         })
@@ -386,8 +507,14 @@ export function useAcidenteForm({
           if (!value) {
             next.tipos = []
             next.tipo = ''
+            next.tiposIds = []
             next.lesoes = []
             next.lesao = ''
+            next.lesoesIds = []
+          }
+          if (alterou) {
+            next.tiposIds = []
+            next.lesoesIds = []
           }
           return next
         })
@@ -397,6 +524,11 @@ export function useAcidenteForm({
           setLesaoOpcoes([])
           setLesoesError(null)
         }
+        return
+      }
+      if (name === 'classificacoesAgentes') {
+        const lista = Array.isArray(value) ? value : []
+        setForm((prev) => ({ ...prev, classificacoesAgentes: lista }))
         return
       }
       if (name === 'tipo') {
@@ -410,6 +542,13 @@ export function useAcidenteForm({
         setForm((prev) => ({ ...prev, tipos: lista, tipo: lista.join('; ') }))
         return
       }
+      if (name === 'tiposIds') {
+        const lista = Array.isArray(value)
+          ? value.map((item) => (item === undefined || item === null ? '' : String(item).trim())).filter(Boolean)
+          : []
+        setForm((prev) => ({ ...prev, tiposIds: lista }))
+        return
+      }
       if (name === 'lesoes') {
         const lista = Array.isArray(value)
           ? value.filter((item) => item && item.trim())
@@ -417,6 +556,13 @@ export function useAcidenteForm({
             ? [value.trim()].filter(Boolean)
             : []
         setForm((prev) => ({ ...prev, lesoes: lista, lesao: lista[0] ?? '' }))
+        return
+      }
+      if (name === 'lesoesIds') {
+        const lista = Array.isArray(value)
+          ? value.map((item) => (item === undefined || item === null ? '' : String(item).trim())).filter(Boolean)
+          : []
+        setForm((prev) => ({ ...prev, lesoesIds: lista }))
         return
       }
       if (name === 'partesLesionadas') {
@@ -428,12 +574,48 @@ export function useAcidenteForm({
         setForm((prev) => ({ ...prev, partesLesionadas: lista }))
         return
       }
+      if (name === 'partesIds') {
+        const lista = Array.isArray(value)
+          ? value.map((item) => (item === undefined || item === null ? '' : String(item).trim())).filter(Boolean)
+          : []
+        setForm((prev) => ({ ...prev, partesIds: lista }))
+        return
+      }
+      if (name === 'centroServicoId') {
+        const raw = value !== undefined && value !== null ? String(value).trim() : ''
+        const option = resolveCentroServicoOption(raw)
+        const nome = option?.nome ?? ''
+        const idValue = option?.id ?? raw
+        setForm((prev) => ({
+          ...prev,
+          centroServicoId: idValue,
+          centroServico: nome,
+          setor: nome,
+        }))
+        return
+      }
+      if (name === 'localId') {
+        const raw = value !== undefined && value !== null ? String(value).trim() : ''
+        const option = resolveLocalOption(raw)
+        const nome = option?.nome ?? ''
+        const idValue = option?.id ?? raw
+        setForm((prev) => ({ ...prev, localId: idValue, local: nome }))
+        return
+      }
       if (name === 'local') {
-        setForm((prev) => ({ ...prev, local: resolveLocalDisponivel(value) }))
+        const localNome = resolveLocalDisponivel(value)
+        setForm((prev) => ({ ...prev, local: localNome, localId: resolveLocalId(localNome || value) || '' }))
         return
       }
       if (name === 'centroServico') {
-        setForm((prev) => ({ ...prev, centroServico: value, setor: value }))
+        const centroNome = typeof value === 'string' ? value : ''
+        const centroServicoId = resolveCentroServicoId(centroNome)
+        setForm((prev) => ({
+          ...prev,
+          centroServico: centroNome,
+          setor: centroNome,
+          centroServicoId: centroServicoId || '',
+        }))
         return
       }
       if (name === 'data') {
@@ -442,7 +624,14 @@ export function useAcidenteForm({
       }
       setForm((prev) => ({ ...prev, [name]: value }))
     },
-    [selectPessoaPorMatricula, resolveLocalDisponivel],
+    [
+      selectPessoaPorMatricula,
+      resolveCentroServicoId,
+      resolveCentroServicoOption,
+      resolveLocalDisponivel,
+      resolveLocalId,
+      resolveLocalOption,
+    ],
   )
 
   const handlePessoaInputChange = useCallback((event) => {
@@ -451,12 +640,15 @@ export function useAcidenteForm({
     setPessoaSearchError(null)
     setForm((prev) => ({
       ...prev,
+      pessoaId: '',
       matricula: '',
       nome: '',
       cargo: '',
       centroServico: '',
+      centroServicoId: '',
       setor: '',
       local: '',
+      localId: '',
     }))
     if (value.trim().length >= PESSOA_SEARCH_MIN_CHARS) {
       setPessoaDropdownOpen(true)
@@ -492,15 +684,16 @@ export function useAcidenteForm({
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
       setEditingAcidente(acidente)
-      const lesoesSelecionadas =
-        Array.isArray(acidente.lesoes) && acidente.lesoes.length
-          ? acidente.lesoes.slice()
-          : acidente.lesao
-            ? [acidente.lesao]
-            : []
-      const agentesSelecionados = parseList(acidente.agentes?.length ? acidente.agentes : acidente.agente)
-      const tiposSelecionados = parseList(acidente.tipos?.length ? acidente.tipos : acidente.tipo)
+      const centroServicoBase = acidente.centroServico || acidente.setor || ''
+      const centroServicoId =
+        acidente.centroServicoId || resolveCentroServicoId(centroServicoBase) || ''
+      const localNome = resolveLocalDisponivel(acidente.local || centroServicoBase)
+      const localId = acidente.localId || resolveLocalId(localNome) || ''
+      const classificacoesAgentes = Array.isArray(acidente.classificacoesAgentes)
+        ? acidente.classificacoesAgentes.slice()
+        : []
       setForm({
+        pessoaId: acidente.pessoaId || acidente.peopleId || '',
         matricula: acidente.matricula || '',
         nome: acidente.nome || '',
         cargo: acidente.cargo || '',
@@ -508,23 +701,30 @@ export function useAcidenteForm({
         diasPerdidos: acidente.diasPerdidos !== null && acidente.diasPerdidos !== undefined ? String(acidente.diasPerdidos) : '',
         diasDebitados:
           acidente.diasDebitados !== null && acidente.diasDebitados !== undefined ? String(acidente.diasDebitados) : '',
-        tipo: tiposSelecionados.join('; '),
-        tipos: tiposSelecionados,
-        agente: agentesSelecionados[agentesSelecionados.length - 1] || '',
-        agentes: agentesSelecionados,
+        tipo: '',
+        tipos: [],
+        tiposIds: [],
+        agente: '',
+        agentes: [],
+        agenteId: '',
+        classificacoesAgentes,
         cid: acidente.cid || '',
-        lesao: lesoesSelecionadas[0] || '',
-        lesoes: lesoesSelecionadas,
+        lesao: '',
+        lesoes: [],
+        lesoesIds: [],
         parteLesionada: acidente.parteLesionada || '',
-        centroServico: acidente.centroServico || acidente.setor || '',
-        setor: acidente.centroServico || acidente.setor || '',
-        local: resolveLocalDisponivel(acidente.local || acidente.centroServico || ''),
+        centroServico: centroServicoBase,
+        centroServicoId,
+        setor: centroServicoBase,
+        local: localNome,
+        localId,
         partesLesionadas:
           Array.isArray(acidente.partesLesionadas) && acidente.partesLesionadas.length
             ? acidente.partesLesionadas.slice()
             : acidente.parteLesionada
               ? [acidente.parteLesionada]
               : [],
+        partesIds: Array.isArray(acidente.partesIds) ? acidente.partesIds.slice() : [],
         cat: acidente.cat || '',
         observacao: acidente.observacao || '',
         dataEsocial: acidente.dataEsocial || '',
@@ -543,7 +743,7 @@ export function useAcidenteForm({
       setTipoOpcoes([])
       setTiposError(null)
     },
-    [pessoasPorMatricula, resolveLocalDisponivel],
+    [pessoasPorMatricula, resolveCentroServicoId, resolveLocalDisponivel, resolveLocalId],
   )
 
   useEffect(() => {
@@ -604,7 +804,7 @@ export function useAcidenteForm({
       event.preventDefault()
       setFormError(null)
 
-      const validationError = validateAcidenteForm(form)
+      const validationError = validateAcidenteForm(form, acidentes, editingAcidente?.id ?? null)
       if (validationError) {
         setFormError(validationError)
         return
@@ -634,7 +834,7 @@ export function useAcidenteForm({
         setIsSaving(false)
       }
     },
-    [editingAcidente, form, onError, onSaved, resetForm, user],
+    [acidentes, editingAcidente, form, onError, onSaved, resetForm, user],
   )
 
   useEffect(() => {
@@ -654,16 +854,30 @@ export function useAcidenteForm({
       try {
         const data = await listCentrosServico()
         if (cancelado) return
+        const lista = (Array.isArray(data) ? data : [])
+          .map((item) => {
+            const nome = normalizeText(item?.nome || item?.label || '')
+            if (!nome) {
+              return null
+            }
+            return {
+              id: item?.id ?? null,
+              nome,
+              label: normalizeText(item?.label || nome) || nome,
+            }
+          })
+          .filter(Boolean)
         const mapa = new Map()
-        ;(Array.isArray(data) ? data : []).forEach((item) => {
-          const nome = normalizeText(item?.nome || item?.label || '')
-          if (nome && item?.id) {
-            mapa.set(normalizeCentroKey(nome), item.id)
+        lista.forEach((item) => {
+          if (item?.id) {
+            mapa.set(normalizeLookupKey(item.nome), item.id)
           }
         })
+        setCentrosServicoOptions(lista)
         setCentrosServicoMap(mapa)
       } catch {
         if (cancelado) return
+        setCentrosServicoOptions([])
         setCentrosServicoMap(new Map())
       }
     }
@@ -671,11 +885,11 @@ export function useAcidenteForm({
     return () => {
       cancelado = true
     }
-  }, [normalizeCentroKey])
+  }, [normalizeLookupKey])
 
   useEffect(() => {
     // HHT não é mais preenchido no formulário; taxas são calculadas no dashboard usando hht_mensal.
-  }, [centrosServicoMap, form.centroServico, form.data, normalizeCentroKey])
+  }, [centrosServicoMap, form.centroServico, form.data, normalizeLookupKey])
 
   return {
     form,

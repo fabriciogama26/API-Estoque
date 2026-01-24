@@ -88,25 +88,121 @@ const normalizeBooleanValue = (value) => {
   return Boolean(value)
 }
 
+const normalizeTextValue = (value) => {
+  if (value === undefined || value === null) {
+    return ''
+  }
+  return String(value).trim()
+}
+
+const normalizeCatValue = (value) => normalizeTextValue(value).replace(/\s+/g, '')
+
+const normalizeCidValue = (value) => normalizeTextValue(value).replace(/\s+/g, '').toUpperCase()
+
+const hasDuplicateAcidenteField = (acidentes, field, value, editingId) => {
+  if (!value) {
+    return false
+  }
+  const lista = Array.isArray(acidentes) ? acidentes : []
+  return lista.some((acidente) => {
+    if (!acidente || !acidente.id) {
+      return false
+    }
+    if (editingId && acidente.id === editingId) {
+      return false
+    }
+    const raw = acidente[field] ?? ''
+    return value === raw
+  })
+}
+
+const buildClassificacoesAgentes = (input) => {
+  const lista = Array.isArray(input) ? input : []
+  const agentesIds = []
+  const tiposIds = []
+  const lesoesIds = []
+  const agentesNomes = []
+  const tiposNomes = []
+  const lesoesNomes = []
+  const agentesSet = new Set()
+  const tiposSet = new Set()
+  const lesoesSet = new Set()
+
+  lista.forEach((item) => {
+    if (!item || typeof item !== 'object') {
+      return
+    }
+    const agenteId = normalizeTextValue(item.agenteId ?? item.agente_id)
+    const agenteNome = normalizeTextValue(item.agenteNome ?? item.agente_nome ?? item.agente)
+    if (!agenteId && !agenteNome) {
+      return
+    }
+    agentesIds.push(agenteId || null)
+    tiposIds.push(normalizeTextValue(item.tipoId ?? item.tipo_id) || null)
+    lesoesIds.push(normalizeTextValue(item.lesaoId ?? item.lesao_id) || null)
+
+    if (agenteNome) {
+      const chave = agenteNome.toLowerCase()
+      if (!agentesSet.has(chave)) {
+        agentesSet.add(chave)
+        agentesNomes.push(agenteNome)
+      }
+    }
+    const tipoNome = normalizeTextValue(item.tipoNome ?? item.tipo_nome ?? item.tipo)
+    if (tipoNome) {
+      const chave = tipoNome.toLowerCase()
+      if (!tiposSet.has(chave)) {
+        tiposSet.add(chave)
+        tiposNomes.push(tipoNome)
+      }
+    }
+    const lesaoNome = normalizeTextValue(item.lesaoNome ?? item.lesao_nome ?? item.lesao)
+    if (lesaoNome) {
+      const chave = lesaoNome.toLowerCase()
+      if (!lesoesSet.has(chave)) {
+        lesoesSet.add(chave)
+        lesoesNomes.push(lesaoNome)
+      }
+    }
+  })
+
+  return {
+    agentesIds,
+    tiposIds,
+    lesoesIds,
+    agentesNomes,
+    tiposNomes,
+    lesoesNomes,
+    lista,
+  }
+}
+
 export function resolveUsuarioNome(user) {
   return user?.name || user?.username || user?.email || 'sistema'
 }
 
-export function validateAcidenteForm(form) {
+export function validateAcidenteForm(form, acidentes = [], editingId = null) {
   const centroServico = form.centroServico?.trim() || form.setor?.trim() || ''
   const local = form.local?.trim() || ''
-  const lesoesSelecionadas = Array.isArray(form.lesoes)
-    ? form.lesoes.filter((item) => item && item.trim())
-    : form.lesao
-    ? [form.lesao.trim()]
-    : []
-  const partesSelecionadas = Array.isArray(form.partesLesionadas)
-    ? form.partesLesionadas.filter((item) => item && item.trim())
-    : form.parteLesionada
-    ? [form.parteLesionada.trim()]
-    : []
-  const agentesSelecionados = collectTextList(form.agentes, form.agente)
-  const tiposSelecionados = collectTextList(form.tipos, form.tipo)
+  const classificacoes = Array.isArray(form.classificacoesAgentes) ? form.classificacoesAgentes : []
+  const classificacoesValidas = classificacoes.filter((item) => {
+    const agenteId = normalizeTextValue(item?.agenteId ?? item?.agente_id)
+    return Boolean(agenteId)
+  })
+  const temTipoOuLesao = classificacoesValidas.some((item) => {
+    const tipo = normalizeTextValue(item?.tipoId ?? item?.tipo_id ?? item?.tipoNome ?? item?.tipo_nome ?? item?.tipo)
+    const lesao = normalizeTextValue(item?.lesaoId ?? item?.lesao_id ?? item?.lesaoNome ?? item?.lesao_nome ?? item?.lesao)
+    return Boolean(tipo || lesao)
+  })
+  const partesSelecionadas =
+    Array.isArray(form.partesIds) && form.partesIds.length
+      ? form.partesIds.filter(Boolean)
+      : Array.isArray(form.partesLesionadas)
+      ? form.partesLesionadas.filter((item) => item && item.trim())
+      : form.parteLesionada
+      ? [form.parteLesionada.trim()]
+      : []
+  const agentesSelecionados = classificacoesValidas.length ? classificacoesValidas : []
 
   if (!form.nome.trim()) {
     return 'Informe o nome do colaborador.'
@@ -123,14 +219,11 @@ export function validateAcidenteForm(form) {
   if (!normalizeDateTimeValue(form.data)) {
     return 'Informe uma data valida para o acidente.'
   }
-  if (!tiposSelecionados.length) {
-    return 'Informe ao menos um tipo do acidente.'
-  }
   if (!agentesSelecionados.length) {
     return 'Informe ao menos um agente do acidente.'
   }
-  if (lesoesSelecionadas.length === 0) {
-    return 'Informe ao menos uma lesao.'
+  if (!temTipoOuLesao) {
+    return 'Informe ao menos um tipo ou lesao.'
   }
   if (partesSelecionadas.length === 0) {
     return 'Informe ao menos uma parte lesionada.'
@@ -173,6 +266,38 @@ export function validateAcidenteForm(form) {
     return 'CAT deve conter apenas numeros inteiros.'
   }
 
+  const catNormalizado = normalizeCatValue(form.cat)
+  if (catNormalizado) {
+    const catDuplicado = hasDuplicateAcidenteField(
+      acidentes.map((acidente) => ({
+        ...acidente,
+        catNormalized: normalizeCatValue(acidente.cat ?? acidente.cat_number ?? ''),
+      })),
+      'catNormalized',
+      catNormalizado,
+      editingId,
+    )
+    if (catDuplicado) {
+      return 'CAT ja cadastrada em outro acidente.'
+    }
+  }
+
+  const cidNormalizado = normalizeCidValue(form.cid)
+  if (cidNormalizado) {
+    const cidDuplicado = hasDuplicateAcidenteField(
+      acidentes.map((acidente) => ({
+        ...acidente,
+        cidNormalized: normalizeCidValue(acidente.cid ?? acidente.cid_code ?? ''),
+      })),
+      'cidNormalized',
+      cidNormalizado,
+      editingId,
+    )
+    if (cidDuplicado) {
+      return 'CID ja cadastrado em outro acidente.'
+    }
+  }
+
   return null
 }
 
@@ -184,6 +309,29 @@ const sanitizeCentroServico = (value) => {
 export function createAcidentePayload(form, usuarioCadastro) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
   const local = form.local?.trim() || centroServico
+  const pessoaId = form.pessoaId || null
+  const centroServicoId = form.centroServicoId || null
+  const localId = form.localId || null
+  const classificacoesInfo = buildClassificacoesAgentes(form.classificacoesAgentes)
+  const agenteId = classificacoesInfo.agentesIds.find(Boolean) || form.agenteId || null
+  const agentesIds = classificacoesInfo.agentesIds.length
+    ? classificacoesInfo.agentesIds
+    : Array.isArray(form.agenteId)
+    ? form.agenteId
+    : form.agenteId
+    ? [form.agenteId]
+    : []
+  const tiposIds = classificacoesInfo.tiposIds.length
+    ? classificacoesInfo.tiposIds
+    : Array.isArray(form.tiposIds)
+    ? form.tiposIds.filter(Boolean)
+    : []
+  const lesoesIds = classificacoesInfo.lesoesIds.length
+    ? classificacoesInfo.lesoesIds
+    : Array.isArray(form.lesoesIds)
+    ? form.lesoesIds.filter(Boolean)
+    : []
+  const partesIds = Array.isArray(form.partesIds) ? form.partesIds.filter(Boolean) : []
   const lesoes = []
   const addLesao = (valor) => {
     const nome = (valor ?? '').trim()
@@ -196,12 +344,21 @@ export function createAcidentePayload(form, usuarioCadastro) {
     }
     lesoes.push(nome)
   }
+  if (classificacoesInfo.lesoesNomes.length) {
+    classificacoesInfo.lesoesNomes.forEach(addLesao)
+  }
   if (Array.isArray(form.lesoes)) {
     form.lesoes.forEach(addLesao)
   }
   addLesao(form.lesao)
-  const agentesSelecionados = collectTextList(form.agentes, form.agente)
-  const tiposSelecionados = collectTextList(form.tipos, form.tipo)
+  const agentesSelecionados =
+    classificacoesInfo.agentesNomes.length > 0
+      ? classificacoesInfo.agentesNomes
+      : collectTextList(form.agentes, form.agente)
+  const tiposSelecionados =
+    classificacoesInfo.tiposNomes.length > 0
+      ? classificacoesInfo.tiposNomes
+      : collectTextList(form.tipos, form.tipo)
   const agentePrincipal = agentesSelecionados[agentesSelecionados.length - 1] ?? ''
   const tipoPrincipal = tiposSelecionados[0] ?? ''
   const partes = Array.isArray(form.partesLesionadas)
@@ -216,6 +373,7 @@ export function createAcidentePayload(form, usuarioCadastro) {
   const dataSesmt = normalizeDateTimeValue(form.dataSesmt)
 
   return {
+    pessoaId,
     matricula: form.matricula.trim(),
     nome: form.nome.trim(),
     cargo: form.cargo.trim(),
@@ -234,9 +392,17 @@ export function createAcidentePayload(form, usuarioCadastro) {
     centroServico,
     setor: centroServico,
     local,
+    centroServicoId,
+    localId,
+    agenteId,
+    agentesIds,
+    tiposIds,
+    lesoesIds,
+    partesIds,
     cat: form.cat.trim(),
     observacao,
     usuarioCadastro,
+    classificacoesAgentes: Array.isArray(form.classificacoesAgentes) ? form.classificacoesAgentes : [],
     dataEsocial,
     sesmt,
     dataSesmt,
@@ -246,6 +412,29 @@ export function createAcidentePayload(form, usuarioCadastro) {
 export function updateAcidentePayload(form, usuarioResponsavel) {
   const centroServico = sanitizeCentroServico(form.centroServico || form.setor)
   const local = form.local?.trim() || centroServico
+  const pessoaId = form.pessoaId || null
+  const centroServicoId = form.centroServicoId || null
+  const localId = form.localId || null
+  const classificacoesInfo = buildClassificacoesAgentes(form.classificacoesAgentes)
+  const agenteId = classificacoesInfo.agentesIds.find(Boolean) || form.agenteId || null
+  const agentesIds = classificacoesInfo.agentesIds.length
+    ? classificacoesInfo.agentesIds
+    : Array.isArray(form.agenteId)
+    ? form.agenteId
+    : form.agenteId
+    ? [form.agenteId]
+    : []
+  const tiposIds = classificacoesInfo.tiposIds.length
+    ? classificacoesInfo.tiposIds
+    : Array.isArray(form.tiposIds)
+    ? form.tiposIds.filter(Boolean)
+    : []
+  const lesoesIds = classificacoesInfo.lesoesIds.length
+    ? classificacoesInfo.lesoesIds
+    : Array.isArray(form.lesoesIds)
+    ? form.lesoesIds.filter(Boolean)
+    : []
+  const partesIds = Array.isArray(form.partesIds) ? form.partesIds.filter(Boolean) : []
   const lesoes = []
   const addLesao = (valor) => {
     const nome = (valor ?? '').trim()
@@ -258,12 +447,21 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     }
     lesoes.push(nome)
   }
+  if (classificacoesInfo.lesoesNomes.length) {
+    classificacoesInfo.lesoesNomes.forEach(addLesao)
+  }
   if (Array.isArray(form.lesoes)) {
     form.lesoes.forEach(addLesao)
   }
   addLesao(form.lesao)
-  const agentesSelecionados = collectTextList(form.agentes, form.agente)
-  const tiposSelecionados = collectTextList(form.tipos, form.tipo)
+  const agentesSelecionados =
+    classificacoesInfo.agentesNomes.length > 0
+      ? classificacoesInfo.agentesNomes
+      : collectTextList(form.agentes, form.agente)
+  const tiposSelecionados =
+    classificacoesInfo.tiposNomes.length > 0
+      ? classificacoesInfo.tiposNomes
+      : collectTextList(form.tipos, form.tipo)
   const agentePrincipal = agentesSelecionados[agentesSelecionados.length - 1] ?? ''
   const tipoPrincipal = tiposSelecionados[0] ?? ''
   const partes = Array.isArray(form.partesLesionadas)
@@ -278,6 +476,7 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
   const dataSesmt = normalizeDateTimeValue(form.dataSesmt)
 
   return {
+    pessoaId,
     matricula: form.matricula.trim(),
     nome: form.nome.trim(),
     cargo: form.cargo.trim(),
@@ -296,9 +495,17 @@ export function updateAcidentePayload(form, usuarioResponsavel) {
     centroServico,
     setor: centroServico,
     local,
+    centroServicoId,
+    localId,
+    agenteId,
+    agentesIds,
+    tiposIds,
+    lesoesIds,
+    partesIds,
     cat: form.cat.trim(),
     observacao,
     usuarioResponsavel,
+    classificacoesAgentes: Array.isArray(form.classificacoesAgentes) ? form.classificacoesAgentes : [],
     dataEsocial,
     sesmt,
     dataSesmt,

@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { formatDateTimeLabel, normalizeText } from '../../../utils/acidentesUtils.js'
 import { formatPessoaDetail, formatPessoaSummary } from '../../../utils/saidasUtils.js'
 import { AcidentesFormAgentes } from './AcidentesFormAgentes.jsx'
-import { AcidentesFormLesoes } from './AcidentesFormLesoes.jsx'
 import { AcidentesFormPartes } from './AcidentesFormPartes.jsx'
 
 export function AcidentesForm({
@@ -72,21 +71,69 @@ export function AcidentesForm({
   const dataEsocialLabel = form.dataEsocial ? formatDateTimeLabel(form.dataEsocial) : ''
   const dataSesmtLabel = form.dataSesmt ? formatDateTimeLabel(form.dataSesmt) : ''
 
-  const centroServicoOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([...(centrosServico || []), form.centroServico].map(normalizeText).filter(Boolean)),
-      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [centrosServico, form.centroServico],
-  )
+  const centroServicoOptions = useMemo(() => {
+    const map = new Map()
+    const addOption = (item) => {
+      if (!item) {
+        return
+      }
+      if (typeof item === 'string') {
+        const nome = normalizeText(item)
+        if (!nome) {
+          return
+        }
+        if (!map.has(nome)) {
+          map.set(nome, { value: nome, label: nome, nome, id: null })
+        }
+        return
+      }
+      const nome = normalizeText(item.nome ?? item.label ?? item.value)
+      if (!nome) {
+        return
+      }
+      const label = normalizeText(item.label) || nome
+      const id = item.id ?? null
+      const value = String(id ?? nome)
+      if (!map.has(value)) {
+        map.set(value, { value, label, nome, id })
+      }
+    }
+    ;(centrosServico || []).forEach(addOption)
+    addOption({ id: form.centroServicoId, nome: form.centroServico || form.centroServicoId })
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [centrosServico, form.centroServico, form.centroServicoId])
 
-  const localOptions = useMemo(
-    () =>
-      Array.from(new Set([...(locais || []), form.local].map(normalizeText).filter(Boolean))).sort(
-        (a, b) => a.localeCompare(b, 'pt-BR'),
-      ),
-    [locais, form.local],
-  )
+  const localOptions = useMemo(() => {
+    const map = new Map()
+    const addOption = (item) => {
+      if (!item) {
+        return
+      }
+      if (typeof item === 'string') {
+        const nome = normalizeText(item)
+        if (!nome) {
+          return
+        }
+        if (!map.has(nome)) {
+          map.set(nome, { value: nome, label: nome, nome, id: null })
+        }
+        return
+      }
+      const nome = normalizeText(item.nome ?? item.label ?? item.value)
+      if (!nome) {
+        return
+      }
+      const label = normalizeText(item.label) || nome
+      const id = item.id ?? null
+      const value = String(id ?? nome)
+      if (!map.has(value)) {
+        map.set(value, { value, label, nome, id })
+      }
+    }
+    ;(locais || []).forEach(addOption)
+    addOption({ id: form.localId, nome: form.local || form.localId })
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [locais, form.local, form.localId])
 
   const matriculaPlaceholder = isLoadingPessoas
     ? 'Carregando colaboradores...'
@@ -98,6 +145,9 @@ export function AcidentesForm({
 
   const shouldDisableCentroServico = isLoadingPessoas && centroServicoOptions.length === 0
   const shouldDisableLocal = isLoadingLocais && localOptions.length === 0
+
+  const centroServicoValue = form.centroServicoId || form.centroServico
+  const localValue = form.localId || form.local
 
   return (
     <section className="card">
@@ -203,16 +253,16 @@ export function AcidentesForm({
                 Centro de servico <span className="asterisco">*</span>
               </span>
               <select
-                name="centroServico"
-                value={form.centroServico}
+                name="centroServicoId"
+                value={centroServicoValue}
                 onChange={onChange}
                 required
                 disabled={shouldDisableCentroServico}
               >
                 <option value="">{centroServicoPlaceholder}</option>
                 {centroServicoOptions.map((centro) => (
-                  <option key={centro} value={centro}>
-                    {centro}
+                  <option key={centro.value} value={centro.value}>
+                    {centro.label}
                   </option>
                 ))}
               </select>
@@ -222,16 +272,16 @@ export function AcidentesForm({
                 Local <span className="asterisco">*</span>
               </span>
               <select
-                name="local"
-                value={form.local}
+                name="localId"
+                value={localValue}
                 onChange={onChange}
                 required
                 disabled={shouldDisableLocal}
               >
                 <option value="">{localPlaceholder}</option>
                 {localOptions.map((local) => (
-                  <option key={local} value={local}>
-                    {local}
+                  <option key={local.value} value={local.value}>
+                    {local.label}
                   </option>
                 ))}
               </select>
@@ -299,36 +349,32 @@ export function AcidentesForm({
 
         <div className="acidentes-form__section">
           <div className="acidentes-form__section-header">
-            <h3>Classificacao</h3>
-            <small className="field__hint">Selecione agente primeiro para carregar tipos e lesoes.</small>
+            <h3>Classificacao Agentes</h3>
+            <small className="field__hint">Selecione agente e classifique tipos/lesoes antes de incluir.</small>
           </div>
-          <div className="acidentes-form__grid acidentes-form__grid--four">
-            <AcidentesFormAgentes
-              form={form}
-              onChange={onChange}
-              agentes={agentes}
-              isLoadingAgentes={isLoadingAgentes}
-              tipos={tipos}
-              isLoadingTipos={isLoadingTipos}
-              inline
-            />
+          <AcidentesFormAgentes
+            form={form}
+            onChange={onChange}
+            agentes={agentes}
+            isLoadingAgentes={isLoadingAgentes}
+            tipos={tipos}
+            isLoadingTipos={isLoadingTipos}
+            lesoes={lesoes}
+            isLoadingLesoes={isLoadingLesoes}
+            inline
+          />
+        </div>
 
-            <AcidentesFormLesoes
-              form={form}
-              onChange={onChange}
-              lesoes={lesoes}
-              isLoadingLesoes={isLoadingLesoes}
-              inline
-            />
-
-            <AcidentesFormPartes
-              form={form}
-              onChange={onChange}
-              partes={partes}
-              isLoadingPartes={isLoadingPartes}
-              inline
-            />
+        <div className="acidentes-form__section">
+          <div className="acidentes-form__section-header">
+            <h3>Classificacao Partes lesionadas</h3>
           </div>
+          <AcidentesFormPartes
+            form={form}
+            onChange={onChange}
+            partes={partes}
+            isLoadingPartes={isLoadingPartes}
+          />
         </div>
 
         <div className="acidentes-form__section">

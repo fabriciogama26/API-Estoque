@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+﻿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
 import {
   montarEstoqueAtual,
@@ -149,10 +149,8 @@ const ACIDENTE_HISTORY_FIELDS = [
   'dataSesmt',
   'tipo',
   'agente',
-  'lesao',
   'lesoes',
   'partesLesionadas',
-  'parteLesionada',
   'centroServico',
   'local',
   'diasPerdidos',
@@ -388,6 +386,39 @@ const normalizeUuid = (value) => {
 const toUuidOrNull = (value) => normalizeUuid(value) ?? null
 const toUuidArrayOrEmpty = (arr) =>
   Array.isArray(arr) ? arr.map((item) => toUuidOrNull(item)).filter(Boolean) : []
+const toUuidArrayOrNulls = (arr) =>
+  Array.isArray(arr) ? arr.map((item) => normalizeUuid(item) ?? null) : []
+
+const normalizeClassificacoesPayload = (payload = {}) => {
+  const lista = Array.isArray(payload.classificacoesAgentes) ? payload.classificacoesAgentes : []
+  if (!lista.length) {
+    return null
+  }
+  const agentesIds = []
+  const tiposIds = []
+  const lesoesIds = []
+  lista.forEach((item) => {
+    if (!item || typeof item !== 'object') {
+      return
+    }
+    agentesIds.push(normalizeUuid(item.agenteId ?? item.agente_id) ?? null)
+    tiposIds.push(normalizeUuid(item.tipoId ?? item.tipo_id) ?? null)
+    lesoesIds.push(normalizeUuid(item.lesaoId ?? item.lesao_id) ?? null)
+  })
+  return {
+    agentesIds,
+    tiposIds,
+    lesoesIds,
+  }
+}
+
+const padArrayToLength = (arr, length) => {
+  const lista = Array.isArray(arr) ? arr.slice(0, length) : []
+  while (lista.length < length) {
+    lista.push(null)
+  }
+  return lista
+}
 
 const resolvePreflightOwnerId = (effective) => {
   if (!effective) {
@@ -1639,7 +1670,17 @@ function mapSupabaseError(error, fallbackMessage = GENERIC_ERROR) {
   if (!error) {
     return new Error(fallbackMessage)
   }
-  const err = new Error(error.message || fallbackMessage)
+  const rawMessage = error.message || fallbackMessage
+  const rawDetails = error.details || ''
+  const rawHint = error.hint || ''
+  const combined = `${rawMessage} ${rawDetails} ${rawHint}`.toLowerCase()
+  if (combined.includes('acidente_cat_duplicate') || combined.includes('accidents_unique_cat_per_owner')) {
+    return new Error('CAT ja cadastrada em outro acidente.')
+  }
+  if (combined.includes('acidente_cid_duplicate') || combined.includes('accidents_unique_cid_per_owner')) {
+    return new Error('CID ja cadastrado em outro acidente.')
+  }
+  const err = new Error(rawMessage)
   err.code = error.code
   err.hint = error.hint
   err.details = error.details
@@ -2523,62 +2564,190 @@ function mapAcidenteRecord(record) {
   if (!record) {
     return null
   }
-  const centroServico = resolveTextValue(
-    record.centroServico ?? record.centro_servico ?? record.setor ?? '',
+  const agentesIds = toUuidArrayOrNulls(record.agentes_ids ?? record.agentesIds ?? [])
+  const tiposIds = toUuidArrayOrNulls(record.tipos_ids ?? record.tiposIds ?? record.tipos_ids)
+  const lesoesIds = toUuidArrayOrNulls(record.lesoes_ids ?? record.lesoesIds ?? record.lesoes_ids)
+  const partesIds = toUuidArrayOrEmpty(record.partes_ids ?? record.partesIds ?? record.partes_ids)
+
+  const tiposNomesBase = normalizeStringArray(
+    record.tipos_nomes ?? record.tiposNomes ?? record.tipos ?? [],
   )
-  const partes = normalizeStringArray(record.partes_lesionadas ?? record.partesLesionadas ?? [])
-  const partePrincipal = partes.length
-    ? partes[0]
-    : trim(record.parteLesionada ?? record.parte_lesionada ?? '')
-  let lesoes = normalizeStringArray(record.lesoes ?? record.lesoesRegistradas ?? [])
-  if (!lesoes.length) {
-    const unica = trim(record.lesao ?? '')
+  const tiposNomes = tiposNomesBase.length
+    ? tiposNomesBase
+    : splitMultiValue(record.tipo ?? record.tipos ?? '')
+
+  const lesoesNomesBase = normalizeStringArray(
+    record.lesoes_nomes ?? record.lesoesNomes ?? record.lesoes ?? [],
+  )
+  let lesoesNomes = lesoesNomesBase.length ? lesoesNomesBase : []
+  if (!lesoesNomes.length) {
+    const unica = trim(record.lesao ?? record.lesao_nome ?? '')
     if (unica) {
-      lesoes = [unica]
+      lesoesNomes = [unica]
     }
   }
-  const lesaoPrincipal = lesoes[0] ?? ''
-  const tiposLista = splitMultiValue(record.tipos ?? record.tipo ?? '')
-  const tiposTexto = tiposLista.join('; ')
-  const agentesLista = splitMultiValue(record.agentes ?? record.agente ?? '')
-  const agentesTexto = agentesLista.join('; ')
-  const agentePrincipalRegistro = trim(record.agentePrincipal ?? record.agente_principal ?? '')
-  const agentePrincipal =
-    agentePrincipalRegistro || (agentesLista.length ? agentesLista[agentesLista.length - 1] : '')
+
+  const agentesNomesBase = normalizeStringArray(
+    record.agentes_nomes ?? record.agentesNomes ?? record.agentes ?? [],
+  )
+
+  const partesNomesBase = normalizeStringArray(
+    record.partes_nomes ?? record.partesNomes ?? record.partesLesionadas ?? record.partes_lesionadas ?? [],
+  )
+  let partesNomes = partesNomesBase.length ? partesNomesBase : []
+  if (!partesNomes.length) {
+    const unica = trim(record.parteLesionada ?? record.parte_lesionada ?? '')
+    if (unica) {
+      partesNomes = [unica]
+    }
+  }
+
+  const agenteNome = resolveTextValue(record.agente_nome ?? record.agenteNome ?? record.agente ?? '')
+  let agentesLista = agentesNomesBase.length
+    ? agentesNomesBase.slice()
+    : normalizeStringArray(record.agentes ?? (agenteNome ? [agenteNome] : []))
+  if (!agentesLista.length && agenteNome) {
+    agentesLista = [agenteNome]
+  }
+
+  let agentesIdsResolvidos = agentesIds
+  if (!agentesIdsResolvidos.length) {
+    const agenteIdFallback = normalizeUuid(record.agente_id ?? record.agenteId)
+    if (agenteIdFallback) {
+      const total = Math.max(tiposIds.length, lesoesIds.length, tiposNomes.length, lesoesNomes.length, 1)
+      agentesIdsResolvidos = Array.from({ length: total }, () => agenteIdFallback)
+    }
+  }
+  let agentesNomesResolvidos = agentesNomesBase
+  if (!agentesNomesResolvidos.length && agenteNome) {
+    const total = Math.max(
+      agentesIdsResolvidos.length,
+      tiposIds.length,
+      lesoesIds.length,
+      tiposNomes.length,
+      lesoesNomes.length,
+      1,
+    )
+    agentesNomesResolvidos = Array.from({ length: total }, () => agenteNome)
+  }
+
+  const totalClassificacoes = Math.max(
+    agentesIdsResolvidos.length,
+    agentesNomesResolvidos.length,
+    tiposIds.length,
+    tiposNomes.length,
+    lesoesIds.length,
+    lesoesNomes.length,
+  )
+  const classificacoesAgentes = []
+  for (let index = 0; index < totalClassificacoes; index += 1) {
+    const agenteId = agentesIdsResolvidos[index] ?? null
+    const agenteNomeRow = agentesNomesResolvidos[index] ?? ''
+    const tipoId = tiposIds[index] ?? null
+    const tipoNomeRow = tiposNomes[index] ?? ''
+    const lesaoId = lesoesIds[index] ?? null
+    const lesaoNomeRow = lesoesNomes[index] ?? ''
+    if (agenteId || agenteNomeRow || tipoId || tipoNomeRow || lesaoId || lesaoNomeRow) {
+      classificacoesAgentes.push({
+        agenteId,
+        agenteNome: agenteNomeRow,
+        tipoId,
+        tipoNome: tipoNomeRow,
+        lesaoId,
+        lesaoNome: lesaoNomeRow,
+      })
+    }
+  }
+
+  const uniqueByLower = (lista) => {
+    const seen = new Set()
+    return lista.filter((item) => {
+      const texto = trim(item)
+      if (!texto) {
+        return false
+      }
+      const chave = texto.toLowerCase()
+      if (seen.has(chave)) {
+        return false
+      }
+      seen.add(chave)
+      return true
+    })
+  }
+
+  const agentesUnicos = uniqueByLower(
+    classificacoesAgentes.map((item) => item.agenteNome).filter(Boolean).length
+      ? classificacoesAgentes.map((item) => item.agenteNome)
+      : agentesLista,
+  )
+  const tiposUnicos = uniqueByLower(tiposNomes)
+  const lesoesUnicas = uniqueByLower(lesoesNomes)
+
+  const tiposTexto = tiposUnicos.join('; ')
+  const agentesTexto = agentesUnicos.length ? agentesUnicos.join('; ') : agenteNome
+  const agentePrincipal = agenteNome || agentesUnicos[agentesUnicos.length - 1] || ''
+
+  const centroServicoNome = resolveTextValue(
+    record.centro_servico ?? record.centroServico ?? record.setor ?? '',
+  )
+  const localNome = resolveTextValue(record.local ?? record.local_nome ?? '')
   return {
     id: record.id,
+    pessoaId: record.people_id ?? record.pessoa_id ?? null,
     matricula: record.matricula ?? '',
     nome: record.nome ?? '',
     cargo: record.cargo ?? '',
-    data: record.data ?? null,
-    diasPerdidos: toNumber(record.diasPerdidos ?? record.dias_perdidos),
-    diasDebitados: toNumber(record.diasDebitados ?? record.dias_debitados),
+    data: record.data ?? record.accident_date ?? null,
+    diasPerdidos: toNumber(record.dias_perdidos ?? record.diasPerdidos ?? record.lost_days),
+    diasDebitados: toNumber(record.dias_debitados ?? record.diasDebitados ?? record.debited_days),
     tipo: tiposTexto,
-    tipos: tiposLista,
+    tipos: tiposUnicos,
+    tiposIds,
     agente: agentesTexto,
-    agentes: agentesLista,
-    tipoPrincipal: tiposLista[0] ?? '',
+    agentes: agentesUnicos,
+    agenteId: classificacoesAgentes[0]?.agenteId ?? record.agente_id ?? record.agenteId ?? null,
+    agentesIds: agentesIdsResolvidos,
+    agenteNome,
+    tipoPrincipal: tiposNomes[0] ?? '',
     agentePrincipal,
-    cid: record.cid ?? '',
-    lesao: lesaoPrincipal,
-    lesoes,
-    parteLesionada: partePrincipal,
-    partesLesionadas: partes,
-    centroServico,
-    setor: resolveTextValue(record.setor ?? centroServico),
-    local: resolveTextValue(record.local ?? centroServico),
-    cat: record.cat ?? null,
-    observacao: record.observacao ?? '',
-    dataEsocial: record.dataEsocial ?? record.data_esocial ?? null,
-    sesmt: Boolean(record.sesmt ?? record.sesmt_flag ?? false),
-    dataSesmt: record.dataSesmt ?? record.data_sesmt ?? null,
-    criadoEm: record.criadoEm ?? record.criado_em ?? null,
-    atualizadoEm: record.atualizadoEm ?? record.atualizado_em ?? null,
-    registradoPor: record.registradoPor ?? record.registrado_por ?? '',
-    atualizadoPor: record.atualizadoPor ?? record.atualizado_por ?? '',
-    hht: toNullableNumber(record.hht),
-    ativo: record.ativo !== false,
-    cancelMotivo: record.cancel_motivo ?? record.cancelMotivo ?? null,
+    cid: record.cid ?? record.cid_code ?? '',
+    lesao: lesoesUnicas[0] ?? '',
+    lesoes: lesoesUnicas,
+    lesoesIds,
+    parteLesionada: partesNomes[0] ?? '',
+    partesLesionadas: partesNomes,
+    partesIds,
+    centroServico: centroServicoNome,
+    centroServicoId: record.centro_servico_id ?? record.centroServicoId ?? record.service_center ?? null,
+    setor: resolveTextValue(record.setor ?? centroServicoNome),
+    local: localNome || centroServicoNome,
+    localId: record.local_id ?? record.localId ?? record.location_name ?? null,
+    cat: record.cat ?? record.cat_number ?? null,
+    observacao: record.observacao ?? record.notes ?? '',
+    dataEsocial: record.data_esocial ?? record.dataEsocial ?? record.esocial_date ?? null,
+    esocial: Boolean(record.esocial ?? record.esocial_involved ?? false),
+    sesmt: Boolean(record.sesmt ?? record.sesmt_involved ?? false),
+    dataSesmt: record.data_sesmt ?? record.dataSesmt ?? record.sesmt_date ?? null,
+    criadoEm: record.criado_em ?? record.criadoEm ?? record.created_at ?? null,
+    atualizadoEm: record.atualizado_em ?? record.atualizadoEm ?? record.updated_at ?? null,
+    registradoPor:
+      record.registrado_por_nome ??
+      record.registradoPorNome ??
+      record.registrado_por ??
+      record.registradoPor ??
+      record.created_by_username ??
+      '',
+    atualizadoPor:
+      record.atualizado_por_nome ??
+      record.atualizadoPorNome ??
+      record.atualizado_por ??
+      record.atualizadoPor ??
+      record.updated_by_username ??
+      '',
+    hht: toNullableNumber(record.hht_value ?? record.hht),
+    ativo: record.ativo !== false && record.is_active !== false,
+    cancelMotivo: record.cancel_motivo ?? record.cancel_reason ?? record.cancelMotivo ?? null,
+    classificacoesAgentes,
   }
 }
 
@@ -2618,12 +2787,12 @@ async function syncAcidentesHht(centroServicoId, mesRef, hhtValor) {
   try {
     await execute(
       supabase
-        .from('acidentes')
-        .update({ hht: valor })
-        .eq('centro_servico', centroServicoId)
-        .gte('data', intervalo.inicio)
-        .lt('data', intervalo.fim)
-        .or('hht.is.null,hht.eq.0'),
+        .from('accidents')
+        .update({ hht_value: valor })
+        .eq('service_center', centroServicoId)
+        .gte('accident_date', intervalo.inicio)
+        .lt('accident_date', intervalo.fim)
+        .or('hht_value.is.null,hht_value.eq.0'),
       'Falha ao vincular HHT aos acidentes.'
     )
   } catch (error) {
@@ -3547,7 +3716,7 @@ async function carregarSaidas(params = {}) {
 
 async function carregarAcidentes() {
   const data = await execute(
-    supabase.from('acidentes').select('*').order('data', { ascending: false }),
+    supabase.from('vw_acidentes').select('*').order('data', { ascending: false }),
     'Falha ao listar acidentes.'
   )
   return (data ?? []).map(mapAcidenteRecord)
@@ -5411,21 +5580,35 @@ export const api = {
       const data = await execute(
         supabase
           .from('acidente_partes')
-          .select('nome, grupo, subgrupo, ativo')
-          .order('grupo', { ascending: true })
-          .order('subgrupo', { ascending: true })
+          .select(
+            `
+              id,
+              nome,
+              ativo,
+              grupo:acidente_partes_grupo(id, nome),
+              subgrupo:acidente_partes_sub_grupo(id, nome)
+            `
+          )
           .order('nome', { ascending: true }),
         'Falha ao listar partes lesionadas.',
       )
       return (data ?? [])
         .filter((item) => item && item.nome && item.ativo !== false)
         .map((item) => {
+          const grupoNome = trim(item?.grupo?.nome ?? '')
+          const subgrupoNome = trim(item?.subgrupo?.nome ?? '')
           const nome = String(item.nome).trim()
-          const label = [item.grupo, item.subgrupo, nome]
+          const label = [grupoNome, subgrupoNome, nome]
             .map((parte) => (parte ? String(parte).trim() : ''))
             .filter(Boolean)
             .join(' / ')
-          return { nome, label: label || nome }
+          return {
+            id: item.id ?? null,
+            nome,
+            label: label || nome,
+            grupoId: item?.grupo?.id ?? null,
+            subgrupoId: item?.subgrupo?.id ?? null,
+          }
         })
     },
 
@@ -5439,7 +5622,7 @@ export const api = {
       const alvoNormalizado = filtrarPorNome ? normalizeAgenteLookupKey(nomeAgente) : ''
       let query = supabase
         .from('acidente_lesoes')
-        .select('agente_id, nome, ativo, agente:acidente_agentes(nome)')
+        .select('id, agente_id, nome, ativo, agente:acidente_agentes(nome)')
         .order('nome', { ascending: true })
       if (agenteId) {
         query = query.eq('agente_id', agenteId)
@@ -5451,6 +5634,7 @@ export const api = {
           const nome = String(item.nome).trim()
           const agente = String(item?.agente?.nome ?? '').trim()
           return {
+            id: item.id ?? null,
             nome,
             agente,
             agenteId: item.agente_id ?? null,
@@ -5479,13 +5663,13 @@ export const api = {
       const alvoNormalizado = filtrarPorNome ? normalizeAgenteLookupKey(nomeAgente) : ''
       let query = supabase
         .from('acidente_tipos')
-        .select('nome, ativo, agente_id, agente:acidente_agentes(nome)')
+        .select('id, nome, ativo, agente_id, agente:acidente_agentes(nome)')
         .order('nome', { ascending: true })
       if (agenteId) {
         query = query.eq('agente_id', agenteId)
       }
       const data = await execute(query, 'Falha ao listar tipos de acidente.')
-      const tipos = new Set()
+      const tipos = new Map()
       ;(data ?? []).forEach((item) => {
         if (!item || item.ativo === false) {
           return
@@ -5495,259 +5679,354 @@ export const api = {
           return
         }
         const tipoNome = String(item.nome ?? '').trim()
-        if (tipoNome) {
-          tipos.add(tipoNome)
+        if (!tipoNome) {
+          return
         }
+        const tipoId = item.id ?? null
+        const chave = tipoId || tipoNome.toLowerCase()
+        if (tipos.has(chave)) {
+          return
+        }
+        tipos.set(chave, {
+          id: tipoId,
+          nome: tipoNome,
+          agente: agenteNome,
+          agenteId: item.agente_id ?? null,
+          label: tipoNome,
+        })
       })
-      return Array.from(tipos).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      return Array.from(tipos.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     },
     async locals() {
       const data = await execute(
         supabase
           .from('acidente_locais')
-          .select('nome, ativo')
+          .select('id, nome, ativo')
           .order('nome', { ascending: true }),
         'Falha ao listar locais de acidente.'
       )
       return (data ?? [])
         .filter((item) => item && item.nome && item.ativo !== false)
-        .map((item) => item.nome.trim())
-        .filter(Boolean)
+        .map((item) => ({
+          id: item.id ?? null,
+          nome: item.nome.trim(),
+        }))
+        .filter((item) => Boolean(item.nome))
     },
     async create(payload) {
-      const partes = normalizeStringArray(payload.partesLesionadas ?? payload.partes_lesionadas ?? [])
-      let lesoes = normalizeStringArray(
-        payload.lesoes ??
-          payload.lesoes_list ??
-          payload.lesoesSelecionadas ??
-          payload.lesoesSelecionada ??
-          [],
+      const pessoaId = normalizeUuid(payload.pessoaId ?? payload.peopleId ?? payload.pessoa_id ?? payload.people_id)
+      let centroServicoId = normalizeUuid(
+        payload.centroServicoId ?? payload.centro_servico_id ?? payload.centroServico_id
       )
-      if (!lesoes.length) {
-        const unica = trim(payload.lesao ?? '')
-        if (unica) {
-          lesoes = [unica]
+      let localId = normalizeUuid(payload.localId ?? payload.local_id)
+      const classificacoesPayload = normalizeClassificacoesPayload(payload)
+      let agentesIds =
+        classificacoesPayload?.agentesIds ?? toUuidArrayOrNulls(payload.agentesIds ?? payload.agentes_ids)
+      let tiposIds =
+        classificacoesPayload?.tiposIds ?? toUuidArrayOrNulls(payload.tiposIds ?? payload.tipos_ids ?? payload.tipos)
+      let lesoesIds =
+        classificacoesPayload?.lesoesIds ?? toUuidArrayOrNulls(payload.lesoesIds ?? payload.lesoes_ids ?? payload.lesoes)
+      const partesIds = toUuidArrayOrEmpty(
+        payload.partesIds ?? payload.partes_ids ?? payload.partesLesionadasIds ?? payload.partes_lesionadas_ids
+      )
+      if (!agentesIds.length) {
+        const agenteFallback = normalizeUuid(payload.agenteId ?? payload.agente_id)
+        if (agenteFallback) {
+          agentesIds = [agenteFallback]
         }
       }
-      const lesaoPrincipal = lesoes[0] ?? ''
-      const partePrincipal = partes[0] ?? trim(payload.parteLesionada)
-      const agentesLista = splitMultiValue(
-        payload.agentes ?? payload.agente ?? '',
-      )
-      const tiposLista = splitMultiValue(payload.tipos ?? payload.tipo ?? '')
-      const agentePrincipal = trim(
-        payload.agentePrincipal ??
-          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
-      )
-      const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
-      const dados = {
-        matricula: trim(payload.matricula),
-        nome: trim(payload.nome),
-        cargo: trim(payload.cargo),
-        tipo: tiposLista.join('; '),
-        tipoPrincipal,
-        agente: agentesLista.join('; '),
-        agentePrincipal,
-        lesao: lesaoPrincipal,
-        lesoes,
-        centroServico: trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
-        local: trim(payload.local) || trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? ''),
-        data: payload.data ? new Date(payload.data).toISOString() : null,
-        diasPerdidos: toNumber(payload.diasPerdidos),
-        diasDebitados: toNumber(payload.diasDebitados),
-        hht: toNullableNumber(payload.hht),
-        cid: trim(payload.cid),
-        cat: trim(payload.cat),
-        observacao: trim(payload.observacao),
-        partesLesionadas: partes,
-        partePrincipal,
-        dataEsocial: payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null,
-        sesmt: Boolean(payload.sesmt),
-        dataSesmt: payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null,
-      }
-      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
-        throw new Error('Preencha os campos obrigatorios do acidente.')
+      const rows = agentesIds.length
+      tiposIds = padArrayToLength(tiposIds, rows)
+      lesoesIds = padArrayToLength(lesoesIds, rows)
+
+      const data = payload.data ? new Date(payload.data).toISOString() : null
+      const dataEsocial = payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null
+      const dataSesmt = payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null
+      const sesmt = Boolean(payload.sesmt)
+      const esocial = payload.esocial !== undefined ? Boolean(payload.esocial) : Boolean(dataEsocial)
+
+      if (!centroServicoId) {
+        const centroNome = trim(payload.centroServico ?? payload.centro_servico ?? payload.setor ?? '')
+        if (centroNome) {
+          centroServicoId = await resolveReferenceId(
+            'centros_servico',
+            centroNome,
+            'Selecione um centro de servico valido.'
+          )
+        }
       }
 
-      const centroServicoIdResolved = await resolveReferenceId(
-        'centros_servico',
-        dados.centroServico,
-        'Selecione um centro de servico valido.'
-      )
-      const mesRef = toMonthRefIso(dados.data)
-      if (!mesRef) {
-        throw new Error('Data do acidente invalida para calcular HHT.')
+      if (!localId) {
+        const localNome = trim(payload.local ?? '')
+        if (localNome) {
+          localId = await resolveReferenceId(
+            'acidente_locais',
+            localNome,
+            'Selecione um local valido.'
+          )
+        }
       }
-      // HHT não é mais persistido no acidente; taxas usam hht_mensal no dashboard.
+
+      if (!pessoaId) {
+        throw new Error('Selecione um colaborador valido.')
+      }
+      if (!agentesIds.length || !agentesIds.some(Boolean)) {
+        throw new Error('Selecione ao menos um agente valido.')
+      }
+      if (agentesIds.some((id) => !id)) {
+        throw new Error('Agente invalido na classificacao.')
+      }
+      if (!tiposIds.some(Boolean) && !lesoesIds.some(Boolean)) {
+        throw new Error('Informe ao menos um tipo ou lesao.')
+      }
+      if (!partesIds.length) {
+        throw new Error('Informe ao menos uma parte lesionada.')
+      }
+      if (!centroServicoId) {
+        throw new Error('Selecione um centro de servico valido.')
+      }
+      if (!localId) {
+        throw new Error('Selecione um local valido.')
+      }
+      if (!data) {
+        throw new Error('Data do acidente obrigatoria.')
+      }
 
       const usuario = await resolveUsuarioResponsavel()
-      await ensureAcidentePartes(partes)
-      await ensureAcidenteLesoes(agentePrincipal, lesoes)
-      const {
-        centroServico: centroServicoDb,
-        partesLesionadas: partesPayload,
-        lesao: _lesaoPrincipal,
-        partePrincipal: _partePrincipal,
-        agentePrincipal: _agentePrincipal,
-        tipoPrincipal: _tipoPrincipal,
-        dataEsocial,
-        sesmt,
-        dataSesmt,
-        ...resto
-      } = dados
       const registro = await executeSingle(
         supabase.rpc('rpc_acidentes_create_full', {
-          p_matricula: resto.matricula,
-          p_nome: resto.nome,
-          p_cargo: resto.cargo,
-          p_data: resto.data,
-          p_dias_perdidos: resto.diasPerdidos,
-          p_dias_debitados: resto.diasDebitados,
-          p_tipo: resto.tipo,
-          p_agente: resto.agente,
-          p_cid: resto.cid,
-          p_centro_servico: centroServicoDb,
-          p_local: resto.local,
-          p_cat: resto.cat,
-          p_observacao: resto.observacao,
-          p_partes_lesionadas: partesPayload,
-          p_lesoes: lesoes,
+          p_pessoa_id: pessoaId,
+          p_data: data,
+          p_dias_perdidos: toNumber(payload.diasPerdidos),
+          p_dias_debitados: toNumber(payload.diasDebitados),
+          p_cid: trim(payload.cid),
+          p_centro_servico_id: centroServicoId,
+          p_local_id: localId,
+          p_cat: trim(payload.cat),
+          p_observacao: trim(payload.observacao),
           p_data_esocial: dataEsocial,
+          p_esocial: esocial,
           p_sesmt: sesmt,
           p_data_sesmt: dataSesmt,
-          p_hht: resto.hht,
+          p_agentes_ids: agentesIds,
+          p_tipos_ids: tiposIds,
+          p_lesoes_ids: lesoesIds,
+          p_partes_ids: partesIds,
           p_registrado_por: usuario,
         }),
         'Falha ao registrar acidente.'
       )
-      return mapAcidenteRecord(registro)
-    },
 
+      const completo = await executeMaybeSingle(
+        supabase.from('vw_acidentes').select('*').eq('id', registro.id).limit(1),
+        'Falha ao obter acidente registrado.'
+      )
+      return mapAcidenteRecord(completo ?? registro)
+    },
     async update(id, payload) {
       if (!id) {
-        throw new Error('ID obrigat?rio.')
+        throw new Error('ID obrigatorio.')
       }
       const atual = await executeSingle(
-        supabase.from('acidentes').select('*').eq('id', id),
+        supabase.from('vw_acidentes').select('*').eq('id', id),
         'Falha ao obter acidente.'
       )
       if (!atual) {
-        throw new Error('Acidente n?o encontrado.')
+        throw new Error('Acidente nao encontrado.')
       }
 
-      const partes = normalizeStringArray(
-        payload.partesLesionadas ?? payload.partes_lesionadas ?? atual.partes_lesionadas ?? [],
+      const atualMap = mapAcidenteRecord(atual)
+      const pessoaId = normalizeUuid(
+        payload.pessoaId ?? payload.peopleId ?? payload.pessoa_id ?? payload.people_id ?? atualMap?.pessoaId
       )
-      let lesoes = normalizeStringArray(
-        payload.lesoes ??
-          payload.lesoes_list ??
-          payload.lesoesSelecionadas ??
-          payload.lesoesSelecionada ??
-          atual.lesoes ??
-          [],
+      let centroServicoId = normalizeUuid(
+        payload.centroServicoId ?? payload.centro_servico_id ?? payload.centroServico_id ?? atualMap?.centroServicoId
       )
-      if (!lesoes.length) {
-        const unica = trim(payload.lesao ?? '')
-        if (unica) {
-          lesoes = [unica]
+      let localId = normalizeUuid(payload.localId ?? payload.local_id ?? atualMap?.localId)
+      const classificacoesPayload = normalizeClassificacoesPayload(payload)
+      let agentesIds =
+        classificacoesPayload?.agentesIds ??
+        toUuidArrayOrNulls(payload.agentesIds ?? payload.agentes_ids ?? atualMap?.agentesIds)
+      let tiposIds =
+        classificacoesPayload?.tiposIds ??
+        toUuidArrayOrNulls(payload.tiposIds ?? payload.tipos_ids ?? payload.tipos ?? atualMap?.tiposIds)
+      let lesoesIds =
+        classificacoesPayload?.lesoesIds ??
+        toUuidArrayOrNulls(payload.lesoesIds ?? payload.lesoes_ids ?? payload.lesoes ?? atualMap?.lesoesIds)
+      const partesIds = toUuidArrayOrEmpty(
+        payload.partesIds ??
+          payload.partes_ids ??
+          payload.partesLesionadasIds ??
+          payload.partes_lesionadas_ids ??
+          atualMap?.partesIds
+      )
+      if (!agentesIds.length) {
+        const agenteFallback = normalizeUuid(payload.agenteId ?? payload.agente_id ?? atualMap?.agenteId)
+        if (agenteFallback) {
+          agentesIds = [agenteFallback]
         }
       }
-      const lesaoPrincipal = lesoes[0] ?? ''
-      const partePrincipal =
-        partes[0] ??
-        trim(payload.parteLesionada ?? atual.parteLesionada ?? atual.parte_lesionada ?? '')
-      const agentesLista = splitMultiValue(
-        payload.agentes ?? payload.agente ?? atual.agentes ?? atual.agente ?? '',
-      )
-      const tiposLista = splitMultiValue(
-        payload.tipos ?? payload.tipo ?? atual.tipos ?? atual.tipo ?? '',
-      )
-      const agentePrincipal = trim(
-        payload.agentePrincipal ??
-          (agentesLista.length ? agentesLista[agentesLista.length - 1] : ''),
-      )
-      const tipoPrincipal = trim(payload.tipoPrincipal ?? tiposLista[0] ?? '')
-      const dados = {
-        matricula: trim(payload.matricula ?? atual.matricula),
-        nome: trim(payload.nome ?? atual.nome),
-        cargo: trim(payload.cargo ?? atual.cargo),
-        tipo: tiposLista.join('; '),
-        tipoPrincipal,
-        agente: agentesLista.join('; '),
-        agentePrincipal,
-        lesao: lesaoPrincipal,
-        lesoes,
-        partesLesionadas: partes,
-        centroServico: trim(payload.centroServico ?? payload.centro_servico ?? atual.centro_servico ?? atual.setor ?? ''),
-        local: trim(payload.local ?? atual.local ?? ''),
-        data: payload.data ? new Date(payload.data).toISOString() : atual.data,
-        diasPerdidos: toNumber(payload.diasPerdidos ?? atual.diasPerdidos ?? atual.dias_perdidos ?? 0),
-        diasDebitados: toNumber(payload.diasDebitados ?? atual.diasDebitados ?? atual.dias_debitados ?? 0),
-        cid: trim(payload.cid ?? atual.cid ?? ''),
-        cat: trim(payload.cat ?? atual.cat ?? ''),
-        observacao: trim(payload.observacao ?? atual.observacao ?? ''),
-        partePrincipal,
-        dataEsocial:
-          payload.dataEsocial !== undefined && payload.dataEsocial !== null
-            ? (payload.dataEsocial ? new Date(payload.dataEsocial).toISOString() : null)
-            : atual.data_esocial ?? atual.dataEsocial ?? null,
-        sesmt:
-          payload.sesmt !== undefined
-            ? Boolean(payload.sesmt)
-            : Boolean(atual.sesmt),
-        dataSesmt:
-          payload.dataSesmt !== undefined && payload.dataSesmt !== null
-            ? (payload.dataSesmt ? new Date(payload.dataSesmt).toISOString() : null)
-            : atual.data_sesmt ?? atual.dataSesmt ?? null,
+      const rows = agentesIds.length
+      tiposIds = padArrayToLength(tiposIds, rows)
+      lesoesIds = padArrayToLength(lesoesIds, rows)
+
+      const data = payload.data ? new Date(payload.data).toISOString() : atualMap?.data
+      const dataEsocial =
+        payload.dataEsocial !== undefined
+          ? payload.dataEsocial
+            ? new Date(payload.dataEsocial).toISOString()
+            : null
+          : atualMap?.dataEsocial
+      const dataSesmt =
+        payload.dataSesmt !== undefined
+          ? payload.dataSesmt
+            ? new Date(payload.dataSesmt).toISOString()
+            : null
+          : atualMap?.dataSesmt
+      const sesmt = payload.sesmt !== undefined ? Boolean(payload.sesmt) : Boolean(atualMap?.sesmt)
+      const esocial = payload.esocial !== undefined ? Boolean(payload.esocial) : Boolean(dataEsocial)
+
+      if (!centroServicoId) {
+        const centroNome = trim(
+          payload.centroServico ?? payload.centro_servico ?? payload.setor ?? atualMap?.centroServico ?? ''
+        )
+        if (centroNome) {
+          centroServicoId = await resolveReferenceId(
+            'centros_servico',
+            centroNome,
+            'Selecione um centro de servico valido.'
+          )
+        }
       }
 
-      if (!dados.matricula || !dados.nome || !dados.cargo || !dados.tipo || !dados.agente || !lesoes.length || !partes.length || !dados.centroServico || !dados.data) {
-        throw new Error('Preencha os campos obrigatorios do acidente.')
+      if (!localId) {
+        const localNomeFallback = trim(payload.local ?? atualMap?.local ?? '')
+        if (localNomeFallback) {
+          localId = await resolveReferenceId(
+            'acidente_locais',
+            localNomeFallback,
+            'Selecione um local valido.'
+          )
+        }
       }
 
-      const centroServicoIdResolved = await resolveReferenceId(
-        'centros_servico',
-        dados.centroServico,
-        'Selecione um centro de servico valido.'
+      if (!pessoaId) {
+        throw new Error('Selecione um colaborador valido.')
+      }
+      if (!agentesIds.length || !agentesIds.some(Boolean)) {
+        throw new Error('Selecione ao menos um agente valido.')
+      }
+      if (agentesIds.some((id) => !id)) {
+        throw new Error('Agente invalido na classificacao.')
+      }
+      if (!tiposIds.some(Boolean) && !lesoesIds.some(Boolean)) {
+        throw new Error('Informe ao menos um tipo ou lesao.')
+      }
+      if (!partesIds.length) {
+        throw new Error('Informe ao menos uma parte lesionada.')
+      }
+      if (!centroServicoId) {
+        throw new Error('Selecione um centro de servico valido.')
+      }
+      if (!localId) {
+        throw new Error('Selecione um local valido.')
+      }
+      if (!data) {
+        throw new Error('Data do acidente obrigatoria.')
+      }
+
+      let agenteNome = trim(payload.agenteNome ?? payload.agente ?? atualMap?.agenteNome ?? atualMap?.agente ?? '')
+      let tiposNomes = normalizeStringArray(payload.tipos ?? payload.tiposNomes ?? atualMap?.tipos ?? [])
+      if (!tiposNomes.length) {
+        tiposNomes = splitMultiValue(payload.tipo ?? atualMap?.tipo ?? '')
+      }
+      let agentesNomes = normalizeStringArray(payload.agentes ?? payload.agentesNomes ?? atualMap?.agentes ?? [])
+      let lesoesNomes = normalizeStringArray(payload.lesoes ?? payload.lesoesNomes ?? atualMap?.lesoes ?? [])
+      if (!lesoesNomes.length) {
+        const unicaLesao = trim(payload.lesao ?? atualMap?.lesao ?? '')
+        if (unicaLesao) {
+          lesoesNomes = [unicaLesao]
+        }
+      }
+      if (Array.isArray(payload.classificacoesAgentes) && payload.classificacoesAgentes.length) {
+        const nomesTipos = []
+        const nomesLesoes = []
+        const nomesAgentes = []
+        payload.classificacoesAgentes.forEach((item) => {
+          if (!item || typeof item !== 'object') {
+            return
+          }
+          const nomeAgente = trim(item.agenteNome ?? item.agente ?? '')
+          if (nomeAgente) {
+            nomesAgentes.push(nomeAgente)
+          }
+          const nomeTipo = trim(item.tipoNome ?? item.tipo ?? '')
+          if (nomeTipo) {
+            nomesTipos.push(nomeTipo)
+          }
+          const nomeLesao = trim(item.lesaoNome ?? item.lesao ?? '')
+          if (nomeLesao) {
+            nomesLesoes.push(nomeLesao)
+          }
+        })
+        if (nomesAgentes.length) {
+          agenteNome = nomesAgentes[nomesAgentes.length - 1]
+          agentesNomes = agentesNomes.length ? agentesNomes : nomesAgentes
+          tiposNomes = tiposNomes.length ? tiposNomes : nomesTipos
+          lesoesNomes = lesoesNomes.length ? lesoesNomes : nomesLesoes
+        }
+      }
+      let partesNomes = normalizeStringArray(
+        payload.partesLesionadas ?? payload.partesNomes ?? atualMap?.partesLesionadas ?? []
       )
-      const mesRef = toMonthRefIso(dados.data)
-      if (!mesRef) {
-        throw new Error('Data do acidente invalida para calcular HHT.')
+      if (!partesNomes.length) {
+        const unicaParte = trim(payload.parteLesionada ?? atualMap?.parteLesionada ?? '')
+        if (unicaParte) {
+          partesNomes = [unicaParte]
+        }
       }
-      // HHT não é mais persistido no acidente; taxas usam hht_mensal no dashboard.
 
-      const usuario = await resolveUsuarioResponsavel()
-      await ensureAcidentePartes(partes)
-      await ensureAcidenteLesoes(agentePrincipal, lesoes)
+      const centroServicoNome = trim(payload.centroServico ?? atualMap?.centroServico ?? '')
+      const localNome = trim(payload.local ?? atualMap?.local ?? centroServicoNome)
+      const matricula = trim(payload.matricula ?? atualMap?.matricula ?? '')
+      const nome = trim(payload.nome ?? atualMap?.nome ?? '')
+      const cargo = trim(payload.cargo ?? atualMap?.cargo ?? '')
+      const diasPerdidos = toNumber(payload.diasPerdidos ?? atualMap?.diasPerdidos ?? 0)
+      const diasDebitados = toNumber(payload.diasDebitados ?? atualMap?.diasDebitados ?? 0)
+      const cid = trim(payload.cid ?? atualMap?.cid ?? '')
+      const cat = trim(payload.cat ?? atualMap?.cat ?? '')
+      const observacao = trim(payload.observacao ?? atualMap?.observacao ?? '')
+      const tiposTexto = tiposNomes.join('; ')
+      const agentesTexto = agentesNomes.length ? agentesNomes.join('; ') : agenteNome
 
-      const antigo = mapAcidenteRecord(atual)
       const novoComparacao = {
-        matricula: dados.matricula,
-        nome: dados.nome,
-        cargo: dados.cargo,
-        data: dados.data,
-        tipo: dados.tipo,
-        agente: dados.agente,
-        lesao: lesaoPrincipal,
-        lesoes,
-        partesLesionadas: partes,
-        parteLesionada: partePrincipal ?? '',
-        centroServico: dados.centroServico,
-        local: dados.local,
-        diasPerdidos: dados.diasPerdidos,
-        diasDebitados: dados.diasDebitados,
-        cid: dados.cid,
-        cat: dados.cat,
-        observacao: dados.observacao,
-        dataEsocial: dados.dataEsocial,
-        sesmt: dados.sesmt,
-        dataSesmt: dados.dataSesmt,
+        matricula,
+        nome,
+        cargo,
+        data,
+        tipo: tiposTexto,
+        agente: agentesTexto,
+        lesao: lesoesNomes[0] ?? '',
+        lesoes: lesoesNomes,
+        partesLesionadas: partesNomes,
+        parteLesionada: partesNomes[0] ?? '',
+        centroServico: centroServicoNome,
+        local: localNome,
+        diasPerdidos,
+        diasDebitados,
+        cid,
+        cat,
+        observacao,
+        dataEsocial,
+        sesmt,
+        dataSesmt,
       }
+
       const camposAlterados = []
       ACIDENTE_HISTORY_FIELDS.forEach((campo) => {
-        const valorAtual = normalizeHistoryValue(antigo[campo])
+        const valorAtual = normalizeHistoryValue(atualMap?.[campo])
         const valorNovo = normalizeHistoryValue(novoComparacao[campo])
-        if (valorAtual !== valorNovo) {
+        if (valorAtual != valorNovo) {
           camposAlterados.push({
             campo,
             de: valorAtual,
@@ -5755,47 +6034,39 @@ export const api = {
           })
         }
       })
-      const {
-        centroServico: centroServicoDb,
-        partesLesionadas: partesPayload,
-        lesao: _lesaoPrincipal,
-        partePrincipal: _partePrincipal,
-        agentePrincipal: _agentePrincipal,
-        tipoPrincipal: _tipoPrincipal,
-        dataEsocial,
-        sesmt,
-        dataSesmt,
-        ...resto
-      } = dados
+
+      const usuario = await resolveUsuarioResponsavel()
       const registro = await executeSingle(
         supabase.rpc('rpc_acidentes_update_full', {
           p_id: id,
-          p_matricula: resto.matricula,
-          p_nome: resto.nome,
-          p_cargo: resto.cargo,
-          p_data: resto.data,
-          p_dias_perdidos: resto.diasPerdidos,
-          p_dias_debitados: resto.diasDebitados,
-          p_tipo: resto.tipo,
-          p_agente: resto.agente,
-          p_cid: resto.cid,
-          p_centro_servico: centroServicoDb,
-          p_local: resto.local,
-          p_cat: resto.cat,
-          p_observacao: resto.observacao,
-          p_partes_lesionadas: partesPayload,
-          p_lesoes: lesoes,
+          p_pessoa_id: pessoaId,
+          p_data: data,
+          p_dias_perdidos: diasPerdidos,
+          p_dias_debitados: diasDebitados,
+          p_cid: cid,
+          p_centro_servico_id: centroServicoId,
+          p_local_id: localId,
+          p_cat: cat,
+          p_observacao: observacao,
           p_data_esocial: dataEsocial,
+          p_esocial: esocial,
           p_sesmt: sesmt,
           p_data_sesmt: dataSesmt,
-          p_hht: toNullableNumber(payload.hht ?? atual.hht),
+          p_agentes_ids: agentesIds,
+          p_tipos_ids: tiposIds,
+          p_lesoes_ids: lesoesIds,
+          p_partes_ids: partesIds,
           p_atualizado_por: usuario,
           p_campos_alterados: camposAlterados,
         }),
         'Falha ao atualizar acidente.'
       )
-      await ensureAcidentePartes(partes)
-      return mapAcidenteRecord(registro)
+
+      const completo = await executeMaybeSingle(
+        supabase.from('vw_acidentes').select('*').eq('id', id).limit(1),
+        'Falha ao obter acidente atualizado.'
+      )
+      return mapAcidenteRecord(completo ?? registro)
     },
     async cancel(id, payload = {}) {
       if (!id) {
@@ -5803,16 +6074,20 @@ export const api = {
       }
       const agora = new Date().toISOString()
       const usuario = await resolveUsuarioResponsavel()
+      const usuarioId = await resolveUsuarioId()
       const motivo = trim(payload?.motivo ?? payload?.cancelMotivo ?? '')
+      const updatePayload = {
+        is_active: false,
+        updated_at: agora,
+        cancel_reason: motivo || null,
+      }
+      if (usuarioId) {
+        updatePayload.updated_by_username = usuarioId
+      }
       const registro = await executeSingle(
         supabase
-          .from('acidentes')
-          .update({
-            ativo: false,
-            atualizadoPor: usuario,
-            atualizadoEm: agora,
-            cancel_motivo: motivo || null,
-          })
+          .from('accidents')
+          .update(updatePayload)
           .eq('id', id)
           .select(),
         'Falha ao cancelar acidente.'
@@ -5836,7 +6111,11 @@ export const api = {
         reportClientError('Nao foi possivel registrar historico do acidente ao cancelar.', err, { id })
       }
 
-      return mapAcidenteRecord(registro)
+      const completo = await executeMaybeSingle(
+        supabase.from('vw_acidentes').select('*').eq('id', id).limit(1),
+        'Falha ao obter acidente cancelado.'
+      )
+      return mapAcidenteRecord(completo ?? registro)
     },
     async history(id) {
       if (!id) {
@@ -5858,11 +6137,12 @@ export const api = {
             .filter(Boolean)
         )
       )
+      const responsaveisUuid = responsaveisIds.filter((valor) => isUuidValue(valor))
       let usuarioNomeMap = new Map()
-      if (responsaveisIds.length > 0) {
+      if (responsaveisUuid.length > 0) {
         try {
           const usuarios = await execute(
-            supabase.from('app_users').select('id, display_name, username, email').in('id', responsaveisIds),
+            supabase.from('app_users').select('id, display_name, username, email').in('id', responsaveisUuid),
             'Falha ao consultar usuarios do historico de acidentes.'
           )
           usuarioNomeMap = new Map(
@@ -5884,7 +6164,9 @@ export const api = {
       return registros.map((item) => {
         const usuarioId = (item.usuario_responsavel ?? item.usuarioResponsavel ?? '').trim()
         const usuarioNome = usuarioId
-          ? usuarioNomeMap.get(usuarioId) ?? usuarioId
+          ? isUuidValue(usuarioId)
+            ? usuarioNomeMap.get(usuarioId) ?? usuarioId
+            : usuarioId
           : 'Responsavel nao informado'
         return {
           id: item.id,

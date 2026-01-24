@@ -11,7 +11,7 @@ export function AcidentesFormPartes({
 }) {
   const [parteSelecionada, setParteSelecionada] = useState('')
 
-  const currentPartes = useMemo(
+  const fallbackPartes = useMemo(
     () =>
       Array.isArray(form.partesLesionadas)
         ? form.partesLesionadas
@@ -23,31 +23,74 @@ export function AcidentesFormPartes({
 
   const parteSelectOptions = useMemo(() => {
     const map = new Map()
+    const buildKey = (nome) => normalizeText(nome).toLocaleLowerCase('pt-BR')
     const lista = Array.isArray(partes) ? partes : []
-    lista.forEach((item) => {
+    const addOption = (item) => {
+      if (!item) {
+        return
+      }
       if (typeof item === 'string') {
         const nome = normalizeText(item)
-        if (nome && !map.has(nome.toLowerCase())) {
-          map.set(nome.toLowerCase(), { value: nome, label: nome })
+        if (!nome) {
+          return
+        }
+        const chave = buildKey(nome)
+        const existente = map.get(chave)
+        if (!existente) {
+          map.set(chave, { id: null, nome, label: nome, value: nome })
         }
         return
       }
       if (item && typeof item === 'object') {
-        const nome = normalizeText(item.nome ?? item.label)
+        const nome = normalizeText(item.nome ?? item.label ?? item.value)
+        if (!nome) {
+          return
+        }
         const label = normalizeText(item.label) || nome
-        if (nome && !map.has(nome.toLowerCase())) {
-          map.set(nome.toLowerCase(), { value: nome, label: label || nome })
+        const id = item.id ?? null
+        const chave = buildKey(nome)
+        const existente = map.get(chave)
+        if (!existente || (!existente.id && id)) {
+          map.set(chave, { id, nome, label, value: String(id ?? nome) })
         }
       }
-    })
-    currentPartes.forEach((parte) => {
-      const nome = normalizeText(parte)
-      if (nome && !map.has(nome.toLowerCase())) {
-        map.set(nome.toLowerCase(), { value: nome, label: nome })
+    }
+    lista.forEach(addOption)
+    fallbackPartes.forEach(addOption)
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [fallbackPartes, partes])
+
+  const parteOptionsById = useMemo(() => {
+    const map = new Map()
+    parteSelectOptions.forEach((option) => {
+      if (option.id) {
+        map.set(String(option.id), option)
       }
     })
-    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
-  }, [currentPartes, partes])
+    return map
+  }, [parteSelectOptions])
+
+  const currentPartesIds = useMemo(
+    () => (Array.isArray(form.partesIds) ? form.partesIds.filter(Boolean) : []),
+    [form.partesIds],
+  )
+
+  const currentPartesSelecionadas = useMemo(() => {
+    if (currentPartesIds.length) {
+      return currentPartesIds.map((id, index) => {
+        const option = parteOptionsById.get(String(id))
+        const fallbackNome = fallbackPartes[index] ?? ''
+        const nome = option?.nome ?? fallbackNome ?? ''
+        const label = (option?.label ?? nome) || String(id)
+        return {
+          id: String(id),
+          nome: nome || label,
+          label,
+        }
+      })
+    }
+    return fallbackPartes.map((nome) => ({ id: nome, nome, label: nome }))
+  }, [currentPartesIds, fallbackPartes, parteOptionsById])
 
   useEffect(() => {
     if (parteSelecionada && !parteSelectOptions.some((option) => option.value === parteSelecionada)) {
@@ -56,11 +99,14 @@ export function AcidentesFormPartes({
   }, [parteSelecionada, parteSelectOptions])
 
   const updatePartes = (lista) => {
-    onChange({ target: { name: 'partesLesionadas', value: lista } })
+    const nomes = lista.map((item) => item.nome).filter(Boolean)
+    const ids = lista.map((item) => item.id).filter(Boolean)
+    onChange({ target: { name: 'partesLesionadas', value: nomes } })
+    onChange({ target: { name: 'partesIds', value: ids } })
   }
 
-  const removerParte = (parteParaRemover) => {
-    const atualizadas = currentPartes.filter((parte) => parte !== parteParaRemover)
+  const removerParte = (parteId) => {
+    const atualizadas = currentPartesSelecionadas.filter((parte) => String(parte.id) !== String(parteId))
     updatePartes(atualizadas)
   }
 
@@ -69,16 +115,19 @@ export function AcidentesFormPartes({
   }
 
   const adicionarParteSelecionada = () => {
-    const valor = normalizeText(parteSelecionada)
-    if (!valor) {
+    const option = parteSelectOptions.find((item) => item.value === parteSelecionada)
+    if (!option) {
       return
     }
-    const chave = valor.toLocaleLowerCase('pt-BR')
-    if (currentPartes.some((item) => normalizeText(item).toLocaleLowerCase('pt-BR') === chave)) {
+    const id = option.id ?? option.value
+    if (currentPartesSelecionadas.some((item) => String(item.id) === String(id))) {
       setParteSelecionada('')
       return
     }
-    updatePartes([...currentPartes, valor])
+    updatePartes([
+      ...currentPartesSelecionadas,
+      { id: String(id), nome: option.nome, label: option.label },
+    ])
     setParteSelecionada('')
   }
 
@@ -104,7 +153,7 @@ export function AcidentesFormPartes({
           name="partesLesionadas"
           value={parteSelecionada}
           onChange={handlePartesSelectChange}
-          required={!currentPartes.length}
+          required={!currentPartesSelecionadas.length}
           disabled={shouldDisablePartes}
         >
           <option value="">{partesPlaceholder}</option>
@@ -127,16 +176,16 @@ export function AcidentesFormPartes({
           </button>
         </div>
         <div className="multi-select__chips">
-          {currentPartes.length ? (
-            currentPartes.map((parte) => (
+          {currentPartesSelecionadas.length ? (
+            currentPartesSelecionadas.map((parte) => (
               <button
                 type="button"
-                key={parte}
+                key={parte.id}
                 className="chip"
-                onClick={() => removerParte(parte)}
-                aria-label={`Remover ${parte}`}
+                onClick={() => removerParte(parte.id)}
+                aria-label={`Remover ${parte.label}`}
               >
-                {parte} <span aria-hidden="true">x</span>
+                {parte.label} <span aria-hidden="true">x</span>
               </button>
             ))
           ) : (

@@ -1,95 +1,39 @@
- {
-  
+{
   "acidentes": {
-
-
-        "title": "Registro de acidentes",
-
-
-        "summary": "Cadastro completo de acidentes com filtros, historico, status e cancelamento controlado.",
-
-
-        "steps": [
-
-
-            {
-
-
-                "title": "Preencher dados do acidente",
-
-
-                "description": "Selecione colaborador (matricula/nome), tipo, agente, lesao e parte afetada. Campos obrigatorios estao marcados com *. Ao editar, o titulo muda para \"Editando...\"; use Salvar para gravar.",
-
-
-                "mediaHint": "Formulario de cadastro de acidentes sem campo de HHT."
-
-
-            },
-
-
-            {
-
-
-                "title": "Definir status e cancelar se preciso",
-
-
-                "description": "Use o botao de X para cancelar um registro: abre modal (estilo HHT) pedindo motivo, grava no historico e marca o status como Cancelado (fica visivel, mas sai dos calculos).",
-
-
-                "mediaHint": "Botao de cancelar com modal de motivo."
-
-
-            },
-
-
-            {
-
-
-                "title": "Filtrar registros",
-
-
-                "description": "Use o campo Busca para digitar pessoa (nome/matricula), agente ou local, inclusive termos parciais, e filtrar rapidamente; refine por tipo, centro de servico ou agente e clique em Aplicar. Limpar zera todos os filtros.",
-
-
-                "mediaHint": "Bloco de filtros acima da lista de acidentes."
-
-
-            },
-
-
-            {
-
-
-                "title": "Consultar historico e detalhes",
-
-
-                "description": "Clique no botao de relogio para ver historico (inclui mudanca de status/motivo) ou no botao com olho para abrir os detalhes completos do acidente, agora com o status exibido.",
-
-
-                "mediaHint": "Modal de detalhes do acidente com status."
-
-
-            }
-
-
-        ],
-
-
-        "notes": [
-
-
-            "Ao salvar um acidente, a lista e recarregada automaticamente.",
-
-
-            "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integracoes de cadastro base.",
-
-
-            "HHT nao e informado na ficha; o dashboard cruza data+centro com o HHT mensal ativo. Cancelados (ativo=false) nao entram nos calculos."
-
-
-        ]
-
-
-    }
-
+    "title": "Registro de acidentes",
+    "summary": "Cadastro completo de acidentes com classificacao por agente/parte, historico, status e cancelamento controlado.",
+    "steps": [
+      {
+        "title": "Preencher colaborador e ocorrencia",
+        "description": "Selecione o colaborador (matricula/nome), data do acidente, centro de servico e local. Campos obrigatorios estao marcados com *.",
+        "mediaHint": "Formulario de cadastro de acidentes com dados do colaborador e ocorrencia."
+      },
+      {
+        "title": "Classificar agentes",
+        "description": "Escolha um agente, selecione tipos e/ou lesoes e clique em Incluir para adicionar as combinacoes na tabela. E possivel incluir mais de um agente. Tipos e lesoes podem ter quantidades diferentes; o campo faltante fica em branco.",
+        "mediaHint": "Bloco Classificacao Agentes com botao Incluir e tabela de combinacoes."
+      },
+      {
+        "title": "Classificar partes lesionadas",
+        "description": "Selecione uma ou mais partes lesionadas usando o seletor com chips. Cada parte adicionada aparece abaixo e pode ser removida.",
+        "mediaHint": "Bloco Classificacao Partes lesionadas com multiselect."
+      },
+      {
+        "title": "Impacto e complemento",
+        "description": "Preencha dias perdidos e debitados, CID, CAT e observacao. CAT e CID nao podem se repetir em outro acidente.",
+        "mediaHint": "Campos de impacto e complemento."
+      },
+      {
+        "title": "Historico, detalhes e cancelamento",
+        "description": "Use o botao de relogio para ver historico, o botao de olho para detalhes e o X para cancelar (exige motivo e marca como Cancelado).",
+        "mediaHint": "Acoes na lista de acidentes."
+      }
+    ],
+    "notes": [
+      "E necessario informar ao menos um agente e pelo menos um tipo ou lesao por agente.",
+      "Ao salvar um acidente, a lista e recarregada automaticamente.",
+      "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integracoes de cadastro base.",
+      "HHT nao e informado na ficha; o dashboard cruza data+centro com o HHT mensal ativo. Cancelados (ativo=false) nao entram nos calculos."
+    ]
   }
+}
