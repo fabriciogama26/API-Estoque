@@ -210,9 +210,6 @@ export function useDashboardEstoque(onError) {
     [saidasDetalhadasFiltradas],
   )
 
-  const totalEntradasRegistros = entradasDetalhadasFiltradas.length
-  const totalSaidasRegistros = saidasDetalhadasFiltradas.length
-
   const seriesHistorica = useMemo(
     () => agruparPorPeriodo(entradasDetalhadasFiltradas, saidasDetalhadasFiltradas),
     [entradasDetalhadasFiltradas, saidasDetalhadasFiltradas],
@@ -273,7 +270,7 @@ export function useDashboardEstoque(onError) {
   const topTrocasSetoresTop = useMemo(() => topTrocasSetores.slice(0, 10), [topTrocasSetores])
   const topTrocasPessoasTop = useMemo(() => topTrocasPessoas.slice(0, 10), [topTrocasPessoas])
 
-  const totalMovimentacoes = totalEntradasRegistros + totalSaidasRegistros
+  const totalMovimentacoes = entradasDetalhadasFiltradas.length + saidasDetalhadasFiltradas.length
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
   const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
   const totalMateriais = data?.estoqueAtual?.itens?.length ?? 0
@@ -284,7 +281,7 @@ export function useDashboardEstoque(onError) {
         id: 'movimentacoes',
         title: 'Movimentações',
         value: totalMovimentacoes,
-        helper: `${totalEntradasRegistros} entradas / ${totalSaidasRegistros} saídas`,
+        helper: `${entradasDetalhadasFiltradas.length} entradas / ${saidasDetalhadasFiltradas.length} saídas`,
         icon: MovementIcon,
         tone: 'blue',
         tooltip: 'Quantidade total de registros de entrada e saída no período filtrado.',
@@ -342,11 +339,11 @@ export function useDashboardEstoque(onError) {
       resumoSaidas.quantidade,
       resumoSaidas.valor,
       totalMateriais,
-      totalEntradasRegistros,
       totalMovimentacoes,
       totalValorMovimentado,
-      totalSaidasRegistros,
       trocaResumo,
+      entradasDetalhadasFiltradas.length,
+      saidasDetalhadasFiltradas.length,
     ],
   )
 
