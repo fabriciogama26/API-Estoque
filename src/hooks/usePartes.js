@@ -11,7 +11,32 @@ export function usePartes() {
     setError(null)
     try {
       const data = await listPartes()
-      setPartes(Array.isArray(data) ? data : [])
+      const lista = Array.isArray(data)
+        ? data
+            .map((item) => {
+              if (!item) {
+                return null
+              }
+              if (typeof item === 'string') {
+                const nome = item.trim()
+                return nome ? { id: null, nome, label: nome } : null
+              }
+              const nome = String(item.nome ?? item.label ?? item.value ?? '').trim()
+              if (!nome) {
+                return null
+              }
+              const label = String(item.label ?? nome).trim() || nome
+              return {
+                id: item.id ?? null,
+                nome,
+                label,
+                grupoId: item.grupoId ?? null,
+                subgrupoId: item.subgrupoId ?? null,
+              }
+            })
+            .filter(Boolean)
+        : []
+      setPartes(lista)
     } catch (err) {
       setError(err.message || 'Falha ao carregar partes lesionadas.')
       setPartes([])

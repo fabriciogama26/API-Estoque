@@ -40,12 +40,11 @@ Campos principais do formulario
 - Dados do acidente:
   - Data/hora do acidente (obrigatorio) exibida como "Data do Acidente" e com captura de hora.
   - Dias perdidos e Dias debitados (obrigatorios quando aplicavel, armazenados como numero, exibidos como texto).
-  - HHT (horas-homem trabalhadas) referente ao periodo usado nos indicadores.
 - Classificacao:
-  - Agente(s) – selecionados em lista; o ultimo agente alimenta o campo principal `agente`.
-  - Tipo(s) de acidente – lista derivada do agente atual quando a API suporta `agentTypes`.
-  - Lesao(oes) – carregadas dinamicamente via `acidentes.lesions(agente)`.
-  - Partes lesionadas – permite informar uma ou mais regioes afetadas.
+  - Classificacao Agentes: selecione um agente, escolha tipos e/ou lesoes e clique em "Incluir" para adicionar combinacoes na tabela.
+  - Permite multiplos agentes; cada linha representa uma combinacao de agente + tipo + lesao.
+  - Tipos e lesoes podem ter quantidades diferentes; o valor faltante fica em branco.
+  - Partes lesionadas: multiseleciona uma ou mais regioes afetadas (chips removiveis).
 - Campos complementares:
   - CID, CAT, Observacao, Data eSocial, flag SESMT, Data SESMT.
 - Status e cancelamento:
@@ -55,16 +54,16 @@ Fluxos principais
 -----------------
 1) Cadastro/edicao
    - Usuario digita matricula ou nome; autocomplete exibe sugestoes e, ao selecionar, preenche dados da pessoa.
-   - Preenche campos obrigatorios: matricula, data, dias perdidos/debitados, centro de servico, local, agente(s), tipo(s), lesao(oes), parte(s) lesionada(s).
+   - Preenche campos obrigatorios: matricula, data, dias perdidos/debitados, centro de servico, local, classificacao de agentes (com incluir) e partes lesionadas.
    - Campos auxiliares: CAT, observacao, CID, flags de lancamento (eSocial/SESMT).
    - Botao alterna entre "Registrar acidente" (novo) e "Salvar alteracoes" (edicao).
    - "Cancelar edicao" limpa o formulario, reseta estado de edicao e limpa caches associados se necessario.
    - HHT nao é informado na ficha; o dashboard cruza data + centro com `hht_mensal`.
 
-2) Multiselecoes (agente/tipo/lesoes/partes)
-   - Select exibe opcoes disponiveis; ao confirmar/adicionar, o item vira chip removivel.
-   - Se uma lista obrigatoria estiver vazia, o formulario bloqueia o submit.
-   - Ao remover o ultimo agente, limpa tipos, lesoes e partes associadas.
+2) Classificacao (agentes/partes)
+   - Classificacao Agentes: cada agente tem tipos/lesoes selecionados com chips; clique em "Incluir" para gravar na tabela de combinacoes.
+   - Se houver mais tipos que lesoes (ou o contrario), o campo faltante fica em branco na tabela.
+   - Partes lesionadas usam multiselect com chips removiveis.
 
 3) Historico
    - Botao de relogio na tabela abre `AcidentesHistoryModal`.
@@ -99,6 +98,7 @@ Regras e validacoes
   - Garante preenchimento de campos obrigatorios.
   - Converte texto para numero em campos como dias perdidos e dias debitados.
   - Checa se os grupos obrigatorios (agentes/tipos/lesoes/partes) estao preenchidos quando configurados.
+  - CAT e CID nao podem se repetir em outro acidente do mesmo owner (validacao no front + DB).
 - `createAcidentePayload` e `updateAcidentePayload`:
   - Montam o payload no formato esperado pela API/BD.
   - Mantem consistencia entre listas (`agentes`, `tipos`, `lesoes`, `partesLesionadas`) e campos unicos legados (`agente`, `tipo`, `lesao`, `parteLesionada`).
@@ -126,6 +126,8 @@ Atualizacao 2026-01
 - Campo HHT removido da ficha; taxas agora cruzam acidentes com `hht_mensal` pelo centro e mes.
 - Status exibido na lista e detalhes; botao de cancelamento segue estilo do HHT mensal, grava `ativo=false` e `cancel_motivo` e permanece visivel (nao entra nos calculos).
 - Historico inclui alteracoes de status/motivo de cancelamento.
+- Classificacao separada em "Classificacao Agentes" (com combinacoes por agente/tipo/lesao) e "Classificacao Partes lesionadas".
+- CAT e CID passaram a ser unicos por owner no front e no banco.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -186,6 +188,6 @@ Servicos e integracoes externas
 Ajuda contextual
 ----------------
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
-- Conteudo vem de src/help/helpContent.json (chave 'acidentes'); edite ali para ajustar titulos/steps/notes.
+- Conteudo vem de src/help/helpAcidentes.json (chave 'acidentes'); edite ali para ajustar titulos/steps/notes.
 - Para imagens, salve em public/help/acidentes/ e aponte no campo 'media' do passo (ex.: /help/acidentes/exemplo.webp).
 - O campo "Agente" tem um icone de informacao proprio que abre o help especifico em src/help/helpAcidentesAgentes.json (titulo, resumo, lista de agentes/tipos/lesoes).

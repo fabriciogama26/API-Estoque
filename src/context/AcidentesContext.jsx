@@ -9,7 +9,6 @@ import {
   extractLesoes,
   extractPartesLesionadas,
 } from '../rules/AcidentesRules.js'
-import { extractAgenteNome, normalizeAgenteKey, normalizeAgenteNome } from '../utils/acidentesUtils.js'
 
 const AcidentesContext = createContext(null)
 
@@ -39,21 +38,6 @@ export function AcidentesProvider({ children }) {
     [acidentesState.acidentes],
   )
 
-  const agenteOpcoesNomes = useMemo(() => {
-    const mapa = new Map()
-    agentesState.agentes.forEach((item) => {
-      const nome = normalizeAgenteNome(extractAgenteNome(item))
-      if (!nome) {
-        return
-      }
-      const chave = normalizeAgenteKey(nome)
-      if (!mapa.has(chave)) {
-        mapa.set(chave, nome)
-      }
-    })
-    return Array.from(mapa.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  }, [agentesState.agentes])
-
   const value = {
     ...acidentesState,
     ...filtroState,
@@ -66,7 +50,6 @@ export function AcidentesProvider({ children }) {
     agentesError: agentesState.error,
     isLoadingAgentes: agentesState.isLoading,
     reloadAgentes: agentesState.reload,
-    agenteOpcoesNomes,
   }
 
   return <AcidentesContext.Provider value={value}>{children}</AcidentesContext.Provider>

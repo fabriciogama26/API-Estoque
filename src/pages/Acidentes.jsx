@@ -30,6 +30,7 @@ export function AcidentesPage() {
 
 function AcidentesPageContent() {
   const {
+    acidentes,
     acidentesFiltrados,
     isLoading: isLoadingAcidentes,
     error: listError,
@@ -41,7 +42,7 @@ function AcidentesPageContent() {
     tiposFiltro,
     centrosServico,
     agentesFiltro,
-    agenteOpcoesNomes,
+    agentes,
     isLoadingAgentes,
     agentesError,
   } = useAcidentesContext()
@@ -84,7 +85,8 @@ function AcidentesPageContent() {
   } = useAcidenteForm({
     pessoas,
     locais,
-    agenteOpcoes: agenteOpcoesNomes,
+    agenteOpcoes: agentes,
+    acidentes,
     onSaved: async () => {
       setHistoryCache({})
       setHistoryState({ ...ACIDENTES_HISTORY_DEFAULT })
@@ -177,7 +179,7 @@ function AcidentesPageContent() {
         locais={locais}
         locaisError={locaisError}
         isLoadingLocais={isLoadingLocais}
-        agentes={agenteOpcoesNomes}
+        agentes={agentes}
         agentesError={agentesError}
         isLoadingAgentes={isLoadingAgentes}
         tipos={tipoOpcoes}

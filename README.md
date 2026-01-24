@@ -45,6 +45,8 @@ Na lista de materiais do Estoque atual, os botÃµes de aÃ§Ã£o por material 
 
 - Catalogos de acidentes sao publicos: agentes, locais, partes, lesoes e tipos (sem filtro por owner).
 - Agentes/locais/partes/lesoes/tipos sao ordenados por nome (coluna `ordem` removida).
+- Classificacao de acidentes agora usa combinacoes por agente/tipo/lesao com botao Incluir; partes lesionadas ficam em bloco separado.
+- CAT e CID sao unicos por owner (validacao no front e indice/validacao no banco).
 
 ## Historicos (UI)
 

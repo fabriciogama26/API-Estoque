@@ -306,10 +306,8 @@ const ACIDENTE_HISTORY_FIELDS = [
   'dataSesmt',
   'tipo',
   'agente',
-  'lesao',
   'lesoes',
   'partesLesionadas',
-  'parteLesionada',
   'centroServico',
   'local',
   'diasPerdidos',
@@ -513,6 +511,33 @@ const mapLocalAcidenteRecord = (acidente) => {
       : []
   const agentesLista = splitMultiValue(acidente.agentes ?? acidente.agente ?? '')
   const tiposLista = splitMultiValue(acidente.tipos ?? acidente.tipo ?? '')
+  const tiposIds = Array.isArray(acidente.tiposIds) && acidente.tiposIds.length ? acidente.tiposIds : tiposLista
+  const lesoesIds = Array.isArray(acidente.lesoesIds) && acidente.lesoesIds.length ? acidente.lesoesIds : lesoes
+  const partesIds = Array.isArray(acidente.partesIds) && acidente.partesIds.length ? acidente.partesIds : partes
+  const agenteId = acidente.agenteId ?? agentesLista[agentesLista.length - 1] ?? null
+  const classificacoesBase = Array.isArray(acidente.classificacoesAgentes)
+    ? acidente.classificacoesAgentes.filter(Boolean)
+    : []
+  const classificacoesAgentes = classificacoesBase.length
+    ? classificacoesBase
+    : (() => {
+        if (!agenteId && !agentesLista.length) {
+          return []
+        }
+        const total = Math.max(tiposIds.length, lesoesIds.length, 1)
+        const agenteNome = agentesLista[agentesLista.length - 1] ?? ''
+        return Array.from({ length: total }, (_, index) => ({
+          agenteId: agenteId ?? null,
+          agenteNome,
+          tipoId: tiposIds[index] ?? null,
+          tipoNome: tiposLista[index] ?? '',
+          lesaoId: lesoesIds[index] ?? null,
+          lesaoNome: lesoes[index] ?? '',
+        }))
+      })()
+  const centroServicoId = acidente.centroServicoId ?? centroServico
+  const localId = acidente.localId ?? acidente.local ?? centroServico
+  const pessoaId = acidente.pessoaId ?? acidente.peopleId ?? null
   return {
     ...acidente,
     ativo: acidente.ativo !== false,
@@ -521,17 +546,26 @@ const mapLocalAcidenteRecord = (acidente) => {
     local: acidente.local ?? centroServico,
     agente: agentesLista.join('; '),
     agentes: agentesLista,
+    agenteId,
+    agentesIds: Array.isArray(acidente.agentesIds) ? acidente.agentesIds : classificacoesAgentes.map((item) => item.agenteId),
     tipo: tiposLista.join('; '),
     tipos: tiposLista,
+    tiposIds,
     lesoes,
+    lesoesIds,
     lesao: lesoes[0] ?? acidente.lesao ?? '',
     partesLesionadas: partes,
+    partesIds,
     parteLesionada: partes[0] ?? acidente.parteLesionada ?? '',
+    classificacoesAgentes,
     dataEsocial: acidente.dataEsocial ?? acidente.data_esocial ?? null,
     sesmt: Boolean(acidente.sesmt),
     dataSesmt: acidente.dataSesmt ?? acidente.data_sesmt ?? null,
     ativo: acidente.ativo !== false,
     cancelMotivo: acidente.cancelMotivo ?? acidente.cancel_motivo ?? null,
+    pessoaId,
+    centroServicoId,
+    localId,
   }
 }
 
@@ -1496,14 +1530,106 @@ const sanitizeAcidentePayload = (payload = {}) => {
     : payload.parteLesionada
     ? [trim(payload.parteLesionada)]
     : []
-  const lesoes = Array.isArray(payload.lesoes)
+  const lesoesDiretas = Array.isArray(payload.lesoes)
     ? payload.lesoes.map((lesao) => trim(lesao)).filter(Boolean)
     : payload.lesao
     ? [trim(payload.lesao)]
     : []
-  const agentes = splitMultiValue(payload.agentes ?? payload.agente ?? '')
-  const tipos = splitMultiValue(payload.tipos ?? payload.tipo ?? '')
+  const classificacoes = Array.isArray(payload.classificacoesAgentes) ? payload.classificacoesAgentes : []
+  const agentesIdsClass = []
+  const tiposIdsClass = []
+  const lesoesIdsClass = []
+  const agentesNomesClass = []
+  const tiposNomesClass = []
+  const lesoesNomesClass = []
+  const agentesSet = new Set()
+  const tiposSet = new Set()
+  const lesoesSet = new Set()
+
+  classificacoes.forEach((item) => {
+    if (!item || typeof item !== 'object') {
+      return
+    }
+    const agenteId = trim(item.agenteId ?? item.agente_id)
+    const agenteNome = trim(item.agenteNome ?? item.agente_nome ?? item.agente ?? '')
+    if (!agenteId && !agenteNome) {
+      return
+    }
+    agentesIdsClass.push(agenteId || null)
+    tiposIdsClass.push(trim(item.tipoId ?? item.tipo_id) || null)
+    lesoesIdsClass.push(trim(item.lesaoId ?? item.lesao_id) || null)
+
+    if (agenteNome) {
+      const chave = agenteNome.toLowerCase()
+      if (!agentesSet.has(chave)) {
+        agentesSet.add(chave)
+        agentesNomesClass.push(agenteNome)
+      }
+    }
+    const tipoNome = trim(item.tipoNome ?? item.tipo_nome ?? item.tipo ?? '')
+    if (tipoNome) {
+      const chave = tipoNome.toLowerCase()
+      if (!tiposSet.has(chave)) {
+        tiposSet.add(chave)
+        tiposNomesClass.push(tipoNome)
+      }
+    }
+    const lesaoNome = trim(item.lesaoNome ?? item.lesao_nome ?? item.lesao ?? '')
+    if (lesaoNome) {
+      const chave = lesaoNome.toLowerCase()
+      if (!lesoesSet.has(chave)) {
+        lesoesSet.add(chave)
+        lesoesNomesClass.push(lesaoNome)
+      }
+    }
+  })
+
+  const agentes = agentesNomesClass.length ? agentesNomesClass : splitMultiValue(payload.agentes ?? payload.agente ?? '')
+  const tipos = tiposNomesClass.length ? tiposNomesClass : splitMultiValue(payload.tipos ?? payload.tipo ?? '')
+  const lesoes = lesoesNomesClass.length ? lesoesNomesClass : lesoesDiretas
+
+  let tiposIds = tiposIdsClass.length
+    ? tiposIdsClass
+    : Array.isArray(payload.tiposIds ?? payload.tipos_ids)
+    ? (payload.tiposIds ?? payload.tipos_ids).map((item) => trim(item)).filter(Boolean)
+    : []
+  let lesoesIds = lesoesIdsClass.length
+    ? lesoesIdsClass
+    : Array.isArray(payload.lesoesIds ?? payload.lesoes_ids)
+    ? (payload.lesoesIds ?? payload.lesoes_ids).map((item) => trim(item)).filter(Boolean)
+    : []
+  let partesIds = Array.isArray(payload.partesIds ?? payload.partes_ids)
+    ? (payload.partesIds ?? payload.partes_ids).map((item) => trim(item)).filter(Boolean)
+    : []
+  if (!tiposIds.length) {
+    tiposIds = tipos
+  }
+  if (!lesoesIds.length) {
+    lesoesIds = lesoes
+  }
+  if (!partesIds.length) {
+    partesIds = partes
+  }
+  const agenteId =
+    trim(payload.agenteId ?? payload.agente_id) ||
+    agentesIdsClass.find(Boolean) ||
+    agentes[agentes.length - 1] ||
+    ''
+  const agentesIds = agentesIdsClass.length ? agentesIdsClass : agenteId ? [agenteId] : []
+  const pessoaId = trim(payload.pessoaId ?? payload.peopleId ?? payload.pessoa_id ?? payload.people_id ?? '')
+  const centroServicoId = trim(
+    payload.centroServicoId ?? payload.centro_servico_id ?? payload.centroServico_id ?? centroServico
+  )
+  const localId = trim(payload.localId ?? payload.local_id ?? local ?? centroServico)
   return {
+    pessoaId: pessoaId || null,
+    agenteId: agenteId || null,
+    agentesIds,
+    centroServicoId: centroServicoId || null,
+    localId: localId || null,
+    tiposIds,
+    lesoesIds,
+    partesIds,
     matricula: trim(payload.matricula),
     nome: trim(payload.nome),
     cargo: trim(payload.cargo),
@@ -1533,6 +1659,7 @@ const sanitizeAcidentePayload = (payload = {}) => {
     sesmt: toBoolean(payload.sesmt),
     dataSesmt: toIsoOrNull(payload.dataSesmt, false),
     cancelMotivo: sanitizeOptional(payload.cancelMotivo ?? payload.motivo),
+    classificacoesAgentes: classificacoes,
   }
 }
 
@@ -1540,23 +1667,47 @@ const validateAcidentePayload = (payload) => {
   if (!payload.matricula) throw createError(400, 'Matricula obrigatoria.')
   if (!payload.nome) throw createError(400, 'Nome obrigatorio.')
   if (!payload.cargo) throw createError(400, 'Cargo obrigatorio.')
-  const tiposValidados = splitMultiValue(payload.tipos ?? payload.tipo ?? payload.tipoPrincipal ?? '')
-  if (!tiposValidados.length) throw createError(400, 'Tipo de acidente obrigatorio.')
-  const agentesValidados = splitMultiValue(payload.agentes ?? payload.agente ?? payload.agentePrincipal ?? '')
-  if (!agentesValidados.length) throw createError(400, 'Agente causador obrigatorio.')
-  const lesoesValidadas = Array.isArray(payload.lesoes)
-    ? payload.lesoes.map((lesao) => (lesao ? lesao.trim() : '')).filter(Boolean)
-    : payload.lesao
-    ? [payload.lesao.trim()]
-    : []
-  if (!lesoesValidadas.length) throw createError(400, 'Lesao obrigatoria.')
-  const partesValidadas = Array.isArray(payload.partesLesionadas)
+  const classificacoes = Array.isArray(payload.classificacoesAgentes) ? payload.classificacoesAgentes : []
+  if (classificacoes.length) {
+    const agentesValidos = classificacoes.filter((item) =>
+      trim(item?.agenteId ?? item?.agente_id ?? item?.agente)
+    )
+    if (!agentesValidos.length) throw createError(400, 'Agente causador obrigatorio.')
+    const temTipoOuLesao = agentesValidos.some((item) => {
+      const tipo = trim(item?.tipoId ?? item?.tipo_id ?? item?.tipo)
+      const lesao = trim(item?.lesaoId ?? item?.lesao_id ?? item?.lesao)
+      return Boolean(tipo || lesao)
+    })
+    if (!temTipoOuLesao) throw createError(400, 'Tipo ou lesao obrigatorio.')
+  } else {
+    const tiposValidados = splitMultiValue(
+      payload.tiposIds ?? payload.tipos_ids ?? payload.tipos ?? payload.tipo ?? payload.tipoPrincipal ?? ''
+    )
+    if (!tiposValidados.length) throw createError(400, 'Tipo de acidente obrigatorio.')
+    const agentesValidados = splitMultiValue(
+      payload.agenteId ?? payload.agente_id ?? payload.agentes ?? payload.agente ?? payload.agentePrincipal ?? ''
+    )
+    if (!agentesValidados.length) throw createError(400, 'Agente causador obrigatorio.')
+    const lesoesValidadas = Array.isArray(payload.lesoesIds ?? payload.lesoes_ids)
+      ? (payload.lesoesIds ?? payload.lesoes_ids).map((lesao) => (lesao ? lesao.trim() : '')).filter(Boolean)
+      : Array.isArray(payload.lesoes)
+      ? payload.lesoes.map((lesao) => (lesao ? lesao.trim() : '')).filter(Boolean)
+      : payload.lesao
+      ? [payload.lesao.trim()]
+      : []
+    if (!lesoesValidadas.length) throw createError(400, 'Lesao obrigatoria.')
+  }
+  const partesValidadas = Array.isArray(payload.partesIds ?? payload.partes_ids)
+    ? (payload.partesIds ?? payload.partes_ids).map((parte) => (parte ? parte.trim() : '')).filter(Boolean)
+    : Array.isArray(payload.partesLesionadas)
     ? payload.partesLesionadas.filter((parte) => parte && parte.trim())
     : payload.parteLesionada
     ? [payload.parteLesionada.trim()]
     : []
   if (!partesValidadas.length) throw createError(400, 'Parte lesionada obrigatoria.')
-  if (!payload.centroServico) throw createError(400, 'Centro de servico obrigatorio.')
+  if (!payload.centroServico && !payload.centroServicoId) {
+    throw createError(400, 'Centro de servico obrigatorio.')
+  }
   if (!payload.data) throw createError(400, 'Data do acidente obrigatoria.')
   if (!Number.isInteger(Number(payload.diasPerdidos)) || Number(payload.diasPerdidos) < 0) {
     throw createError(400, 'Dias perdidos deve ser um inteiro zero ou positivo.')
@@ -2651,7 +2802,7 @@ const localApi = {
           const label = [grupo, subgrupo, nome].filter(Boolean).join(' / ')
           const chave = normalizeKeyPart(nome)
           if (!mapa.has(chave)) {
-            mapa.set(chave, { nome, label: label || nome })
+            mapa.set(chave, { id: nome, nome, label: label || nome })
           }
         })
         const lista = Array.isArray(state.acidentes) ? state.acidentes : []
@@ -2668,7 +2819,7 @@ const localApi = {
             }
             const chave = normalizeKeyPart(nome)
             if (!mapa.has(chave)) {
-              mapa.set(chave, { nome, label: nome })
+              mapa.set(chave, { id: nome, nome, label: nome })
             }
           })
         })
@@ -2694,6 +2845,7 @@ const localApi = {
             return
           }
           mapa.set(chave, {
+            id: chave,
             agente,
             nome,
             label: nome,
@@ -2754,7 +2906,8 @@ const localApi = {
             return
           }
           if (!mapa.has(chave)) {
-            mapa.set(chave, { id: null, nome: nome.trim() })
+            const nomeTrim = nome.trim()
+            mapa.set(chave, { id: nomeTrim || null, nome: nomeTrim, label: nomeTrim })
           }
         })
         const lista = Array.isArray(state.acidentes) ? state.acidentes : []
@@ -2767,7 +2920,7 @@ const localApi = {
               return
             }
             if (!mapa.has(chave)) {
-              mapa.set(chave, { id: null, nome })
+              mapa.set(chave, { id: nome || null, nome, label: nome })
             }
           })
         })
@@ -2792,7 +2945,12 @@ const localApi = {
         ] ??
         []
       return readState((state) => {
-        const extrasSet = new Set(base || [])
+        const extrasSet = new Set()
+        ;(base || []).forEach((tipo) => {
+          if (tipo) {
+            extrasSet.add(tipo)
+          }
+        })
         const lista = Array.isArray(state.acidentes) ? state.acidentes : []
         lista.forEach((acidente) => {
           const agentes = splitMultiValue(acidente.agentes ?? acidente.agente ?? '')
@@ -2809,7 +2967,14 @@ const localApi = {
             }
           })
         })
-        return Array.from(extrasSet).sort((a, b) => a.localeCompare(b))
+        return Array.from(extrasSet)
+          .sort((a, b) => a.localeCompare(b))
+          .map((tipo) => ({
+            id: tipo,
+            nome: tipo,
+            agente: nome,
+            label: tipo,
+          }))
       })
     },
     async locals() {
@@ -2824,7 +2989,9 @@ const localApi = {
             }
           }
         })
-        return Array.from(set).sort((a, b) => a.localeCompare(b))
+        return Array.from(set)
+          .sort((a, b) => a.localeCompare(b))
+          .map((nome) => ({ id: nome, nome, label: nome }))
       })
     },
     async list() {
@@ -2850,15 +3017,20 @@ const localApi = {
       const usuario = trim(payload.usuarioResponsavel) || 'sistema'
 
       return writeState((state) => {
-        const pessoa = state.pessoas.find(
-          (item) => item.matricula && item.matricula.toLowerCase() === dados.matricula.toLowerCase()
-        )
+        const pessoa = dados.pessoaId
+          ? state.pessoas.find((item) => item.id === dados.pessoaId)
+          : state.pessoas.find(
+              (item) => item.matricula && item.matricula.toLowerCase() === dados.matricula.toLowerCase()
+            )
         if (!pessoa) {
           throw createError(404, 'Pessoa nao encontrada para a matricula informada.')
         }
 
+        const pessoaId = dados.pessoaId || pessoa?.id || null
         const centroServicoBase = dados.centroServico || pessoa?.centroServico || pessoa?.setor || pessoa?.local || ''
         const localBase = dados.local || pessoa?.local || pessoa?.centroServico || ''
+        const centroServicoId = dados.centroServicoId || centroServicoBase || null
+        const localId = dados.localId || localBase || null
         const mesRef = toMonthRefIso(dados.data)
         if (!mesRef) {
           throw createError(400, 'Data do acidente invalida para HHT mensal.')
@@ -2880,38 +3052,47 @@ const localApi = {
         const agora = nowIso()
         const acidente = {
           id: randomId(),
+          pessoaId,
           matricula: dados.matricula,
           nome: dados.nome,
           cargo: dados.cargo,
           data: dados.data,
           tipo: dados.tipo,
           tipos: splitMultiValue(dados.tipo),
+          tiposIds: Array.isArray(dados.tiposIds) ? dados.tiposIds.slice() : [],
           agente: dados.agente,
           agentes: splitMultiValue(dados.agente),
+          agenteId: dados.agenteId ?? null,
+          agentesIds: Array.isArray(dados.agentesIds) ? dados.agentesIds.slice() : [],
           lesao: dados.lesao,
-        lesoes: dados.lesoes,
-        parteLesionada: dados.parteLesionada,
-        partesLesionadas: dados.partesLesionadas,
-        centroServico: centroServicoBase,
-        setor: centroServicoBase,
-        local: localBase,
-        diasPerdidos: dados.diasPerdidos,
-        diasDebitados: dados.diasDebitados,
-        hht: hhtValor,
-        cid: dados.cid,
-        cat: dados.cat,
-        observacao: dados.observacao,
-        dataEsocial: dados.dataEsocial,
-        sesmt: dados.sesmt,
-        dataSesmt: dados.dataSesmt,
-        registradoPor: usuario,
-        criadoEm: agora,
-        atualizadoEm: null,
-        atualizadoPor: null,
-        ativo: true,
-        cancelMotivo: dados.cancelMotivo ?? null,
-        historicoEdicao: [],
-      }
+          lesoes: dados.lesoes,
+          lesoesIds: Array.isArray(dados.lesoesIds) ? dados.lesoesIds.slice() : [],
+          parteLesionada: dados.parteLesionada,
+          partesLesionadas: dados.partesLesionadas,
+          partesIds: Array.isArray(dados.partesIds) ? dados.partesIds.slice() : [],
+          classificacoesAgentes: Array.isArray(dados.classificacoesAgentes) ? dados.classificacoesAgentes.slice() : [],
+          centroServico: centroServicoBase,
+          centroServicoId,
+          setor: centroServicoBase,
+          local: localBase,
+          localId,
+          diasPerdidos: dados.diasPerdidos,
+          diasDebitados: dados.diasDebitados,
+          hht: hhtValor,
+          cid: dados.cid,
+          cat: dados.cat,
+          observacao: dados.observacao,
+          dataEsocial: dados.dataEsocial,
+          sesmt: dados.sesmt,
+          dataSesmt: dados.dataSesmt,
+          registradoPor: usuario,
+          criadoEm: agora,
+          atualizadoEm: null,
+          atualizadoPor: null,
+          ativo: true,
+          cancelMotivo: dados.cancelMotivo ?? null,
+          historicoEdicao: [],
+        }
 
         state.acidentes.push(acidente)
         return mapLocalAcidenteRecord(acidente)
@@ -2930,7 +3111,9 @@ const localApi = {
         const atual = state.acidentes[index]
         const usuario = trim(payload.usuarioResponsavel) || 'sistema'
         const dadosSanitizados = sanitizeAcidentePayload({ ...atual, ...payload })
-        const pessoa = dadosSanitizados.matricula
+        const pessoa = dadosSanitizados.pessoaId
+          ? state.pessoas.find((item) => item.id === dadosSanitizados.pessoaId)
+          : dadosSanitizados.matricula
           ? state.pessoas.find((item) =>
               item.matricula && item.matricula.toLowerCase() === dadosSanitizados.matricula.toLowerCase()
             )
@@ -2946,8 +3129,11 @@ const localApi = {
 
         const centroServicoPessoa = pessoa?.centroServico || pessoa?.setor || pessoa?.local || ''
         const localPessoa = pessoa?.local || pessoa?.centroServico || ''
+        dados.pessoaId = pessoa?.id ?? dadosSanitizados.pessoaId ?? dados.pessoaId ?? null
         dados.centroServico = dadosSanitizados.centroServico || centroServicoPessoa || atual.centroServico || atual.setor || ''
+        dados.centroServicoId = dadosSanitizados.centroServicoId || dados.centroServicoId || dados.centroServico || null
         dados.local = dadosSanitizados.local || localPessoa || atual.local || dados.centroServico
+        dados.localId = dadosSanitizados.localId || dados.localId || dados.local || null
         dados.setor = dados.centroServico
 
         validateAcidentePayload(dados)
@@ -3023,6 +3209,7 @@ const localApi = {
         const agora = nowIso()
         const usuario = trim(payload.usuarioResponsavel) || 'sistema'
         const atual = state.acidentes[index]
+        const dadosSanitizados = sanitizeAcidentePayload({ ...atual, ...payload })
         const atualizado = {
           ...atual,
           ativo: false,
