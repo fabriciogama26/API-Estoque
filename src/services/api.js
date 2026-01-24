@@ -2282,6 +2282,7 @@ function mapEntradaRecord(record) {
   if (!record) {
     return null
   }
+  const statusRel = record.status_rel ?? record.status_rel_default ?? null
   const centroEstoqueValor = record.centroEstoque ?? record.centro_estoque ?? null
   const centroCustoRaw = record.centroCusto ?? record.centro_custo ?? record.centroEstoque ?? ''
   const centroCustoId = normalizeUuid(centroEstoqueValor)
@@ -2297,8 +2298,9 @@ function mapEntradaRecord(record) {
   const usuarioId = isUuidValue(usuarioRaw) ? usuarioRaw : null
   const usuarioTexto = resolveTextValue(usuarioRaw)
   const statusRaw = record.status ?? record.status_entrada ?? ''
-  const statusId = isUuidValue(statusRaw) ? statusRaw : null
-  const statusNome = resolveTextValue(record.statusNome ?? record.status_nome ?? '')
+  const statusRelNome = resolveTextValue(statusRel?.status ?? record.statusNome ?? record.status_nome ?? '')
+  const statusId = record.statusId ?? statusRel?.id ?? (isUuidValue(statusRaw) ? statusRaw : null)
+  const statusNome = statusRelNome || (statusId ? '' : resolveTextValue(statusRaw)) || statusRaw
   const usuarioEdicaoRaw = record.usuarioEdicao ?? record.usuario_edicao ?? ''
   const usuarioEdicaoId = isUuidValue(usuarioEdicaoRaw) ? usuarioEdicaoRaw : null
   const usuarioEdicaoNome = resolveTextValue(usuarioEdicaoRaw)
@@ -3842,7 +3844,7 @@ async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
     (() => {
       let query = supabase
         .from('entradas')
-        .select('materialId, quantidade, dataEntrada, centro_estoque')
+        .select('materialId, quantidade, dataEntrada, centro_estoque, status, status_rel:status_entrada ( id, status )')
       query = query.eq('materialId', materialId)
       if (centroEstoqueId) {
         query = query.eq('centro_estoque', centroEstoqueId)

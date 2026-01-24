@@ -12,6 +12,11 @@ const normalizeText = (value) => {
   return String(value).trim()
 }
 
+const isRegistroCancelado = (registro = {}) => {
+  const statusTexto = (registro.statusNome || registro.status || '').toString().trim().toLowerCase()
+  return statusTexto === 'cancelado'
+}
+
 export function parsePeriodo(params = {}) {
   if (!params) {
     return null
@@ -231,14 +236,12 @@ export function calcularSaldoMaterial(materialId, entradas, saidas, periodo) {
   const entradasFiltradas = entradas
     .filter((entrada) => entrada.materialId === materialId)
     .filter((entrada) => filtrarPorPeriodo(entrada, 'dataEntrada', periodo))
+    .filter((entrada) => !isRegistroCancelado(entrada))
 
   const saidasFiltradas = saidas
     .filter((saida) => saida.materialId === materialId)
     .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
-    .filter((saida) => {
-      const statusTexto = typeof saida?.status === 'string' ? saida.status.trim().toLowerCase() : ''
-      return statusTexto !== 'cancelado'
-    })
+    .filter((saida) => !isRegistroCancelado(saida))
 
   const totalEntradas = entradasFiltradas.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
   const totalSaidas = saidasFiltradas.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
@@ -268,13 +271,11 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     const entradasMaterial = entradas
       .filter((entrada) => entrada.materialId === material.id)
       .filter((entrada) => filtrarPorPeriodo(entrada, 'dataEntrada', periodo))
+      .filter((entrada) => !isRegistroCancelado(entrada))
     const saidasMaterial = saidas
       .filter((saida) => saida.materialId === material.id)
       .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
-      .filter((saida) => {
-        const statusTexto = typeof saida?.status === 'string' ? saida.status.trim().toLowerCase() : ''
-        return statusTexto !== 'cancelado'
-      })
+      .filter((saida) => !isRegistroCancelado(saida))
 
     const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo)
     const { estoqueMinimo, deficitQuantidade, valorReposicao } = calcularDeficit(material, saldo)
@@ -489,14 +490,16 @@ export function montarDashboard({ materiais = [], entradas = [], saidas = [], pe
 
   const filtrar = (lista, campoData) => lista.filter((item) => filtrarPorPeriodo(item, campoData, periodo))
 
-  const entradasFiltradas = filtrar(entradas, 'dataEntrada')
+  const entradasFiltradas = filtrar(entradas, 'dataEntrada').filter((entrada) => !isRegistroCancelado(entrada))
   const pessoaAtivaIds = new Set(pessoasAtivas.map((pessoa) => pessoa?.id).filter(Boolean))
-  const saidasFiltradas = filtrar(saidas, 'dataEntrega').filter((saida) => {
-    if (!saida?.pessoaId) {
-      return true
-    }
-    return pessoaAtivaIds.has(saida.pessoaId)
-  })
+  const saidasFiltradas = filtrar(saidas, 'dataEntrega')
+    .filter((saida) => !isRegistroCancelado(saida))
+    .filter((saida) => {
+      if (!saida?.pessoaId) {
+        return true
+      }
+      return pessoaAtivaIds.has(saida.pessoaId)
+    })
 
   const entradasDetalhadas = entradasFiltradas.map((entrada) => ({
     ...entrada,
@@ -559,7 +562,7 @@ export function montarDashboard({ materiais = [], entradas = [], saidas = [], pe
     .sort((a, b) => b.totalQuantidade - a.totalQuantidade)
     .slice(0, 10)
 
-  const estoqueAtual = montarEstoqueAtual(materiaisNormalizados, entradas, saidas, periodo)
+  const estoqueAtual = montarEstoqueAtual(materiaisNormalizados, entradasFiltradas, saidasFiltradas, periodo)
 
   const entradasHistoricas = agruparHistorico(entradasDetalhadas, 'dataEntrada', materiaisMap)
   const saidasHistoricas = agruparHistorico(saidasDetalhadas, 'dataEntrega', materiaisMap)
