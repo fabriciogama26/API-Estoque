@@ -28,7 +28,6 @@ Campos e fluxos
 - Escopo de centros para pessoas usa RPC de catalogo; se vier vazio, a listagem cai para o filtro padrao por RLS.
 - Tabela: paginacao local; a coluna "Registrado por" usa os campos retornados pela view/RPC de pessoas.
 - Historico: modal no padrÃ£o Materiais, mostrando campo a campo (inclui Observacao).
-- Resumo (cards): calculado no frontend a partir de pessoas ativas, evitando `rpc_pessoas_resumo` para nao misturar familias.
 
 Desligamento em massa (novo)
 ----------------------------

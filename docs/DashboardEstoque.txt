@@ -38,11 +38,11 @@ Filtros disponiveis
 Indicadores principais
 ----------------------
 - Cards de resumo:
-  - Movimentacoes: total de registros (linhas) de entradas + saidas no periodo filtrado.
+  - Quantidade total de movimentacoes (entradas + saidas).
   - Valor movimentado no periodo.
-  - Entradas / Saida: soma das quantidades registradas em entradas e saidas no periodo filtrado.
+  - Relacao estoque/saidas (quando aplicavel).
   - Numero de alertas de estoque critico.
-  - Materiais monitorados: total de materiais distintos (materialId) com saldo atual ou entradas no periodo.
+  - Total de materiais monitorados.
 - Serie historica:
   - `EntradasSaidasChart` agrega quantidades e valores mensais via `agruparPorPeriodo`.
 - Valor movimentado:
@@ -125,7 +125,3 @@ Atualizacao 2026-01 (UI)
 - Botao "Troca" alterna Top materiais/setores/pessoas para dados de troca (sem substituir graficos).
 - Modal de expansao isolado em src/components/Dashboard/ChartExpandModal.jsx.
 - Ajuda: src/help/helpDashboard.json.
-
-Melhorias pendentes
--------------------
-- Card de previsao de valor de movimentacao para o periodo filtrado (baseado em historico/periodo anterior).
