@@ -7,8 +7,9 @@ import { AcidentesTable } from '../components/Acidentes/Table/AcidentesTable.jsx
 import { AcidentesHistoryModal } from '../components/Acidentes/Modal/AcidentesHistoryModal.jsx'
 import { AcidenteDetailsModal } from '../components/Acidentes/Modal/AcidenteDetailsModal.jsx'
 import { AcidenteCancelModal } from '../components/Acidentes/Modal/AcidenteCancelModal.jsx'
+import { AcidentesImportModal } from '../components/Acidentes/AcidentesImportModal.jsx'
 import { ACIDENTES_HISTORY_DEFAULT } from '../config/AcidentesConfig.js'
-import { cancelAcidente, getAcidenteHistory } from '../services/acidentesService.js'
+import { cancelAcidente, getAcidenteHistory, downloadAcidenteTemplate, importAcidentePlanilha } from '../services/acidentesService.js'
 import { usePessoas } from '../hooks/usePessoas.js'
 import { useLocais } from '../hooks/useLocais.js'
 import { usePartes } from '../hooks/usePartes.js'
@@ -55,6 +56,9 @@ function AcidentesPageContent() {
   const [historyState, setHistoryState] = useState(() => ({ ...ACIDENTES_HISTORY_DEFAULT }))
   const [detailsState, setDetailsState] = useState({ open: false, acidente: null })
   const [cancelState, setCancelState] = useState({ open: false, acidente: null, error: null, isSaving: false })
+  const [importOpen, setImportOpen] = useState(false)
+  const [importInfo, setImportInfo] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
 
   const {
     form,
@@ -173,6 +177,7 @@ function AcidentesPageContent() {
         isSaving={isSaving}
         editingAcidente={editingAcidente}
         onCancel={cancelEdit}
+        onOpenImportMassa={() => setImportOpen(true)}
         error={formError}
         pessoasError={pessoasError}
         isLoadingPessoas={isLoadingPessoas}
@@ -250,6 +255,62 @@ function AcidentesPageContent() {
         onConfirm={confirmCancel}
         onMotivoChange={(motivo) => setCancelState((prev) => ({ ...prev, motivo }))}
         isSaving={cancelState.isSaving}
+      />
+      <AcidentesImportModal
+        open={importOpen}
+        onClose={() => {
+          setImportOpen(false)
+          setImportInfo(null)
+          setImportLoading(false)
+        }}
+        info={importInfo}
+        disabled={importLoading}
+        loading={importLoading}
+        onDownloadTemplate={async () => {
+          setImportInfo({ status: 'info', message: 'Baixando modelo...' })
+          try {
+            const { blob, filename } = await downloadAcidenteTemplate()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename || 'acidente_template.xlsx'
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+            setImportInfo({ status: 'success', message: 'Modelo baixado com sucesso.' })
+          } catch (err) {
+            setImportInfo({ status: 'error', message: err.message || 'Falha ao baixar modelo.' })
+          }
+        }}
+        onUploadFile={async (file) => {
+          if (!file) return
+          setImportLoading(true)
+          setImportInfo({ status: 'info', message: 'Enviando planilha...' })
+          try {
+            const result = await importAcidentePlanilha(file)
+            setImportInfo({
+              status: 'success',
+              message: 'Importacao concluida.',
+              stats: {
+                processed: result?.processed ?? result?.total ?? 0,
+                success: result?.success ?? result?.imported ?? 0,
+                errors: result?.errors ?? result?.failed ?? 0,
+              },
+              errorsUrl: result?.errorsUrl ?? null,
+              firstError: result?.firstError ?? null,
+              errorSamples: result?.errorSamples ?? [],
+            })
+            await reloadAcidentes()
+          } catch (err) {
+            setImportInfo({
+              status: 'error',
+              message: err.message || 'Falha ao importar planilha.',
+            })
+          } finally {
+            setImportLoading(false)
+          }
+        }}
       />
     </div>
   )

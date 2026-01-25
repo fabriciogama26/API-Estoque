@@ -216,6 +216,12 @@ Arquivos e docs:
 
 - Documentacao do fluxo: `docs/CadastroEmMassa.txt`
 
+## Acidentes em massa (Cadastro de Acidentes)
+
+- Botao "Importar em massa" ao lado de "Registrar acidente".
+- Template e importacao via Edge Functions `acidente-template` e `acidente-import`.
+- Documentacao do fluxo: `docs/AcidentesEmMassa.txt`
+
 ## Limpeza automatica de arquivos de erro (imports)
 
 - Edge Function: `cleanup-import-errors`

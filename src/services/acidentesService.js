@@ -20,3 +20,20 @@ export const createAcidente = (payload) => api.acidentes.create(payload)
 export const updateAcidente = (id, payload) => api.acidentes.update(id, payload)
 export const getAcidenteHistory = (id) => api.acidentes.history(id)
 export const cancelAcidente = (id, payload) => api.acidentes.cancel(id, payload)
+
+export const downloadAcidenteTemplate = () => {
+  if (api?.acidentes?.downloadTemplate) {
+    return api.acidentes.downloadTemplate()
+  }
+  return Promise.reject(new Error('Endpoint de download de modelo nao configurado.'))
+}
+
+export const importAcidentePlanilha = (file) => {
+  if (!file) {
+    return Promise.reject(new Error('Selecione um arquivo XLSX.'))
+  }
+  if (api?.acidentes?.importPlanilha) {
+    return api.acidentes.importPlanilha(file)
+  }
+  return Promise.reject(new Error('Endpoint de importacao de acidentes nao configurado.'))
+}

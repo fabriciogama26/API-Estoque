@@ -24,6 +24,11 @@
         "mediaHint": "Campos de impacto e complemento."
       },
       {
+        "title": "Cadastro em massa",
+        "description": "Use o botao Cadastrar em massa para enviar uma planilha XLSX com matricula, data, hora, dias_debitados, dias_perdidos, centro_servico, local, agentes, tipos, lesoes e partes.",
+        "mediaHint": "Modal de importacao em massa com upload de XLSX."
+      },
+      {
         "title": "Historico, detalhes e cancelamento",
         "description": "Use o botao de relogio para ver historico, o botao de olho para detalhes e o X para cancelar (exige motivo e marca como Cancelado).",
         "mediaHint": "Acoes na lista de acidentes."
@@ -31,6 +36,7 @@
     ],
     "notes": [
       "E necessario informar ao menos um agente e pelo menos um tipo ou lesao por agente.",
+      "No cadastro em massa, agentes/tipos/lesoes/partes usam ';' como separador e devem existir no catalogo.",
       "Ao salvar um acidente, a lista e recarregada automaticamente.",
       "Se algum dropdown estiver vazio, aguarde o carregamento ou revise integracoes de cadastro base.",
       "HHT nao e informado na ficha; o dashboard cruza data+centro com o HHT mensal ativo. Cancelados (ativo=false) nao entram nos calculos."

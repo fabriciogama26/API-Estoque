@@ -1,0 +1,96 @@
+Acidentes em massa
+==================
+
+Objetivo
+--------
+Registrar acidentes em massa a partir de planilha XLSX.
+
+Formato da planilha (XLSX)
+--------------------------
+Colunas obrigatorias (cabecalho na 1a linha):
+- matricula
+- data (dd/MM/yyyy)
+- hora (HH:mm)
+- dias_debitados
+- dias_perdidos
+- centro_servico (texto)
+- local (texto)
+- agentes (texto)
+- tipos (texto)
+- lesoes (texto)
+- partes (texto)
+
+Colunas opcionais:
+- cat
+- cid
+- observacao
+
+Observacoes importantes:
+- O arquivo deve ser .xlsx (nao CSV).
+- Agentes, tipos, lesoes e partes devem usar ";" como separador.
+- A ordem precisa ser coerente:
+  Ex.: agentes="A1;A2", tipos="T1;T2", lesoes="L1;L2".
+- CAT e CID sao unicos por owner; duplicados geram erro.
+- Data/hora sao combinadas em timestamptz (fuso padrao -03).
+
+Como usar (passo a passo)
+-------------------------
+1) Abra a tela de Cadastro de Acidentes.
+2) Clique em "Importar em massa" na lista de acidentes.
+3) (Opcional) Clique em "Baixar modelo (.xlsx)".
+4) Preencha a planilha seguindo as regras.
+5) Selecione o arquivo XLSX (drag-and-drop ou clique para selecionar).
+6) Clique em "Importar planilha".
+7) Ao final, o modal mostra:
+   - quantos registros foram processados
+   - quantos foram importados
+   - quantos tiveram erro
+   - (se houver) um exemplo de erro e a opcao de baixar relatorio CSV
+
+Regras de importacao
+--------------------
+- matricula obrigatoria e deve existir na tabela pessoas (mesma familia).
+- data e hora obrigatorias (dd/MM/yyyy + HH:mm).
+- dias_perdidos e dias_debitados obrigatorios (inteiros).
+- centro_servico e local obrigatorios (devem existir nos catalogos).
+- agentes obrigatorio (ao menos 1).
+- tipos e/ou lesoes obrigatorios (ao menos 1).
+- partes obrigatorio (ao menos 1).
+- cat: somente numeros.
+- cid: texto livre (evitar duplicado).
+
+Mapa do fluxo (frontend -> Supabase)
+------------------------------------
+UI (Modal)
+- src/components/Acidentes/AcidentesImportModal.jsx
+  - recebe o arquivo XLSX e chama o service de importacao
+
+Service (frontend)
+- src/services/api.js
+  - api.acidentes.importPlanilha(file)
+    1) Faz upload do XLSX no Storage (bucket "imports")
+       path: acidentes/<uuid>-<nome-do-arquivo>.xlsx
+    2) Chama a Edge Function "acidente-import" com body JSON:
+       { "path": "<path-do-arquivo-no-bucket>" }
+
+Edge Functions (Supabase)
+- supabase/functions/acidente-import/index.ts
+  - Valida usuario logado via JWT (Authorization Bearer)
+  - Faz download do arquivo XLSX no Storage (bucket "imports")
+  - Le a planilha e valida cada linha
+  - Insere via rpc_acidentes_create_full
+  - (Se houver erros) gera um CSV com as linhas invalidas
+  - Remove o arquivo XLSX enviado (best-effort)
+
+- supabase/functions/acidente-template/index.ts
+  - Retorna um XLSX com as colunas e um exemplo.
+
+Relatorio de erros (CSV)
+------------------------
+Quando houver erros, a Edge Function retorna:
+- errorsUrl: URL assinada para baixar o CSV (se configurado)
+- firstError: primeira linha de erro
+- errorSamples: amostras de erros
+
+Formato do CSV:
+linha,coluna,motivo
