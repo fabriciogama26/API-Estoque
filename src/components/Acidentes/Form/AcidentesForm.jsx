@@ -11,6 +11,7 @@ export function AcidentesForm({
   isSaving,
   editingAcidente,
   onCancel,
+  onOpenImportMassa,
   error,
   pessoasError,
   isLoadingPessoas = false,
@@ -419,14 +420,18 @@ export function AcidentesForm({
         {partesError ? <p className="feedback feedback--error">{partesError}</p> : null}
         {error ? <p className="feedback feedback--error">{error}</p> : null}
         <div className="acidentes-form__actions">
+          <button type="submit" className="button button--primary" disabled={isSaving}>
+            {isSaving ? 'Salvando...' : editingAcidente ? 'Salvar alteracoes' : 'Registrar acidente'}
+          </button>
           {editingAcidente ? (
             <button type="button" className="button button--ghost" onClick={onCancel} disabled={isSaving}>
               Cancelar edicao
             </button>
+          ) : onOpenImportMassa ? (
+            <button type="button" className="button button--ghost" onClick={onOpenImportMassa} disabled={isSaving}>
+              Cadastrar em massa
+            </button>
           ) : null}
-          <button type="submit" className="button button--primary" disabled={isSaving}>
-            {isSaving ? 'Salvando...' : editingAcidente ? 'Salvar alteracoes' : 'Registrar acidente'}
-          </button>
         </div>
       </form>
     </section>

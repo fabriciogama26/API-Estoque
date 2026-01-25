@@ -270,12 +270,8 @@ export function useDashboardEstoque(onError) {
   const topTrocasSetoresTop = useMemo(() => topTrocasSetores.slice(0, 10), [topTrocasSetores])
   const topTrocasPessoasTop = useMemo(() => topTrocasPessoas.slice(0, 10), [topTrocasPessoas])
 
-  const totalMovimentacoes = resumoEntradas.quantidade + resumoSaidas.quantidade
+  const totalMovimentacoes = entradasDetalhadasFiltradas.length + saidasDetalhadasFiltradas.length
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
-  const totalItensEstoque = useMemo(
-    () => (data?.estoqueAtual?.itens ?? []).reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0),
-    [data],
-  )
   const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
   const totalMateriais = data?.estoqueAtual?.itens?.length ?? 0
 
@@ -285,7 +281,7 @@ export function useDashboardEstoque(onError) {
         id: 'movimentacoes',
         title: 'Movimentações',
         value: totalMovimentacoes,
-        helper: `${totalEntradasRegistros} entradas / ${totalSaidasRegistros} saídas`,
+        helper: `${entradasDetalhadasFiltradas.length} entradas / ${saidasDetalhadasFiltradas.length} saídas`,
         icon: MovementIcon,
         tone: 'blue',
         tooltip: 'Quantidade total de registros de entrada e saída no período filtrado.',
@@ -342,9 +338,12 @@ export function useDashboardEstoque(onError) {
       resumoEntradas.valor,
       resumoSaidas.quantidade,
       resumoSaidas.valor,
-      totalItensEstoque,
       totalMateriais,
+      totalMovimentacoes,
+      totalValorMovimentado,
       trocaResumo,
+      entradasDetalhadasFiltradas.length,
+      saidasDetalhadasFiltradas.length,
     ],
   )
 

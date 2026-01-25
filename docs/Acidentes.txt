@@ -81,6 +81,15 @@ Fluxos principais
    - Acoes: editar, historico, detalhar e cancelar (X vermelho). O botao "Detalhar" abre um modal com os demais campos (agente/tipo/lesoes/partes, dias, eSOCIAL, SESMT, observacao) e inclui o status atual.
    - Cancelar abre modal (mesmo estilo do HHT mensal) solicitando motivo; define `ativo = false`, grava `cancel_motivo` e adiciona no historico. O registro continua visivel, mas sai dos calculos/dashboard.
 
+Cadastro em massa (novo)
+------------------------
+- Existe um botao "Importar em massa" ao lado de "Registrar acidente".
+- A planilha exige: matricula, data, hora, dias_debitados, dias_perdidos, centro_servico, local, agentes, tipos, lesoes e partes.
+- Campos opcionais: cat, cid, observacao.
+- Agentes/tipos/lesoes/partes usam ";" como separador.
+- O fluxo completo esta documentado em:
+  - docs/AcidentesEmMassa.txt
+
 Carregamento de dados
 ---------------------
 - Pessoas, locais, agentes, tipos, lesoes e partes sao carregados em paralelo, cada catalogo com seu proprio `isLoading` e `error`.
