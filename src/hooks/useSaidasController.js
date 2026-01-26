@@ -635,18 +635,74 @@ export function useSaidasController() {
     [saidas],
   )
 
+  const pessoasMap = useMemo(() => new Map((pessoas ?? []).map((pessoa) => [pessoa.id, pessoa])), [pessoas])
+  const materiaisMap = useMemo(() => new Map((materiais ?? []).map((material) => [material.id, material])), [materiais])
+
   const saidasFiltradas = useMemo(() => {
-    const { trocaPrazo, trocaOnly } = filters
+    const { trocaPrazo, trocaOnly, termo, registradoPor, status } = filters
     let lista = saidasComPrazo
     if (trocaOnly) {
       lista = lista.filter((s) => Boolean(s.isTroca))
     }
-    if (!trocaPrazo) return lista
-    if (trocaPrazo === 'sem-data') {
-      return lista.filter((s) => !s.trocaPrazo)
+    if (trocaPrazo) {
+      if (trocaPrazo === 'sem-data') {
+        lista = lista.filter((s) => !s.trocaPrazo)
+      } else {
+        lista = lista.filter((s) => s.trocaPrazo?.variant === trocaPrazo)
+      }
     }
-    return lista.filter((s) => s.trocaPrazo?.variant === trocaPrazo)
-  }, [filters, saidasComPrazo])
+
+    const statusRaw = (status ?? '').toString().trim()
+    if (statusRaw) {
+      const statusNormalizado = normalizeSearchValue(statusRaw)
+      lista = lista.filter((saida) => {
+        const statusId = (saida?.statusId || '').toString().trim()
+        if (statusId) {
+          return statusId === statusRaw
+        }
+        const statusNome = normalizeSearchValue(saida?.statusNome || saida?.status || '')
+        return statusNome === statusNormalizado
+      })
+    }
+
+    const registradoPorRaw = (registradoPor ?? '').toString().trim()
+    if (registradoPorRaw) {
+      const registradoPorNormalizado = normalizeSearchValue(registradoPorRaw)
+      lista = lista.filter((saida) => {
+        const usuarioId = (saida?.usuarioResponsavelId || '').toString().trim()
+        if (usuarioId) {
+          return usuarioId === registradoPorRaw
+        }
+        const usuarioNome = normalizeSearchValue(
+          saida?.usuarioResponsavelNome || saida?.usuarioResponsavel || ''
+        )
+        return usuarioNome === registradoPorNormalizado
+      })
+    }
+
+    const termoNormalizado = normalizeSearchValue(termo)
+    if (termoNormalizado) {
+      lista = lista.filter((saida) => {
+        const pessoa = pessoasMap.get(saida.pessoaId)
+        const material = materiaisMap.get(saida.materialId)
+        if (pessoaMatchesTerm(pessoa, termoNormalizado) || materialMatchesTerm(material, termoNormalizado)) {
+          return true
+        }
+        const extraCampos = [
+          saida?.materialId,
+          saida?.pessoaId,
+          saida?.centroCusto,
+          saida?.centroServico,
+          saida?.usuarioResponsavel,
+        ]
+        return extraCampos
+          .map(normalizeSearchValue)
+          .some((campo) => campo && campo.includes(termoNormalizado))
+      })
+    }
+
+    return lista
+  }, [filters, saidasComPrazo, materiaisMap, pessoasMap])
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(saidasFiltradas.length / TABLE_PAGE_SIZE))
@@ -711,18 +767,17 @@ export function useSaidasController() {
   }, [saidas])
 
   const registradoPorFilterOptions = useMemo(() => {
-    const uniq = new Set(
-      saidas
-        .map((s) =>
-          (s.usuarioResponsavelNome || s.usuarioResponsavelId || s.usuarioResponsavel || '')
-            .toString()
-            .trim()
-        )
-        .filter(Boolean)
-    )
-    return Array.from(uniq)
-      .map((label) => ({ id: label, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+    const mapa = new Map()
+    saidas.forEach((saida) => {
+      const id = (saida?.usuarioResponsavelId || '').toString().trim()
+      const label = (saida?.usuarioResponsavelNome || saida?.usuarioResponsavel || '').toString().trim()
+      const chave = id || label.toLowerCase()
+      if (!chave) return
+      if (!mapa.has(chave)) {
+        mapa.set(chave, { id: id || label, label: label || id })
+      }
+    })
+    return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   }, [saidas])
 
   const paginatedSaidas = useMemo(() => {

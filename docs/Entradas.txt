@@ -52,6 +52,7 @@ Filtros, auto-complete e listagem
   - Faixa de datas.
   - "Aplicar" chama `load(filters)` (consulta na API); nao ha refiltro local a cada tecla.
   - "Limpar" restaura filtros padrao e recarrega a lista a partir da API.
+  - Termo, status, centro e registrado por aplicam refiltro local com normalizacao (fallback quando a API nao filtra).
 - Auto-complete de materiais:
   - Dispara busca apos um minimo de caracteres (`MATERIAL_SEARCH_MIN_CHARS`).
   - Usa debounce (`MATERIAL_SEARCH_DEBOUNCE_MS`) para nao sobrecarregar a API.
@@ -69,6 +70,7 @@ Filtros, auto-complete e listagem
   - "Atualizar" refaz a consulta com os filtros atuais.
   - "Cancelar alteracao" sai do modo de edicao e reseta formulario/buscas quando um registro esta sendo editado.
   - Quando nao ha registros no filtro/periodo, exibe mensagem neutra em vez de tabela vazia quebrada.
+  - "Exportar Excel (CSV)" gera planilha com todas as entradas filtradas.
 
 Boas praticas
 -------------
@@ -95,6 +97,11 @@ Atualizacao 2025-12
 - Pagina modularizada: agora apenas orquestra `EntradasProvider` e componentes visuais.
 - Logica de busca, filtros, historico e autocomplete extraida para hook + utils + services.
 - Erros da tela registrados no Supabase (ou sistema equivalente) via `useErrorLogger('entradas')`.
+
+Atualizacao 2026-01
+-------------------
+- Filtro local aplicado para termo/status/centro/registrado por (fallback quando a API nao filtra).
+- Exportacao CSV com base na lista filtrada da tela.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -132,6 +139,10 @@ Funcoes utilitarias relacionadas
   - Tipo: utilitarios/regras
   - Caminho: src/utils/entradasUtils.js e src/rules/EntradasRules.js
   - Responsavel por: montar payloads, filtrar lista, formatar valores/datas e validar campos.
+- Exportacao CSV
+  - Tipo: utilitarios
+  - Caminho: src/utils/entradasExport.js
+  - Responsavel por: gerar e baixar CSV com as entradas filtradas.
 
 Servicos e integracoes externas
 -------------------------------

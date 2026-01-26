@@ -2188,6 +2188,13 @@ export const SaidasOperations = {
       query = query.eq('status', status)
     }
 
+    const registradoPor = trim(params.registradoPor)
+    if (registradoPor) {
+      query = UUID_REGEX.test(registradoPor)
+        ? query.eq('usuarioResponsavel', registradoPor)
+        : query.ilike('usuarioResponsavel', `%${registradoPor}%`)
+    }
+
     const centroCusto = trim(params.centroCusto)
     if (centroCusto) {
       query = query.ilike('centroCusto', centroCusto)

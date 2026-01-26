@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { EntryIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
+import { EntryIcon, EditIcon, HistoryIcon, CancelIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModal.jsx'
 import { EntradaDetailsModal } from '../components/Entradas/Modal/EntradaDetailsModal.jsx'
 import { EntradaCancelModal } from '../components/Entradas/Modal/EntradaCancelModal.jsx'
@@ -12,6 +12,7 @@ import { EntradasProvider, useEntradasContext } from '../context/EntradasContext
 import { formatCurrency, formatDisplayDate, formatMaterialSummary, normalizeSearchValue } from '../utils/entradasUtils.js'
 import { formatDisplayDateTime } from '../utils/saidasUtils.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
+import { downloadEntradasCsv } from '../utils/entradasExport.js'
 import '../styles/MateriaisPage.css'
 
 function EntradasContent() {
@@ -148,6 +149,17 @@ function EntradasContent() {
   const detalheAtualizadoEm = detalheEntrada?.atualizadoEm || detalheEntrada?.atualizado_em || ''
   const detalheUsuarioEdicao =
     detalheEntrada?.usuarioEdicaoNome || detalheEntrada?.usuarioEdicao || detalheEntrada?.usuarioEdicaoId || ''
+  const centrosCustoMap = new Map(
+    centrosCusto.map((item) => {
+      const nome = (item?.nome ?? '').toString().trim()
+      return [item?.id ?? nome, nome]
+    }),
+  )
+
+  const handleExportCsv = () => {
+    const filename = `entradas-${new Date().toISOString().slice(0, 10)}.csv`
+    downloadEntradasCsv(filteredEntradas, { materiaisMap, centrosCustoMap }, { filename })
+  }
 
   return (
     <div className="stack">
@@ -315,14 +327,26 @@ function EntradasContent() {
       <section className="card">
         <header className="card__header">
           <h2>Historico de entradas</h2>
-          <button
-            type="button"
-            className="button button--ghost"
-            onClick={() => load(filters, { refreshCatalogs: true })}
-            disabled={isLoading}
-          >
-            Atualizar
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleExportCsv}
+              aria-label="Exportar lista de entradas em CSV"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SpreadsheetIcon size={16} />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => load(filters, { refreshCatalogs: true })}
+              disabled={isLoading}
+            >
+              Atualizar
+            </button>
+          </div>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
         {!isLoading && entradas.length === 0 ? <p className="feedback">Nenhuma entrada registrada.</p> : null}

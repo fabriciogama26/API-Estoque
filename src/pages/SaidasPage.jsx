@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { ExitIcon, EditIcon, HistoryIcon, CancelIcon } from '../components/icons.jsx'
+import { ExitIcon, EditIcon, HistoryIcon, CancelIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { SaidasHistoryModal } from '../components/Saidas/SaidasHistoryModal.jsx'
@@ -12,6 +12,7 @@ import { SaidaTrocaModal } from '../components/Saidas/Modal/SaidaTrocaModal.jsx'
 import { SaidaDetailsModal } from '../components/Saidas/Modal/SaidaDetailsModal.jsx'
 import { SaidasProvider, useSaidasContext } from '../context/SaidasContext.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
+import { downloadSaidasCsv } from '../utils/saidasExport.js'
 import '../styles/MateriaisPage.css'
 
 function SaidasContent() {
@@ -131,6 +132,16 @@ function SaidasContent() {
     if (!valor) return '-'
     const found = centrosEstoqueOptions.find((c) => String(c.id) === String(valor))
     return found?.nome || valor
+  }
+
+  const handleExportCsv = () => {
+    const filename = `saidas-${new Date().toISOString().slice(0, 10)}.csv`
+    const pessoasMap = new Map(pessoas.map((pessoa) => [pessoa.id, pessoa]))
+    const materiaisMap = new Map(materiais.map((material) => [material.id, material]))
+    const centrosEstoqueMap = new Map(
+      centrosEstoqueOptions.map((centro) => [centro.id, centro.nome ?? centro.id])
+    )
+    downloadSaidasCsv(saidasFiltradas, { pessoasMap, materiaisMap, centrosEstoqueMap }, { filename })
   }
 
   return (
@@ -346,7 +357,7 @@ function SaidasContent() {
             <select name="registradoPor" value={filters.registradoPor} onChange={handleFilterChange}>
               <option value="">Todos</option>
               {registradoPorFilterOptions.map((opt) => (
-                <option key={opt.id} value={opt.label}>
+                <option key={opt.id} value={opt.id}>
                   {opt.label}
                 </option>
               ))}
@@ -407,14 +418,26 @@ function SaidasContent() {
       <section className="card">
         <header className="card__header">
           <h2>Lista de saídas</h2>
-          <button
-            type="button"
-            className="button button--ghost"
-            onClick={() => load(filters, { resetPage: true })}
-            disabled={isLoading}
-          >
-            Atualizar
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleExportCsv}
+              aria-label="Exportar lista de saidas em CSV"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SpreadsheetIcon size={16} />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => load(filters, { resetPage: true })}
+              disabled={isLoading}
+            >
+              Atualizar
+            </button>
+          </div>
         </header>
         <div className="saidas-legend" aria-label="Legenda das datas de troca">
           <div className="saidas-legend__item">
