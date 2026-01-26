@@ -1,9 +1,9 @@
 module.exports = {
-  MaterialService: require('./MaterialService'),
-  PessoaService: require('./PessoaService'),
-  EntradaService: require('./EntradaService'),
-  SaidaService: require('./SaidaService'),
-  EstoqueService: require('./EstoqueService'),
+  MaterialService: require('./server/MaterialService'),
+  PessoaService: require('./server/PessoaService'),
+  EntradaService: require('./server/EntradaService'),
+  SaidaService: require('./server/SaidaService'),
+  EstoqueService: require('./server/EstoqueService'),
   AuthService: require('./authService'),
-  AcidenteService: require('./AcidenteService'),
+  AcidenteService: require('./server/AcidenteService'),
 }

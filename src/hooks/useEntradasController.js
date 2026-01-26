@@ -512,7 +512,74 @@ export function useEntradasController() {
     }
   }, [])
 
-  const filteredEntradas = useMemo(() => entradas, [entradas])
+  const filteredEntradas = useMemo(() => {
+    const termoNormalizado = normalizeSearchValue(filters.termo)
+    const registradoPorRaw = (filters.registradoPor ?? '').toString().trim()
+    const registradoPorNormalizado = normalizeSearchValue(registradoPorRaw)
+    const centroCustoRaw = (filters.centroCusto ?? '').toString().trim()
+    const centroCustoNormalizado = normalizeSearchValue(centroCustoRaw)
+    const statusRaw = (filters.status ?? '').toString().trim()
+    const statusNormalizado = normalizeSearchValue(statusRaw)
+
+    return entradas.filter((entrada) => {
+      if (centroCustoRaw) {
+        const resolvedCentro = resolveCentroCustoLabel(entrada)
+        const centroCompare = normalizeSearchValue(resolvedCentro || entrada.centroCusto || entrada.centroCustoId || '')
+        if (centroCompare !== centroCustoNormalizado && normalizeSearchValue(entrada.centroCustoId) !== centroCustoNormalizado) {
+          return false
+        }
+      }
+
+      if (statusRaw) {
+        const statusId = (entrada?.statusId || '').toString().trim()
+        if (statusId) {
+          if (statusId !== statusRaw) {
+            return false
+          }
+        } else {
+          const statusNome = normalizeSearchValue(entrada?.statusNome || entrada?.status || '')
+          if (statusNome !== statusNormalizado) {
+            return false
+          }
+        }
+      }
+
+      if (registradoPorRaw) {
+        const usuarioId = (entrada?.usuarioResponsavelId || '').toString().trim()
+        if (usuarioId) {
+          if (usuarioId !== registradoPorRaw) {
+            return false
+          }
+        } else {
+          const usuarioNome = normalizeSearchValue(entrada?.usuarioResponsavelNome || entrada?.usuarioResponsavel || '')
+          if (usuarioNome !== registradoPorNormalizado) {
+            return false
+          }
+        }
+      }
+
+      if (!termoNormalizado) {
+        return true
+      }
+
+      const material = materiaisMap.get(entrada.materialId)
+      if (materialMatchesTerm(material, termoNormalizado)) {
+        return true
+      }
+
+      const extraCampos = [
+        entrada?.materialId,
+        entrada?.centroCusto,
+        entrada?.centroCustoId,
+        entrada?.usuarioResponsavel,
+        entrada?.statusNome,
+        entrada?.status,
+      ]
+      return extraCampos
+        .map(normalizeSearchValue)
+        .some((campo) => campo && campo.includes(termoNormalizado))
+    })
+  }, [entradas, filters, materiaisMap, resolveCentroCustoLabel])
 
   const paginatedEntradas = useMemo(() => {
     const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE

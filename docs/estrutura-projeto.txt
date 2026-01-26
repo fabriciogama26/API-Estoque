@@ -1,0 +1,22 @@
+Estrutura do projeto
+--------------------
+
+Objetivo
+- Separar claramente o que roda no browser (frontend) do que roda no Node (backend).
+- Evitar confusao entre services com nomes parecidos.
+
+Pastas principais
+- Frontend (React/Vite): tudo em `src/`.
+  - Services do browser ficam em `src/services/*.js` (ESM, dataClient, api/localApi).
+- Backend (Node/Express):
+  - Services em `src/services/server/*.js` (CommonJS, usados por controllers).
+  - Agregador em `src/services/index.js` exporta os services do backend.
+
+Serverless (Vercel/Supabase)
+- Funcoes Vercel ficam em `api/` e usam helpers em `api/_shared`.
+- Edge Functions ficam em `supabase/functions`.
+
+Nota de lint
+- O ESLint atual assume ambiente browser/ESM.
+- Arquivos CommonJS em `src/services/server` podem acusar "`require` is not defined".
+- Nao e erro de runtime; ajuste o ESLint se quiser validar backend separadamente.

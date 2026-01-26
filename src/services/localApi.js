@@ -1957,6 +1957,8 @@ function filterLocalSaidas(saidas, params = {}, state) {
   const materialId = trim(params.materialId || '')
   const centroCusto = normalizeSearchTerm(params.centroCusto)
   const centroServico = normalizeSearchTerm(params.centroServico)
+  const registradoPorRaw = trim(params.registradoPor)
+  const registradoPor = normalizeSearchTerm(registradoPorRaw)
   const status = normalizeSearchTerm(params.status)
   const inicio = toStartOfDay(params.dataInicio)
   const fim = toEndOfDay(params.dataFim)
@@ -1988,6 +1990,20 @@ function filterLocalSaidas(saidas, params = {}, state) {
 
     if (centroServico && normalizeSearchTerm(saida.centroServico) !== centroServico) {
       return false
+    }
+
+    if (registradoPor) {
+      const usuarioId = trim(saida.usuarioResponsavelId || '')
+      if (usuarioId) {
+        if (usuarioId !== registradoPorRaw) {
+          return false
+        }
+      } else {
+        const usuarioNome = normalizeSearchTerm(saida.usuarioResponsavelNome ?? saida.usuarioResponsavel ?? '')
+        if (!usuarioNome.includes(registradoPor)) {
+          return false
+        }
+      }
     }
 
     if (inicio || fim) {

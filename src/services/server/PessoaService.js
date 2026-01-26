@@ -1,7 +1,7 @@
 const { v4: uuid } = require('uuid');
-const { Pessoa } = require('../models');
-const repositories = require('../repositories');
-const { pessoaRules } = require('../rules');
+const { Pessoa } = require('../../models');
+const repositories = require('../../repositories');
+const { pessoaRules } = require('../../rules');
 
 function normalizeDate(value) {
   if (!value) {

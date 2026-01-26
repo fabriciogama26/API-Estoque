@@ -1,7 +1,7 @@
 const { v4: uuid } = require('uuid');
-const { SaidaMaterial } = require('../models');
-const repositories = require('../repositories');
-const { saidaRules } = require('../rules');
+const { SaidaMaterial } = require('../../models');
+const repositories = require('../../repositories');
+const { saidaRules } = require('../../rules');
 const EstoqueService = require('./EstoqueService');
 
 class SaidaService {
