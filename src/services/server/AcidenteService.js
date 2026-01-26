@@ -1,7 +1,7 @@
 const { v4: uuid } = require('uuid');
-const { Acidente } = require('../models');
-const repositories = require('../repositories');
-const { acidenteRules } = require('../rules');
+const { Acidente } = require('../../models');
+const repositories = require('../../repositories');
+const { acidenteRules } = require('../../rules');
 
 function sanitizeRequiredString(value) {
   if (value === undefined || value === null) {

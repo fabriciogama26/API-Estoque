@@ -1,7 +1,7 @@
 const { v4: uuid } = require('uuid');
-const { EntradaMaterial } = require('../models');
-const repositories = require('../repositories');
-const { entradaRules } = require('../rules');
+const { EntradaMaterial } = require('../../models');
+const repositories = require('../../repositories');
+const { entradaRules } = require('../../rules');
 
 class EntradaService {
   registrarEntrada(payload) {

@@ -1,7 +1,7 @@
 const { v4: uuid } = require('uuid');
-const { Material, PrecoHistorico } = require('../models');
-const repositories = require('../repositories');
-const { materialRules } = require('../rules');
+const { Material, PrecoHistorico } = require('../../models');
+const repositories = require('../../repositories');
+const { materialRules } = require('../../rules');
 
 const sanitizeText = (value) => (value === undefined || value === null ? '' : String(value).trim());
 

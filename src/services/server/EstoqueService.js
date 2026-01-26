@@ -1,5 +1,5 @@
-const repositories = require('../repositories');
-const { estoqueRules } = require('../rules');
+const repositories = require('../../repositories');
+const { estoqueRules } = require('../../rules');
 
 function filtrarPorPeriodo(registro, campoData, periodo) {
   if (!periodo) {
