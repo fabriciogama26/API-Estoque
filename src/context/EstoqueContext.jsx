@@ -16,6 +16,7 @@ const INITIAL_FILTERS = {
   apenasAlertas: false,
   apenasSaidas: false,
   apenasZerado: false,
+  movimentacaoPeriodo: false,
 }
 
 export function EstoqueProvider({ children }) {
@@ -27,7 +28,7 @@ export function EstoqueProvider({ children }) {
     () => user?.id || user?.user?.id || user?.name || user?.username || 'sistema',
     (err, ctx) => reportError(err, { area: 'load_estoque', ...ctx }),
   )
-  const filtroState = useEstoqueFiltro(INITIAL_FILTERS, estoqueState.estoque)
+  const filtroState = useEstoqueFiltro(INITIAL_FILTERS, estoqueState.estoque, estoqueState.estoqueBase)
 
   const handleMinStockSave = async (item) => {
     return await estoqueState.handleMinStockSave(item, filtroState.filters, (err, ctx) =>
@@ -35,23 +36,38 @@ export function EstoqueProvider({ children }) {
     )
   }
 
-  const applyFilters = async () => {
-    filtroState.applyDraftFilters()
-    await estoqueState.load({ ...filtroState.filters }, { force: true })
+  const applyFilters = async (nextFilters = null) => {
+    if (nextFilters) {
+      filtroState.setFilters(nextFilters)
+    }
+    const params = nextFilters ?? filtroState.filters
+    filtroState.applyDraftFilters(params)
+    await estoqueState.load({ ...params }, { force: true })
   }
   const resetFilters = async () => {
     filtroState.resetFiltersState()
     await estoqueState.load({ ...INITIAL_FILTERS }, { force: true })
   }
 
+  const handleFilterChange = (event) => {
+    const { name, value, type, checked } = event.target
+    const nextValue = type === 'checkbox' ? checked : value
+    const nextFilters = { ...filtroState.filters, [name]: nextValue }
+    filtroState.handleChange(event)
+    if (name === 'movimentacaoPeriodo') {
+      applyFilters(nextFilters)
+    }
+  }
+
   const value = {
     // dados
     estoque: estoqueState.estoque,
+    estoqueBase: estoqueState.estoqueBase,
     error: estoqueState.error,
     // filtros
     filters: filtroState.filters,
     setFilters: filtroState.setFilters,
-    handleFilterChange: filtroState.handleChange,
+    handleFilterChange,
     applyFilters,
     resetFilters,
     centrosCustoDisponiveis: filtroState.centrosCustoDisponiveis,
@@ -65,6 +81,7 @@ export function EstoqueProvider({ children }) {
     // itens
     paginatedItens: filtroState.paginatedItens,
     itensFiltrados: filtroState.itensFiltrados,
+    itensFiltradosBase: filtroState.itensFiltradosBase,
     itensPage: filtroState.itensPage,
     totalItensPages: filtroState.totalItensPages,
     setItensPage: filtroState.setItensPage,

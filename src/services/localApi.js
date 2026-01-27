@@ -2771,7 +2771,11 @@ const localApi = {
   },
   estoque: {
     async current(params = {}) {
-      const periodo = resolvePeriodoSaldo(parsePeriodo(params))
+      const usarMovimentacao =
+        params?.movimentacaoPeriodo === true ||
+        params?.movimentacaoPeriodo === 'true' ||
+        params?.modo === 'periodo'
+      const periodo = usarMovimentacao ? parsePeriodo(params) : null
       return readState((state) => {
         const pessoasMap = new Map((state.pessoas ?? []).map((pessoa) => [pessoa.id, mapLocalPessoaRecord(pessoa)]))
         const saidasEnriquecidas = (state.saidas ?? []).map((saida) => {
@@ -2783,7 +2787,9 @@ const localApi = {
             pessoaMatricula: saida.pessoaMatricula ?? pessoa?.matricula ?? '',
           }
         })
-        return montarEstoqueAtual(state.materiais, state.entradas, saidasEnriquecidas, periodo)
+        return montarEstoqueAtual(state.materiais, state.entradas, saidasEnriquecidas, periodo, {
+          includeAll: usarMovimentacao,
+        })
       })
     },
     async saldo(materialId) {

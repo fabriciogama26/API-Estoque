@@ -37,6 +37,7 @@ function EstoquePageContent() {
     itensPage,
     setItensPage,
     itensFiltrados,
+    itensFiltradosBase,
     minStockDrafts,
     minStockErrors,
     savingMinStock,
@@ -50,8 +51,14 @@ function EstoquePageContent() {
   }
 
   const handleExportCsv = () => {
-    const filename = `estoque-atual-${new Date().toISOString().slice(0, 10)}.csv`
-    downloadEstoqueCsv(itensFiltrados, { filename })
+    const now = new Date()
+    const localDate = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+    ].join('-')
+    const filename = `estoque-atual-${localDate}.csv`
+    downloadEstoqueCsv(itensFiltradosBase, { filename })
   }
 
   return (

@@ -25,15 +25,19 @@ Arquitetura (modular)
 
 Filtros
 -------
-- Periodo inicial/final (mes/ano) calcula o saldo fisico acumulado ate o fim do periodo.
+- Periodo inicial/final (mes/ano) so e aplicado quando "Movimentacao do periodo" esta ativo.
+- Com "Movimentacao do periodo" desligado, o estoque mostra o saldo fisico acumulado (posicao atual).
+- Com "Movimentacao do periodo" ativo, a lista exibe todos os materiais e o saldo pode ficar negativo.
 - Termo de busca (nome do material, fabricante, centro).
 - Centro de estoque/servico.
 - Quantidade (>= valor) para filtrar por saldo minimo exibido.
 - Checkboxes:
   - "Apenas zerado": mantem somente materiais com quantidade 0.
   - "Apenas saidas": mantem somente materiais com movimentacao de saida registrada (sino ativo).
-  - "Apenas alertas": mantém somente materiais com alerta ativo.
-  - "Apenas com histórico de saídas": mantém somente materiais que já possuem movimentação de saída (sino ativo). Útil para focar em itens que já foram entregues pelo menos uma vez.
+  - "Apenas alertas": mant?m somente materiais com alerta ativo.
+  - "Movimentacao do periodo": aplica o intervalo de datas para calcular entradas/saidas.
+  - "Apenas com hist?rico de sa?das": mant?m somente materiais que j? possuem movimenta??o de sa?da (sino ativo). ?til para focar em itens que j? foram entregues pelo menos uma vez.
+
 - Botoes:
   - "Aplicar filtros" consulta na API (sem refiltro local em memoria).
   - "Limpar filtros" restaura defaults e recarrega a visao padrao a partir da API.
@@ -56,6 +60,7 @@ Resumo geral
   - Valor de reposicao – soma dos valores associados aos deficits.
   - Data da ultima movimentacao relacionada ao material.
 - Geralmente calculado via `useMemo` para nao recalcular desnecessariamente.
+- Resumo e alertas seguem o modo selecionado (saldo acumulado ou movimentacao do periodo).
 
 Lista de itens
 --------------
@@ -76,16 +81,44 @@ Lista de itens
   - Ao salvar, chama `api.materiais.update` com `estoqueMinimo` e `usuarioResponsavel`.
   - Em caso de sucesso, recarrega dados do estoque atual.
   - Em caso de erro, mostra feedback e bloqueia o botao enquanto a operacao estiver em andamento.
+- Exportacao CSV:
+  - Sempre exporta a posicao fisica acumulada (ignora movimentacao do periodo).
 
 Boas praticas
 -------------
 - Configurar politicas no Supabase para permitir update de `estoque_minimo` apenas por usuarios autenticados/autorizados.
 - Manter `localApi.estoque.current` (modo local) alinhado com a estrutura esperada (`alertas` + `itens`) para facilitar testes.
-- Utilizar filtros de periodo para inspecionar o saldo fisico ao fim do periodo antes de gerar relatorios oficiais.
+- Utilizar "Movimentacao do periodo" para inspecionar entradas/saidas do intervalo antes de gerar relatorios oficiais.
 
 Melhoria possivel
 -----------------
-- Criar um RPC no Supabase para calcular o saldo do Estoque atual (com corte por data fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
+- Criar um RPC no Supabase para calcular o saldo do Estoque atual (com corte por data inicio/fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
+
+Atualizacao 2026-01
+-------------------
+- Arquivos alterados:
+  - src/services/api.js
+  - src/services/localApi.js
+  - src/lib/estoque.js
+  - src/help/helpEstoque.json
+  - src/styles/EstoquePage.css
+  - docs/Estoque.txt
+  - src/components/Estoque/Filters/EstoqueFilters.jsx
+  - src/components/Estoque/Filters/EstoqueMovimentacaoHelpButton.jsx
+  - src/hooks/useEstoque.js
+  - src/hooks/useEstoqueFiltro.js
+  - src/context/EstoqueContext.jsx
+  - src/pages/EstoquePage.jsx
+- Funcoes/hooks tocadas:
+  - api.estoque.current (movimentacao do periodo vs saldo acumulado)
+  - localApi.estoque.current (movimentacao do periodo vs saldo acumulado)
+  - montarEstoqueAtual (includeAll quando em movimentacao)
+  - useEstoque/useEstoqueFiltro (dados base e exportacao)
+  - EstoqueFilters/EstoquePage (toggle + CSV acumulado)
+- Comportamento antes/depois:
+  - Antes: periodo sempre filtrava o saldo mostrado na lista.
+  - Depois: lista mostra saldo acumulado por padrao; "Movimentacao do periodo" aplica o intervalo.
+  - CSV exporta sempre a posicao fisica acumulada.
 
 Atualizacao 2025-12
 -------------------

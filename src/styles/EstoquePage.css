@@ -5,6 +5,48 @@
   gap: 1rem;
 }
 
+.help-inline-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 0.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.help-inline-button__icon {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--color-accent);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.help-inline-button:hover .help-inline-button__icon,
+.help-inline-button:focus-visible .help-inline-button__icon {
+  background: var(--color-accent);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+}
+
+.help-inline-button:focus-visible {
+  outline: none;
+}
+
+.help-inline-button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
 @media (min-width: 1200px) {
   .estoque-alert-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
