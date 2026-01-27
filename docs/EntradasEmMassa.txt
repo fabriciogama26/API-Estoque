@@ -1,0 +1,77 @@
+Entradas em massa
+================
+
+Objetivo
+--------
+Registrar entradas em massa a partir de planilha XLSX.
+
+Formato da planilha (XLSX)
+--------------------------
+Colunas obrigatorias (cabecalho na 1a linha):
+- centro_estoque (texto)
+- material_id (uuid)
+- quantidade (numero)
+- data_entrada (dd/MM/yyyy)
+
+Observacoes importantes:
+- O arquivo deve ser .xlsx (nao CSV).
+- O centro_estoque deve existir no catalogo (centros_estoque.almox).
+- O material_id deve existir no catalogo de materiais (mesma familia).
+- A hora e definida automaticamente no momento do import.
+
+Como usar (passo a passo)
+-------------------------
+1) Abra a tela de Entradas.
+2) Clique em "Importar em massa" ao lado do botao Registrar entrada.
+3) (Opcional) Clique em "Baixar modelo (.xlsx)".
+4) Preencha a planilha seguindo as regras.
+5) Selecione o arquivo XLSX (drag-and-drop ou clique para selecionar).
+6) Clique em "Importar planilha".
+7) Ao final, o modal mostra:
+   - quantos registros foram processados
+   - quantos foram importados
+   - quantos tiveram erro
+   - (se houver) um exemplo de erro e a opcao de baixar relatorio CSV
+
+Regras de importacao
+--------------------
+- centro_estoque obrigatorio e deve existir no catalogo.
+- material_id obrigatorio e deve ser UUID valido (existente).
+- quantidade obrigatoria e maior que zero.
+- data_entrada obrigatoria no formato dd/MM/yyyy.
+
+Mapa do fluxo (frontend -> Supabase)
+------------------------------------
+UI (Modal)
+- src/components/Entradas/EntradasImportModal.jsx
+  - recebe o arquivo XLSX e chama o service de importacao
+
+Service (frontend)
+- src/services/api.js
+  - api.entradas.importPlanilha(file)
+    1) Faz upload do XLSX no Storage (bucket "imports")
+       path: entradas/<uuid>-<nome-do-arquivo>.xlsx
+    2) Chama a Edge Function "entrada-import" com body JSON:
+       { "path": "<path-do-arquivo-no-bucket>" }
+
+Edge Functions (Supabase)
+- supabase/functions/entrada-import/index.ts
+  - Valida usuario logado via JWT (Authorization Bearer)
+  - Faz download do arquivo XLSX no Storage (bucket "imports")
+  - Le a planilha e valida cada linha
+  - Insere via rpc_entradas_create_full
+  - (Se houver erros) gera um CSV com as linhas invalidas
+  - Remove o arquivo XLSX enviado (best-effort)
+
+- supabase/functions/entrada-template/index.ts
+  - Retorna um XLSX com as colunas e um exemplo.
+
+Relatorio de erros (CSV)
+------------------------
+Quando houver erros, a Edge Function retorna:
+- errorsUrl: URL assinada para baixar o CSV (se configurado)
+- firstError: primeira linha de erro
+- errorSamples: amostras de erros
+
+Formato do CSV:
+linha,coluna,motivo

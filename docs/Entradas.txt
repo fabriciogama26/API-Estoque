@@ -42,6 +42,11 @@ Cadastro
   - Ao concluir cadastro com sucesso, limpa o formulario e, quando aplicavel, limpa a selecao/autocomplete.
   - Ao iniciar edicao de uma entrada, a pagina rola para o topo e exibe o botao "Cancelar alteracao" ao lado do salvar.
   - Erros de validacao sao exibidos em area de feedback acima dos botoes.
+- Cadastro em massa:
+  - Botao "Importar em massa" abre modal com download do modelo XLSX.
+  - Colunas obrigatorias: centro_estoque, material_id, quantidade, data_entrada.
+  - Hora da entrada e definida automaticamente no momento do import.
+  - Centro de estoque e material precisam existir no catalogo do owner.
 
 Filtros, auto-complete e listagem
 ---------------------------------
@@ -102,6 +107,7 @@ Atualizacao 2026-01
 -------------------
 - Filtro local aplicado para termo/status/centro/registrado por (fallback quando a API nao filtra).
 - Exportacao CSV com base na lista filtrada da tela.
+- Importacao em massa via XLSX com relatorio de erros em CSV.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -113,6 +119,10 @@ Funcoes principais
   - Tipo: componente de pagina React
   - Caminho: src/pages/EntradasPage.jsx
   - Responsavel por: orquestrar formulario, filtros e tabela de entradas via contexto/controller.
+- EntradasImportModal
+  - Tipo: componente de UI
+  - Caminho: src/components/Entradas/EntradasImportModal.jsx
+  - Responsavel por: modal de importacao em massa (download modelo, upload XLSX, status).
 - useEntradasController
   - Tipo: hook/controller
   - Caminho: src/hooks/useEntradasController.js
@@ -150,6 +160,11 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/entradasService.js
   - Responsavel por: listar/criar/atualizar/cancelar entradas (Supabase ou modo local via dataClient).
+  - Tambem expõe downloadEntradaTemplate/importEntradaPlanilha para importacao em massa.
+- Edge Functions (importacao)
+  - Tipo: Supabase Edge Functions
+  - Caminho: supabase/functions/entrada-import/index.ts, supabase/functions/entrada-template/index.ts
+  - Responsavel por: importar XLSX e gerar modelo de planilha.
 
 Ajuda contextual
 ----------------

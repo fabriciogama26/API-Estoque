@@ -58,6 +58,12 @@ Obrigatorias:
 
 Opcionais:
 - `VITE_IMPORTS_BUCKET`
+- `ERRORS_BUCKET` (Edge Functions)
+- `ACIDENTES_TZ_OFFSET` (Edge Functions)
+- `ENTRADAS_TZ_OFFSET` (Edge Functions)
+- `ERRORS_RETENTION_DAYS` (Edge Functions)
+- `ERRORS_CLEANUP_PAGE_SIZE` (Edge Functions)
+- `CRON_SECRET` (Edge Functions)
 
 ---
 
@@ -76,7 +82,7 @@ Visao resumida e fiel da organizacao do projeto.
 
 ---
 
-### Estrutura completa
+## Estrutura completa de patas
 Visao completa de cada arquivo.
 
 - `api/`:
@@ -100,6 +106,7 @@ Visao completa de cada arquivo.
   - `docs/DashboardEstoque.txt`: documentacao: DashboardEstoque.
   - `docs/DesligamentoEmMassa.txt`: documentacao: DesligamentoEmMassa.
   - `docs/Entradas.txt`: documentacao: Entradas.
+  - `docs/EntradasEmMassa.txt`: documentacao: EntradasEmMassa.
   - `docs/Estoque.txt`: documentacao: Estoque.
   - `docs/HhtMensal.txt`: documentacao: HhtMensal.
   - `docs/Login.txt`: documentacao: Login.
@@ -178,6 +185,7 @@ Visao completa de cada arquivo.
   - `src/components/DashboardCards.jsx`: componente React.
   - `src/components/Documents/TermoEpiPreviewModal.jsx`: componente React.
   - `src/components/Entradas/EntradasHistoryModal.jsx`: componente React.
+  - `src/components/Entradas/EntradasImportModal.jsx`: componente React.
   - `src/components/Entradas/Modal/EntradaCancelModal.jsx`: componente React.
   - `src/components/Entradas/Modal/EntradaDetailsModal.jsx`: componente React.
   - `src/components/ErrorBoundary.jsx`: componente React.
@@ -427,6 +435,8 @@ Visao completa de cada arquivo.
   - `supabase/functions/cleanup-import-errors/index.ts`: Edge Function.
   - `supabase/functions/desligamento-import/index.ts`: Edge Function.
   - `supabase/functions/desligamento-template/index.ts`: Edge Function.
+  - `supabase/functions/entrada-import/index.ts`: Edge Function.
+  - `supabase/functions/entrada-template/index.ts`: Edge Function.
   - `supabase/functions/import_map.json`: import map das Edge Functions.
   - `supabase/functions/request-password-reset/index.ts`: Edge Function.
   - `supabase/functions/termo-epi/index.ts`: Edge Function.
