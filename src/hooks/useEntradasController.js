@@ -28,6 +28,7 @@ import {
   searchMateriais,
   updateEntrada,
 } from '../services/entradasService.js'
+import { listSaidas } from '../services/saidasService.js'
 
 const HISTORY_INITIAL = {
   open: false,
@@ -43,6 +44,11 @@ const CANCEL_INITIAL = {
   motivo: '',
   isSubmitting: false,
   error: null,
+  checkLoading: false,
+  canCancel: true,
+  checkMessage: '',
+  checkDetails: null,
+  materialLabel: '',
 }
 
 export function useEntradasController() {
@@ -68,6 +74,7 @@ export function useEntradasController() {
   const materialBlurTimeoutRef = useRef(null)
   const [historyState, setHistoryState] = useState({ ...HISTORY_INITIAL })
   const [cancelState, setCancelState] = useState({ ...CANCEL_INITIAL })
+  const cancelCheckRef = useRef(0)
 
   const load = useCallback(
     async (params = filters, { resetPage = false, refreshCatalogs = false } = {}) => {
@@ -308,9 +315,102 @@ export function useEntradasController() {
     setHistoryState({ ...HISTORY_INITIAL })
   }
 
+  const resolveMaterialLabel = useCallback(
+    (entrada) => {
+      if (!entrada?.materialId) {
+        return 'Material nao informado'
+      }
+      const material = materiais.find((item) => item.id === entrada.materialId)
+      return material ? formatMaterialSummary(material) : entrada.materialId
+    },
+    [materiais],
+  )
+
+  const isRegistroCancelado = (registro) => {
+    const status = (registro?.statusNome || registro?.status || '').toString().trim().toLowerCase()
+    return status === STATUS_CANCELADO_NOME.toLowerCase() || status === 'cancelado'
+  }
+
+  const validarCancelamentoEntrada = useCallback(
+    async (entrada) => {
+      if (!entrada?.materialId) {
+        setCancelState((prev) => ({
+          ...prev,
+          checkLoading: false,
+          canCancel: true,
+          checkMessage: 'Nao foi possivel validar: material nao informado.',
+        }))
+        return
+      }
+
+      const requestId = cancelCheckRef.current + 1
+      cancelCheckRef.current = requestId
+      setCancelState((prev) => ({
+        ...prev,
+        checkLoading: true,
+        canCancel: true,
+        checkMessage: '',
+        checkDetails: null,
+      }))
+
+      try {
+        const [entradasMaterial, saidasMaterial] = await Promise.all([
+          listEntradas({ materialId: entrada.materialId }),
+          listSaidas({ materialId: entrada.materialId }),
+        ])
+        if (cancelCheckRef.current !== requestId) {
+          return
+        }
+
+        const entradasAtivas = (entradasMaterial ?? []).filter(
+          (item) => item?.id !== entrada.id && !isRegistroCancelado(item),
+        )
+        const saidasAtivas = (saidasMaterial ?? []).filter((item) => !isRegistroCancelado(item))
+
+        const totalEntradasRestantes = entradasAtivas.reduce(
+          (acc, item) => acc + Number(item?.quantidade ?? 0),
+          0,
+        )
+        const totalSaidas = saidasAtivas.reduce((acc, item) => acc + Number(item?.quantidade ?? 0), 0)
+
+        const canCancel = totalSaidas <= totalEntradasRestantes
+        const materialLabel = resolveMaterialLabel(entrada)
+        const checkMessage = canCancel
+          ? `Cancelamento permitido para ${materialLabel}.`
+          : `Nao e possivel cancelar ${materialLabel}: as saidas ativas superam o saldo que restaria.`
+
+        setCancelState((prev) => ({
+          ...prev,
+          checkLoading: false,
+          canCancel,
+          checkMessage,
+          checkDetails: {
+            totalSaidas,
+            totalEntradasRestantes,
+          },
+          materialLabel,
+        }))
+      } catch (err) {
+        if (cancelCheckRef.current !== requestId) {
+          return
+        }
+        setCancelState((prev) => ({
+          ...prev,
+          checkLoading: false,
+          canCancel: true,
+          checkMessage: err?.message || 'Nao foi possivel validar o cancelamento.',
+          checkDetails: null,
+        }))
+      }
+    },
+    [resolveMaterialLabel],
+  )
+
   const openCancelModal = (entrada) => {
     if (!entrada) return
-    setCancelState({ ...CANCEL_INITIAL, open: true, entrada })
+    const materialLabel = resolveMaterialLabel(entrada)
+    setCancelState({ ...CANCEL_INITIAL, open: true, entrada, materialLabel })
+    validarCancelamentoEntrada(entrada)
   }
 
   const closeCancelModal = () => {
@@ -319,6 +419,14 @@ export function useEntradasController() {
 
   const handleCancelSubmit = async () => {
     if (!cancelState.entrada?.id) return
+    if (cancelState.checkLoading) return
+    if (cancelState.canCancel === false) {
+      setCancelState((prev) => ({
+        ...prev,
+        error: prev.checkMessage || 'Nao e possivel cancelar esta entrada.',
+      }))
+      return
+    }
     setCancelState((prev) => ({ ...prev, isSubmitting: true, error: null }))
     try {
       await cancelEntrada(cancelState.entrada.id, cancelState.motivo)

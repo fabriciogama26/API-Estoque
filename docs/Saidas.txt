@@ -37,6 +37,7 @@ Cadastro
   - Campo "Em estoque" somente leitura.
 - Comportamento:
   - Ao editar, rola para o topo e habilita "Cancelar edicao".
+  - Bloqueia registro quando saldo do material <= 0 ou quando a quantidade informada supera o saldo disponivel.
   - Erros aparecem em area de feedback.
 
 Filtros, auto-complete e listagem
@@ -52,6 +53,7 @@ Filtros, auto-complete e listagem
 - Auto-complete de materiais:
   - Dispara busca apos `MATERIAL_SEARCH_MIN_CHARS` com debounce.
   - Fallback local quando `api.materiais.search` nao existe.
+  - Lista apenas materiais com saldo > 0 no centro de estoque selecionado.
 - Auto-complete de pessoas:
   - Dispara busca apos `PESSOA_SEARCH_MIN_CHARS` com debounce.
 - Tabela:
@@ -93,6 +95,25 @@ Atualizacao 2026-01
 - Filtro registradoPor aplicado no dataMode local e na API serverless.
 - Filtro de status aplica refiltro local com normalizacao.
 - Exportacao CSV com base na lista filtrada da tela.
+- Bloqueio adicional no formulario quando saldo do material <= 0 ou quantidade > saldo.
+
+Atualizacao 2026-01 (estoque)
+-----------------------------
+- Arquivos alterados:
+  - src/hooks/useSaidasController.js
+  - src/help/helpSaidas.json
+  - docs/Saidas.txt
+  - src/services/saidasService.js
+- Funcoes/hooks tocadas:
+  - useSaidasController.handleSubmit (validacao de saldo)
+  - useSaidasController.confirmTroca (validacao de saldo)
+  - useSaidasController (filtro de materiais com saldo > 0 no autocomplete)
+  - saidasService.getMaterialEstoque (usa materiais.estoqueAtual quando disponivel)
+- Comportamento antes/depois:
+  - Antes: validacao de saldo apenas via backend (Supabase/RPC).
+  - Depois: UI bloqueia saida quando saldo <= 0 ou quando a quantidade excede o saldo (inclui edicao).
+  - Antes: autocomplete podia listar materiais com saldo zero/negativo.
+  - Depois: autocomplete lista apenas materiais com saldo positivo no centro selecionado.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

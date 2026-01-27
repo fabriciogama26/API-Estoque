@@ -26,6 +26,10 @@ export const listMateriais = () =>
 
 export const searchMateriais = (params) => (api?.materiais?.search ? api.materiais.search(params) : Promise.resolve([]))
 export const getMaterialEstoque = async (materialId, centroEstoqueId = null) => {
+  if (api?.materiais?.estoqueAtual) {
+    const saldo = await api.materiais.estoqueAtual(materialId, centroEstoqueId)
+    return { materialId, quantidade: Number(saldo ?? 0) }
+  }
   if (api?.estoque?.current) {
     // Usa a mesma fonte da tela Estoque Atual; se necessário, o backend pode aplicar centro
     const lista = await api.estoque.current({

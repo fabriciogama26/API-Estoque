@@ -98,6 +98,7 @@ export function useSaidasController() {
   const [materialSearchError, setMaterialSearchError] = useState(null)
   const materialSearchTimeoutRef = useRef(null)
   const materialBlurTimeoutRef = useRef(null)
+  const materialSaldoCacheRef = useRef(new Map())
 
   const [pessoaSearchValue, setPessoaSearchValue] = useState('')
   const [pessoaSuggestions, setPessoaSuggestions] = useState([])
@@ -244,6 +245,27 @@ export function useSaidasController() {
     }
     setIsSaving(true)
     try {
+      const estoqueAtual = Number(materialEstoque?.quantidade ?? 0)
+      if (materialEstoqueLoading) {
+        throw new Error('Aguarde a consulta do estoque do material.')
+      }
+      if (!Number.isFinite(estoqueAtual)) {
+        throw new Error('Nao foi possivel validar o estoque do material.')
+      }
+      const quantidadeTroca = Number(trocaPrompt.payload.quantidade ?? 0)
+      if (!Number.isFinite(quantidadeTroca) || quantidadeTroca <= 0) {
+        throw new Error('Informe uma quantidade valida.')
+      }
+      let estoquePermitido = estoqueAtual
+      if (editingSaida && String(editingSaida.materialId) === String(trocaPrompt.payload.materialId)) {
+        estoquePermitido += Number(editingSaida.quantidade ?? 0)
+      }
+      if (estoquePermitido <= 0) {
+        throw new Error('Sem estoque disponivel para este material.')
+      }
+      if (quantidadeTroca > estoquePermitido) {
+        throw new Error('Quantidade informada maior que o estoque disponivel.')
+      }
       await createSaida({ ...trocaPrompt.payload, forceTroca: true })
       cancelEditSaida()
       await load(filters, { resetPage: true })
@@ -254,7 +276,17 @@ export function useSaidasController() {
     } finally {
       setIsSaving(false)
     }
-  }, [cancelEditSaida, closeTrocaPrompt, filters, load, reportError, trocaPrompt])
+  }, [
+    cancelEditSaida,
+    closeTrocaPrompt,
+    editingSaida,
+    filters,
+    load,
+    materialEstoque,
+    materialEstoqueLoading,
+    reportError,
+    trocaPrompt,
+  ])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -276,6 +308,27 @@ export function useSaidasController() {
       }
       if (!payload.pessoaId || !payload.materialId || !payload.dataEntrega || !payload.centroEstoqueId) {
         throw new Error('Preencha pessoa, centro de estoque, material e data da entrega.')
+      }
+      if (materialEstoqueLoading) {
+        throw new Error('Aguarde a consulta do estoque do material.')
+      }
+      const estoqueAtual = Number(materialEstoque?.quantidade ?? 0)
+      if (!Number.isFinite(estoqueAtual)) {
+        throw new Error('Nao foi possivel validar o estoque do material.')
+      }
+      const quantidadeInformada = Number(payload.quantidade ?? 0)
+      if (!Number.isFinite(quantidadeInformada) || quantidadeInformada <= 0) {
+        throw new Error('Informe uma quantidade valida.')
+      }
+      let estoquePermitido = estoqueAtual
+      if (editingSaida && String(editingSaida.materialId) === String(payload.materialId)) {
+        estoquePermitido += Number(editingSaida.quantidade ?? 0)
+      }
+      if (estoquePermitido <= 0) {
+        throw new Error('Sem estoque disponivel para este material.')
+      }
+      if (quantidadeInformada > estoquePermitido) {
+        throw new Error('Quantidade informada maior que o estoque disponivel.')
       }
       if (editingSaida) {
         await updateSaida(editingSaida.id, payload)
@@ -486,6 +539,33 @@ export function useSaidasController() {
     [materiais],
   )
 
+  const resolveMaterialSaldo = useCallback(async (materialId, centroEstoqueId) => {
+    const key = `${String(centroEstoqueId || '')}:${String(materialId || '')}`
+    if (materialSaldoCacheRef.current.has(key)) {
+      return materialSaldoCacheRef.current.get(key)
+    }
+    const estoque = await getMaterialEstoque(materialId, centroEstoqueId)
+    const quantidade = Number(estoque?.quantidade ?? estoque?.saldo ?? 0)
+    materialSaldoCacheRef.current.set(key, quantidade)
+    return quantidade
+  }, [getMaterialEstoque])
+
+  const filtrarMateriaisComSaldo = useCallback(async (lista = [], centroEstoqueId) => {
+    const candidatos = Array.isArray(lista) ? lista : []
+    if (!candidatos.length) return []
+    const verificacoes = await Promise.all(
+      candidatos.map(async (material) => {
+        const materialId = material?.id ?? material?.materialId
+        if (!materialId) return null
+        const saldo = await resolveMaterialSaldo(materialId, centroEstoqueId)
+        return { material, saldo }
+      }),
+    )
+    return verificacoes
+      .filter((item) => item && Number(item.saldo ?? 0) > 0)
+      .map((item) => item.material)
+  }, [resolveMaterialSaldo])
+
   const fallbackPessoaSearch = useCallback(
     (term) => {
       const normalized = normalizeSearchValue(term)
@@ -537,7 +617,17 @@ export function useSaidasController() {
             (!resultados || resultados.length === 0) && termoNormalizado
               ? fallbackMaterialSearch(termo)
               : resultados
-          setMaterialSuggestions(dedupeMateriais(itens ?? []))
+          const deduped = dedupeMateriais(itens ?? [])
+          try {
+            const filtrados = await filtrarMateriaisComSaldo(deduped, form.centroEstoqueId)
+            setMaterialSuggestions(filtrados)
+            if (deduped.length > 0 && filtrados.length === 0) {
+              setMaterialSearchError('Nenhum material com saldo disponivel.')
+            }
+          } catch (saldoErr) {
+            setMaterialSearchError(saldoErr?.message || 'Falha ao validar saldo do material.')
+            setMaterialSuggestions([])
+          }
           setMaterialDropdownOpen(true)
         }
       } catch (err) {
@@ -558,7 +648,14 @@ export function useSaidasController() {
         materialSearchTimeoutRef.current = null
       }
     }
-  }, [materialSearchValue, form.materialId, fallbackMaterialSearch, reportError])
+  }, [
+    materialSearchValue,
+    form.materialId,
+    form.centroEstoqueId,
+    fallbackMaterialSearch,
+    filtrarMateriaisComSaldo,
+    reportError,
+  ])
 
   useEffect(() => {
     if (pessoaSearchTimeoutRef.current) {

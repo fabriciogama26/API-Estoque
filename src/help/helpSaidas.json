@@ -5,12 +5,12 @@
     "steps": [
       {
         "title": "Registrar saida",
-        "description": "No campo de busca, digite o nome ou matricula para achar a pessoa e selecione o material pelo autocomplete por nome, ID ou CA. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saida para gravar a entrega.",
+        "description": "No campo de busca, digite o nome ou matricula para achar a pessoa e selecione o material pelo autocomplete por nome, ID ou CA. O autocomplete exibe apenas materiais com saldo > 0 no centro selecionado. Informe quantidade, centro de estoque e data; confira o saldo exibido ao lado e clique em Registrar saida para gravar a entrega.",
         "mediaHint": "Formulario de cadastro de saidas com busca de pessoa e material."
       },
       {
         "title": "Conferir saldo disponivel",
-        "description": "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque para evitar liberacoes acima do estoque.",
+        "description": "Ao selecionar o material, a caixa lateral mostra saldo por centro de estoque. O sistema bloqueia a saida quando o saldo esta zero/negativo ou quando a quantidade informada excede o saldo disponivel.",
         "mediaHint": "Bloco de saldo do material ao lado do formulario."
       },
       {
@@ -26,6 +26,8 @@
     ],
     "notes": [
       "Saidas canceladas ficam marcadas e nao impactam o saldo.",
+      "Materiais com saldo zero ou negativo nao aparecem no autocomplete.",
+      "Nao e permitido registrar saida com saldo zero/negativo ou acima do saldo disponivel.",
       "Atalho: vindo do Estoque atual, o formulario pode abrir com Centro de estoque e Material ja selecionados.",
       "O filtro de Busca aceita ID do material.",
       "O historico detalha quem registrou e quando a entrega foi alterada."

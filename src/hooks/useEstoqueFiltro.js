@@ -10,7 +10,7 @@ import {
 export const ALERTAS_PAGE_SIZE = 6
 export const ITENS_PAGE_SIZE = 10
 
-export function useEstoqueFiltro(initialFilters, estoque) {
+export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null) {
   const [filters, setFilters] = useState(initialFilters)
   const [appliedFilters, setAppliedFilters] = useState(initialFilters)
   const [alertasPage, setAlertasPage] = useState(1)
@@ -25,6 +25,12 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     () => filterEstoqueItens(estoque.itens, appliedFilters),
     [estoque.itens, appliedFilters],
   )
+  const itensFiltradosBase = useMemo(() => {
+    if (!estoqueBase?.itens) {
+      return itensFiltrados
+    }
+    return filterEstoqueItens(estoqueBase.itens, appliedFilters)
+  }, [estoqueBase, appliedFilters, itensFiltrados])
 
   const alertasFiltrados = useMemo(
     () =>
@@ -159,8 +165,8 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     })
   }, [totalItensPages])
 
-  const applyDraftFilters = () => {
-    setAppliedFilters({ ...filters })
+  const applyDraftFilters = (nextFilters = null) => {
+    setAppliedFilters(nextFilters ? { ...nextFilters } : { ...filters })
   }
 
   const resetFiltersState = () => {
@@ -203,5 +209,6 @@ export function useEstoqueFiltro(initialFilters, estoque) {
     totalItensPages,
     setItensPage,
     summaryCards,
+    itensFiltradosBase,
   }
 }

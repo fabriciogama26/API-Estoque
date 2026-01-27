@@ -6,36 +6,70 @@ let hasRunInitialLoad = false
 
 export function useEstoque(initialFilters, userResolver, onError) {
   const [estoque, setEstoque] = useState({ itens: [], alertas: [] })
+  const [estoqueBase, setEstoqueBase] = useState({ itens: [], alertas: [] })
   const [error, setError] = useState(null)
   const [minStockDrafts, setMinStockDrafts] = useState({})
   const [savingMinStock, setSavingMinStock] = useState({})
   const [minStockErrors, setMinStockErrors] = useState({})
   const initRef = useRef(false)
   const lastLoadKeyRef = useRef(null)
+  const lastBaseKeyRef = useRef(null)
   const estoqueRef = useRef({ itens: [], alertas: [] })
+  const estoqueBaseRef = useRef({ itens: [], alertas: [] })
   const lastParamsRef = useRef(null)
+  const normalizeBaseParams = (rawParams) => {
+    const {
+      periodoInicio,
+      periodoFim,
+      ano,
+      mes,
+      dataInicio,
+      dataFim,
+      movimentacaoPeriodo,
+      modo,
+      ...rest
+    } = rawParams || {}
+    return rest
+  }
 
   const load = useCallback(
     async (params = initialFilters, { force = false, silent = false } = {}) => {
-      const key = JSON.stringify(params || {})
-      if (!force && lastLoadKeyRef.current === key) {
+      const usarMovimentacao = Boolean(params?.movimentacaoPeriodo)
+      const baseParams = normalizeBaseParams(params)
+      const baseKey = JSON.stringify(baseParams || {})
+      const viewParams = usarMovimentacao ? { ...params, movimentacaoPeriodo: true } : baseParams
+      const viewKey = JSON.stringify(viewParams || {})
+      if (!force && lastLoadKeyRef.current === viewKey && lastBaseKeyRef.current === baseKey) {
         return null
       }
-      lastLoadKeyRef.current = key
       try {
-        const data = await listEstoqueAtual({
-          periodoInicio: params.periodoInicio || undefined,
-          periodoFim: params.periodoFim || undefined,
-        })
-        const next = { itens: data?.itens ?? [], alertas: data?.alertas ?? [] }
+        let baseData = estoqueBaseRef.current
+        if (force || lastBaseKeyRef.current !== baseKey) {
+          const data = await listEstoqueAtual(baseParams)
+          baseData = { itens: data?.itens ?? [], alertas: data?.alertas ?? [] }
+          setEstoqueBase(baseData)
+          estoqueBaseRef.current = baseData
+          lastBaseKeyRef.current = baseKey
+        }
+
+        let nextView = baseData
+        if (usarMovimentacao) {
+          if (force || lastLoadKeyRef.current !== viewKey) {
+            const data = await listEstoqueAtual(viewParams)
+            nextView = { itens: data?.itens ?? [], alertas: data?.alertas ?? [] }
+          } else {
+            nextView = estoqueRef.current
+          }
+        }
+
         const currentKey = JSON.stringify(estoqueRef.current)
-        const nextKey = JSON.stringify(next)
+        const nextKey = JSON.stringify(nextView)
         if (currentKey !== nextKey) {
-          setEstoque(next)
-          estoqueRef.current = next
+          setEstoque(nextView)
+          estoqueRef.current = nextView
           setMinStockDrafts(() => {
             const drafts = {}
-            ;(next.itens ?? []).forEach((item) => {
+            ;(nextView.itens ?? []).forEach((item) => {
               drafts[item.materialId] =
                 item.estoqueMinimo !== undefined && item.estoqueMinimo !== null
                   ? String(item.estoqueMinimo)
@@ -45,8 +79,9 @@ export function useEstoque(initialFilters, userResolver, onError) {
           })
           setMinStockErrors({})
         }
+        lastLoadKeyRef.current = viewKey
         lastParamsRef.current = params
-        return data
+        return nextView
       } catch (err) {
         setError(err.message)
         if (typeof onError === 'function') {
@@ -126,6 +161,7 @@ export function useEstoque(initialFilters, userResolver, onError) {
 
   return {
     estoque,
+    estoqueBase,
     isLoading: false,
     error,
     load,

@@ -1,3 +1,5 @@
+import { EstoqueMovimentacaoHelpButton } from './EstoqueMovimentacaoHelpButton.jsx'
+
 export function EstoqueFilters({
   filters,
   centrosCusto,
@@ -13,11 +15,35 @@ export function EstoqueFilters({
       <form className="form form--inline" onSubmit={onSubmit}>
         <label className="field">
           <span>Periodo inicial</span>
-          <input type="month" name="periodoInicio" value={filters.periodoInicio} onChange={onChange} />
+          <input
+            type="month"
+            name="periodoInicio"
+            value={filters.periodoInicio}
+            onChange={onChange}
+            disabled={!filters.movimentacaoPeriodo}
+          />
         </label>
         <label className="field">
           <span>Periodo final</span>
-          <input type="month" name="periodoFim" value={filters.periodoFim} onChange={onChange} />
+          <input
+            type="month"
+            name="periodoFim"
+            value={filters.periodoFim}
+            onChange={onChange}
+            disabled={!filters.movimentacaoPeriodo}
+          />
+        </label>
+        <label className="field field--checkbox field--checkbox-accent">
+          <input
+            type="checkbox"
+            name="movimentacaoPeriodo"
+            checked={Boolean(filters.movimentacaoPeriodo)}
+            onChange={onChange}
+          />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            Movimentacao do periodo
+            <EstoqueMovimentacaoHelpButton />
+          </span>
         </label>
         <label className="field">
           <span>Busca</span>

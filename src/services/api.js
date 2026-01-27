@@ -5603,17 +5603,34 @@ export const api = {
   estoque: {
     async current(params = {}) {
       const periodo = parsePeriodo(params)
-      const periodoSaldo = resolvePeriodoSaldo(periodo)
-      const periodoRange = resolvePeriodoRange(periodoSaldo)
-      const dataFim = periodoRange?.end ? periodoRange.end.toISOString() : null
+      const usarMovimentacao =
+        params?.movimentacaoPeriodo === true ||
+        params?.movimentacaoPeriodo === 'true' ||
+        params?.modo === 'periodo'
+      const limparPeriodo = (rawParams) => {
+        const { periodoInicio, periodoFim, ano, mes, dataInicio, dataFim, movimentacaoPeriodo, modo, ...rest } =
+          rawParams || {}
+        return rest
+      }
+      const periodoRange = usarMovimentacao ? resolvePeriodoRange(periodo) : null
       const hasExplicitDate = Boolean(params.dataInicio || params.dataFim)
-      const queryParams = !hasExplicitDate && dataFim ? { ...params, dataFim } : params
+      const queryParams = usarMovimentacao
+        ? !hasExplicitDate && periodoRange?.start && periodoRange?.end
+          ? {
+              ...params,
+              dataInicio: periodoRange.start.toISOString(),
+              dataFim: periodoRange.end.toISOString(),
+            }
+          : params
+        : limparPeriodo(params)
       const [materiais, entradas, saidas] = await Promise.all([
         carregarMateriais(),
         carregarEntradas(queryParams),
         carregarSaidas(queryParams),
       ])
-      return montarEstoqueAtual(materiais, entradas, saidas, periodoSaldo)
+      return montarEstoqueAtual(materiais, entradas, saidas, usarMovimentacao ? periodo : null, {
+        includeAll: usarMovimentacao,
+      })
     },
     async saldo(materialId) {
       return obterSaldoMaterial(materialId)

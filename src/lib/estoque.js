@@ -263,7 +263,8 @@ function normalizarMaterial(material) {
   }
 }
 
-export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], periodo = null) {
+export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], periodo = null, options = {}) {
+  const includeAll = Boolean(options?.includeAll)
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
   const materiaisComMovimentacao = new Set()
 
@@ -371,7 +372,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     }
   })
 
-  const itensFiltrados = itens.filter((item) => materiaisComMovimentacao.has(item.materialId))
+  const itensFiltrados = includeAll ? itens : itens.filter((item) => materiaisComMovimentacao.has(item.materialId))
 
   const alertas = itensFiltrados
     .filter((item) => item.alerta)
