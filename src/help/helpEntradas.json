@@ -22,6 +22,11 @@
         "title": "Atualizar dados",
         "description": "Clique em Atualizar no cabecalho da lista para recarregar dados e sugestoes de materiais.",
         "mediaHint": "Botao Atualizar no topo da secao de historico."
+      },
+      {
+        "title": "Importar em massa",
+        "description": "Use o botao Importar em massa ao lado de Registrar entrada para abrir o modal. Baixe o modelo XLSX, preencha as colunas obrigatorias (centro_estoque, material_id, quantidade, data_entrada) e envie o arquivo.",
+        "mediaHint": "Modal de importacao em massa com download do modelo, dropzone e relatorio de erros."
       }
     ],
     "notes": [

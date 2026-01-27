@@ -25,6 +25,23 @@ export const listMateriais = () => api.materiais.list()
 
 export const searchMateriais = (params) => (api?.materiais?.search ? api.materiais.search(params) : Promise.resolve([]))
 
+export const downloadEntradaTemplate = () => {
+  if (api?.entradas?.downloadTemplate) {
+    return api.entradas.downloadTemplate()
+  }
+  return Promise.reject(new Error('Endpoint de download de modelo nao configurado.'))
+}
+
+export const importEntradaPlanilha = (file) => {
+  if (!file) {
+    return Promise.reject(new Error('Selecione um arquivo XLSX.'))
+  }
+  if (api?.entradas?.importPlanilha) {
+    return api.entradas.importPlanilha(file)
+  }
+  return Promise.reject(new Error('Endpoint de importacao de entradas nao configurado.'))
+}
+
 export const listCentrosEstoque = () => {
   if (api?.centrosEstoque && typeof api.centrosEstoque.list === 'function') {
     return api.centrosEstoque.list()

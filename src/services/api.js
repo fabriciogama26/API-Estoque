@@ -5125,6 +5125,116 @@ export const api = {
   entradas: {
     list: carregarEntradas,
     materialOptions: carregarMateriaisDeEntradas,
+    async downloadTemplate() {
+      if (!FUNCTIONS_URL) {
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
+      }
+      const headers = await buildAuthHeaders()
+      const resp = await fetch(`${FUNCTIONS_URL}/entrada-template`, { headers })
+      if (!resp.ok) {
+        throw new Error('Falha ao baixar modelo de entradas.')
+      }
+      const blob = await resp.blob()
+      return { blob, filename: 'entrada_template.xlsx' }
+    },
+    async importPlanilha(file) {
+      try {
+        if (!file) {
+          throw new Error('Selecione um arquivo XLSX.')
+        }
+        if (!isSupabaseConfigured) {
+          throw new Error('Supabase nao configurado.')
+        }
+
+        const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
+        const path = `entradas/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+
+        const upload = await supabase.storage.from(importsBucket).upload(path, file, {
+          contentType:
+            file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          upsert: false,
+        })
+        if (upload.error) {
+          throw new Error(upload.error.message || 'Falha ao enviar arquivo para o Storage.')
+        }
+
+        if (!FUNCTIONS_URL) {
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
+        }
+
+        const headers = await buildAuthHeaders({
+          'Content-Type': 'application/json',
+          ...(SUPABASE_ANON_KEY ? { apikey: SUPABASE_ANON_KEY } : {}),
+        })
+        const resp = await fetch(`${FUNCTIONS_URL}/entrada-import`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ path }),
+        })
+        const status = resp.status
+        const requestId =
+          resp.headers.get('x-deno-execution-id') ||
+          resp.headers.get('x-sb-request-id') ||
+          null
+        let responseText = null
+        try {
+          responseText = await resp.text()
+        } catch (_) {
+          responseText = null
+        }
+        let responseJson = null
+        try {
+          responseJson = responseText ? JSON.parse(responseText) : null
+        } catch (_) {
+          responseJson = null
+        }
+        if (!resp.ok) {
+          const stage = responseJson?.stage || null
+          const responseMessage = responseJson?.message || responseJson?.error || responseText
+          const suffixParts = []
+          if (stage) suffixParts.push(`stage=${stage}`)
+          if (requestId) suffixParts.push(`req=${requestId}`)
+          const suffix = suffixParts.length ? ` (${suffixParts.join(', ')})` : ''
+          const friendly =
+            responseMessage && String(responseMessage).trim()
+              ? `Falha ao importar planilha (${status || 'sem status'}): ${responseMessage}${suffix}`
+              : `Falha ao importar planilha (${status || 'sem status'})${suffix}.`
+
+          const enriched = new Error(friendly)
+          enriched.details = {
+            status,
+            stage,
+            requestId,
+            response: responseMessage,
+            function: 'entrada-import',
+            bucket: importsBucket,
+            path,
+          }
+          throw enriched
+        }
+        return responseJson || {}
+      } catch (err) {
+        const details = err?.details || {}
+        reportClientError(
+          'Falha ao importar entradas em massa.',
+          err,
+          {
+            feature: 'entradas',
+            action: 'entrada-import',
+            status: details.status,
+            code: details.code,
+            stage: details.stage,
+            function: details.function,
+            bucket: details.bucket,
+            path: details.path,
+            response: details.response,
+            requestId: details.requestId,
+          },
+          'error'
+        )
+        throw err
+      }
+    },
     async searchMateriais(params = {}) {
       const termo = params?.termo ?? params?.q ?? params?.query ?? ''
       const limit = Number.isFinite(Number(params?.limit)) ? Number(params.limit) : 10

@@ -4,6 +4,7 @@ import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { EntryIcon, EditIcon, HistoryIcon, CancelIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModal.jsx'
+import { EntradasImportModal } from '../components/Entradas/EntradasImportModal.jsx'
 import { EntradaDetailsModal } from '../components/Entradas/Modal/EntradaDetailsModal.jsx'
 import { EntradaCancelModal } from '../components/Entradas/Modal/EntradaCancelModal.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
@@ -13,6 +14,7 @@ import { formatCurrency, formatDisplayDate, formatMaterialSummary, normalizeSear
 import { formatDisplayDateTime } from '../utils/saidasUtils.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { downloadEntradasCsv } from '../utils/entradasExport.js'
+import { downloadEntradaTemplate, importEntradaPlanilha } from '../services/entradasService.js'
 import '../styles/MateriaisPage.css'
 
 function EntradasContent() {
@@ -66,6 +68,9 @@ function EntradasContent() {
   } = useEntradasContext()
 
   const [detalheEntrada, setDetalheEntrada] = useState(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importInfo, setImportInfo] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
 
   useEffect(() => {
     const centroParam = (searchParams.get('centroEstoque') || searchParams.get('centroCusto') || '').trim()
@@ -258,7 +263,11 @@ function EntradasContent() {
             <button type="button" className="button button--ghost" onClick={cancelEdit} disabled={isSaving}>
               Cancelar edição
             </button>
-          ) : null}
+          ) : (
+            <button type="button" className="button button--ghost" onClick={() => setImportOpen(true)} disabled={isSaving}>
+              Cadastrar em massa
+            </button>
+          )}
         </div>
         </form>
       </section>
@@ -490,7 +499,63 @@ function EntradasContent() {
         onMotivoChange={(value) => setCancelState((prev) => ({ ...prev, motivo: value }))}
         isSaving={cancelState.isSubmitting}
       />
-            <EntradasHistoryModal state={historyState} onClose={closeHistory} />
+      <EntradasImportModal
+        open={importOpen}
+        onClose={() => {
+          setImportOpen(false)
+          setImportInfo(null)
+          setImportLoading(false)
+        }}
+        info={importInfo}
+        disabled={importLoading}
+        loading={importLoading}
+        onDownloadTemplate={async () => {
+          setImportInfo({ status: 'info', message: 'Baixando modelo...' })
+          try {
+            const { blob, filename } = await downloadEntradaTemplate()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename || 'entrada_template.xlsx'
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+            setImportInfo({ status: 'success', message: 'Modelo baixado com sucesso.' })
+          } catch (err) {
+            setImportInfo({ status: 'error', message: err.message || 'Falha ao baixar modelo.' })
+          }
+        }}
+        onUploadFile={async (file) => {
+          if (!file) return
+          setImportLoading(true)
+          setImportInfo({ status: 'info', message: 'Enviando planilha...' })
+          try {
+            const result = await importEntradaPlanilha(file)
+            setImportInfo({
+              status: 'success',
+              message: 'Importacao concluida.',
+              stats: {
+                processed: result?.processed ?? result?.total ?? 0,
+                success: result?.success ?? result?.imported ?? 0,
+                errors: result?.errors ?? result?.failed ?? 0,
+              },
+              errorsUrl: result?.errorsUrl ?? null,
+              firstError: result?.firstError ?? null,
+              errorSamples: result?.errorSamples ?? [],
+            })
+            await load(filters, { resetPage: true, refreshCatalogs: true })
+          } catch (err) {
+            setImportInfo({
+              status: 'error',
+              message: err.message || 'Falha ao importar planilha.',
+            })
+          } finally {
+            setImportLoading(false)
+          }
+        }}
+      />
+      <EntradasHistoryModal state={historyState} onClose={closeHistory} />
     </div>
   )
 }
