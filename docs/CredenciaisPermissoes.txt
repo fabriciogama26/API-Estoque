@@ -194,6 +194,12 @@ Diagnóstico rápido de “Sem permissão”
 
 
 
+Atualizacao 2026-01 (schema)
+-----------------------------
+- Arquivos alterados: supabase/migrations/20260228_register_missing_tables.sql.
+- Tabelas registradas: public.roles, public.permissions, public.role_permissions, public.user_roles, public.user_permission_overrides.
+- Antes/Depois: antes existiam no banco sem migration; depois estao versionadas na pasta supabase/migrations.
+
 Referências de migrations principais
 
 ------------------------------------
