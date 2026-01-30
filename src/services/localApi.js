@@ -2788,7 +2788,7 @@ const localApi = {
           }
         })
         return montarEstoqueAtual(state.materiais, state.entradas, saidasEnriquecidas, periodo, {
-          includeAll: usarMovimentacao,
+          includeAll: false,
         })
       })
     },

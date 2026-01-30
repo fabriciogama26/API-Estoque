@@ -1,0 +1,10 @@
+Content-Type=application/json
+x-cron-secret=****
+
+
+{"dryRun": true} para listar
+
+{"dryRun": false} para apagar
+
+
+POST

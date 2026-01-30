@@ -24,6 +24,7 @@ import Info from 'lucide-react/dist/esm/icons/info.js'
 import UserCircle from 'lucide-react/dist/esm/icons/user-circle.js'
 import LifeBuoy from 'lucide-react/dist/esm/icons/life-buoy.js'
 import FileSpreadsheet from 'lucide-react/dist/esm/icons/file-spreadsheet.js'
+import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw.js'
 
 const defaultSize = 18
 const defaultStroke = 1.8
@@ -57,3 +58,4 @@ export const InfoIcon = (props) => <Info {...withDefaultProps(props)} />
 export const PersonIcon = (props) => <UserCircle {...withDefaultProps(props)} />
 export const HelpIcon = (props) => <LifeBuoy {...withDefaultProps(props)} />
 export const SpreadsheetIcon = (props) => <FileSpreadsheet {...withDefaultProps(props)} />
+export const RefreshIcon = (props) => <RefreshCw {...withDefaultProps(props)} />

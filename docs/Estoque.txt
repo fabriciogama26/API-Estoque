@@ -27,7 +27,7 @@ Filtros
 -------
 - Periodo inicial/final (mes/ano) so e aplicado quando "Movimentacao do periodo" esta ativo.
 - Com "Movimentacao do periodo" desligado, o estoque mostra o saldo fisico acumulado (posicao atual).
-- Com "Movimentacao do periodo" ativo, a lista exibe todos os materiais e o saldo pode ficar negativo.
+- Com "Movimentacao do periodo" ativo, a lista mostra apenas materiais com movimentacao no intervalo (saldo pode ficar negativo).
 - Termo de busca (nome do material, fabricante, centro).
 - Centro de estoque/servico.
 - Quantidade (>= valor) para filtrar por saldo minimo exibido.
@@ -83,6 +83,7 @@ Lista de itens
   - Em caso de erro, mostra feedback e bloqueia o botao enquanto a operacao estiver em andamento.
 - Exportacao CSV:
   - Sempre exporta a posicao fisica acumulada (ignora movimentacao do periodo).
+  - Botao "Atualizar" recarrega a lista aplicando os filtros atuais.
 
 Boas praticas
 -------------
@@ -103,6 +104,7 @@ Atualizacao 2026-01
   - src/help/helpEstoque.json
   - src/styles/EstoquePage.css
   - docs/Estoque.txt
+  - src/components/icons.jsx
   - src/components/Estoque/Filters/EstoqueFilters.jsx
   - src/components/Estoque/Filters/EstoqueMovimentacaoHelpButton.jsx
   - src/hooks/useEstoque.js
@@ -114,10 +116,11 @@ Atualizacao 2026-01
   - localApi.estoque.current (movimentacao do periodo vs saldo acumulado)
   - montarEstoqueAtual (includeAll quando em movimentacao)
   - useEstoque/useEstoqueFiltro (dados base e exportacao)
-  - EstoqueFilters/EstoquePage (toggle + CSV acumulado)
+  - EstoqueFilters/EstoquePage (toggle + CSV acumulado + botao atualizar)
 - Comportamento antes/depois:
-  - Antes: periodo sempre filtrava o saldo mostrado na lista.
-  - Depois: lista mostra saldo acumulado por padrao; "Movimentacao do periodo" aplica o intervalo.
+  - Antes: o botao "Aplicar filtros" enviava um payload incorreto e os filtros da tela nao eram aplicados.
+  - Depois: o botao usa os filtros atuais do formulario e aplica corretamente na lista e no resumo.
+  - Lista mostra saldo acumulado por padrao; "Movimentacao do periodo" aplica o intervalo e filtra apenas materiais com movimentacao.
   - CSV exporta sempre a posicao fisica acumulada.
 
 Atualizacao 2025-12
