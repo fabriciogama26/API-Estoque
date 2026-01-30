@@ -5629,7 +5629,7 @@ export const api = {
         carregarSaidas(queryParams),
       ])
       return montarEstoqueAtual(materiais, entradas, saidas, usarMovimentacao ? periodo : null, {
-        includeAll: usarMovimentacao,
+        includeAll: false,
       })
     },
     async saldo(materialId) {

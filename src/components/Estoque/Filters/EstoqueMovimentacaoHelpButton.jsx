@@ -73,7 +73,7 @@ export function EstoqueMovimentacaoHelpButton() {
                 <li>
                   <strong>Ligado:</strong> aplica o periodo e mostra a movimentacao do intervalo (entradas - saidas).
                 </li>
-                <li>Com o periodo ligado, a lista exibe todos os materiais, mesmo sem movimentacao.</li>
+                <li>Com o periodo ligado, a lista mostra apenas materiais com movimentacao no intervalo.</li>
                 <li>Resumo e alertas seguem o modo selecionado.</li>
                 <li>Itens cancelados nao entram no calculo.</li>
                 <li>O CSV exporta sempre a posicao fisica acumulada.</li>

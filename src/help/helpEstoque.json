@@ -46,7 +46,7 @@
       "Atalho: ao clicar em Entrada/Saida a partir do Estoque atual, o sistema tenta preencher automaticamente o Centro de estoque e o Material.",
       "Movimentacao do periodo considera apenas as movimentacoes dentro do intervalo selecionado.",
       "Resumo e alertas seguem o modo selecionado.",
-      "Com Movimentacao do periodo ativa, a lista exibe todos os materiais, mesmo sem movimentacao."
+      "Com Movimentacao do periodo ativa, a lista mostra somente materiais com movimentacao no intervalo."
     ]
   }
 }

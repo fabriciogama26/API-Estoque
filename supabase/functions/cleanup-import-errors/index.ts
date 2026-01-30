@@ -1,4 +1,3 @@
-// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
 
@@ -10,7 +9,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-const errorsBucket = Deno.env.get("ERRORS_BUCKET") || "imports"
+const bucket = Deno.env.get("ERRORS_BUCKET") || "imports"
 const cronSecret = Deno.env.get("CRON_SECRET") || ""
 
 const clampInt = (value: string | undefined, fallback: number) => {
@@ -20,9 +19,17 @@ const clampInt = (value: string | undefined, fallback: number) => {
 }
 
 const retentionDays = clampInt(Deno.env.get("ERRORS_RETENTION_DAYS"), 7)
-const pageSize = clampInt(Deno.env.get("ERRORS_CLEANUP_PAGE_SIZE"), 1000)
+const pageSize = clampInt(Deno.env.get("ERRORS_CLEANUP_PAGE_SIZE"), 500)
 
-const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { persistSession: false },
+  global: {
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+    },
+  },
+})
 
 const isAuthorized = (req: Request) => {
   if (!cronSecret) return true
@@ -33,89 +40,249 @@ const isAuthorized = (req: Request) => {
   return headerToken === cronSecret || bearerToken === cronSecret
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
-  }
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405, headers: corsHeaders })
-  }
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY", {
-      status: 500,
-      headers: corsHeaders,
-    })
-  }
-  if (!isAuthorized(req)) {
-    return new Response("Unauthorized", { status: 401, headers: corsHeaders })
-  }
+function isErrorCsv(path: string) {
+  const s = path.toLowerCase()
+  return s.includes("_erros_") && s.endsWith(".csv")
+}
+function isInDesligamento(path: string) {
+  return path.toLowerCase().startsWith("desligamento/")
+}
 
-  let dryRun = false
-  try {
-    const body = await req.json()
-    dryRun = Boolean(body?.dryRun || body?.dry_run)
-  } catch (_) {
-    dryRun = false
+function extractTs(obj: any): number | null {
+  const candidates = [
+    obj?.created_at,
+    obj?.updated_at,
+    obj?.last_modified,
+    obj?.metadata?.created_at,
+    obj?.metadata?.updated_at,
+    obj?.metadata?.lastModified,
+    obj?.metadata?.last_modified,
+  ].filter(Boolean)
+
+  for (const v of candidates) {
+    const t = Date.parse(String(v))
+    if (!Number.isNaN(t)) return t
   }
+  return null
+}
 
-  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
-
-  let totalCandidates = 0
-  let deleted = 0
-  let pages = 0
-  const deleteErrors: string[] = []
-
+async function listAll(prefix: string) {
+  const out: any[] = []
   for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabaseAdmin
-      .from("storage.objects")
-      .select("name, created_at")
-      .eq("bucket_id", errorsBucket)
-      .ilike("name", "%_erros_%.csv")
-      .lt("created_at", cutoff)
-      .order("created_at", { ascending: true })
-      .range(offset, offset + pageSize - 1)
+    const { data, error } = await supabaseAdmin.storage.from(bucket).list(prefix, {
+      limit: pageSize,
+      offset,
+      sortBy: { column: "name", order: "asc" },
+    } as any)
 
-    if (error) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          message: error.message,
-          bucket: errorsBucket,
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      )
-    }
+    if (error) throw new Error(`list("${prefix}") failed: ${error.message}`)
+    if (!data || data.length === 0) break
 
-    const batch = (data || []).map((item) => item?.name).filter(Boolean) as string[]
-    if (batch.length === 0) break
-
-    totalCandidates += batch.length
-    pages += 1
-
-    if (!dryRun) {
-      const { error: deleteError } = await supabaseAdmin.storage.from(errorsBucket).remove(batch)
-      if (deleteError) {
-        deleteErrors.push(deleteError.message)
-      } else {
-        deleted += batch.length
-      }
-    }
-
-    if (batch.length < pageSize) break
+    out.push(...data)
+    if (data.length < pageSize) break
   }
+  return out
+}
+
+async function deleteInBatches(paths: string[], dryRun: boolean) {
+  const batchSize = 25
+  let deleted = 0
+  const errors: { path: string; message: string }[] = []
+
+  for (let i = 0; i < paths.length; i += batchSize) {
+    const batch = paths.slice(i, i + batchSize)
+    if (dryRun) continue
+
+    const { error } = await supabaseAdmin.storage.from(bucket).remove(batch)
+    if (error) errors.push({ path: batch.join(","), message: error.message })
+    else deleted += batch.length
+  }
+
+  return { deleted, errors }
+}
+
+// tenta salvar e NUNCA derruba a função por causa disso
+async function saveRunToDb(row: Record<string, any>) {
+  const { error } = await supabaseAdmin.from("edge_functions_error_report").insert(row)
+  if (error) console.log("WARN insert edge_functions_error_report:", error.message)
+}
+
+function getSbRequestId(req: Request) {
+  // quando a chamada vem via gateway, esse header normalmente existe
+  return req.headers.get("x-sb-request-id") || req.headers.get("sb-request-id") || null
+}
+
+Deno.serve(async (req) => {
+  const t0 = Date.now()
+  let httpStatus = 200
+
+  // valores que a gente quer salvar independentemente do resultado
+  const baseRow: any = {
+    function_name: "cleanup-import-errors",
+    bucket,
+    retention_days: retentionDays,
+    cutoff: new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString(),
+    dry_run: true,
+    total_listed: 0,
+    candidates: 0,
+    deleted: 0,
+    errors_count: 0,
+    duration_ms: null,
+    http_status: null,
+    error_message: null,
+    error_stack: null,
+    sb_request_id: getSbRequestId(req),
+    details: null,
+  }
+
+  try {
+    if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
+    if (req.method !== "POST") {
+      httpStatus = 405
+      baseRow.http_status = httpStatus
+      baseRow.error_message = "Method not allowed"
+      baseRow.duration_ms = Date.now() - t0
+      await saveRunToDb(baseRow)
+      return new Response("Method not allowed", { status: 405, headers: corsHeaders })
+    }
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      httpStatus = 500
+      baseRow.http_status = httpStatus
+      baseRow.error_message = "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+      baseRow.duration_ms = Date.now() - t0
+      await saveRunToDb(baseRow)
+      return new Response(JSON.stringify({ ok: false, message: baseRow.error_message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    if (!isAuthorized(req)) {
+      httpStatus = 401
+      baseRow.http_status = httpStatus
+      baseRow.error_message = "Unauthorized"
+      baseRow.duration_ms = Date.now() - t0
+      await saveRunToDb(baseRow)
+      return new Response(JSON.stringify({ ok: false, message: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const dryRun = Boolean((body as any)?.dryRun ?? (body as any)?.dry_run ?? false)
+    const maxDeletesRaw = (body as any)?.maxDeletes ?? (body as any)?.max_deletes ?? null
+    const maxDeletes = maxDeletesRaw == null ? null : clampInt(String(maxDeletesRaw), 200)
+
+    baseRow.dry_run = dryRun
+
+    const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000
+    const cutoffIso = new Date(cutoffMs).toISOString()
+    baseRow.cutoff = cutoffIso
+
+    const rootList = await listAll("")
+    const desligamentoList = await listAll("desligamento/")
+
+    const rootPaths = rootList.map((o: any) => String(o.name)).filter(Boolean)
+    const desligPaths = desligamentoList.map((o: any) => `desligamento/${String(o.name)}`).filter(Boolean)
+    const allPaths = Array.from(new Set([...rootPaths, ...desligPaths]))
+
+    baseRow.total_listed = allPaths.length
+
+    const tsMap = new Map<string, number | null>()
+    for (const o of rootList) tsMap.set(String(o.name), extractTs(o))
+    for (const o of desligamentoList) tsMap.set(`desligamento/${String(o.name)}`, extractTs(o))
+
+    const hasAnyTs = allPaths.some((p) => tsMap.get(p) != null)
+    if (!hasAnyTs) {
+  const durationMs = Date.now() - t0
+
+  // grava no histórico como execução OK (sem deleção)
+  await saveRunToDb({
+    ...baseRow,
+    http_status: 200,
+    error_message: null,
+    error_stack: null,
+    errors_count: 0,
+    duration_ms: durationMs,
+    details: {
+      note: "Sem timestamps no storage.list(); tratando como pasta vazia/sem metadados. Nenhum arquivo deletado.",
+      hint: "Verifique prefixo. Às vezes 'desligamento' vs 'desligamento/' muda a resposta.",
+      sample_list_item: rootList?.[0] ?? null,
+    },
+  })
 
   return new Response(
     JSON.stringify({
       ok: true,
       dryRun,
-      bucket: errorsBucket,
+      bucket,
       retentionDays,
-      cutoff,
-      totalCandidates,
-      deleted,
-      pages,
-      errors: deleteErrors,
+      cutoff: cutoffIso,
+      totalListed: allPaths.length,
+      candidates: 0,
+      deleted: 0,
+      errors: [],
+      note: "Sem timestamps retornados. Tratado como pasta vazia/sem metadados. Nada foi deletado.",
     }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   )
+}
+
+
+    const candidatesAll = allPaths.filter((p) => {
+      const ts = tsMap.get(p)
+      if (ts == null) return false
+      if (!(isErrorCsv(p) || isInDesligamento(p))) return false
+      return ts <= cutoffMs
+    })
+
+    const candidates = maxDeletes ? candidatesAll.slice(0, maxDeletes) : candidatesAll
+    baseRow.candidates = candidates.length
+
+    const { deleted, errors } = await deleteInBatches(candidates, dryRun)
+
+    baseRow.deleted = deleted
+    baseRow.errors_count = errors.length
+    baseRow.http_status = 200
+    baseRow.duration_ms = Date.now() - t0
+    baseRow.details = {
+      max_deletes: maxDeletes,
+      sample_candidates: candidates.slice(0, 10),
+      sample_errors: errors.slice(0, 10),
+    }
+
+    await saveRunToDb(baseRow)
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        dryRun,
+        bucket,
+        retentionDays,
+        cutoff: cutoffIso,
+        totalListed: allPaths.length,
+        candidates: candidates.length,
+        deleted,
+        errors,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    )
+  } catch (e: any) {
+    httpStatus = 500
+    baseRow.http_status = httpStatus
+    baseRow.error_message = String(e?.message ?? e)
+    baseRow.error_stack = typeof e?.stack === "string" ? e.stack : null
+    baseRow.errors_count = 1
+    baseRow.duration_ms = Date.now() - t0
+    baseRow.details = { stage: "unhandled" }
+
+    await saveRunToDb(baseRow)
+
+    return new Response(JSON.stringify({ ok: false, error: baseRow.error_message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
+  }
 })

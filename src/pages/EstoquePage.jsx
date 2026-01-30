@@ -1,5 +1,5 @@
 import { PageHeader } from '../components/PageHeader.jsx'
-import { InventoryIcon, SpreadsheetIcon } from '../components/icons.jsx'
+import { InventoryIcon, RefreshIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { EstoqueFilters } from '../components/Estoque/Filters/EstoqueFilters.jsx'
 import { EstoqueAlerts } from '../components/Estoque/Alerts/EstoqueAlerts.jsx'
 import { EstoqueSummary } from '../components/Estoque/Summary/EstoqueSummary.jsx'
@@ -47,7 +47,7 @@ function EstoquePageContent() {
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    applyFilters({ source: 'filters' })
+    applyFilters()
   }
 
   const handleExportCsv = () => {
@@ -59,6 +59,10 @@ function EstoquePageContent() {
     ].join('-')
     const filename = `estoque-atual-${localDate}.csv`
     downloadEstoqueCsv(itensFiltradosBase, { filename })
+  }
+
+  const handleRefresh = () => {
+    applyFilters()
   }
 
   return (
@@ -104,16 +108,28 @@ function EstoquePageContent() {
       <section className="card">
         <header className="card__header">
           <h2>Estoque materiais</h2>
-          <button
-            type="button"
-            className="button button--ghost"
-            onClick={handleExportCsv}
-            aria-label="Exportar estoque atual em CSV"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <SpreadsheetIcon size={16} />
-            <span>Exportar Excel (CSV)</span>
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleExportCsv}
+              aria-label="Exportar estoque atual em CSV"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SpreadsheetIcon size={16} />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleRefresh}
+              aria-label="Atualizar lista de estoque"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <RefreshIcon size={16} />
+              <span>Atualizar</span>
+            </button>
+          </div>
         </header>
         <EstoqueList
           itens={paginatedItens}
