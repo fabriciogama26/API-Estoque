@@ -6,6 +6,7 @@ const PAGE_CATALOG = [
   { id: 'saidas', label: 'Saidas', paths: ['/saidas', '/movimentacoes/saidas'] },
   { id: 'cadastros-pessoas', label: 'Pessoas', paths: ['/cadastros/pessoas'] },
   { id: 'cadastros-materiais', label: "EPI's", paths: ['/cadastros/materiais'] },
+  { id: 'cadastros-base', label: 'Cadastro Base', paths: ['/cadastros/base'] },
   { id: 'acidentes-cadastro', label: 'Cadastro de Acidentes', paths: ['/acidentes/cadastro'] },
   { id: 'acidentes-hht-mensal', label: 'HHT Mensal', paths: ['/acidentes/hht-mensal'] },
   { id: 'termo-epi', label: 'Termo de EPI', paths: ['/documentos/termo-epi', '/termos/epi'] },
@@ -24,6 +25,7 @@ const PAGE_REQUIRED_PERMISSION = {
   saidas: 'estoque.read',
   'cadastros-pessoas': 'pessoas.read',
   'cadastros-materiais': 'estoque.read',
+  'cadastros-base': 'basic_registration.read',
   'acidentes-cadastro': 'acidentes.read',
   'acidentes-hht-mensal': 'hht.read',
   'termo-epi': 'estoque.read',
@@ -108,6 +110,8 @@ const PERMISSION_LABELS = {
   'acidentes.write': 'Acidentes - Alterar',
   'hht.read': 'HHT - Ler historico',
   'hht.write': 'HHT - Alterar historico',
+  'basic_registration.read': 'Cadastro base - Ler',
+  'basic_registration.write': 'Cadastro base - Alterar',
 }
 
 // Grupos de permissão (toggle único liga conjunto de chaves)
@@ -122,6 +126,7 @@ const PERMISSION_GROUPS = [
   { id: 'estoque', label: 'Estoque', keys: ['estoque.read', 'estoque.write'] },
   { id: 'pessoas', label: 'Pessoas', keys: ['pessoas.read', 'pessoas.write'] },
   { id: 'hht', label: 'HHT', keys: ['hht.read', 'hht.write'] },
+  { id: 'cadastro-base', label: 'Cadastro Base', keys: ['basic_registration.read', 'basic_registration.write'] },
 ]
 
 export {

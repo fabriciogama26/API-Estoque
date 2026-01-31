@@ -190,6 +190,46 @@ const mapDomainOption = (valor, index) => {
   }
 }
 
+const BASIC_REGISTRATION_TABLE_CONFIG = {
+  fabricantes: { nameColumn: 'fabricante', order: ['fabricante'] },
+  cargos: { nameColumn: 'nome', order: ['nome'] },
+  centros_custo: { nameColumn: 'nome', order: ['nome'] },
+  centros_servico: { nameColumn: 'nome', order: ['nome'] },
+  centros_estoque: { nameColumn: 'almox', order: ['almox'] },
+  setores: { nameColumn: 'nome', order: ['nome'] },
+}
+
+const resolveBasicRegistrationConfig = (table) => {
+  const key = trim(table).toLowerCase()
+  const config = BASIC_REGISTRATION_TABLE_CONFIG[key]
+  if (!config) {
+    throw createError(400, 'Tabela de cadastro base invalida.')
+  }
+  return { key, config }
+}
+
+const mapBasicRegistrationLocalRecord = (table, record) => {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+  const { config } = resolveBasicRegistrationConfig(table)
+  const nome = trim(record?.[config.nameColumn])
+  const createdAt = record?.created_at ?? record?.criado_em ?? null
+  const updatedAt = record?.updated_at ?? null
+  return {
+    id: record?.id ?? null,
+    nome,
+    ativo: record?.ativo !== false,
+    createdAt,
+    updatedAt,
+    createdByUserId: record?.created_by_user_id ?? null,
+    createdByUserName: trim(record?.created_by_user_name ?? ''),
+    updatedByUserId: record?.updated_by_user_id ?? null,
+    centroCustoId: record?.centro_custo_id ?? record?.centro_custo ?? null,
+    centroServicoId: record?.centro_servico_id ?? null,
+  }
+}
+
 const mapLocalPessoaRecord = (pessoa) => {
   if (!pessoa || typeof pessoa !== 'object') {
     return pessoa
@@ -3787,6 +3827,204 @@ const localApi = {
         cargos: mapLista(extractCargos(snapshot)),
         tiposExecucao: mapLista(extractTiposExecucao(snapshot)),
       }
+    },
+  },
+  basicRegistration: {
+    async list(params = {}) {
+      const { table, termo, ativo } = params
+      const { key, config } = resolveBasicRegistrationConfig(table)
+      const termoBase = normalizeSearchTerm(termo)
+      return readState((state) => {
+        const lista = Array.isArray(state.basicRegistration?.[key]) ? state.basicRegistration[key].slice() : []
+        const filtrados = lista.filter((item) => {
+          if (!item || typeof item !== 'object') {
+            return false
+          }
+          if (ativo === true || ativo === false) {
+            if ((item.ativo !== false) !== ativo) {
+              return false
+            }
+          }
+          if (termoBase) {
+            const nomeBase = normalizeSearchTerm(item?.[config.nameColumn])
+            if (!nomeBase.includes(termoBase)) {
+              return false
+            }
+          }
+          return true
+        })
+        filtrados.sort((a, b) => {
+          const ativoA = a?.ativo !== false
+          const ativoB = b?.ativo !== false
+          if (ativoA !== ativoB) {
+            return ativoA ? -1 : 1
+          }
+          for (const campo of config.order) {
+            const va = a?.[campo]
+            const vb = b?.[campo]
+            if (va === undefined || va === null) return 1
+            if (vb === undefined || vb === null) return -1
+            if (va < vb) return -1
+            if (va > vb) return 1
+          }
+          return 0
+        })
+        return filtrados.map((record) => mapBasicRegistrationLocalRecord(key, record))
+      })
+    },
+    async create(params = {}) {
+      const { table, data } = params
+      const { key, config } = resolveBasicRegistrationConfig(table)
+      const nome = trim(data?.nome)
+      if (!nome) {
+        throw createError(400, 'Informe o nome para cadastro.')
+      }
+      const agora = nowIso()
+      return writeState((state) => {
+        state.basicRegistration = state.basicRegistration || {}
+        state.basicRegistration[key] = Array.isArray(state.basicRegistration[key]) ? state.basicRegistration[key] : []
+        state.basicRegistrationHistory = Array.isArray(state.basicRegistrationHistory)
+          ? state.basicRegistrationHistory
+          : []
+        const record = {
+          id: randomId(),
+          ativo: data?.ativo !== false,
+          created_by_user_id: data?.usuarioId ?? null,
+          updated_by_user_id: data?.usuarioId ?? null,
+          created_by_user_name: trim(data?.usuarioNome ?? ''),
+          account_owner_id: data?.accountOwnerId ?? null,
+        }
+        record[config.nameColumn] = nome
+        if (key === 'centros_servico') {
+          record.centro_custo_id = data?.centroCustoId ?? null
+        }
+        if (key === 'centros_estoque') {
+          record.centro_custo = data?.centroCustoId ?? null
+        }
+        if (key === 'setores') {
+          record.centro_servico_id = data?.centroServicoId ?? null
+        }
+        if (key === 'fabricantes' || key === 'centros_estoque') {
+          record.created_at = agora
+        } else {
+          record.criado_em = agora
+        }
+        record.updated_at = agora
+        state.basicRegistration[key].push(record)
+
+        const history = {
+          id: randomId(),
+          table_name: key,
+          record_id: record.id,
+          record_name: record[config.nameColumn] ?? '',
+          action: 'INSERT',
+          changed_fields: Object.keys(record),
+          before: null,
+          after: { ...record },
+          record_created_at: record.created_at ?? record.criado_em ?? null,
+          record_updated_at: record.updated_at ?? null,
+          record_created_by_user_id: record.created_by_user_id ?? null,
+          record_updated_by_user_id: record.updated_by_user_id ?? null,
+          changed_by_user_id: record.updated_by_user_id ?? record.created_by_user_id ?? null,
+          changed_by_user_name: record.created_by_user_name ?? '',
+          created_at: agora,
+          account_owner_id: record.account_owner_id ?? null,
+        }
+        state.basicRegistrationHistory.push(history)
+        return mapBasicRegistrationLocalRecord(key, record)
+      })
+    },
+    async update(params = {}) {
+      const { table, id, data } = params
+      const { key, config } = resolveBasicRegistrationConfig(table)
+      if (!id) {
+        throw createError(400, 'ID obrigatorio para atualizar.')
+      }
+      return writeState((state) => {
+        state.basicRegistration = state.basicRegistration || {}
+        state.basicRegistration[key] = Array.isArray(state.basicRegistration[key]) ? state.basicRegistration[key] : []
+        state.basicRegistrationHistory = Array.isArray(state.basicRegistrationHistory)
+          ? state.basicRegistrationHistory
+          : []
+        const index = state.basicRegistration[key].findIndex((item) => item?.id === id)
+        if (index === -1) {
+          throw createError(404, 'Registro nao encontrado.')
+        }
+        const atual = state.basicRegistration[key][index]
+        const antes = { ...atual }
+        const agora = nowIso()
+
+        if (data?.nome !== undefined) {
+          const nome = trim(data.nome)
+          if (!nome) {
+            throw createError(400, 'Informe o nome para cadastro.')
+          }
+          atual[config.nameColumn] = nome
+        }
+        if (data?.ativo !== undefined) {
+          atual.ativo = data.ativo !== false
+        }
+        if (key === 'centros_servico' && data?.centroCustoId !== undefined) {
+          atual.centro_custo_id = data.centroCustoId || null
+        }
+        if (key === 'centros_estoque' && data?.centroCustoId !== undefined) {
+          atual.centro_custo = data.centroCustoId || null
+        }
+        if (key === 'setores' && data?.centroServicoId !== undefined) {
+          atual.centro_servico_id = data.centroServicoId || null
+        }
+        atual.updated_at = agora
+        atual.updated_by_user_id = data?.usuarioId ?? atual.updated_by_user_id ?? null
+        if (data?.usuarioNome) {
+          atual.created_by_user_name = trim(data.usuarioNome)
+        }
+
+        const after = { ...atual }
+        const changedFields = Array.from(
+          new Set([...Object.keys(antes), ...Object.keys(after)])
+        ).filter((campo) => JSON.stringify(antes[campo]) !== JSON.stringify(after[campo]))
+
+        if (changedFields.length) {
+          state.basicRegistrationHistory.push({
+            id: randomId(),
+            table_name: key,
+            record_id: atual.id,
+            record_name: atual[config.nameColumn] ?? '',
+            action: 'UPDATE',
+            changed_fields: changedFields,
+            before: antes,
+            after,
+            record_created_at: atual.created_at ?? atual.criado_em ?? null,
+            record_updated_at: atual.updated_at ?? null,
+            record_created_by_user_id: atual.created_by_user_id ?? null,
+            record_updated_by_user_id: atual.updated_by_user_id ?? null,
+            changed_by_user_id: atual.updated_by_user_id ?? atual.created_by_user_id ?? null,
+            changed_by_user_name: atual.updated_by_user_name ?? atual.created_by_user_name ?? '',
+            created_at: agora,
+            account_owner_id: atual.account_owner_id ?? null,
+          })
+        }
+
+        state.basicRegistration[key][index] = atual
+        return mapBasicRegistrationLocalRecord(key, atual)
+      })
+    },
+    async inactivate(params = {}) {
+      const { table, id } = params
+      return this.update({ table, id, data: { ativo: false } })
+    },
+    async history(params = {}) {
+      const { table, recordId } = params
+      const { key } = resolveBasicRegistrationConfig(table)
+      if (!recordId) {
+        throw createError(400, 'ID obrigatorio para historico.')
+      }
+      return readState((state) => {
+        const lista = Array.isArray(state.basicRegistrationHistory) ? state.basicRegistrationHistory : []
+        return lista
+          .filter((item) => item?.table_name === key && item?.record_id === recordId)
+          .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      })
     },
   },
   documentos: {

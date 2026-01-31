@@ -16,6 +16,7 @@ import { HhtMensalAcidentesPage } from './pages/HhtMensalAcidentes.jsx'
 import { TermosEpiPage } from './pages/TermosEpiPage.jsx'
 import { NoAccessPage } from './pages/NoAccessPage.jsx'
 import { ErrorBoundaryWithLogger } from './components/ErrorBoundary.jsx'
+import { CadastroBasePage } from './pages/CadastroBase.jsx'
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
             <Route path="cadastros">
               <Route path="pessoas" element={<PessoasPage />} />
               <Route path="materiais" element={<MateriaisPage />} />
+              <Route path="base" element={<CadastroBasePage />} />
             </Route>
 
             <Route path="acidentes">
