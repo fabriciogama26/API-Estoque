@@ -51,6 +51,7 @@ const navSections = [
     items: [
       { to: '/cadastros/pessoas', label: 'Pessoas', icon: PeopleIcon, pageId: 'cadastros-pessoas' },
       { to: '/cadastros/materiais', label: "Materiais", icon: MaterialIcon, pageId: 'cadastros-materiais' },
+      { to: '/cadastros/base', label: 'Cadastro Base', icon: ChecklistIcon, pageId: 'cadastros-base' },
     ],
   },
   {

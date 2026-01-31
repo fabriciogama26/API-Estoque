@@ -138,6 +138,12 @@ Atualizacao 2026-01
 - Classificacao separada em "Classificacao Agentes" (com combinacoes por agente/tipo/lesao) e "Classificacao Partes lesionadas".
 - CAT e CID passaram a ser unicos por owner no front e no banco.
 
+Atualizacao 2026-01 (schema)
+-----------------------------
+- Arquivos alterados: supabase/migrations/20260228_register_missing_tables.sql.
+- Tabelas registradas: public.acidente_partes_grupo, public.acidente_partes_sub_grupo.
+- Antes/Depois: antes existiam no banco sem migration; depois estao versionadas na pasta supabase/migrations.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

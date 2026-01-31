@@ -130,6 +130,15 @@ const normalizeOptionArrayLocal = (value, prefix) => {
 function getDefaultState() {
   return {
     version: STATE_VERSION,
+    basicRegistration: {
+      fabricantes: [],
+      cargos: [],
+      centros_custo: [],
+      centros_servico: [],
+      centros_estoque: [],
+      setores: [],
+    },
+    basicRegistrationHistory: [],
     pessoas: [],
     materiais: [],
     entradas: [],
@@ -146,6 +155,11 @@ function normalizeState(state) {
   const base = getDefaultState()
   const sanitized = { ...base, ...state }
   sanitized.version = STATE_VERSION
+  sanitized.basicRegistration = {
+    ...base.basicRegistration,
+    ...(sanitized.basicRegistration || {}),
+  }
+  sanitized.basicRegistrationHistory = normalizeArray(sanitized.basicRegistrationHistory)
   sanitized.pessoas = normalizeArray(sanitized.pessoas).map((pessoa) => {
     if (!pessoa || typeof pessoa !== 'object') {
       return pessoa

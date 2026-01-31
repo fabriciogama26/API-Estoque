@@ -617,6 +617,98 @@ const normalizeNameList = (nomes) =>
     .map((nome) => trim(nome))
     .filter(Boolean)
 
+const BASIC_REGISTRATION_TABLE_CONFIG = {
+  fabricantes: {
+    nameColumn: 'fabricante',
+    select:
+      'id,fabricante,ativo,created_at,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['fabricante'],
+  },
+  cargos: {
+    nameColumn: 'nome',
+    select:
+      'id,nome,ativo,criado_em,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['nome'],
+  },
+  centros_custo: {
+    nameColumn: 'nome',
+    select:
+      'id,nome,ativo,criado_em,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['nome'],
+  },
+  centros_servico: {
+    nameColumn: 'nome',
+    select:
+      'id,nome,ativo,criado_em,updated_at,centro_custo_id,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['nome'],
+  },
+  centros_estoque: {
+    nameColumn: 'almox',
+    select:
+      'id,almox,centro_custo,ativo,created_at,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['almox'],
+  },
+  setores: {
+    nameColumn: 'nome',
+    select:
+      'id,nome,ativo,criado_em,updated_at,centro_servico_id,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['nome'],
+  },
+}
+
+const resolveBasicRegistrationConfig = (table) => {
+  const key = String(table || '').trim().toLowerCase()
+  const config = BASIC_REGISTRATION_TABLE_CONFIG[key]
+  if (!config) {
+    throw new Error('Tabela de cadastro base invalida.')
+  }
+  return { key, config }
+}
+
+const resolveUserLabel = (user) => {
+  if (!user || typeof user !== 'object') {
+    return ''
+  }
+  const username = resolveTextValue(user.username ?? '')
+  if (username) {
+    return username
+  }
+  const display = resolveTextValue(user.display_name ?? '')
+  if (display) {
+    return display
+  }
+  const email = resolveTextValue(user.email ?? '')
+  if (email) {
+    return email
+  }
+  return ''
+}
+
+const mapBasicRegistrationRecord = (table, record) => {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+  const { config } = resolveBasicRegistrationConfig(table)
+  const nome = resolveTextValue(record?.[config.nameColumn] ?? '')
+  const createdByUser = record?.created_by_user || record?.created_by_user_id
+  const createdByUserName =
+    resolveTextValue(record?.created_by_user_name ?? '') || resolveUserLabel(createdByUser)
+  const createdAt = record?.created_at ?? record?.criado_em ?? null
+  const updatedAt = record?.updated_at ?? null
+  return {
+    id: record?.id ?? null,
+    nome,
+    ativo: record?.ativo !== false,
+    createdAt,
+    updatedAt,
+    createdByUserId: record?.created_by_user_id ?? null,
+    createdByUserName,
+    updatedByUserId: record?.updated_by_user_id ?? null,
+    centroCustoId: record?.centro_custo_id ?? record?.centro_custo ?? null,
+    centroServicoId: record?.centro_servico_id ?? null,
+  }
+}
+
 async function resolveCatalogScope() {
   ensureSupabase()
   const { data } = await supabase.auth.getSession()
@@ -6857,6 +6949,128 @@ export const api = {
         cargos: normalizeDomainOptions(cargos),
         tiposExecucao: normalizeDomainOptions(tipos),
       }
+    },
+  },
+  basicRegistration: {
+    async list(params = {}) {
+      const { table, termo, ativo } = params
+      const { key, config } = resolveBasicRegistrationConfig(table)
+      let query = supabase.from(key).select(config.select)
+      const termoBase = trim(termo)
+      if (termoBase) {
+        const like = `%${termoBase.replace(/\s+/g, '%')}%`
+        query = query.ilike(config.nameColumn, like)
+      }
+      if (ativo === true || ativo === false) {
+        query = query.eq('ativo', ativo)
+      }
+      query = query.order('ativo', { ascending: false })
+      config.order.forEach((column) => {
+        query = query.order(column, { ascending: true })
+      })
+      const data = await execute(query, 'Falha ao listar cadastro base.')
+      return (data ?? []).map((record) => mapBasicRegistrationRecord(key, record))
+    },
+    async create(params = {}) {
+      const { table, data } = params
+      const { key, config } = resolveBasicRegistrationConfig(table)
+      const nome = trim(data?.nome)
+      if (!nome) {
+        throw new Error('Informe o nome para cadastro.')
+      }
+      const actorId = data?.usuarioId || (await resolveUsuarioId())
+      const payload = {
+        [config.nameColumn]: nome,
+        ativo: data?.ativo !== false,
+        created_by_user_id: actorId,
+        updated_by_user_id: actorId,
+      }
+      if (data?.usuarioNome) {
+        payload.created_by_user_name = data.usuarioNome
+        payload.updated_by_user_name = data.usuarioNome
+      }
+      if (key === 'centros_servico' && data?.centroCustoId) {
+        payload.centro_custo_id = data.centroCustoId
+      }
+      if (key === 'centros_estoque' && data?.centroCustoId) {
+        payload.centro_custo = data.centroCustoId
+      }
+      if (key === 'setores' && data?.centroServicoId) {
+        payload.centro_servico_id = data.centroServicoId
+      }
+      const record = await execute(
+        supabase.from(key).insert(payload).select(config.select).single(),
+        'Falha ao cadastrar item.'
+      )
+      clearCatalogCache(key)
+      return mapBasicRegistrationRecord(key, record)
+    },
+    async update(params = {}) {
+      const { table, id, data } = params
+      const { key, config } = resolveBasicRegistrationConfig(table)
+      if (!id) {
+        throw new Error('ID obrigatorio para atualizar.')
+      }
+      const actorId = data?.usuarioId || (await resolveUsuarioId())
+      const payload = {}
+      if (data?.nome !== undefined) {
+        const nome = trim(data.nome)
+        if (!nome) {
+          throw new Error('Informe o nome para cadastro.')
+        }
+        payload[config.nameColumn] = nome
+      }
+      if (data?.ativo !== undefined) {
+        payload.ativo = data.ativo !== false
+      }
+      if (actorId) {
+        payload.updated_by_user_id = actorId
+      }
+      if (data?.usuarioNome) {
+        payload.updated_by_user_name = data.usuarioNome
+      }
+      if (key === 'centros_servico' && data?.centroCustoId !== undefined) {
+        payload.centro_custo_id = data.centroCustoId || null
+      }
+      if (key === 'centros_estoque' && data?.centroCustoId !== undefined) {
+        payload.centro_custo = data.centroCustoId || null
+      }
+      if (key === 'setores' && data?.centroServicoId !== undefined) {
+        payload.centro_servico_id = data.centroServicoId || null
+      }
+      const record = await execute(
+        supabase.from(key).update(payload).eq('id', id).select(config.select).single(),
+        'Falha ao atualizar item.'
+      )
+      clearCatalogCache(key)
+      return mapBasicRegistrationRecord(key, record)
+    },
+    async inactivate(params = {}) {
+      const { table, id } = params
+      return this.update({ table, id, data: { ativo: false } })
+    },
+    async history(params = {}) {
+      const { table, recordId, limit = 50 } = params
+      const { key } = resolveBasicRegistrationConfig(table)
+      if (!recordId) {
+        throw new Error('ID obrigatorio para historico.')
+      }
+      const data = await execute(
+        supabase
+          .from('basic_registration_history')
+          .select(
+            'id, table_name, record_id, record_name, action, changed_fields, before, after, record_created_at, record_updated_at, record_created_by_user_id, record_updated_by_user_id, changed_by_user_id, created_at, changed_by_user:changed_by_user_id(id,username,display_name,email)'
+          )
+          .eq('table_name', key)
+          .eq('record_id', recordId)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        'Falha ao consultar historico.'
+      )
+      return (data ?? []).map((registro) => ({
+        ...registro,
+        changedByUserName: resolveUserLabel(registro?.changed_by_user || registro?.changed_by_user_id),
+      }))
     },
   },
   centrosEstoque: {

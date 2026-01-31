@@ -109,6 +109,12 @@ Atualizacao 2026-01
 - Exportacao CSV com base na lista filtrada da tela.
 - Importacao em massa via XLSX com relatorio de erros em CSV.
 
+Atualizacao 2026-01 (schema)
+-----------------------------
+- Arquivos alterados: supabase/migrations/20260228_register_missing_tables.sql.
+- Tabelas registradas: public.entrada_historico, public.centros_estoque.
+- Antes/Depois: antes existiam no banco sem migration; depois estao versionadas na pasta supabase/migrations.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

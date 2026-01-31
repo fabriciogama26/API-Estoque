@@ -1,0 +1,108 @@
+Tela: Cadastro Base
+===================
+
+Visao geral
+-----------
+- Cadastro unificado das tabelas de apoio: fabricantes, cargos, centros de custo, centros de servico, centros de estoque e setores.
+- Uma unica tela com seletor de tabela, formulario dinamico, filtros e lista.
+- Inativacao (ativo=false) em vez de exclusao.
+
+Arquitetura
+-----------
+- Contexto:
+  - `CadastroBaseProvider` expõe estado e ações do hook `useCadastroBaseController`.
+- Hook `useCadastroBaseController`:
+  - Centraliza estado de tabela selecionada, formulario, filtros, lista e historico.
+  - Carrega dependencias (centros de custo/servico) para selects obrigatorios.
+  - Integra com logs via `useErrorLogger('cadastro-base')`.
+- Servicos:
+  - `basicRegistrationService` concentra CRUD e historico via `dataClient`.
+
+Cadastro
+--------
+- Campos dinamicos por tabela:
+  - Nome (label varia: fabricante/cargo/centro/setor).
+  - Ativo (checkbox).
+  - Referencias:
+    - Centro de servico: exige centro de custo.
+    - Centro de estoque: exige centro de custo.
+    - Setor: exige centro de servico (e centro de custo indiretamente).
+- Bloqueios:
+  - Se dependencias estiverem vazias, o formulario bloqueia salvamento.
+  - Para Cargos, a digitacao exige Caps Lock ativo (desktop). Colar so permite texto em maiusculo.
+- Inativacao:
+  - Botao "Inativar" altera ativo=false.
+
+Filtros, auto-complete e listagem
+---------------------------------
+- Filtros:
+  - Tabela (repete o seletor para trocar a lista).
+  - Termo livre (nome).
+  - Status (ativos/inativos/todos).
+- Listagem:
+  - Colunas mudam conforme a tabela (nome, referencias, status).
+  - Acoes: Editar, Historico, Inativar.
+- Historico:
+  - Modal mostra acao, data, campos alterados e usuario (ID).
+  - Somente edicoes (UPDATE) geram historico; primeiro cadastro nao registra historico.
+
+Boas praticas
+-------------
+- Cadastre Centros de custo antes de Centros de servico/estoque.
+- Cadastre Centros de servico antes de Setores.
+
+Atualizacao 2026-01
+-------------------
+- Nova tela de Cadastro Base com formulario e lista dinamicos.
+- Adicionado historico unificado (basic_registration_history).
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- CadastroBasePage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/CadastroBase.jsx
+  - Responsavel por: orquestrar formulario, filtros, tabela e historico via contexto.
+- CadastroBaseForm/Filters/Table/HistoryModal
+  - Tipo: componentes de UI
+  - Caminho: src/components/CadastroBase/*
+  - Responsavel por: UI dinamica do cadastro base.
+- useCadastroBaseController
+  - Tipo: hook/controller
+  - Caminho: src/hooks/useCadastroBaseController.js
+  - Responsavel por: estado, load, submit, edit, inativacao e historico.
+- CadastroBaseContext
+  - Tipo: contexto
+  - Caminho: src/context/CadastroBaseContext.jsx
+  - Responsavel por: expor controller para componentes.
+
+Constantes e configuracoes
+--------------------------
+- Tabelas suportadas (labels, dependencias, caps lock)
+  - Tipo: configuracao no controller
+  - Caminho: src/hooks/useCadastroBaseController.js
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- formatDisplayDateTime
+  - Tipo: utilitario de data
+  - Caminho: src/utils/saidasUtils.js
+  - Uso: exibir datas no historico.
+
+Servicos e integracoes externas
+-------------------------------
+- basicRegistrationService
+  - Tipo: servico de API
+  - Caminho: src/services/basicRegistrationService.js
+  - Responsavel por: list/create/update/inactivate/history via dataClient.
+- api.basicRegistration / localApi.basicRegistration
+  - Tipo: dataClient
+  - Caminho: src/services/api.js, src/services/localApi.js
+  - Responsavel por: execucao Supabase e modo local.
+
+Ajuda contextual
+----------------
+- Nao ha ajuda contextual dedicada ainda.
