@@ -24,3 +24,20 @@ export const listBasicRegistrationHistory = (table, recordId, limit = 50) =>
   api?.basicRegistration?.history
     ? api.basicRegistration.history({ table, recordId, limit })
     : Promise.resolve([])
+
+export const downloadBasicRegistrationTemplate = (table) => {
+  if (api?.basicRegistration?.downloadTemplate) {
+    return api.basicRegistration.downloadTemplate({ table })
+  }
+  return Promise.reject(new Error('Endpoint de download de modelo nao configurado.'))
+}
+
+export const importBasicRegistrationPlanilha = (table, file) => {
+  if (!file) {
+    return Promise.reject(new Error('Selecione um arquivo XLSX.'))
+  }
+  if (api?.basicRegistration?.importPlanilha) {
+    return api.basicRegistration.importPlanilha({ table, file })
+  }
+  return Promise.reject(new Error('Endpoint de importacao de cadastro base nao configurado.'))
+}

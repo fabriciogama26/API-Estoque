@@ -10,7 +10,7 @@ Visao geral
 Arquitetura
 -----------
 - Contexto:
-  - `CadastroBaseProvider` expõe estado e ações do hook `useCadastroBaseController`.
+  - `CadastroBaseProvider` expÃµe estado e aÃ§Ãµes do hook `useCadastroBaseController`.
 - Hook `useCadastroBaseController`:
   - Centraliza estado de tabela selecionada, formulario, filtros, lista e historico.
   - Carrega dependencias (centros de custo/servico) para selects obrigatorios.
@@ -32,6 +32,11 @@ Cadastro
   - Para Cargos, a digitacao exige Caps Lock ativo (desktop). Colar so permite texto em maiusculo.
 - Inativacao:
   - Botao "Inativar" altera ativo=false.
+- Cadastro em massa:
+  - Botao "Importar em massa" abre modal com selecao de tabela.
+  - Modelo XLSX varia por tabela (nome + relacoes).
+  - Todos os campos sao texto; ativo e opcional (true/false).
+  - Itens duplicados na planilha ou ja existentes sao bloqueados.
 
 Filtros, auto-complete e listagem
 ---------------------------------
@@ -44,7 +49,7 @@ Filtros, auto-complete e listagem
   - Acoes: Editar, Historico, Inativar.
 - Historico:
   - Modal mostra acao, data, campos alterados e usuario (ID).
-  - Somente edicoes (UPDATE) geram historico; primeiro cadastro nao registra historico.
+  - Insercoes nao sao exibidas no modal; apenas UPDATE/DELETE.
 
 Boas praticas
 -------------
@@ -55,6 +60,8 @@ Atualizacao 2026-01
 -------------------
 - Nova tela de Cadastro Base com formulario e lista dinamicos.
 - Adicionado historico unificado (basic_registration_history).
+- Importacao em massa por tabela via XLSX.
+- Auditoria ajustada para ignorar INSERT no historico.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -70,6 +77,10 @@ Funcoes principais
   - Tipo: componentes de UI
   - Caminho: src/components/CadastroBase/*
   - Responsavel por: UI dinamica do cadastro base.
+- CadastroBaseImportModal
+  - Tipo: componente de UI
+  - Caminho: src/components/CadastroBase/CadastroBaseImportModal.jsx
+  - Responsavel por: modal de importacao em massa por tabela.
 - useCadastroBaseController
   - Tipo: hook/controller
   - Caminho: src/hooks/useCadastroBaseController.js
@@ -98,10 +109,15 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/basicRegistrationService.js
   - Responsavel por: list/create/update/inactivate/history via dataClient.
+  - Tambem exp?e downloadBasicRegistrationTemplate/importBasicRegistrationPlanilha.
 - api.basicRegistration / localApi.basicRegistration
   - Tipo: dataClient
   - Caminho: src/services/api.js, src/services/localApi.js
   - Responsavel por: execucao Supabase e modo local.
+- Edge Functions (importacao)
+  - Tipo: Supabase Edge Functions
+  - Caminho: supabase/functions/cadastro-base-import/index.ts, supabase/functions/cadastro-base-template/index.ts
+  - Responsavel por: importar XLSX e gerar modelos por tabela.
 
 Ajuda contextual
 ----------------
