@@ -276,7 +276,8 @@ export function useCadastroBaseController() {
     setHistoryModal({ open: true, isLoading: true, error: null, item, registros: [], centrosCustoMap, centrosServicoMap })
     try {
       const registros = await listBasicRegistrationHistory(tableKey, item.id)
-      setHistoryModal({ open: true, isLoading: false, error: null, item, registros: registros || [], centrosCustoMap, centrosServicoMap })
+      const filtered = (registros || []).filter((registro) => registro?.action !== 'INSERT')
+      setHistoryModal({ open: true, isLoading: false, error: null, item, registros: filtered, centrosCustoMap, centrosServicoMap })
     } catch (err) {
       setHistoryModal({
         open: true,

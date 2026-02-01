@@ -107,7 +107,7 @@ Opcionais / por feature:
 
 ---
 
-## Estrutura de pastas simplificada
+## Estrutura de pastas
 - `api/`: funcoes serverless (Vercel).
 - `docs/`: documentacao por tela e guias.
 - `public/`: assets estaticos.
@@ -132,6 +132,8 @@ Opcionais / por feature:
 - `docs/`: documentacao por tela e guias.
   - `Acidentes.txt`: documentacao: Acidentes.
   - `AcidentesEmMassa.txt`: documentacao: AcidentesEmMassa.
+  - `CadastroBase.txt`: documentacao: CadastroBase.
+  - `CadastroBaseEmMassa.txt`: documentacao: CadastroBaseEmMassa.
   - `CadastroEmMassa.txt`: documentacao: CadastroEmMassa.
   - `Configuracoes.txt`: documentacao: Configuracoes.
   - `CredenciaisPermissoes.txt`: documentacao: CredenciaisPermissoes.
@@ -192,6 +194,14 @@ Opcionais / por feature:
     - `index.js`: template de documento compartilhado.
 - `src/`: aplicacao React.
   - `components/`:
+    - `CadastroBase/`:
+      - `CadastroBaseFilters.jsx`: componente React.
+      - `CadastroBaseForm.jsx`: componente React.
+      - `CadastroBaseImportModal.jsx`: componente React.
+      - `CadastroBaseTable.jsx`: componente React.
+      - `CadastroBaseHistoryModal.jsx`: componente React.
+      - `CadastroBaseHistoryTimeline.jsx`: componente React.
+
     - `Acidentes/`:
       - `Filters/`:
         - `AcidentesFilters.jsx`: componente React.
@@ -512,6 +522,10 @@ Opcionais / por feature:
     - `cadastro-import/`:
       - `index.ts`: edge function (Supabase).
     - `cadastro-template/`:
+      - `index.ts`: edge function (Supabase).
+    - `cadastro-base-import/`:
+      - `index.ts`: edge function (Supabase).
+    - `cadastro-base-template/`:
       - `index.ts`: edge function (Supabase).
     - `cleanup-import-errors/`:
       - `index.ts`: edge function (Supabase).

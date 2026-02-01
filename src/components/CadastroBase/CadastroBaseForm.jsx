@@ -16,6 +16,7 @@ export function CadastroBaseForm({
   isSaving,
   error,
   editingItem,
+  onOpenImportMassa,
   onTableChange,
   onChange,
   onSubmit,
@@ -162,6 +163,10 @@ export function CadastroBaseForm({
           {editingItem ? (
             <button type="button" className="button button--ghost" onClick={onCancel} disabled={isSaving}>
               Cancelar edicao
+            </button>
+          ) : onOpenImportMassa ? (
+            <button type="button" className="button button--ghost" onClick={onOpenImportMassa} disabled={isSaving}>
+              Cadastrar em massa
             </button>
           ) : null}
         </div>

@@ -1,0 +1,70 @@
+Cadastro Base em massa
+======================
+
+Objetivo
+--------
+Cadastrar itens em massa nas tabelas base (fabricantes, cargos, centros, setores) via XLSX.
+
+Fluxo geral
+-----------
+1) Abrir Cadastro Base.
+2) Clicar em "Importar em massa".
+3) Selecionar a tabela no modal.
+4) Baixar o modelo da tabela.
+5) Preencher e importar a planilha XLSX.
+
+Formato da planilha (XLSX)
+--------------------------
+O modelo varia por tabela, mas sempre usa texto.
+
+Colunas obrigatorias por tabela:
+- fabricantes: fabricante
+- cargos: cargo
+- centros_custo: centro_custo
+- centros_servico: centro_servico, centro_custo
+- centros_estoque: centro_estoque, centro_custo
+- setores: setor, centro_servico
+
+Colunas opcionais:
+- ativo (true/false) para todas as tabelas
+
+Regras de importacao
+--------------------
+- Todos os valores sao texto (UUID nao e aceito).
+- Nomes precisam bater com os catalogos relacionados.
+- Itens duplicados na mesma planilha ou ja existentes geram erro.
+- O campo ativo e opcional (default true).
+
+Mapa do fluxo (frontend -> Supabase)
+------------------------------------
+UI (Modal)
+- src/components/CadastroBase/CadastroBaseImportModal.jsx
+  - seleciona tabela e envia arquivo XLSX
+
+Service (frontend)
+- src/services/api.js
+  - api.basicRegistration.importPlanilha({ table, file })
+    1) Upload no Storage (bucket "imports")
+       path: cadastro-base/<tabela>/<uuid>-<arquivo>.xlsx
+    2) Chama Edge Function "cadastro-base-import" com JSON:
+       { "path": "<path>", "table": "<tabela>" }
+
+Edge Functions (Supabase)
+- supabase/functions/cadastro-base-import/index.ts
+  - valida usuario logado e owner
+  - valida e insere linhas
+  - gera CSV de erros quando necessario
+  - remove o XLSX enviado (best-effort)
+
+- supabase/functions/cadastro-base-template/index.ts
+  - retorna XLSX modelo por tabela
+
+Relatorio de erros (CSV)
+------------------------
+Quando houver erros, a Edge Function retorna:
+- errorsUrl: URL assinada para baixar o CSV
+- firstError: primeira linha de erro
+- errorSamples: amostras de erros
+
+Formato do CSV:
+linha,coluna,motivo
