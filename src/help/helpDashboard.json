@@ -1,92 +1,37 @@
-{
-
-
-    "dashboard": {
-
-
-        "title": "Dashboard de estoque",
-
-
-        "summary": "Use esta tela para ver rapidamente movimentaÃ§Ã£o, valores e alertas de estoque.",
-
-
-        "steps": [
-
-
-            {
-
-
-                "title": "Aplicar filtros rÃ¡pidos",
-
-
-                "description": "No campo Busca digite parte do nome de material, grupo ou pessoa e combine com perÃ­odo inicial/final; clique em Aplicar filtros para recalcular todos os grÃ¡ficos. Use Limpar filtros para voltar ao panorama completo.",
-
-
-                "mediaHint": "Ãrea de filtros no topo com perÃ­odo e campo de busca."
-
-
-            },
-
-
-            {
-
-
-                "title": "Ler os cards de destaque",
-
-
-                "description": "Os cards mostram totais consolidados (movimentado, saldo e alertas). Passe o mouse no Ã­cone (i) para entender como cada indicador Ã© calculado.",
-
-
-                "mediaHint": "Cards de resumo com valores e Ã­cones."
-
-
-            },
-
-
-            {
-
-
-                "title": "Interagir com os grÃ¡ficos",
-
-
-                "description": "Clique em uma barra ou fatia para filtrar o restante dos grÃ¡ficos pelo mesmo termo. Use o chip Limpar que aparece acima do grÃ¡fico para remover o filtro.",
-
-
-                "mediaHint": "GrÃ¡fico com tooltip e chip de filtro ativo."
-
-
-            },
-
-
-            {
-
-
-                "title": "Expandir grÃ¡ficos",
-
-
-                "description": "Para analisar um grÃ¡fico com mais espaÃ§o, clique no botÃ£o de expandir (canto superior direito do card). Feche clicando fora ou no Ã­cone de fechar.",
-
-
-                "mediaHint": "BotÃ£o de expandir no cabeÃ§alho do card."
-
-
-            }
-
-
-        ],
-
-
-        "notes": [
-
-
-            "Os grÃ¡ficos respeitam os filtros aplicados; se algo parecer zerado, confirme o perÃ­odo.",
-
-
-            "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam."
-
-
-        ]
-
-
-    }
+﻿{
+  "dashboard": {
+    "title": "Dashboard de estoque",
+    "summary": "Use esta tela para ver rapidamente movimentacao, valores e alertas de estoque.",
+    "steps": [
+      {
+        "title": "Aplicar filtros rapidos",
+        "description": "No campo Busca digite parte do nome de material, grupo ou pessoa e combine com periodo inicial/final; clique em Aplicar filtros para recalcular todos os graficos. Use Limpar filtros para voltar ao panorama completo.",
+        "mediaHint": "Area de filtros no topo com periodo e campo de busca."
+      },
+      {
+        "title": "Ler os cards de destaque",
+        "description": "Os cards mostram totais consolidados (movimentado, saldo e alertas). Passe o mouse no icone (i) para entender como cada indicador e calculado.",
+        "mediaHint": "Cards de resumo com valores e icones."
+      },
+      {
+        "title": "Interagir com os graficos",
+        "description": "Clique em uma barra ou fatia para filtrar o restante dos graficos pelo mesmo termo. Use o chip Limpar que aparece acima do grafico para remover o filtro.",
+        "mediaHint": "Grafico com tooltip e chip de filtro ativo."
+      },
+      {
+        "title": "Expandir graficos",
+        "description": "Para analisar um grafico com mais espaco, clique no botao de expandir (canto superior direito do card). Feche clicando fora ou no icone de fechar.",
+        "mediaHint": "Botao de expandir no cabecalho do card."
+      },
+      {
+        "title": "Interpretar os Paretos",
+        "description": "Pareto 80/20 - Saida por quantidade responde: \"O que mais sai fisicamente?\". Pareto por risco operacional responde: \"O que nao pode faltar de jeito nenhum?\". Pareto financeiro - Saida por valor responde: \"O que doi mais no caixa?\".",
+        "mediaHint": "Cards dos Paretos com curva acumulada e linha de 80%."
+      }
+    ],
+    "notes": [
+      "Os graficos respeitam os filtros aplicados; se algo parecer zerado, confirme o periodo.",
+      "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam."
+    ]
+  }
 }

@@ -1,0 +1,62 @@
+RELATÓRIO MENSAL DE ESTOQUE
+1. Identificação
+
+Mês de referência: {{mes_referencia}}
+Período analisado: {{periodo_inicio}} a {{periodo_fim}}
+Data de emissão: {{data_emissao}}
+
+2. Resumo executivo
+
+No período analisado, o estoque registrou {{total_movimentacoes}} movimentações, sendo {{total_entradas}} entradas e {{total_saidas}} saídas, com valor total movimentado de {{valor_total_movimentado}}.
+
+Alertas ativos: {{alertas_ativos}}
+Nível de risco geral: {{nivel_risco_geral}}
+
+Status geral do estoque: {{status_estoque}}
+
+3. Pareto 80/20 – Saída por quantidade
+
+A análise de Pareto demonstrou que {{percentual_pareto}}% das saídas estão concentradas em {{percentual_materiais}}% dos materiais.
+
+{{lista_pareto_quantidade}}
+
+(Material – Quantidade – % acumulado)
+
+4. Pareto por risco operacional
+
+Classificação no período:
+Críticos: {{qtd_criticos}}
+Em atenção: {{qtd_atencao}}
+Controlados: {{qtd_controlados}}
+
+Materiais críticos:
+{{lista_materiais_criticos}}
+
+5. Pareto financeiro – Para onde está indo o dinheiro
+
+Materiais e categorias com maior valor de saída:
+{{lista_pareto_valor}}
+
+6. Consumo por setor / centro de serviço
+
+{{lista_consumo_setor}}
+
+7. Vencidos / Vencendo / Excesso
+
+Vencidos: {{qtd_vencidos}}
+Vencendo (até 30 dias): {{qtd_vencendo}}
+Excesso (estoque_atual > pressao_vida_util * 1,5): {{qtd_excesso}}
+
+8. Cobertura por trabalhador
+
+Status: {{status_cobertura}}
+Interpretação: {{interpretacao_cobertura}}
+
+9. Síntese de alertas
+
+Materiais abaixo do mínimo: {{qtd_abaixo_minimo}}
+Riscos imediatos de ruptura: {{qtd_riscos_imediatos}}
+
+10. Conclusão mensal
+
+Situação geral: {{status_final}}

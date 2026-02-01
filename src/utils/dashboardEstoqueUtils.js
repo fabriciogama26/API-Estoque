@@ -11,6 +11,9 @@ export const chartInfoMessagesEstoque = {
   valor: 'Evolucao do valor financeiro movimentado (entradas x saidas) no periodo filtrado.',
   estoqueMaterial: 'Ranking dos materiais com maior volume de saidas dentro do periodo filtrado.',
   estoqueCategoria: 'Categorias dos materiais que mais geraram saidas no periodo.',
+  paretoQuantidade: 'Pareto 80/20 - Saida por quantidade. Responde: "O que mais sai fisicamente?"',
+  paretoRisco: 'Pareto por risco operacional. Responde: "O que nao pode faltar de jeito nenhum?"',
+  paretoFinanceiro: 'Pareto financeiro - Saida por valor. Responde: "O que doi mais no caixa?"',
   topFabricantes: 'Fabricantes com maior movimentacao (entradas + saidas) dentro do periodo.',
   topCentros: 'Total de EPIs entregues por centro de servico de acordo com as saidas filtradas.',
   topSetores: 'Total de entregas por setor considerando as saidas filtradas.',
@@ -25,6 +28,52 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const isLikelyUuid = (value) => UUID_PATTERN.test(String(value || '').trim())
 
 export const sanitizeDisplayText = (value) => (value ? String(value).trim() : '')
+
+const resolveListText = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item?.nome ? String(item.nome).trim() : String(item ?? '').trim()))
+      .filter(Boolean)
+      .join('; ')
+  }
+  return sanitizeDisplayText(value)
+}
+
+const resolveMaterialSizeValue = (value) => {
+  const texto = sanitizeDisplayText(value)
+  if (!texto || isLikelyUuid(texto)) {
+    return ''
+  }
+  return texto
+}
+
+export function resolveMaterialNumeroTamanho(material = {}) {
+  const numeroCalcado =
+    resolveMaterialSizeValue(material.numeroCalcadoNome) || resolveMaterialSizeValue(material.numeroCalcado)
+  if (numeroCalcado) {
+    return numeroCalcado
+  }
+  const tamanhoVestimenta =
+    resolveMaterialSizeValue(material.numeroVestimentaNome) || resolveMaterialSizeValue(material.numeroVestimenta)
+  if (tamanhoVestimenta) {
+    return tamanhoVestimenta
+  }
+  return resolveMaterialSizeValue(material.numeroEspecifico)
+}
+
+export function resolveMaterialDescricaoCompleta(material = {}) {
+  if (!material) {
+    return ''
+  }
+  const item = sanitizeDisplayText(material.materialItemNome || material.nome)
+  const grupo = sanitizeDisplayText(material.grupoMaterialNome || material.grupoMaterial)
+  const tamanhoNumero = resolveMaterialNumeroTamanho(material)
+  const caracteristicas = resolveListText(material.caracteristicasTexto || material.caracteristicaEpi)
+  const cor = resolveListText(material.corMaterial || material.coresTexto || material.cores)
+  const fabricante = resolveFabricanteDisplay(material)
+
+  return [item, grupo, tamanhoNumero, caracteristicas, cor, fabricante].filter(Boolean).join(' | ')
+}
 
 export function resolveFabricanteDisplay(material = {}) {
   const candidatos = [material.fabricanteNome, material.fabricante]
@@ -93,7 +142,8 @@ const isSaidaCancelada = (saida = {}) => {
 }
 
 export function formatEstoqueMaterialLabel(item = {}) {
-  const base = item.resumo || [item.nome, resolveFabricanteDisplay(item)].filter(Boolean).join(' | ')
+  const tamanhoNumero = resolveMaterialNumeroTamanho(item)
+  const base = item.resumo || [item.nome, resolveFabricanteDisplay(item), tamanhoNumero].filter(Boolean).join(' | ')
   const partes = base.split('|').map((parte) => sanitizeDisplayText(parte)).filter(Boolean)
   const compacto = partes.slice(0, 3).join(' | ')
   if (compacto.length <= 55) {
@@ -247,10 +297,17 @@ export const montarTopMateriaisSaida = (saidas = [], termoNormalizado) => {
     }
     const nome = formatEstoqueMaterialLabel(material)
     const chave = material.id || nome
-    const descricao = material.resumo || [material.nome, resolveFabricanteDisplay(material)].filter(Boolean).join(' | ')
+    const descricaoCompleta = resolveMaterialDescricaoCompleta(material)
+    const descricao =
+      material.resumo ||
+      [material.nome, resolveFabricanteDisplay(material), resolveMaterialNumeroTamanho(material)]
+        .filter(Boolean)
+        .join(' | ')
     const atual = materiais.get(chave) ?? {
       materialId: material.id ?? chave,
+      materialIdDisplay: material.id ?? null,
       nome,
+      descricaoCompleta,
       descricao: descricao || nome,
       filtro: nome,
       quantidade: 0,
@@ -401,10 +458,17 @@ export const montarTopTrocasMateriais = (saidas = [], termoNormalizado) => {
     }
     const nome = formatEstoqueMaterialLabel(material)
     const chave = material.id || nome
-    const descricao = material.resumo || [material.nome, resolveFabricanteDisplay(material)].filter(Boolean).join(' | ')
+    const descricaoCompleta = resolveMaterialDescricaoCompleta(material)
+    const descricao =
+      material.resumo ||
+      [material.nome, resolveFabricanteDisplay(material), resolveMaterialNumeroTamanho(material)]
+        .filter(Boolean)
+        .join(' | ')
     const atual = materiais.get(chave) ?? {
       materialId: material.id ?? chave,
+      materialIdDisplay: material.id ?? null,
       nome,
+      descricaoCompleta,
       descricao: descricao || nome,
       filtro: nome,
       quantidade: 0,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MovementIcon, RevenueIcon, StockIcon, AlertIcon, DashboardIcon, TrendIcon } from '../components/icons.jsx'
-import { fetchDashboardEstoque } from '../services/dashboardEstoqueApi.js'
+import { fetchDashboardEstoque, generateDashboardEstoqueReport } from '../services/dashboardEstoqueApi.js'
 import {
   initialDashboardEstoqueFilters,
   normalizarTermo,
@@ -18,6 +18,30 @@ import {
   montarTopTrocasSetores,
   montarTopTrocasPessoas,
 } from '../utils/dashboardEstoqueUtils.js'
+import {
+  buildParetoList,
+  buildRiscoOperacional,
+  buildSaidasResumo,
+  computePercentile,
+} from '../utils/inventoryReportUtils.js'
+import { parsePeriodo, resolvePeriodoRange } from '../lib/estoque.js'
+
+const uniqueByMaterialId = (items = []) => {
+  const seen = new Set()
+  const lista = []
+  items.forEach((item) => {
+    const key = item?.materialId ?? item?.id ?? item?.nome
+    const normalized = key === null || key === undefined ? '' : String(key).trim().toLowerCase()
+    if (normalized && seen.has(normalized)) {
+      return
+    }
+    if (normalized) {
+      seen.add(normalized)
+    }
+    lista.push(item)
+  })
+  return lista
+}
 
 export function useDashboardEstoque(onError) {
   const [filters, setFilters] = useState(initialDashboardEstoqueFilters)
@@ -26,6 +50,8 @@ export function useDashboardEstoque(onError) {
   const [error, setError] = useState(null)
   const [chartFilter, setChartFilter] = useState(null)
   const [expandedChartId, setExpandedChartId] = useState(null)
+  const [reportStatus, setReportStatus] = useState(null)
+  const [reportLoading, setReportLoading] = useState(false)
   const lastKeyRef = useRef(null)
   const dataRef = useRef(null)
 
@@ -123,10 +149,59 @@ export function useDashboardEstoque(onError) {
     )
   }
 
+  const handleGenerateReport = async () => {
+    try {
+      setReportStatus(null)
+      setReportLoading(true)
+      const result = await generateDashboardEstoqueReport({
+        periodoInicio: appliedFilters.periodoInicio,
+        periodoFim: appliedFilters.periodoFim,
+        termo: appliedFilters.termo,
+      })
+      const tipo = result?.tipo ? result.tipo.toLowerCase() : 'mensal'
+      if (result?.sent === true) {
+        setReportStatus({
+          type: 'success',
+          message: `Relatorio ${tipo} gerado e enviado para administradores.`,
+        })
+      } else if (result?.sent === false) {
+        const detalhe = result?.emailError ? ` (${result.emailError})` : ''
+        setReportStatus({
+          type: 'error',
+          message: `Relatorio ${tipo} gerado, mas o envio por email falhou${detalhe}.`,
+        })
+      } else {
+        setReportStatus({
+          type: 'success',
+          message: `Relatorio ${tipo} gerado.`,
+        })
+      }
+    } catch (err) {
+      setReportStatus({
+        type: 'error',
+        message: err?.message || 'Erro ao gerar relatorio de estoque.',
+      })
+      notifyError(err, { area: 'dashboard_estoque_report' })
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
   const termoNormalizado = useMemo(
     () => normalizarTermo(appliedFilters.termo),
     [appliedFilters.termo],
   )
+
+  const periodoRange = useMemo(() => resolvePeriodoRange(parsePeriodo(appliedFilters)), [appliedFilters])
+
+  const diasPeriodo = useMemo(() => {
+    if (!periodoRange?.start || !periodoRange?.end) {
+      return 0
+    }
+    const diff = periodoRange.end.getTime() - periodoRange.start.getTime()
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1
+    return Math.max(1, days)
+  }, [periodoRange])
 
   const entradasDetalhadasFiltradas = useMemo(
     () => filtrarPorTermo(data?.entradasDetalhadas ?? [], termoNormalizado),
@@ -136,6 +211,11 @@ export function useDashboardEstoque(onError) {
   const saidasDetalhadasFiltradas = useMemo(
     () => filtrarPorTermo(data?.saidasDetalhadas ?? [], termoNormalizado),
     [data, termoNormalizado],
+  )
+
+  const saidasResumo = useMemo(
+    () => buildSaidasResumo(saidasDetalhadasFiltradas),
+    [saidasDetalhadasFiltradas],
   )
 
   const parseDateWithoutTimezone = (value) => {
@@ -270,6 +350,58 @@ export function useDashboardEstoque(onError) {
   const topTrocasSetoresTop = useMemo(() => topTrocasSetores.slice(0, 10), [topTrocasSetores])
   const topTrocasPessoasTop = useMemo(() => topTrocasPessoas.slice(0, 10), [topTrocasPessoas])
 
+  const p80Quantidade = useMemo(
+    () => computePercentile(saidasResumo.map((item) => item.quantidade), 0.8),
+    [saidasResumo],
+  )
+  const p90Quantidade = useMemo(
+    () => computePercentile(saidasResumo.map((item) => item.quantidade), 0.9),
+    [saidasResumo],
+  )
+  const p80Giro = useMemo(() => {
+    if (!diasPeriodo) return 0
+    return computePercentile(saidasResumo.map((item) => item.quantidade / diasPeriodo), 0.8)
+  }, [diasPeriodo, saidasResumo])
+
+  const riscoOperacional = useMemo(
+    () =>
+      buildRiscoOperacional({
+        saidasResumo,
+        estoqueAtual: data?.estoqueAtual?.itens ?? [],
+        diasPeriodo,
+        p80Quantidade,
+        p90Quantidade,
+        p80Giro,
+      }),
+    [data, diasPeriodo, p80Giro, p80Quantidade, p90Quantidade, saidasResumo],
+  )
+
+  const paretoQuantidade = useMemo(
+    () => buildParetoList(saidasResumo, 'quantidade'),
+    [saidasResumo],
+  )
+  const paretoFinanceiro = useMemo(
+    () => buildParetoList(saidasResumo, 'valorTotal'),
+    [saidasResumo],
+  )
+  const paretoRisco = useMemo(
+    () => buildParetoList(riscoOperacional.filter((item) => item.score > 0), 'score'),
+    [riscoOperacional],
+  )
+
+  const paretoQuantidadeTop = useMemo(
+    () => uniqueByMaterialId(paretoQuantidade.lista).slice(0, 12),
+    [paretoQuantidade],
+  )
+  const paretoFinanceiroTop = useMemo(
+    () => uniqueByMaterialId(paretoFinanceiro.lista).slice(0, 12),
+    [paretoFinanceiro],
+  )
+  const paretoRiscoTop = useMemo(
+    () => uniqueByMaterialId(paretoRisco.lista).slice(0, 12),
+    [paretoRisco],
+  )
+
   const totalMovimentacoes = entradasDetalhadasFiltradas.length + saidasDetalhadasFiltradas.length
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
   const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
@@ -372,8 +504,14 @@ export function useDashboardEstoque(onError) {
     topTrocasMateriaisTop,
     topTrocasSetoresTop,
     topTrocasPessoasTop,
+    paretoQuantidadeTop,
+    paretoFinanceiroTop,
+    paretoRiscoTop,
     highlightCards,
     formatPeriodoLabel,
     formatCurrency,
+    reportStatus,
+    reportLoading,
+    handleGenerateReport,
   }
 }

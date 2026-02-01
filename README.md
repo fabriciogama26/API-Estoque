@@ -1,15 +1,11 @@
-# API-Estoque
+﻿# API-Estoque
 
 Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
-
----
 
 ## Visao geral
 - Problema resolvido: centralizar cadastros, movimentacoes de estoque e historicos.
 - Solucao proposta: frontend React com Supabase Auth/Database/Storage e migrations versionadas.
 - Contexto de uso: times de seguranca e almoxarifado em ambiente multi-tenant.
-
----
 
 ## Tecnologias
 - React
@@ -18,15 +14,11 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 - Node.js
 - Vercel Serverless Functions (pasta `api/`)
 
----
-
 ## Requisitos
 - Node.js 20+
 - npm 10+
 - Projeto Supabase configurado (Auth, Database, Storage)
 - Supabase CLI (para rodar migrations localmente)
-
----
 
 ## Como rodar o projeto
 
@@ -37,16 +29,12 @@ npm install
 npm run dev
 ```
 
----
-
 ### Build / Producao
 
 ```bash
 npm run build
 npm run preview
 ```
-
----
 
 ## Variaveis de ambiente
 
@@ -55,7 +43,7 @@ Obrigatorias (frontend remoto):
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_SUPABASE_FUNCTIONS_URL`
 
-Obrigatorias (Edge Functions, quando usadas):
+Obrigatorias (API serverless e relatorios):
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY`
@@ -64,6 +52,7 @@ Obrigatorias (Edge Functions, quando usadas):
 - `ERRORS_RETENTION_DAYS`
 - `ERRORS_CLEANUP_PAGE_SIZE`
 - `CRON_SECRET`
+- `BREVO_API_KEY`
 - `ACIDENTES_TZ_OFFSET`
 - `ENTRADAS_TZ_OFFSET`
 - `PUPPETEER_BROWSERLESS_IO_KEY`
@@ -105,17 +94,13 @@ Opcionais / por feature:
 - `SUPABASE_SECRET_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`
 
----
-
-## Estrutura de pastas
+## Estrutura de pastas simplificada
 - `api/`: funcoes serverless (Vercel).
 - `docs/`: documentacao por tela e guias.
 - `public/`: assets estaticos.
 - `shared/`: templates e utilitarios compartilhados.
 - `src/`: aplicacao React.
 - `supabase/`: migrations, functions e configuracoes.
-
----
 
 ## Estrutura completa de pastas
 - `api/`: funcoes serverless (Vercel).
@@ -192,6 +177,8 @@ Opcionais / por feature:
   - `documents/`:
     - `epiTermTemplate.js`: template de documento compartilhado.
     - `index.js`: template de documento compartilhado.
+    - `RELATÓRIO MENSAL DE ESTOQUE.txt`: template do relatorio mensal de estoque.
+    - `RELATÓRIO TRIMESTRAL DE ESTOQUE (COMPARATIVO).txt`: template do relatorio trimestral de estoque.
 - `src/`: aplicacao React.
   - `components/`:
     - `CadastroBase/`:
@@ -299,6 +286,7 @@ Opcionais / por feature:
       - `EntradasSaidasChart.jsx`: componente React.
       - `EstoqueCategoriaChart.jsx`: componente React.
       - `EstoqueCharts.jsx`: componente React.
+      - `ParetoChart.jsx`: componente React.
     - `AutoResizeIframe.jsx`: componente React.
     - `CaptchaGuard.jsx`: componente React.
     - `DashboardCards.jsx`: componente React.
@@ -497,6 +485,7 @@ Opcionais / por feature:
     - `estoqueUtils.js`: utilitario.
     - `hhtMensalUtils.js`: utilitario.
     - `indicadores.js`: utilitario.
+    - `inventoryReportUtils.js`: utilitario.
     - `passwordPolicy.js`: utilitario.
     - `pessoasUtils.js`: utilitario.
     - `saidasExport.js`: utilitario.
@@ -689,6 +678,7 @@ Opcionais / por feature:
     - `20250218_fix_rpc_saida_verificar_troca_owner.sql`: migration SQL.
     - `20250218_fix_saidas_troca_sequencia.sql`: migration SQL.
     - `20250218_update_rpc_admin_write_credential_history.sql`: migration SQL.
+    - `20260201_create_inventory_report.sql`: migration SQL.
     - `20260219_refactor_acidentes_to_accidents.sql`: migration SQL.
     - `20260220_update_vw_indicadores_acidentes_accidents.sql`: migration SQL.
     - `20260221_fix_accident_group_and_pessoas_view.sql`: migration SQL.
@@ -727,34 +717,29 @@ Opcionais / por feature:
 - `vercel.json`: configuracao de deploy Vercel.
 - `vite.config.js`: configuracao do Vite.
 
----
-
 ## Fluxo principal (happy path)
 - Autenticar no Supabase e carregar contexto do usuario.
 - Cadastrar catalogos base (grupos, fabricantes, cores, caracteristicas, medidas).
 - Cadastrar materiais e pessoas.
 - Registrar entradas para compor saldo.
 - Registrar saidas e acompanhar historico.
-- Consultar dashboards e gerar termo de EPI quando aplicavel.
-
----
+- Consultar dashboards e gerar relatorios mensais/trimestrais quando necessario.
+- Gerar termo de EPI quando aplicavel.
 
 ## Testes
 - Nao existem testes automatizados.
-
----
 
 ## Troubleshooting
 - Erro de RLS (42501): conferir `account_owner_id`, roles/permissions e policies do schema.
 - Erro de auth/URL: validar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
 - Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.
-
----
+- Relatorio nao enviado: validar `BREVO_API_KEY` e destinatarios admin/master.
+- Relatorio automatico nao executa: validar `CRON_SECRET` e a rota `/api/estoque/relatorio/auto`.
+- Nenhuma movimentacao encontrada: revisar filtros e periodo do relatorio.
 
 ## Status do projeto
-- ?? Em desenvolvimento
-
----
+🟡 Em desenvolvimento
 
 ## Licenca
 - Nao definida no repositorio.
+

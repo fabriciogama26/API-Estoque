@@ -125,7 +125,7 @@ export function CadastroBaseImportModal({
                 <li key={col}>{col}</li>
               ))}
             </ul>
-            <p className="desligamento-help__text">Todos os valores sao texto.</p>
+            <p className="desligamento-help__text">Todos os valores sao texto, faça com o capslk sempre ativo para ficar tudo maiusculo.</p>
             <p className="desligamento-help__text">O campo ativo somente: (true ou false).</p>
           </section>
 

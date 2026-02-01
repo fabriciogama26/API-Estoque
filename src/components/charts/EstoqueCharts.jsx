@@ -1,7 +1,30 @@
 import PropTypes from 'prop-types'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 
+function MaterialTooltip({ active, payload, label, valueFormatter, valueLabel }) {
+  if (!active || !payload?.length) {
+    return null
+  }
+  const entry = payload[0]?.payload ?? {}
+  const descricaoCompleta = entry?.descricaoCompleta || entry?.descricao || label
+  const materialId = entry?.materialIdDisplay || entry?.materialId || entry?.id
+  const valor = entry?.quantidade ?? payload[0]?.value
+
+  return (
+    <div className="chart-tooltip">
+      <span className="chart-tooltip__label">{descricaoCompleta}</span>
+      {materialId ? <span className="chart-tooltip__meta">ID: {materialId}</span> : null}
+      <ul>
+        <li>
+          <strong>{valueLabel}:</strong> {valueFormatter ? valueFormatter(valor) : valor}
+        </li>
+      </ul>
+    </div>
+  )
+}
+
 export function EstoquePorMaterialChart({ data, valueFormatter, height = 320, onItemClick }) {
+  const valueLabel = 'Quantidade'
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout="vertical" margin={{ top: 12, right: 24, left: 16, bottom: 12 }}>
@@ -15,13 +38,14 @@ export function EstoquePorMaterialChart({ data, valueFormatter, height = 320, on
           tickLine={false}
         />
         <Tooltip
-          formatter={(value) => (valueFormatter ? valueFormatter(value) : value)}
-          labelFormatter={(label, payload) => (payload && payload[0]?.payload?.descricao) || label}
+          content={
+            <MaterialTooltip valueFormatter={valueFormatter} valueLabel={valueLabel} />
+          }
         />
         <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ color: '#475569' }} />
         <Bar
           dataKey="quantidade"
-          name="Quantidade"
+          name={valueLabel}
           radius={[8, 8, 8, 8]}
           fill="#22d3ee"
           cursor={onItemClick ? 'pointer' : 'default'}

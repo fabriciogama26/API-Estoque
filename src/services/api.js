@@ -5739,6 +5739,41 @@ export const api = {
       const pessoas = Array.from(pessoasDetalhes.values())
       return montarDashboard({ materiais, entradas, saidas, pessoas }, periodo)
     },
+    async report(params = {}) {
+      ensureSupabase()
+      const { data } = await supabase.auth.getSession()
+      const token = data?.session?.access_token
+      if (!token) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/estoque/relatorio`
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(params || {}),
+      })
+
+      if (!response.ok) {
+        let message = `Falha ao gerar relatorio (status ${response.status}).`
+        try {
+          const data = await response.json()
+          if (data?.error) {
+            message = data.error
+          }
+        } catch {
+          // ignore
+        }
+        throw new Error(message)
+      }
+
+      return response.json()
+    },
   },
   statusSaida: {
     async list() {

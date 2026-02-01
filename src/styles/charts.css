@@ -14,6 +14,13 @@
   color: var(--color-primary); /* verde segurança */
 }
 
+.chart-tooltip__meta {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(248, 250, 252, 0.8);
+  margin-bottom: 0.35rem;
+}
+
 .chart-tooltip ul {
   margin: 0;
   padding: 0;
@@ -152,4 +159,5 @@
   background: rgba(14, 165, 233, 0.3);
   color: #0f172a;
 }
+
 
