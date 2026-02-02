@@ -6,3 +6,10 @@ export const fetchDashboardEstoque = (params = {}) => {
   }
   return api.estoque.dashboard(params)
 }
+
+export const generateDashboardEstoqueReport = (params = {}) => {
+  if (!api?.estoque?.report) {
+    throw new Error('Recurso de relatorio de estoque indisponivel.')
+  }
+  return api.estoque.report(params)
+}

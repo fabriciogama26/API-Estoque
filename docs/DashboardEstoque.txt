@@ -1,79 +1,83 @@
-Tela: Dashboard de Estoque
+﻿Tela: Dashboard de Estoque
 =========================
 
 Visao geral
 -----------
 - Consolida indicadores de movimentacao de estoque (entradas, saidas, saldo e valor movimentado) no periodo filtrado.
-- Mostra series historicas, rankings e cards de resumo para apoiar compras, reposicao e auditoria.
-- Fonte principal: `api.estoque.dashboard` via `fetchDashboardEstoque` (`dashboardEstoqueApi`).
+- Exibe series historicas, rankings e graficos de Pareto (quantidade, risco operacional e financeiro).
+- Permite gerar relatorio mensal ou trimestral e enviar por email para administradores.
+- Fonte principal: `api.estoque.dashboard` e `api.estoque.report` via `dashboardEstoqueApi`.
 
 Arquitetura
 -----------
 - Hook `useDashboardEstoque`:
   - Mantem filtros, dados, estado de loading/erro.
-  - Gera uma chave de filtros para evitar recargas desnecessarias.
-  - Monta series historicas (entradas/saidas) e rankings (materiais, categorias, fabricantes, centros, setores, pessoas).
+  - Monta series historicas, rankings e calcula Pareto/risco operacional.
+  - Dispara geracao de relatorio via `generateDashboardEstoqueReport`.
 - Contexto `DashboardEstoqueProvider`:
-  - Expõe o estado do hook, funcoes de recarregar e mensagens/tip de graficos.
-  - Facilita compartilhamento de dados entre filtros, cards e graficos.
-- Utils:
-  - `dashboardEstoqueUtils` concentra agregacoes, formatacao de datas, moeda e funcoes `montarTop*`.
-- Pagina `DashboardPage.jsx`:
-  - Apenas orquestra: recebe dados do contexto, renderiza filtros, cards e grade de graficos.
+  - Expoe o estado do hook, funcoes de recarregar e mensagens de ajuda dos graficos.
+- Componentes de grafico:
+  - `ParetoChart` (novo) para curva 80/20, risco e financeiro.
+  - `ChartExpandModal` para visualizar graficos em tela cheia.
+- Backend:
+  - `EstoqueOperations.report` gera o relatorio, grava em `inventory_report` e envia email via Brevo.
+  - `EstoqueOperations.reportAuto` gera relatorios mensais/trimestrais via cron.
+  - Templates em `shared/documents` alimentam os textos enviados por email.
 - Erros:
-  - `useErrorLogger('dashboard_estoque')` registra falhas de carga e problemas de formataçao.
+  - `useErrorLogger('dashboard_estoque')` registra falhas de carga e geracao de relatorio.
 
-Filtros disponiveis
--------------------
+Filtros, auto-complete e listagem
+---------------------------------
 - Periodo inicial/final (AAAA-MM).
-- Termo livre (nome do material, fabricante, categoria, centro, setor, pessoa).
-- Aplicacao sob demanda: periodo/termo sÇõo aplicados apenas ao clicar em **Aplicar filtros** (mantemos rascunho x aplicado).
+- Termo livre (material, fabricante, categoria, centro, setor, pessoa).
+- Aplicacao sob demanda: filtros sao aplicados apenas ao clicar em **Aplicar filtros**.
 - Filtro contextual por grafico:
-  - Clique em um grafico aplica `chartFilter` (ex.: filtrar por um centro ou categoria especifica).
-  - Badge "Limpar filtro do grafico" aparece quando o filtro contextual esta ativo.
-- Botoes:
-  - "Aplicar filtros" chama `load(filters)` no hook.
-  - "Limpar filtros" restaura o ano corrente e recarrega dados padrao.
+  - Clique em um grafico aplica `chartFilter` (ex.: filtrar por um centro ou categoria).
+  - Badge "Limpar" remove o filtro contextual.
 
-Indicadores principais
-----------------------
-- Cards de resumo:
-  - Quantidade total de movimentacoes (entradas + saidas).
-  - Valor movimentado no periodo.
-  - Relacao estoque/saidas (quando aplicavel).
-  - Numero de alertas de estoque critico.
-  - Total de materiais monitorados.
-- Serie historica:
-  - `EntradasSaidasChart` agrega quantidades e valores mensais via `agruparPorPeriodo`.
-- Valor movimentado:
-  - `ValorMovimentadoChart` usa a mesma base da serie historica, formatando valores em BRL.
-- Rankings:
-  - Materiais mais movimentados.
-  - Categorias, fabricantes, centros de estoque/servico.
-  - Setores e pessoas responsaveis pelas movimentacoes.
-  - Baseados em funcoes `montarTop*`, aplicando filtros em memoria sem nova consulta a API.
+Boas praticas
+-------------
+- Garantir `valorUnitario` e `validadeDias` nos materiais para calculos financeiros e pressao de vida util.
+- Preencher `grupoMaterial` para classificar EPI/EPC no risco operacional.
+- Manter `dataTroca` consistente nas saidas para vencidos/vencendo.
+- Respeitar `account_owner_id` em todas as consultas (multi-tenant).
+- Pareto 80/20 responde: "O que mais sai fisicamente?".
+- Pareto por risco operacional responde: "O que nao pode faltar de jeito nenhum?".
+- Pareto financeiro responde: "O que doi mais no caixa?".
 
-Erros e comportamento
----------------------
-- Erros de carga sao capturados e exibidos em mensagem unica no lugar dos graficos/cards, evitando que o layout quebre.
-- Nao ha spinner global travando a pagina:
-  - O botao de filtros permanece estatico.
-  - Somente cards e graficos atualizam quando novos dados chegam.
-- Modal de expansao de graficos:
-  - Usa `expandedChartId` para abrir um grafico em destaque.
-  - Clique fora ou no botao de fechar encerra o modo expandido.
-
-Boas praticas para dados
-------------------------
-- Sempre retornar `valorUnitario` nas entradas/saidas para permitir calculo correto de valores financeiros.
-- Manter campos de exibicao preenchidos (fabricante, centro, setor, pessoa) para evitar rotulos "Nao informado".
-- Em modo local, manter o formato da resposta de `api.estoque.dashboard` alinhado aos utils para nao precisar ajustar a pagina a cada mudanca de mock.
-
-Atualizacao 2025-12
+Atualizacao 2026-02
 -------------------
-- Refatorado para hook/context e utils dedicados.
-- Cache de chave de filtros reduz recargas e flicker ao aplicar/limpar filtros.
-- Filtros clicaveis de graficos centralizados no hook; a pagina apenas monta a interface.
+- Adicionados graficos de Pareto (quantidade, risco e financeiro) no dashboard.
+- Relatorios mensais e trimestrais com envio por email e persistencia em `inventory_report`.
+- Templates TXT criados em `shared/documents` para relatorios mensais e trimestrais.
+- Ajustado espacamento e labels do Pareto para manter o grafico dentro do card.
+- Labels de materiais agora incluem numero/tamanho para evitar duplicidade visual.
+- IDs de tamanho/numero nao sao exibidos; usa nome legivel quando disponivel.
+- Tooltip e legenda dos Paretos de quantidade/risco agora mostram "Quantidade" em vez de "Valor".
+- Tooltip dos graficos de materiais mostra descricao completa, ID e quantidade.
+- Pareto consolida itens repetidos pelo mesmo materialId antes de ordenar.
+- Dashboard aplica filtro de itens unicos por materialId nos Paretos exibidos.
+- SaidasResumo normaliza chave por materialId para evitar duplicidade visual.
+- Pareto usa ordenacao deterministica (quantidade desc + materialId asc) para evitar troca de posicoes.
+- Mensagens de ajuda do dashboard atualizadas com as perguntas do Pareto.
+- Antes/Depois:
+  - Antes: dashboard sem Pareto e sem relatorio persistido; labels longos encostavam no card e itens com mesmo nome confundiam.
+  - Depois: Pareto ativo + relatorios gerados, enviados e gravados por execucao; labels truncados, margens internas maiores e numero/tamanho no nome.
+- Arquivos alterados/criados:
+  - `src/pages/DashboardPage.jsx`
+  - `src/hooks/useDashboardEstoque.js`
+  - `src/components/charts/ParetoChart.jsx`
+  - `src/utils/inventoryReportUtils.js`
+  - `src/services/dashboardEstoqueApi.js`
+  - `src/services/api.js`
+  - `src/services/localApi.js`
+  - `src/utils/dashboardEstoqueUtils.js`
+  - `api/_shared/operations.js`
+  - `api/index.js`
+  - `api/_shared/withAuth.js`
+  - `shared/documents/RELATÓRIO MENSAL DE ESTOQUE.txt`
+  - `shared/documents/RELATÓRIO TRIMESTRAL DE ESTOQUE (COMPARATIVO).txt`
+  - `supabase/migrations/20260201_create_inventory_report.sql`
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -84,44 +88,54 @@ Funcoes principais
 - DashboardPage
   - Tipo: componente de pagina React
   - Caminho: src/pages/DashboardPage.jsx
-  - Responsavel por: orquestrar filtros, cards e graficos do dashboard de estoque usando o contexto.
+  - Responsavel por: orquestrar filtros, cards, graficos e botao de relatorio.
 - useDashboardEstoque
   - Tipo: hook de dados/dashboard
   - Caminho: src/hooks/useDashboardEstoque.js
-  - Responsavel por: carregar indicadores, montar series/rankings, controlar filtros, cachear chave de busca e estado de loading/erro.
-- DashboardEstoqueProvider / EstoqueContext
-  - Tipo: contexto
-  - Caminho: src/context/EstoqueContext.jsx
-  - Responsavel por: disponibilizar dados do hook para filtros/cards/graficos, tamanhos de pagina e handlers.
+  - Responsavel por: carregar dados, calcular Pareto/risco e disparar relatorio.
+- ParetoChart
+  - Tipo: componente de grafico
+  - Caminho: src/components/charts/ParetoChart.jsx
+  - Responsavel por: exibir barras + curva acumulada (80/20).
+- EstoqueOperations.report/reportAuto
+  - Tipo: operacao backend
+  - Caminho: api/_shared/operations.js
+  - Responsavel por: gerar relatorio, gravar no banco e enviar email.
 
 Constantes e configuracoes
 --------------------------
-- Tamanhos de pagina e chaves de filtro (ex.: alertasPageSize)
-  - Tipo: configuracoes do contexto
-  - Caminho: src/context/EstoqueContext.jsx
-  - Uso: controla paginacao de alertas e cards e evita reload repetido.
+- chartInfoMessagesEstoque
+  - Tipo: configuracao de ajuda
+  - Caminho: src/utils/dashboardEstoqueUtils.js
+  - Uso: mensagens dos botoes de info dos graficos.
+- DEFAULT_RISK_WEIGHTS / DEFAULT_RISK_THRESHOLDS
+  - Tipo: configuracao de risco
+  - Caminho: src/utils/inventoryReportUtils.js
+  - Uso: peso e corte para classificacao de risco operacional.
 
 Funcoes utilitarias relacionadas
 --------------------------------
-- formatadores e builders de series/rankings
+- buildParetoList / buildRiscoOperacional / computePercentile
+  - Tipo: utilitarios
+  - Caminho: src/utils/inventoryReportUtils.js
+  - Responsavel por: gerar Pareto, risco e percentis.
+- builders de series/rankings
   - Tipo: utilitarios
   - Caminho: src/utils/dashboardEstoqueUtils.js
-  - Responsavel por: formatar valores, montar series historicas, rankings e labels/tooltips.
+  - Responsavel por: formatar valores, montar series historicas e rankings.
 
 Servicos e integracoes externas
 -------------------------------
 - dashboardEstoqueApi
   - Tipo: servico de API
   - Caminho: src/services/dashboardEstoqueApi.js
-  - Responsavel por: buscar dados consolidados do dashboard (entradas/saidas, valores, rankings).
+  - Responsavel por: buscar dashboard e gerar relatorio.
+- Brevo (email)
+  - Tipo: integracao externa
+  - Caminho: api/_shared/operations.js
+  - Responsavel por: envio de relatorios via `BREVO_API_KEY`.
 
 Ajuda contextual
 ----------------
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
-- Conteudo vem de src/help/helpContent.json (chave 'dashboard'); edite ali para ajustar titulos/steps/notes.
-- Para imagens, salve em public/help/dashboard/ e aponte no campo 'media' do passo (ex.: /help/dashboard/exemplo.webp).
-
-Atualizacao 2026-01 (UI)
-- Botao "Troca" alterna Top materiais/setores/pessoas para dados de troca (sem substituir graficos).
-- Modal de expansao isolado em src/components/Dashboard/ChartExpandModal.jsx.
-- Ajuda: src/help/helpDashboard.json.
+- Conteudo vem de src/help/helpDashboard.json (chave 'dashboard').

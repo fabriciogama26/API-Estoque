@@ -1,43 +1,47 @@
-Duplicidade de Materiais
+﻿Duplicidade de Materiais
 ========================
 
 1. **Objetivo**
-   - Nenhum material deve ser repetido no banco com a mesma base: `fabricante`, `grupoMaterial`, `nome (item)`, `numeroEspecifico/Calcado/Vestimenta`, `ca`, `cores` e `características`.
-   - A deduplicação roda em duas camadas: (a) preflight no frontend (RPC) para avisar/bloquear antes de gravar; (b) triggers no banco para impedir inserts/updates conflitantes.
+   - Nenhum material deve ser repetido no banco com a mesma base: `fabricante`, `grupoMaterial`, `nome (item)`, `numeroEspecifico/Calcado/Vestimenta`, `ca`, `cores` e `caracterÃ­sticas`.
+   - A deduplicaÃ§Ã£o roda em duas camadas: (a) preflight no frontend (RPC) para avisar/bloquear antes de gravar; (b) triggers no banco para impedir inserts/updates conflitantes.
 
 2. **View `materiais_unicos_view`**
-   - Agrega cada material com as cores e características ordenadas.
+   - Agrega cada material com as cores e caracterÃ­sticas ordenadas.
    - Calcula `hash_unico = md5(lower(concat_ws('|', fabricante, grupoMaterial, numeroEspecifico, valorUnitario, ca, cores_string, caracteristicas_string)))`.
-   - Serve como base para comparar combinações completas.
+   - Serve como base para comparar combinaÃ§Ãµes completas.
 
 3. **Hashes atuais**
-   - `material_hash_base(material_id)`: fabricante + grupo + item + número (resolve númeroEspecifico > calcado > vestimenta) + cores.
-   - `material_hash_completo(material_id)`: base + CA + cores + características.
+   - `material_hash_base(material_id)`: fabricante + grupo + item + nÃºmero (resolve nÃºmeroEspecifico > calcado > vestimenta) + cores.
+   - `material_hash_completo(material_id)`: base + CA + cores + caracterÃ­sticas.
 
 4. **Triggers no banco**
-   - INSERT: `evitar_duplicidade_material` (mig. `20250109_adjust_materials_dedup.sql`) bloqueia:
-     - CA repetido em qualquer material (global, mesmo se base diferente).
-     - Base igual com CA vazio (usa base + características, via hash_completo).
-     - Hash completo igual (cores/características + CA).
-   - UPDATE: `evitar_duplicidade_material_update` (mig. `20250112_base_ca_diff_update.sql`) replica as regras acima ignorando o próprio registro (`m.id <> NEW.id`).
-   - Triggers relacionais (`material_grupo_cor`, `material_grupo_caracteristica_epi`) recalculam hashes e revalidam após mudanças de vínculos.
+   - INSERT: `evitar_duplicidade_material` (mig. `20260201_allow_ca_repeat_diff_base.sql`) bloqueia:
+     - CA repetido na mesma base (fabricante+grupo+item+numero+cores+caracteristicas).
+     - Base igual com CA vazio (usa base + caracterÃ­sticas, via hash_completo).
+     - Hash completo igual (cores/caracterÃ­sticas + CA).
+   - UPDATE: `evitar_duplicidade_material_update` (mig. `20260201_allow_ca_repeat_diff_base.sql`) replica as regras acima ignorando o prÃ³prio registro (`m.id <> NEW.id`).
+   - Triggers relacionais (`material_grupo_cor`, `material_grupo_caracteristica_epi`) recalculam hashes e revalidam apÃ³s mudanÃ§as de vÃ­nculos.
 
 5. **RPC de preflight (`material_preflight_check`)**
-   - Migração `20250111_material_preflight.sql`.
-   - Entrada: grupo, item, fabricante, números, CA, cores[], características[], `p_material_id` (NULL em create; id em update) e `p_account_owner_id` para escopo.
+   - Migracao `20250111_material_preflight.sql` (atualizada em `20260201_allow_ca_repeat_diff_base.sql`).
+   - Entrada: grupo, item, fabricante, nÃºmeros, CA, cores[], caracterÃ­sticas[], `p_material_id` (NULL em create; id em update) e `p_account_owner_id` para escopo.
    - Retorno: `ca_conflict` (mesma base+CA), `base_conflict_empty` (base igual com CA ausente) e `base_match_ca_diff` + `base_match_ids` (base igual com CA diferente).
-   - Front bloqueia CA duplicado ou base com CA vazio; no caso de CA diferente abre modal e só grava se usuário confirmar (`forceBaseCaDiff`).
+   - Front bloqueia CA duplicado na mesma base ou base com CA vazio; no caso de CA diferente abre modal e sÃ³ grava se usuÃ¡rio confirmar (`forceBaseCaDiff`).
    - Persistencia: RPCs material_create_full/material_update_full gravam material + vinculos (cores/caracteristicas) em uma unica transacao; triggers continuam como protecao final.
 
 6. **Testes**
-   - Preflight (frontend): criar com base igual e CA diferente → receber modal; confirmar grava, cancelar aborta. Criar com base igual e CA vazio → bloqueia. Criar com CA duplicado na mesma base → bloqueia.
-   - Trigger INSERT: tente inserir base igual com CA vazio → falha. Inserir base+CA igual (mesmas cores/características) → falha.
-   - Trigger UPDATE: editar um material para ficar igual a outro (mesma base+CA) → falha; editar sem alterar base/CA passa (ignora o próprio id).
-   - Materiais com mesmo CA mas base diferente (ex.: outra cor ou característica) continuam permitidos se não violarem as regras acima.
+   - Preflight (frontend): criar com base igual e CA diferente â†’ receber modal; confirmar grava, cancelar aborta. Criar com base igual e CA vazio â†’ bloqueia. Criar com CA duplicado na mesma base â†’ bloqueia.
+   - Trigger INSERT: tente inserir base igual com CA vazio â†’ falha. Inserir base+CA igual (mesmas cores/caracterÃ­sticas) â†’ falha.
+   - Trigger UPDATE: editar um material para ficar igual a outro (mesma base+CA) â†’ falha; editar sem alterar base/CA passa (ignora o prÃ³prio id).
+   - Materiais com mesmo CA mas base diferente (ex.: outra cor ou caracteristica) continuam permitidos se nao violarem as regras acima.
 
+
+Atualizacao 2026-02
+--------------------
+- Regra de CA ajustada para permitir repeticao em bases diferentes; conflito apenas quando base completa + CA forem iguais.
 
 Atualizacao 2025-11
 --------------------
 - Expliquei que, alem de consolidar registros duplicados, e preciso garantir a consistencia do `fabricanteNome`, pois os graficos clicaveis exibem o texto exatamente como armazenado.
-- Inclui checklist para revisar campos `resumo` e `grupoMaterial` apos mesclas, assegurando que o formato `Nome | Categoria | Numero | Caracteristica | Fabricante` permaneça limpo para uso nos eixos.
+- Inclui checklist para revisar campos `resumo` e `grupoMaterial` apos mesclas, assegurando que o formato `Nome | Categoria | Numero | Caracteristica | Fabricante` permaneÃ§a limpo para uso nos eixos.
 

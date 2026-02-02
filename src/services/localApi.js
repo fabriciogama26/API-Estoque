@@ -2855,6 +2855,22 @@ const localApi = {
         )
       )
     },
+    async report(params = {}) {
+      const inicio = String(params.periodoInicio || '').trim()
+      const fim = String(params.periodoFim || '').trim()
+      if (!inicio || !fim) {
+        throw createError(400, 'Periodo inicial e final sao obrigatorios.')
+      }
+      const [inicioAno, inicioMes] = inicio.split('-').map(Number)
+      const [fimAno, fimMes] = fim.split('-').map(Number)
+      const diffMeses = (fimAno - inicioAno) * 12 + (fimMes - inicioMes) + 1
+      let tipo = ''
+      if (diffMeses === 1) tipo = 'mensal'
+      else if (diffMeses === 3) tipo = 'trimestral'
+      else throw createError(400, 'Periodo precisa ser mensal ou trimestral.')
+
+      return { tipo, origem: 'local' }
+    },
   },
   acidentes: {
     async parts() {

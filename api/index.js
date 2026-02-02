@@ -124,6 +124,16 @@ export default withAuth(async (req, res, user) => {
     }
 
     // Estoque e Dashboard
+    if (path === '/api/estoque/relatorio' && method === 'POST') {
+      const body = await readJson(req)
+      return sendJson(res, 200, await EstoqueOperations.report(body, user))
+    }
+    if (path === '/api/estoque/relatorio/auto' && method === 'POST') {
+      if (!req.isCron) {
+        return sendJson(res, 401, { error: 'Nao autorizado para executar relatorio automatico.' })
+      }
+      return sendJson(res, 200, await EstoqueOperations.reportAuto())
+    }
     if (path === '/api/estoque') {
       if (query.view === 'dashboard') {
         return sendJson(res, 200, await EstoqueOperations.dashboard(query))
