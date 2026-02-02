@@ -4831,7 +4831,7 @@ export const api = {
         'Falha no preflight de material.'
       )
       if (preflight?.ca_conflict) {
-        const err = new Error('Ja existe material com este C.A. em outro grupo/item.')
+        const err = new Error('Ja existe material cadastrado com este C.A. na mesma base.')
         err.code = 'CA_CONFLICT'
         throw err
       }

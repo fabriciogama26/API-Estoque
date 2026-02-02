@@ -1,66 +1,67 @@
-Tela: Cadastro de Materiais (EPI)
+﻿Tela: Cadastro de Materiais (EPI)
 - Conteudo em src/help/helpMateriais.json; edite titulos/steps/notes e midias (/public/help/materiais/*).
 - Campos com * sao obrigatorios no formulario.
 
-Visão geral
+VisÃ£o geral
 
-Cadastro e manutenção de materiais/EPI com fabricantes, grupos, cores, características, histórico de preços e histórico de edições. Suporta modo Supabase e local.
+Cadastro e manutenÃ§Ã£o de materiais/EPI com fabricantes, grupos, cores, caracterÃ­sticas, histÃ³rico de preÃ§os e histÃ³rico de ediÃ§Ãµes. Suporta modo Supabase e local.
 
 Arquitetura (modular)
 
-- Hooks: useMateriaisController (form, filtros, lista, paginação, histórico), catálogos (grupos/itens/fabricantes/cores/características/medidas).
-- Serviços: materiaisService (listar/criar/atualizar, detalhes completos, histórico de preço), dataMode remoto/local.
-- Utils: MateriaisUtils (formatação/moeda, normalização de selects), selectionUtils; regras em MateriaisRules (payloads, validações, filtro).
+- Hooks: useMateriaisController (form, filtros, lista, paginaÃ§Ã£o, histÃ³rico), catÃ¡logos (grupos/itens/fabricantes/cores/caracterÃ­sticas/medidas).
+- ServiÃ§os: materiaisService (listar/criar/atualizar, detalhes completos, histÃ³rico de preÃ§o), dataMode remoto/local.
+- Utils: MateriaisUtils (formataÃ§Ã£o/moeda, normalizaÃ§Ã£o de selects), selectionUtils; regras em MateriaisRules (payloads, validaÃ§Ãµes, filtro).
 - Erros: useErrorLogger('materiais') envia falhas para app_errors.
 
 Fluxos principais
 
-- Formulário: dados básicos (item/grupo/fabricante), medidas (calçado/vestimenta), CA, validade, valor unitário, estoque mínimo, ativo; prevenção de duplicidade via preflight + gatilhos.
-- Lista: colunas Grupo, Material, Descrição, Valor unitário, Validade (dias), Fabricante, Registrado por, Cadastrado em; ações Ver (detalhes em cartões), Editar, Histórico.
-- Filtros: termo livre, grupo, tamanho/número, fabricante, características, cores, status e intervalo de valor unitário (mín/máx); ajuste os campos e clique em Aplicar para recalcular (sem refiltro automático); limpar restaura defaults.
-- Detalhes: modal em cartões (padrão acidentes) com todos os campos, buscando o material completo por id.
-- Histórico: modal no padrão “Histórico do acidente”, exibindo edições campo a campo (usuário/data).
+- FormulÃ¡rio: dados bÃ¡sicos (item/grupo/fabricante), medidas (calÃ§ado/vestimenta), CA, validade, valor unitÃ¡rio, estoque mÃ­nimo, ativo; prevenÃ§Ã£o de duplicidade via preflight + gatilhos.
+- Lista: colunas Grupo, Material, DescriÃ§Ã£o, Valor unitÃ¡rio, Validade (dias), Fabricante, Registrado por, Cadastrado em; aÃ§Ãµes Ver (detalhes em cartÃµes), Editar, HistÃ³rico.
+- Filtros: termo livre, grupo, tamanho/nÃºmero, fabricante, caracterÃ­sticas, cores, status e intervalo de valor unitÃ¡rio (mÃ­n/mÃ¡x); ajuste os campos e clique em Aplicar para recalcular (sem refiltro automÃ¡tico); limpar restaura defaults.
+- Detalhes: modal em cartÃµes (padrÃ£o acidentes) com todos os campos, buscando o material completo por id.
+- HistÃ³rico: modal no padrÃ£o â€œHistÃ³rico do acidenteâ€, exibindo ediÃ§Ãµes campo a campo (usuÃ¡rio/data).
 
-Boas práticas
+Boas prÃ¡ticas
 
-- Sempre usar formatadores de moeda (MateriaisUtils); validar números antes do submit.
-- Priorizar consultas com projeção mínima na lista e buscar detalhes completos sob demanda.
-- Respeitar mensagens de duplicidade do gatilho; ajustar catálogos antes de forçar inserts.
+- Sempre usar formatadores de moeda (MateriaisUtils); validar nÃºmeros antes do submit.
+- Priorizar consultas com projeÃ§Ã£o mÃ­nima na lista e buscar detalhes completos sob demanda.
+- Respeitar mensagens de duplicidade do gatilho; ajustar catÃ¡logos antes de forÃ§ar inserts.
 
-Atualizações recentes
+AtualizaÃ§Ãµes recentes
 
-- 2025-12: Lista reordenada, filtro de valor unitário adicionado, detalhes/histórico padronizados, datas de cadastro mapeadas, botão de olho para detalhes.
-- 2026-01: Preflight `material_preflight_check` compara base completa (fabricante+grupo+item+número+cores+características) e retorna: `ca_conflict` (bloqueia), `base_conflict_empty` (bloqueia) e `base_match_ca_diff` (alerta/modal). Em update o próprio id é ignorado (`p_material_id`). Os gatilhos de INSERT/UPDATE usam os hashes `hash_base`/`hash_completo` para impedir base igual com CA vazio ou CA repetido na mesma base.
+- 2025-12: Lista reordenada, filtro de valor unitÃ¡rio adicionado, detalhes/histÃ³rico padronizados, datas de cadastro mapeadas, botÃ£o de olho para detalhes.
+- 2026-01: Preflight `material_preflight_check` compara base completa (fabricante+grupo+item+numero+cores+caracteristicas) e retorna: `ca_conflict` (mesma base + CA), `base_conflict_empty` (bloqueia) e `base_match_ca_diff` (alerta/modal). Em update o proprio id e ignorado (`p_material_id`). Os gatilhos de INSERT/UPDATE usam os hashes `hash_base`/`hash_completo` para impedir base igual com CA vazio ou duplicidade exata.
+- 2026-02: CA pode repetir em bases diferentes; conflito apenas quando base completa + CA forem iguais.
 - 2026-01: RPCs material_create_full e material_update_full gravam material + vinculos (cores/caracteristicas) em uma unica transacao; evita 42501 em RLS de tabelas de vinculo.
 - 2026-01: Migrations registram tabelas de catalogo e vinculos de materiais (cores/caracteristicas/medidas/fabricantes/epi_classe) e coluna created_at nos vinculos.
 
 ===========================================
-Mapa de Código (funções, hooks e constantes)
+Mapa de CÃ³digo (funÃ§Ãµes, hooks e constantes)
 ===========================================
 
-Funções principais
+FunÃ§Ãµes principais
 ------------------
-- MateriaisPage — componente de página (src/pages/Materiais.jsx); orquestra formulário, filtros, tabela, detalhes e histórico via MateriaisProvider.
-- useMateriaisController — hook/controller (src/hooks/useMateriaisController.js); estado do form, filtros, lista, histórico de preço, submit/editar, catálogos.
-- MateriaisProvider / MateriaisContext — contexto (src/context/MateriaisContext.jsx); expõe dados/handlers para form/filtros/tabela/modais.
-- Componentes MateriaisForm/Filters/Table/HistoryModal — UI do cadastro, filtros, tabela e históricos.
+- MateriaisPage â€” componente de pÃ¡gina (src/pages/Materiais.jsx); orquestra formulÃ¡rio, filtros, tabela, detalhes e histÃ³rico via MateriaisProvider.
+- useMateriaisController â€” hook/controller (src/hooks/useMateriaisController.js); estado do form, filtros, lista, histÃ³rico de preÃ§o, submit/editar, catÃ¡logos.
+- MateriaisProvider / MateriaisContext â€” contexto (src/context/MateriaisContext.jsx); expÃµe dados/handlers para form/filtros/tabela/modais.
+- Componentes MateriaisForm/Filters/Table/HistoryModal â€” UI do cadastro, filtros, tabela e histÃ³ricos.
 
-Constantes e configurações
+Constantes e configuraÃ§Ãµes
 --------------------------
-- createMateriaisFormDefault, MATERIAIS_FILTER_DEFAULT, HISTORY_MODAL_DEFAULT — src/config/MateriaisConfig.js; estados iniciais de formulário, filtros e modal de histórico.
+- createMateriaisFormDefault, MATERIAIS_FILTER_DEFAULT, HISTORY_MODAL_DEFAULT â€” src/config/MateriaisConfig.js; estados iniciais de formulÃ¡rio, filtros e modal de histÃ³rico.
 
-Funções utilitárias relacionadas
+FunÃ§Ãµes utilitÃ¡rias relacionadas
 --------------------------------
-- validateMaterialForm, create/updateMaterialPayload, filterMateriais (inclui faixa de valor), parseCaracteristicaEpi, sortMateriaisByNome — src/rules/MateriaisRules.js.
-- formatCurrency/formatCurrencyInput, findOptionByValue, normalizeSelectionList/Item/Key, selectionToArray — src/utils/MateriaisUtils.js e src/utils/selectionUtils.js.
+- validateMaterialForm, create/updateMaterialPayload, filterMateriais (inclui faixa de valor), parseCaracteristicaEpi, sortMateriaisByNome â€” src/rules/MateriaisRules.js.
+- formatCurrency/formatCurrencyInput, findOptionByValue, normalizeSelectionList/Item/Key, selectionToArray â€” src/utils/MateriaisUtils.js e src/utils/selectionUtils.js.
 
-Serviços e integrações externas
+ServiÃ§os e integraÃ§Ãµes externas
 -------------------------------
-- materiaisService — serviço de API (src/services/materiaisService.js); listar/criar/atualizar, detalhes completos (get), histórico de preço, catálogos (grupos, itens, fabricantes, cores, características, calçados, tamanhos).
+- materiaisService â€” serviÃ§o de API (src/services/materiaisService.js); listar/criar/atualizar, detalhes completos (get), histÃ³rico de preÃ§o, catÃ¡logos (grupos, itens, fabricantes, cores, caracterÃ­sticas, calÃ§ados, tamanhos).
 
 Ajuda contextual
 ----------------
-- Botão 'Ajuda' no cabeçalho abre modal com passos/notas desta página.
+- BotÃ£o 'Ajuda' no cabeÃ§alho abre modal com passos/notas desta pÃ¡gina.
 - Conteudo em src/help/helpMateriais.json; edite titulos/steps/notes e midias (/public/help/materiais/*).
 
 
