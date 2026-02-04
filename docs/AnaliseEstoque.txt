@@ -41,7 +41,11 @@ Boas praticas
 - Filtros de periodo afetam consumo, nao afetam estoque atual (sempre acumulado).
 - Pareto de score de risco ordena pelo score e usa cores por faixa (alto/medio/baixo).
 - Previsao anual usa sempre os ultimos 12 meses completos (nao depende do filtro aplicado).
-- Previsao mensal e agregados sao gerados por cron e podem ser calculados manualmente no botao "Calcular previsao".
+- Base de previsao considera o ultimo mes com dados (meses vazios atuais nao travam o forecast).
+- Previsao mensal e agregados sao gerados por cron via Edge Function.
+- O botao "Calcular previsao" aplica o fator de tendencia apenas no grafico e no card (nao grava no banco).
+- Cron oficial roda via Edge Function `forecast-gasto-mensal` (schedule 0 3 28-31 * *), com checagem de ultimo dia do mes e suporte a force no body.
+- Para testes por periodo, usar `rpc_previsao_gasto_mensal_calcular_periodo(p_owner_id, p_periodo_inicio, p_periodo_fim, p_fator_tendencia)` (grava forecast e inventory_forecast).
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
 
 Cancelamento e saldo
@@ -67,6 +71,8 @@ Atualizacao 2026-02
 - Cartao de previsao anual e grafico de historico mensal com projecao.
 - Tabelas `agg_gasto_mensal` e `f_previsao_gasto_mensal` adicionadas para historico e previsao mensal.
 - Endpoint `/api/estoque/previsao` retorna dados apenas das tabelas agregadas.
+- Edge Function `forecast-gasto-mensal` dispara a previsao mensal para todos os tenants.
+- rpc_refresh_gasto_mensal agora ignora saidas canceladas via status_saida (evita erro de UUID e garante agregados corretos).
 - Ajuda contextual criada para a pagina.
 
 ===========================================

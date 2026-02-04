@@ -30,7 +30,9 @@
       "Pareto financeiro - Saida por valor responde: \"O que doi mais no caixa?\".",
       "Risco operacional: Classe A = abaixo minimo + giro alto; Classe B = abaixo minimo; Classe C = acima do minimo.",
       "A previsao anual nao usa filtros de periodo: considera sempre os ultimos 12 meses completos.",
-      "Os dados do card e grafico de previsao sao lidos das tabelas agregadas (nao ha calculo no client)."
-    ]
-  }
+        "O botao \"Calcular previsao\" aplica o fator de tendencia sobre os dados ja calculados na tabela.",
+        "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes.",
+        "Os dados do card e grafico de previsao sao lidos das tabelas agregadas (nao ha calculo no client)."
+      ]
+    }
 }

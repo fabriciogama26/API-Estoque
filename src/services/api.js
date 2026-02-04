@@ -5889,38 +5889,16 @@ export const api = {
     },
     async forecastUpdate(params = {}) {
       ensureSupabase()
-      const { data } = await supabase.auth.getSession()
-      const token = data?.session?.access_token
-      if (!token) {
-        throw new Error('Sessao expirada. Faça login novamente.')
-      }
-
-      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
-      const endpoint = `${base}/api/estoque/previsao`
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(params || {}),
+      const { data, error } = await supabase.functions.invoke('forecast-gasto-mensal', {
+        body: params || {},
       })
-
-      if (!response.ok) {
-        let message = `Falha ao atualizar previsao (status ${response.status}).`
-        try {
-          const data = await response.json()
-          if (data?.error) {
-            message = data.error
-          }
-        } catch {
-          // ignore
-        }
-        throw new Error(message)
+      if (error) {
+        throw mapSupabaseError(error, 'Falha ao atualizar previsao.')
       }
-
-      return response.json()
+      if (!data) {
+        throw new Error('Falha ao atualizar previsao.')
+      }
+      return data?.data ?? data
     },
   },
   statusSaida: {
