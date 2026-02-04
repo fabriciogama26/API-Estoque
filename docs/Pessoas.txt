@@ -46,6 +46,7 @@ Cadastro em massa (novo)
 - Importar bloqueia matriculas ja existentes; Atualizar exige matriculas existentes.
 - O fluxo completo esta documentado em:
   - docs/CadastroEmMassa.txt
+- Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.
 
 Boas praticas
 -------------

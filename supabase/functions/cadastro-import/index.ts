@@ -229,15 +229,15 @@ Deno.serve(async (req) => {
     let processed = 0
     let success = 0
     let errors = 0
-    const errorLines: string[] = ["linha,coluna,motivo"]
-    const inserts: { line: number; data: Record<string, unknown> }[] = []
-    const updates: { line: number; id: string; data: Record<string, unknown> }[] = []
+    const errorLines: string[] = ["linha,matricula,coluna,motivo"]
+    const inserts: { line: number; matricula: string; data: Record<string, unknown> }[] = []
+    const updates: { line: number; id: string; matricula: string; data: Record<string, unknown> }[] = []
     const seenMatriculas = new Set<string>()
     const now = new Date().toISOString()
 
-    const pushError = (line: number, col: string, motivo: string) => {
+    const pushError = (line: number, matricula: string, col: string, motivo: string) => {
       errors += 1
-      errorLines.push(`${line},${col},"${motivo}"`)
+      errorLines.push(`${line},"${matricula}",${col},"${motivo}"`)
     }
 
     for (let i = 0; i < rows.length; i++) {
@@ -249,15 +249,17 @@ Deno.serve(async (req) => {
       const matricula = normalizeMatricula(matriculaRaw)
       const matriculaTexto = matricula ?? ""
 
+      const matriculaDisplay = matriculaTexto || (matriculaRaw === null || matriculaRaw === undefined ? "" : String(matriculaRaw).trim())
+
       if (!matriculaTexto) {
         const rawText = matriculaRaw === null || matriculaRaw === undefined ? "" : String(matriculaRaw).trim()
-        pushError(idx, "matricula", rawText ? "deve ser numerica" : "obrigatoria")
+        pushError(idx, matriculaDisplay, "matricula", rawText ? "deve ser numerica" : "obrigatoria")
         continue
       }
 
       const baseKey = matriculaTexto.replace(/^0+/, "") || "0"
       if (seenMatriculas.has(baseKey)) {
-        pushError(idx, "matricula", "duplicada")
+        pushError(idx, matriculaDisplay, "matricula", "duplicada")
         continue
       }
       seenMatriculas.add(baseKey)
@@ -265,65 +267,65 @@ Deno.serve(async (req) => {
       const matriculaKeys = buildMatriculaKeys(matriculaTexto)
       const existingId = matriculaKeys.map((key) => existingMap.get(key)).find(Boolean) || null
       if (updateMode && !existingId) {
-        pushError(idx, "matricula", "nao encontrada")
+        pushError(idx, matriculaDisplay, "matricula", "nao encontrada")
         continue
       }
       if (!updateMode && existingId) {
-        pushError(idx, "matricula", "ja existe")
+        pushError(idx, matriculaDisplay, "matricula", "ja existe")
         continue
       }
 
       const nome = normalizeTextUpper(resolveField(linha, "nome"))
       if (!nome) {
-        pushError(idx, "nome", "obrigatorio")
+        pushError(idx, matriculaDisplay, "nome", "obrigatorio")
         continue
       }
 
       const centroNome = normalizeTextUpper(resolveField(linha, "centro_servico"))
       if (!centroNome) {
-        pushError(idx, "centro_servico", "obrigatorio")
+        pushError(idx, matriculaDisplay, "centro_servico", "obrigatorio")
         continue
       }
       const centro = centrosMap.get(centroNome)
       if (!centro?.id) {
-        pushError(idx, "centro_servico", "inexistente")
+        pushError(idx, matriculaDisplay, "centro_servico", "inexistente")
         continue
       }
       if (!centro.centro_custo_id) {
-        pushError(idx, "centro_servico", "centro_custo nao encontrado")
+        pushError(idx, matriculaDisplay, "centro_servico", "centro_custo nao encontrado")
         continue
       }
 
       const setorNome = normalizeTextUpper(resolveField(linha, "setor"))
       if (!setorNome) {
-        pushError(idx, "setor", "obrigatorio")
+        pushError(idx, matriculaDisplay, "setor", "obrigatorio")
         continue
       }
       const setor = setoresMap.get(setorNome)
       if (!setor?.id) {
-        pushError(idx, "setor", "inexistente")
+        pushError(idx, matriculaDisplay, "setor", "inexistente")
         continue
       }
 
       const cargoNome = normalizeTextUpper(resolveField(linha, "cargo"))
       if (!cargoNome) {
-        pushError(idx, "cargo", "obrigatorio")
+        pushError(idx, matriculaDisplay, "cargo", "obrigatorio")
         continue
       }
       const cargo = cargosMap.get(cargoNome)
       if (!cargo?.id) {
-        pushError(idx, "cargo", "inexistente")
+        pushError(idx, matriculaDisplay, "cargo", "inexistente")
         continue
       }
 
       const tipoNome = normalizeTextUpper(resolveField(linha, "tipo_execucao"))
       if (!tipoNome) {
-        pushError(idx, "tipo_execucao", "obrigatorio")
+        pushError(idx, matriculaDisplay, "tipo_execucao", "obrigatorio")
         continue
       }
       const tipo = tiposMap.get(tipoNome)
       if (!tipo?.id) {
-        pushError(idx, "tipo_execucao", "inexistente")
+        pushError(idx, matriculaDisplay, "tipo_execucao", "inexistente")
         continue
       }
 
@@ -332,12 +334,12 @@ Deno.serve(async (req) => {
         ? ""
         : String(dataAdmissaoRaw).trim()
       if (!dataAdmissaoText) {
-        pushError(idx, "data_admissao", "obrigatoria")
+        pushError(idx, matriculaDisplay, "data_admissao", "obrigatoria")
         continue
       }
       const dataAdmissao = parseDate(dataAdmissaoRaw)
       if (!dataAdmissao) {
-        pushError(idx, "data_admissao", "invalida")
+        pushError(idx, matriculaDisplay, "data_admissao", "invalida")
         continue
       }
 
@@ -345,6 +347,7 @@ Deno.serve(async (req) => {
         updates.push({
           line: idx,
           id: existingId as string,
+          matricula: matriculaTexto,
           data: {
             nome,
             matricula: matriculaTexto,
@@ -361,6 +364,7 @@ Deno.serve(async (req) => {
       } else {
         inserts.push({
           line: idx,
+          matricula: matriculaTexto,
           data: {
             nome,
             matricula: matriculaTexto,
@@ -388,7 +392,7 @@ Deno.serve(async (req) => {
           .eq("id", row.id)
           .eq("account_owner_id", owner)
         if (updateErr) {
-          pushError(row.line, "db", updateErr.message)
+          pushError(row.line, row.matricula, "db", updateErr.message)
           continue
         }
         success += 1
@@ -400,7 +404,7 @@ Deno.serve(async (req) => {
       for (const row of inserts) {
         const { error: insertErr } = await supabaseAdmin.from("pessoas").insert(row.data)
         if (insertErr) {
-          pushError(row.line, "db", insertErr.message)
+          pushError(row.line, row.matricula, "db", insertErr.message)
           continue
         }
         success += 1
