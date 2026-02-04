@@ -1,0 +1,1 @@
+export const PDF_REPORT_LIMIT_PER_MONTH = 1

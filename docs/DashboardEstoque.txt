@@ -4,20 +4,20 @@
 Visao geral
 -----------
 - Consolida indicadores de movimentacao de estoque (entradas, saidas, saldo e valor movimentado) no periodo filtrado.
-- Exibe series historicas, rankings e graficos de Pareto (quantidade, risco operacional e financeiro).
-- Permite gerar relatorio mensal ou trimestral e enviar por email para administradores.
+- Exibe series historicas e rankings de movimentacao.
+- Paretos e interpretacoes foram movidos para a pagina "Analise de Estoque".
+- Relatorios mensais e trimestrais sao gerados automaticamente e enviados por email para administradores.
 - Fonte principal: `api.estoque.dashboard` e `api.estoque.report` via `dashboardEstoqueApi`.
 
 Arquitetura
 -----------
 - Hook `useDashboardEstoque`:
   - Mantem filtros, dados, estado de loading/erro.
-  - Monta series historicas, rankings e calcula Pareto/risco operacional.
+  - Monta series historicas e rankings.
   - Dispara geracao de relatorio via `generateDashboardEstoqueReport`.
 - Contexto `DashboardEstoqueProvider`:
   - Expoe o estado do hook, funcoes de recarregar e mensagens de ajuda dos graficos.
 - Componentes de grafico:
-  - `ParetoChart` (novo) para curva 80/20, risco e financeiro.
   - `ChartExpandModal` para visualizar graficos em tela cheia.
 - Backend:
   - `EstoqueOperations.report` gera o relatorio, grava em `inventory_report` e envia email via Brevo.
@@ -40,29 +40,27 @@ Boas praticas
 - Garantir `valorUnitario` e `validadeDias` nos materiais para calculos financeiros e pressao de vida util.
 - Preencher `grupoMaterial` para classificar EPI/EPC no risco operacional.
 - Manter `dataTroca` consistente nas saidas para vencidos/vencendo.
+- Filtros de periodo afetam consumo, nao afetam estoque atual (sempre acumulado).
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
-- Pareto 80/20 responde: "O que mais sai fisicamente?".
-- Pareto por risco operacional responde: "O que nao pode faltar de jeito nenhum?".
-- Pareto financeiro responde: "O que doi mais no caixa?".
 
 Atualizacao 2026-02
 -------------------
-- Adicionados graficos de Pareto (quantidade, risco e financeiro) no dashboard.
+- Paretos movidos para a pagina "Analise de Estoque".
 - Relatorios mensais e trimestrais com envio por email e persistencia em `inventory_report`.
 - Templates TXT criados em `shared/documents` para relatorios mensais e trimestrais.
-- Ajustado espacamento e labels do Pareto para manter o grafico dentro do card.
-- Labels de materiais agora incluem numero/tamanho para evitar duplicidade visual.
+- Rotina automatica gera mensal no ultimo dia do mes (mes corrente fechado) e trimestral em fim de trimestre.
+- Backfill automatico gera meses/trimestres antigos sem relatorio quando houver dados.
+- Labels de materiais agora incluem numero/tamanho e CA para evitar duplicidade visual.
 - IDs de tamanho/numero nao sao exibidos; usa nome legivel quando disponivel.
-- Tooltip e legenda dos Paretos de quantidade/risco agora mostram "Quantidade" em vez de "Valor".
 - Tooltip dos graficos de materiais mostra descricao completa, ID e quantidade.
-- Pareto consolida itens repetidos pelo mesmo materialId antes de ordenar.
-- Dashboard aplica filtro de itens unicos por materialId nos Paretos exibidos.
-- SaidasResumo normaliza chave por materialId para evitar duplicidade visual.
-- Pareto usa ordenacao deterministica (quantidade desc + materialId asc) para evitar troca de posicoes.
-- Mensagens de ajuda do dashboard atualizadas com as perguntas do Pareto.
+- Botao de gerar relatorio removido do dashboard; uso passa para pagina de Relatorio de Estoque.
+- Alertas ativos e materiais monitorados usam o saldo fisico acumulado (mesma base da tela Estoque atual).
+- Modal de graficos expandidos agora suporta rolagem e exibe todas as linhas dos rankings (materiais, fabricantes, centros, setores e pessoas).
+- Top pessoas agora exibe matricula no label quando disponivel.
+- Clique em barras com ID copia o materialId para a area de transferencia.
 - Antes/Depois:
-  - Antes: dashboard sem Pareto e sem relatorio persistido; labels longos encostavam no card e itens com mesmo nome confundiam.
-  - Depois: Pareto ativo + relatorios gerados, enviados e gravados por execucao; labels truncados, margens internas maiores e numero/tamanho no nome.
+  - Antes: Paretos e interpretacoes no dashboard principal.
+  - Depois: Dashboard focado em movimentacao; Paretos migrados para Analise de Estoque.
 - Arquivos alterados/criados:
   - `src/pages/DashboardPage.jsx`
   - `src/hooks/useDashboardEstoque.js`
@@ -92,11 +90,7 @@ Funcoes principais
 - useDashboardEstoque
   - Tipo: hook de dados/dashboard
   - Caminho: src/hooks/useDashboardEstoque.js
-  - Responsavel por: carregar dados, calcular Pareto/risco e disparar relatorio.
-- ParetoChart
-  - Tipo: componente de grafico
-  - Caminho: src/components/charts/ParetoChart.jsx
-  - Responsavel por: exibir barras + curva acumulada (80/20).
+  - Responsavel por: carregar dados, calcular series e rankings e disparar relatorio.
 - EstoqueOperations.report/reportAuto
   - Tipo: operacao backend
   - Caminho: api/_shared/operations.js
@@ -115,10 +109,10 @@ Constantes e configuracoes
 
 Funcoes utilitarias relacionadas
 --------------------------------
-- buildParetoList / buildRiscoOperacional / computePercentile
-  - Tipo: utilitarios
+- computePercentile
+  - Tipo: utilitario
   - Caminho: src/utils/inventoryReportUtils.js
-  - Responsavel por: gerar Pareto, risco e percentis.
+  - Responsavel por: gerar percentis usados nos rankings e indicadores.
 - builders de series/rankings
   - Tipo: utilitarios
   - Caminho: src/utils/dashboardEstoqueUtils.js

@@ -563,7 +563,7 @@ export function montarDashboard({ materiais = [], entradas = [], saidas = [], pe
     .sort((a, b) => b.totalQuantidade - a.totalQuantidade)
     .slice(0, 10)
 
-  const estoqueAtual = montarEstoqueAtual(materiaisNormalizados, entradasFiltradas, saidasFiltradas, periodo)
+  const estoqueAtual = montarEstoqueAtual(materiaisNormalizados, entradas, saidas, null)
 
   const entradasHistoricas = agruparHistorico(entradasDetalhadas, 'dataEntrada', materiaisMap)
   const saidasHistoricas = agruparHistorico(saidasDetalhadas, 'dataEntrega', materiaisMap)

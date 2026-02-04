@@ -17,10 +17,8 @@ import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { EntradasSaidasChart, ValorMovimentadoChart } from '../components/charts/EntradasSaidasChart.jsx'
 import { EstoquePorMaterialChart } from '../components/charts/EstoqueCharts.jsx'
 import { EstoquePorCategoriaChart } from '../components/charts/EstoqueCategoriaChart.jsx'
-import { ParetoChart } from '../components/charts/ParetoChart.jsx'
 import { DashboardEstoqueProvider, useDashboardEstoqueContext } from '../context/DashboardEstoqueContext.jsx'
 import { ChartExpandModal } from '../components/Dashboard/ChartExpandModal.jsx'
-import { formatNumber } from '../utils/inventoryReportUtils.js'
 
 import '../styles/DashboardPage.css'
 
@@ -50,28 +48,7 @@ function ChartFilterBadge({ active, onClear }) {
 }
 
 function DashboardActions() {
-  const { handleGenerateReport, reportLoading } = useDashboardEstoqueContext()
-  return (
-    <>
-      <button
-        type="button"
-        className="button button--primary"
-        onClick={handleGenerateReport}
-        disabled={reportLoading}
-      >
-        {reportLoading ? 'Gerando relatorio...' : 'Gerar relatorio'}
-      </button>
-      <HelpButton topic="dashboard" />
-    </>
-  )
-}
-
-function ReportFeedback() {
-  const { reportStatus } = useDashboardEstoqueContext()
-  if (!reportStatus) {
-    return null
-  }
-  return <p className={`feedback feedback--${reportStatus.type}`}>{reportStatus.message}</p>
+  return <HelpButton topic="dashboard" />
 }
 
 function ChartContainer({ chartFilter, onClear, children }) {
@@ -162,17 +139,22 @@ function ChartsGrid() {
     setExpandedChartId,
     seriesHistorica,
     valorMovimentadoSeries,
+    estoquePorMaterial,
     estoquePorCategoria,
     estoquePorMaterialTop,
-    paretoQuantidadeTop,
-    paretoRiscoTop,
-    paretoFinanceiroTop,
+    rankingFabricantes,
     rankingFabricantesTop,
+    topCentrosServico,
     topCentrosServicoTop,
+    topSetores,
     topSetoresTop,
+    topPessoas,
     topPessoasTop,
+    topTrocasMateriais,
     topTrocasMateriaisTop,
+    topTrocasSetores,
     topTrocasSetoresTop,
+    topTrocasPessoas,
     topTrocasPessoasTop,
     formatPeriodoLabel,
     formatCurrency,
@@ -187,7 +169,6 @@ function ChartsGrid() {
   const toggleTrocaView = (key) => {
     setTrocaViews((prev) => ({ ...prev, [key]: !prev[key] }))
   }
-
 
   const materiaisChart = {
     active: trocaViews.materiais,
@@ -207,6 +188,12 @@ function ChartsGrid() {
     infoKey: trocaViews.pessoas ? 'topTrocasPessoas' : 'topPessoas',
     data: trocaViews.pessoas ? topTrocasPessoasTop : topPessoasTop,
   }
+
+  const getExpandedHeight = (length) => Math.max(520, length * 38)
+
+  const materiaisExpandedData = trocaViews.materiais ? topTrocasMateriais : estoquePorMaterial
+  const setoresExpandedData = trocaViews.setores ? topTrocasSetores : topSetores
+  const pessoasExpandedData = trocaViews.pessoas ? topTrocasPessoas : topPessoas
 
   const handleChartSelect = (value, source) => {
     applyChartFilter(value, source)
@@ -232,109 +219,98 @@ function ChartsGrid() {
       estoqueMaterial: {
         title: materiaisChart.title,
         render: () => (
-          <EstoquePorMaterialChart
-            data={materiaisChart.data}
-            height={520}
-            onItemClick={(item) => handleChartSelect(item?.filtro || item?.descricao || item?.nome, 'material')}
-          />
-        ),
-      },
-      paretoQuantidade: {
-        title: 'Pareto 80/20 - Saida por quantidade',
-        render: () => (
-          <ParetoChart
-            data={paretoQuantidadeTop}
-            valueKey="quantidade"
-            valueLabel="Quantidade"
-            valueFormatter={formatNumber}
-            height={520}
-          />
-        ),
-      },
-      paretoRisco: {
-        title: 'Pareto por risco operacional',
-        render: () => (
-          <ParetoChart
-            data={paretoRiscoTop}
-            valueKey="score"
-            valueLabel="Quantidade"
-            valueFormatter={formatNumber}
-            height={520}
-          />
-        ),
-      },
-      paretoFinanceiro: {
-        title: 'Pareto financeiro - Saida por valor',
-        render: () => (
-          <ParetoChart data={paretoFinanceiroTop} valueKey="valorTotal" valueFormatter={formatCurrency} height={520} />
+          <div className="chart-modal__scroll">
+            <EstoquePorMaterialChart
+              data={materiaisExpandedData}
+              height={getExpandedHeight(materiaisExpandedData.length)}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.descricao || item?.nome, 'material')}
+            />
+          </div>
         ),
       },
       estoqueCategoria: {
         title: 'Top categorias',
         render: () => (
-          <EstoquePorCategoriaChart
-            data={estoquePorCategoria}
-            height={520}
-            onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome || item?.categoria, 'categoria')}
-          />
+          <div className="chart-modal__scroll">
+            <EstoquePorCategoriaChart
+              data={estoquePorCategoria}
+              height={getExpandedHeight(estoquePorCategoria.length)}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome || item?.categoria, 'categoria')}
+            />
+          </div>
         ),
       },
       topFabricantes: {
         title: 'Top fabricantes',
         render: () => (
-          <EstoquePorMaterialChart
-            data={rankingFabricantesTop}
-            height={520}
-            onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'fabricante')}
-          />
+          <div className="chart-modal__scroll">
+            <EstoquePorMaterialChart
+              data={rankingFabricantes}
+              height={getExpandedHeight(rankingFabricantes.length)}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'fabricante')}
+            />
+          </div>
         ),
       },
       topCentros: {
         title: 'Top centro de servicos',
         render: () => (
-          <EstoquePorMaterialChart
-            data={topCentrosServicoTop}
-            height={520}
-            onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'centro')}
-          />
+          <div className="chart-modal__scroll">
+            <EstoquePorMaterialChart
+              data={topCentrosServico}
+              height={getExpandedHeight(topCentrosServico.length)}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'centro')}
+            />
+          </div>
         ),
       },
       topSetores: {
         title: setoresChart.title,
         render: () => (
-          <EstoquePorMaterialChart
-            data={setoresChart.data}
-            height={520}
-            onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'setor')}
-          />
+          <div className="chart-modal__scroll">
+            <EstoquePorMaterialChart
+              data={setoresExpandedData}
+              height={getExpandedHeight(setoresExpandedData.length)}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'setor')}
+            />
+          </div>
         ),
       },
       topPessoas: {
         title: pessoasChart.title,
         render: () => (
-          <EstoquePorMaterialChart
-            data={pessoasChart.data}
-            height={520}
-            onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'pessoa')}
-          />
+          <div className="chart-modal__scroll">
+            <EstoquePorMaterialChart
+              data={pessoasExpandedData}
+              height={getExpandedHeight(pessoasExpandedData.length)}
+              onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome, 'pessoa')}
+            />
+          </div>
         ),
       },
     }),
     [
+      estoquePorMaterial,
       estoquePorCategoria,
       expandedChartId,
       formatCurrency,
-      formatNumber,
       formatPeriodoLabel,
       materiaisChart,
-      paretoFinanceiroTop,
-      paretoQuantidadeTop,
-      paretoRiscoTop,
+      materiaisExpandedData,
       pessoasChart,
+      pessoasExpandedData,
+      rankingFabricantes,
       rankingFabricantesTop,
       seriesHistorica,
       setoresChart,
+      setoresExpandedData,
+      topCentrosServico,
       topCentrosServicoTop,
+      topPessoas,
+      topSetores,
+      topTrocasMateriais,
+      topTrocasPessoas,
+      topTrocasSetores,
       valorMovimentadoSeries,
     ],
   )
@@ -457,92 +433,6 @@ function ChartsGrid() {
               data={estoquePorCategoria}
               onItemClick={(item) => handleChartSelect(item?.filtro || item?.nome || item?.categoria, 'categoria')}
             />
-          </ChartContainer>
-        </section>
-      </div>
-
-      <div className="dashboard-grid dashboard-grid--two">
-        <section className="card dashboard-card--chart dashboard-card--chart-lg">
-          <header className="card__header dashboard-card__header">
-            <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="paretoQuantidade" label="Informacoes sobre o grafico Pareto 80/20" />
-              <h2 className="dashboard-card__title">
-                <TrendIcon size={20} /> <span>Pareto 80/20 - Saida por quantidade</span>
-              </h2>
-            </div>
-            <div className="dashboard-card__actions">
-              <button
-                type="button"
-                className="dashboard-card__expand"
-                onClick={() => setExpandedChartId('paretoQuantidade')}
-                aria-label="Expandir grafico Pareto 80/20"
-              >
-                <ExpandIcon size={16} />
-              </button>
-            </div>
-          </header>
-          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
-            <ParetoChart
-              data={paretoQuantidadeTop}
-              valueKey="quantidade"
-              valueLabel="Quantidade"
-              valueFormatter={formatNumber}
-            />
-          </ChartContainer>
-        </section>
-
-        <section className="card dashboard-card--chart dashboard-card--chart-lg">
-          <header className="card__header dashboard-card__header">
-            <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="paretoRisco" label="Informacoes sobre o grafico Pareto por risco" />
-              <h2 className="dashboard-card__title">
-                <AlertIcon size={20} /> <span>Pareto por risco operacional</span>
-              </h2>
-            </div>
-            <div className="dashboard-card__actions">
-              <button
-                type="button"
-                className="dashboard-card__expand"
-                onClick={() => setExpandedChartId('paretoRisco')}
-                aria-label="Expandir grafico Pareto por risco"
-              >
-                <ExpandIcon size={16} />
-              </button>
-            </div>
-          </header>
-          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
-            <ParetoChart
-              data={paretoRiscoTop}
-              valueKey="score"
-              valueLabel="Quantidade"
-              valueFormatter={formatNumber}
-            />
-          </ChartContainer>
-        </section>
-      </div>
-
-      <div className="dashboard-grid dashboard-grid--two">
-        <section className="card dashboard-card--chart dashboard-card--chart-lg">
-          <header className="card__header dashboard-card__header">
-            <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="paretoFinanceiro" label="Informacoes sobre o grafico Pareto financeiro" />
-              <h2 className="dashboard-card__title">
-                <RevenueIcon size={20} /> <span>Pareto financeiro - Saida por valor</span>
-              </h2>
-            </div>
-            <div className="dashboard-card__actions">
-              <button
-                type="button"
-                className="dashboard-card__expand"
-                onClick={() => setExpandedChartId('paretoFinanceiro')}
-                aria-label="Expandir grafico Pareto financeiro"
-              >
-                <ExpandIcon size={16} />
-              </button>
-            </div>
-          </header>
-          <ChartContainer chartFilter={chartFilter} onClear={clearChartFilter}>
-            <ParetoChart data={paretoFinanceiroTop} valueKey="valorTotal" valueFormatter={formatCurrency} />
           </ChartContainer>
         </section>
       </div>
@@ -701,7 +591,6 @@ export function DashboardPage() {
           actions={<DashboardActions />}
         />
         <FiltersForm />
-        <ReportFeedback />
         <Highlights />
         <ChartsGrid />
       </div>

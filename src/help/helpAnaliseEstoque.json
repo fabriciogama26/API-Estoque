@@ -1,0 +1,36 @@
+{
+  "analiseEstoque": {
+    "title": "Analise de estoque",
+    "summary": "Centralize os Paretos e indicadores de acao para decisao rapida sobre estoque.",
+    "steps": [
+      {
+        "title": "Aplicar filtros",
+        "description": "Use Periodo inicial/final e Busca para recalcular os Paretos e os cartoes de decisao."
+      },
+      {
+        "title": "Ler os cartoes de decisao",
+        "description": "Os cartoes resumem concentracao, risco, financeiro e recomendacoes automaticas para priorizar acoes."
+      },
+      {
+        "title": "Interpretar os Paretos",
+        "description": "Cada Pareto vem com interpretacao e acao recomendada ao lado. Use o bloco para orientar compras e controle."
+      },
+      {
+        "title": "Previsao anual",
+        "description": "O card mostra a previsao de gasto anual baseada na media dos ultimos 12 meses. Use \"Calcular previsao\" para gravar na tabela."
+      },
+      {
+        "title": "Copiar IDs",
+        "description": "Clique em barras com ID para copiar o materialId e usar em consultas ou cadastros."
+      }
+    ],
+    "notes": [
+      "Pareto 80/20 - Saida por quantidade responde: \"O que mais sai fisicamente?\".",
+      "Pareto de score de risco responde: \"O que nao pode faltar de jeito nenhum?\". Ordena pelo score (alto para baixo) e colore as barras por faixa de score (alto/medio/baixo).",
+      "Pareto financeiro - Saida por valor responde: \"O que doi mais no caixa?\".",
+      "Risco operacional: Classe A = abaixo minimo + giro alto; Classe B = abaixo minimo; Classe C = acima do minimo.",
+      "A previsao anual nao usa filtros de periodo: considera sempre os ultimos 12 meses completos.",
+      "Os dados do card e grafico de previsao sao lidos das tabelas agregadas (nao ha calculo no client)."
+    ]
+  }
+}

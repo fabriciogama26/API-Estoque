@@ -128,11 +128,25 @@ export default withAuth(async (req, res, user) => {
       const body = await readJson(req)
       return sendJson(res, 200, await EstoqueOperations.report(body, user))
     }
+    if (path === '/api/estoque/relatorios' && method === 'GET') {
+      return sendJson(res, 200, await EstoqueOperations.reportHistory(query, user))
+    }
+    if (path === '/api/estoque/relatorio/pdf' && method === 'POST') {
+      const body = await readJson(req)
+      return sendJson(res, 200, await EstoqueOperations.reportPdf(body, user))
+    }
     if (path === '/api/estoque/relatorio/auto' && method === 'POST') {
       if (!req.isCron) {
         return sendJson(res, 401, { error: 'Nao autorizado para executar relatorio automatico.' })
       }
       return sendJson(res, 200, await EstoqueOperations.reportAuto())
+    }
+    if (path === '/api/estoque/previsao') {
+      if (method === 'GET') return sendJson(res, 200, await EstoqueOperations.forecast(query, user))
+      if (method === 'POST') {
+        const body = await readJson(req)
+        return sendJson(res, 200, await EstoqueOperations.forecast(body, user))
+      }
     }
     if (path === '/api/estoque') {
       if (query.view === 'dashboard') {

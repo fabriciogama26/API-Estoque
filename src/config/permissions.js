@@ -1,5 +1,6 @@
 const PAGE_CATALOG = [
   { id: 'dashboard', label: 'Dashboard Estoque', paths: ['/', '/dashboard'] },
+  { id: 'dashboard-analise-estoque', label: 'Analise de Estoque', paths: ['/analise-estoque'] },
   { id: 'dashboard-acidentes', label: 'Dashboard Acidentes', paths: ['/dashboard/acidentes'] },
   { id: 'estoque', label: 'Estoque Atual', paths: ['/estoque'] },
   { id: 'entradas', label: 'Entradas', paths: ['/entradas', '/movimentacoes/entradas'] },
@@ -10,6 +11,7 @@ const PAGE_CATALOG = [
   { id: 'acidentes-cadastro', label: 'Cadastro de Acidentes', paths: ['/acidentes/cadastro'] },
   { id: 'acidentes-hht-mensal', label: 'HHT Mensal', paths: ['/acidentes/hht-mensal'] },
   { id: 'termo-epi', label: 'Termo de EPI', paths: ['/documentos/termo-epi', '/termos/epi'] },
+  { id: 'relatorio-estoque', label: 'Relatorio de Estoque', paths: ['/relatorios/estoque'] },
   { id: 'configuracoes', label: 'Configuracoes', paths: ['/configuracoes'] },
   { id: 'no-access', label: 'Sem acesso', paths: ['/sem-acesso'] },
 ]
@@ -19,6 +21,7 @@ const ALL_PAGE_IDS = PAGE_CATALOG.map((page) => page.id)
 // Mapeia cada pagina para a permission key necessária (leitura). Paginas sem mapeamento liberam por default.
 const PAGE_REQUIRED_PERMISSION = {
   dashboard: 'estoque.read',
+  'dashboard-analise-estoque': 'dashboard_analise_estoque',
   'dashboard-acidentes': 'acidentes.read',
   estoque: 'estoque.read',
   entradas: 'estoque.read',
@@ -29,6 +32,7 @@ const PAGE_REQUIRED_PERMISSION = {
   'acidentes-cadastro': 'acidentes.read',
   'acidentes-hht-mensal': 'hht.read',
   'termo-epi': 'estoque.read',
+  'relatorio-estoque': 'estoque.read',
   configuracoes: 'estoque.write',
 }
 
@@ -99,6 +103,7 @@ const PERMISSION_LABELS = {
   'estoque.read': 'Estoque - Ler',
   'estoque.write': 'Estoque - Alterar',
   'estoque.dashboard': 'Dashboard Estoque',
+  'dashboard_analise_estoque': 'Dashboard Analise de Estoque',
   'acidentes.dashboard': 'Dashboard Acidentes',
   'estoque.entradas': 'Entradas',
   'estoque.saidas': 'Saidas',
@@ -117,6 +122,11 @@ const PERMISSION_LABELS = {
 // Grupos de permissão (toggle único liga conjunto de chaves)
 const PERMISSION_GROUPS = [
   { id: 'dashboard', label: 'Dashboard Estoque', keys: ['estoque.read', 'estoque.dashboard'] },
+  {
+    id: 'dashboard-analise-estoque',
+    label: 'Analise de Estoque',
+    keys: ['estoque.read', 'dashboard_analise_estoque'],
+  },
   { id: 'dashboard-acidentes', label: 'Dashboard Acidentes', keys: ['acidentes.read', 'acidentes.dashboard'] },
   { id: 'entradas', label: 'Entradas', keys: ['estoque.read', 'estoque.write', 'estoque.entradas'] },
   { id: 'saidas', label: 'Saidas', keys: ['estoque.read', 'estoque.write', 'estoque.saidas'] },

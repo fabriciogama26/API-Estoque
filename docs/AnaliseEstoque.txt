@@ -1,0 +1,128 @@
+﻿Tela: Analise de Estoque
+========================
+
+Visao geral
+-----------
+- Tela dedicada a interpretacao dos Paretos e acoes recomendadas de estoque.
+- Usa os mesmos filtros do Dashboard de Estoque (periodo e termo).
+- Exibe cartoes de decisao, Paretos e blocos de interpretacao/acao ao lado.
+- Inclui previsao de gasto anual baseada no consumo medio dos ultimos 12 meses.
+
+Arquitetura
+-----------
+- Provider `DashboardEstoqueProvider`:
+  - Reaproveita a carga de dados e filtros do dashboard.
+- Pagina `AnaliseEstoquePage`:
+  - Monta cartoes com regras de concentracao, risco, financeiro e recomendacoes.
+  - Renderiza Paretos com interpretacao e acoes ao lado.
+  - Busca previsao anual via endpoint de estoque (nao usa filtros).
+- Componentes:
+  - `ParetoChart` para os graficos.
+  - `ChartExpandModal` para visualizacao expandida.
+  - `ForecastGastoChart` para historico mensal e projecao.
+ - Tabelas:
+   - `agg_gasto_mensal` (agregado mensal real por tenant).
+   - `f_previsao_gasto_mensal` (previsao mensal por tenant).
+
+Cadastro
+--------
+- Nao aplicavel.
+
+Filtros, auto-complete e listagem
+---------------------------------
+- Periodo inicial/final (AAAA-MM).
+- Termo livre (material, fabricante, categoria, centro, setor, pessoa).
+- Aplicacao sob demanda: filtros sao aplicados apenas ao clicar em **Aplicar filtros**.
+
+Boas praticas
+-------------
+- Valor unitario e giro diario direcionam o cartao de itens caros com baixo giro.
+- Use os cartoes de recomendacao para orientar compras e revisao de politicas.
+- Filtros de periodo afetam consumo, nao afetam estoque atual (sempre acumulado).
+- Pareto de score de risco ordena pelo score e usa cores por faixa (alto/medio/baixo).
+- Previsao anual usa sempre os ultimos 12 meses completos (nao depende do filtro aplicado).
+- Previsao mensal e agregados sao gerados por cron e podem ser calculados manualmente no botao "Calcular previsao".
+- Respeitar `account_owner_id` em todas as consultas (multi-tenant).
+
+Cancelamento e saldo
+--------------------
+- Nao aplicavel.
+
+Atalhos
+-------
+- Clique nas barras com ID para copiar o materialId.
+
+Atualizacao 2026-02
+-------------------
+- Nova pagina de Analise de Estoque em `/analise-estoque`.
+- Paretos movidos do Dashboard para esta pagina.
+- Cartoes de decisao agrupados com informativo (classe A por quantidade, risco ABC, concentracao do gasto, alertas de giro, anomalias e recomendacoes).
+- Interpretacoes e acoes exibidas ao lado de cada Pareto.
+- Textos dos Paretos agora incluem resumo com numeros e listas curtas (top 3-5 itens).
+- Validacao do Pareto agora abre em modal com tabela base paginada (10 itens por pagina).
+- Pareto de score de risco tambem possui modal de validacao com flags e classe ABC.
+- Estoque atual do Pareto de risco usa o saldo fisico acumulado (mesma base da tela Estoque atual).
+- Classe de risco operacional segue regra: A = abaixo minimo + giro alto, B = abaixo minimo sem giro alto, C = acima minimo.
+- Pareto financeiro agora possui validacao com valor total de saida, percentuais e classe ABC financeira.
+- Cartao de previsao anual e grafico de historico mensal com projecao.
+- Tabelas `agg_gasto_mensal` e `f_previsao_gasto_mensal` adicionadas para historico e previsao mensal.
+- Endpoint `/api/estoque/previsao` retorna dados apenas das tabelas agregadas.
+- Ajuda contextual criada para a pagina.
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- AnaliseEstoquePage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/AnaliseEstoquePage.jsx
+  - Responsavel por: montar filtros, cartoes, Paretos e interpretacoes.
+- ForecastGastoChart
+  - Tipo: componente de grafico
+  - Caminho: src/components/charts/ForecastGastoChart.jsx
+  - Responsavel por: exibir historico mensal e projecao de gasto anual.
+- DashboardEstoqueProvider
+  - Tipo: provider React
+  - Caminho: src/context/DashboardEstoqueContext.jsx
+  - Responsavel por: prover dados e filtros para a analise.
+
+Constantes e configuracoes
+--------------------------
+- Regras de Pareto e percentis
+  - Tipo: utilitarios
+  - Caminho: src/utils/inventoryReportUtils.js
+  - Uso: calculo de percentis, formatos e listas de Pareto.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- computePercentile / formatPercent / formatNumber / formatCurrency
+  - Tipo: utilitarios
+  - Caminho: src/utils/inventoryReportUtils.js
+  - Responsavel por: percentis e formatacoes exibidas nos cartoes.
+
+Servicos e integracoes externas
+-------------------------------
+- dashboardEstoqueApi
+  - Tipo: servico de API
+  - Caminho: src/services/dashboardEstoqueApi.js
+  - Responsavel por: buscar dados do dashboard usados na analise.
+- estoqueApi
+  - Tipo: servico de API
+  - Caminho: src/services/estoqueApi.js
+  - Responsavel por: carregar o saldo fisico acumulado usado no Pareto de risco.
+- estoqueApi (previsao)
+  - Tipo: servico de API
+  - Caminho: src/services/estoqueApi.js
+  - Responsavel por: carregar previsao de gasto anual e atualizar fator de tendencia.
+- RPCs de previsao
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260204_create_gasto_forecast_tables.sql
+  - Responsavel por: gerar agregados mensais e previsoes por tenant.
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpAnaliseEstoque.json (chave 'analiseEstoque').
+

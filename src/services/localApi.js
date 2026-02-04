@@ -2871,6 +2871,144 @@ const localApi = {
 
       return { tipo, origem: 'local' }
     },
+    async reportHistory() {
+      return { items: [] }
+    },
+    async reportPdf(params = {}) {
+      const reportId = String(params.reportId || params.id || '').trim()
+      if (!reportId) {
+        throw createError(400, 'ID do relatorio obrigatorio.')
+      }
+      return {
+        reportId,
+        html: '<!DOCTYPE html><html><body><p>Relatorio indisponivel no modo local.</p></body></html>',
+      }
+    },
+    async forecast(params = {}) {
+      const fatorInput = params?.fator_tendencia ?? params?.fatorTendencia ?? params?.fator
+      return readState((state) => {
+        const hoje = new Date()
+        const lastMonth = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), 0))
+        const baseFim = new Date(Date.UTC(lastMonth.getUTCFullYear(), lastMonth.getUTCMonth() + 1, 0))
+        const baseInicio = new Date(Date.UTC(baseFim.getUTCFullYear(), baseFim.getUTCMonth() - 11, 1))
+        const anteriorFim = new Date(Date.UTC(baseInicio.getUTCFullYear(), baseInicio.getUTCMonth(), 0))
+        const anteriorInicio = new Date(Date.UTC(anteriorFim.getUTCFullYear(), anteriorFim.getUTCMonth() - 11, 1))
+
+        const materiaisMap = new Map((state.materiais ?? []).map((material) => [material.id, material]))
+        const totals = new Map()
+        ;(state.saidas ?? []).forEach((saida) => {
+          if (!saida?.dataEntrega) return
+          const status = (saida.statusNome || saida.status || '').toString().trim().toLowerCase()
+          if (status === 'cancelado') return
+          const data = new Date(saida.dataEntrega)
+          if (Number.isNaN(data.getTime())) return
+          const key = `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, '0')}`
+          const material = materiaisMap.get(saida.materialId) || null
+          const valorUnitario = Number(material?.valorUnitario ?? 0)
+          const quantidade = Number(saida.quantidade ?? 0)
+          totals.set(key, (totals.get(key) || 0) + valorUnitario * quantidade)
+        })
+
+        const buildSeries = (start, end) => {
+          const series = []
+          let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1))
+          const limit = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1))
+          while (cursor <= limit) {
+            const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`
+            series.push({
+              mes: key,
+              label: `${String(cursor.getUTCMonth() + 1).padStart(2, '0')}/${cursor.getUTCFullYear()}`,
+              valor: Number((totals.get(key) || 0).toFixed(2)),
+            })
+            cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))
+          }
+          return series
+        }
+
+        const baseSerie = buildSeries(baseInicio, baseFim)
+        const anteriorSerie = buildSeries(anteriorInicio, anteriorFim)
+        const mesesComDados = baseSerie.filter((item) => item.valor > 0).length
+        if (mesesComDados < 12) {
+          return {
+            status: 'insufficient',
+            requiredMonths: 12,
+            monthsAvailable: mesesComDados,
+            periodo_base_inicio: baseInicio.toISOString().split('T')[0],
+            periodo_base_fim: baseFim.toISOString().split('T')[0],
+          }
+        }
+
+        const gastoTotalPeriodo = baseSerie.reduce((acc, item) => acc + item.valor, 0)
+        const mediaMensal = gastoTotalPeriodo / 12
+        const gastoAnoAnterior = anteriorSerie.reduce((acc, item) => acc + item.valor, 0)
+        const variacaoPercentual =
+          gastoAnoAnterior > 0 ? Number((((gastoTotalPeriodo - gastoAnoAnterior) / gastoAnoAnterior) * 100).toFixed(2)) : null
+
+        const ultimos3 = baseSerie.slice(-3).map((item) => item.valor)
+        const anteriores3 = baseSerie.slice(-6, -3).map((item) => item.valor)
+        const mediaUltimos3 = ultimos3.length ? ultimos3.reduce((acc, val) => acc + val, 0) / ultimos3.length : 0
+        const mediaAnteriores3 = anteriores3.length
+          ? anteriores3.reduce((acc, val) => acc + val, 0) / anteriores3.length
+          : 0
+        const tendenciaDelta =
+          mediaAnteriores3 > 0 ? (mediaUltimos3 - mediaAnteriores3) / mediaAnteriores3 : 0
+        let tipoTendencia = 'estavel'
+        if (tendenciaDelta > 0.05) tipoTendencia = 'subida'
+        else if (tendenciaDelta < -0.05) tipoTendencia = 'queda'
+
+        const fatorAuto = tipoTendencia === 'subida' ? 1.05 : tipoTendencia === 'queda' ? 0.95 : 1
+        const fatorNumeric = Number(fatorInput)
+        const fatorTendencia = Number.isFinite(fatorNumeric) && fatorNumeric > 0 ? fatorNumeric : fatorAuto
+
+        const previsaoAnual = mediaMensal * 12 * fatorTendencia
+        const previsaoInicio = new Date(Date.UTC(baseFim.getUTCFullYear(), baseFim.getUTCMonth() + 1, 1))
+        const previsaoFim = new Date(Date.UTC(previsaoInicio.getUTCFullYear(), previsaoInicio.getUTCMonth() + 11, 1))
+        const previsaoSerie = buildSeries(previsaoInicio, previsaoFim).map((item) => ({
+          ...item,
+          valor: Number((mediaMensal * fatorTendencia).toFixed(2)),
+        }))
+
+        return {
+          status: 'ok',
+          resumo: {
+            periodo_base_inicio: baseInicio.toISOString().split('T')[0],
+            periodo_base_fim: baseFim.toISOString().split('T')[0],
+            qtd_meses_base: 12,
+            gasto_total_periodo: Number(gastoTotalPeriodo.toFixed(2)),
+            media_mensal: Number(mediaMensal.toFixed(2)),
+            fator_tendencia: Number(fatorTendencia.toFixed(4)),
+            tipo_tendencia: tipoTendencia,
+            variacao_percentual: variacaoPercentual,
+            previsao_anual: Number(previsaoAnual.toFixed(2)),
+            gasto_ano_anterior: gastoAnoAnterior > 0 ? Number(gastoAnoAnterior.toFixed(2)) : null,
+            metodo_previsao: fatorTendencia !== 1 ? 'ajustada' : 'media_simples',
+            nivel_confianca: gastoAnoAnterior > 0 ? 'alto' : 'medio',
+            created_at: nowIso(),
+          },
+          historico: baseSerie.map((item, index) => {
+            const slice = baseSerie.slice(Math.max(0, index - 2), index + 1)
+            const media = slice.reduce((acc, current) => acc + current.valor, 0) / slice.length
+            return {
+              ano_mes: item.mes,
+              label: item.label,
+              valor_saida: item.valor,
+              valor_entrada: 0,
+              media_movel: Number(media.toFixed(2)),
+            }
+          }),
+          previsao: previsaoSerie.map((item) => ({
+            ano_mes: item.mes,
+            label: item.label,
+            valor_previsto: item.valor,
+            metodo: fatorTendencia !== 1 ? 'ajustada' : 'media_simples',
+            cenario: 'base',
+          })),
+        }
+      })
+    },
+    async forecastUpdate(params = {}) {
+      return this.forecast(params)
+    },
   },
   acidentes: {
     async parts() {

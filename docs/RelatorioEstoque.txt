@@ -1,0 +1,84 @@
+﻿Tela: Relatorio de Estoque
+=========================
+
+Visao geral
+-----------
+- Permite consultar o historico de relatorios mensais e trimestrais gravados em inventory_report.
+- Gera o HTML do relatorio a partir dos dados persistidos e dispara o PDF.
+- Respeita limite de 1 PDF por mes por relatorio.
+
+Arquitetura
+-----------
+- Pagina `RelatorioEstoquePage` consome hook `useRelatorioEstoque`.
+- Hook chama `relatorioEstoqueApi` para listar relatorios e gerar HTML/PDF.
+- Backend exposto em `EstoqueOperations.reportHistory` e `EstoqueOperations.reportPdf`.
+- Persistencia feita na tabela `inventory_report` (campos pdf_gerado_em/pdf_gerado_por).
+
+Filtros, auto-complete e listagem
+---------------------------------
+- Tipo:
+  - Mensal: filtra por mes (YYYY-MM).
+  - Trimestral: filtra por trimestre (T1..T4) e ano.
+- Listagem mostra: periodo, tipo, data de geracao e data do ultimo PDF.
+- Botao "Gerar PDF" fica desabilitado quando o limite mensal foi atingido.
+
+Boas praticas
+-------------
+- Executar o cron no ultimo dia do mes para manter o historico atualizado.
+- Usar apenas dados salvos em inventory_report para gerar HTML/PDF.
+- Manter PDF_REPORT_LIMIT_PER_MONTH em `src/config/RelatorioEstoqueConfig.js`.
+
+Atualizacao 2026-02
+-------------------
+- Criada pagina de historico de relatorios de estoque.
+- Endpoints para listar relatorios e gerar HTML/PDF a partir do historico.
+- Limite de 1 PDF por mes por relatorio com registro em inventory_report.
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- RelatorioEstoquePage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/RelatorioEstoque.jsx
+  - Responsavel por: filtros, listagem e pre-visualizacao do relatorio.
+- useRelatorioEstoque
+  - Tipo: hook
+  - Caminho: src/hooks/useRelatorioEstoque.js
+  - Responsavel por: carregar historico, acionar geracao de PDF e tratar limites.
+- EstoqueOperations.reportHistory / reportPdf
+  - Tipo: operacoes backend
+  - Caminho: api/_shared/operations.js
+  - Responsavel por: listar relatorios e registrar geracao de PDF.
+
+Constantes e configuracoes
+--------------------------
+- PDF_REPORT_LIMIT_PER_MONTH
+  - Tipo: configuracao
+  - Caminho: src/config/RelatorioEstoqueConfig.js
+  - Uso: limite mensal de geracao de PDF por relatorio.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- downloadRelatorioEstoquePdf
+  - Tipo: utilitario
+  - Caminho: src/utils/RelatorioEstoquePdfUtils.js
+  - Responsavel por: enviar HTML para renderizacao e baixar PDF.
+
+Servicos e integracoes externas
+-------------------------------
+- relatorioEstoqueApi
+  - Tipo: servico
+  - Caminho: src/services/relatorioEstoqueApi.js
+  - Responsavel por: listar relatorios e solicitar HTML/PDF.
+- Supabase Functions (renderizacao PDF)
+  - Tipo: integracao externa
+  - Caminho: supabase/functions/termo-epi
+  - Responsavel por: converter HTML em PDF.
+
+Ajuda contextual
+----------------
+- Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
+- Conteudo vem de src/help/helpRelatorioEstoque.json.

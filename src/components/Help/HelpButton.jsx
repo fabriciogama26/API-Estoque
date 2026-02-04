@@ -10,6 +10,8 @@ import helpSaidas from '../../help/helpSaidas.json'
 import helpHhtMensal from '../../help/helpHhtMensal.json'
 import helpTermoEpi from '../../help/helpTermoEpi.json'
 import helpConfiguracoes from '../../help/helpConfiguracoes.json'
+import helpRelatorioEstoque from '../../help/helpRelatorioEstoque.json'
+import helpAnaliseEstoque from '../../help/helpAnaliseEstoque.json'
 import { HelpIcon, InfoIcon } from '../icons.jsx'
 import '../../styles/help.css'
 
@@ -33,6 +35,8 @@ const helpByTopic = {
   hhtMensal: helpHhtMensal,
   termoEpi: helpTermoEpi,
   configuracoes: helpConfiguracoes,
+  relatorioEstoque: helpRelatorioEstoque,
+  analiseEstoque: helpAnaliseEstoque,
 }
 
 const resolveContent = (topic) => {

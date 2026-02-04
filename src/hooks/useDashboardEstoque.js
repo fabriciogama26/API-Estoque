@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MovementIcon, RevenueIcon, StockIcon, AlertIcon, DashboardIcon, TrendIcon } from '../components/icons.jsx'
 import { fetchDashboardEstoque, generateDashboardEstoqueReport } from '../services/dashboardEstoqueApi.js'
+import { listEstoqueAtual } from '../services/estoqueApi.js'
 import {
   initialDashboardEstoqueFilters,
   normalizarTermo,
@@ -30,7 +31,7 @@ const uniqueByMaterialId = (items = []) => {
   const seen = new Set()
   const lista = []
   items.forEach((item) => {
-    const key = item?.materialId ?? item?.id ?? item?.nome
+    const key = item?.materialIdDisplay ?? item?.materialId ?? item?.id ?? item?.nome
     const normalized = key === null || key === undefined ? '' : String(key).trim().toLowerCase()
     if (normalized && seen.has(normalized)) {
       return
@@ -47,6 +48,7 @@ export function useDashboardEstoque(onError) {
   const [filters, setFilters] = useState(initialDashboardEstoqueFilters)
   const [appliedFilters, setAppliedFilters] = useState(initialDashboardEstoqueFilters)
   const [data, setData] = useState(null)
+  const [estoqueBase, setEstoqueBase] = useState({ itens: [], alertas: [] })
   const [error, setError] = useState(null)
   const [chartFilter, setChartFilter] = useState(null)
   const [expandedChartId, setExpandedChartId] = useState(null)
@@ -54,6 +56,7 @@ export function useDashboardEstoque(onError) {
   const [reportLoading, setReportLoading] = useState(false)
   const lastKeyRef = useRef(null)
   const dataRef = useRef(null)
+  const lastBaseKeyRef = useRef(null)
 
   const notifyError = useCallback(
     (err, context = {}) => {
@@ -72,6 +75,17 @@ export function useDashboardEstoque(onError) {
         return
       }
       try {
+        const baseKey = '__base_estoque__'
+        if (force || lastBaseKeyRef.current !== baseKey) {
+          try {
+            const baseData = await listEstoqueAtual()
+            const base = { itens: baseData?.itens ?? [], alertas: baseData?.alertas ?? [] }
+            setEstoqueBase(base)
+            lastBaseKeyRef.current = baseKey
+          } catch (err) {
+            notifyError(err, { area: 'dashboard_estoque_base' })
+          }
+        }
         const dashboard = await fetchDashboardEstoque({
           periodoInicio: params.periodoInicio || undefined,
           periodoFim: params.periodoFim || undefined,
@@ -367,13 +381,13 @@ export function useDashboardEstoque(onError) {
     () =>
       buildRiscoOperacional({
         saidasResumo,
-        estoqueAtual: data?.estoqueAtual?.itens ?? [],
+        estoqueAtual: estoqueBase?.itens ?? [],
         diasPeriodo,
         p80Quantidade,
         p90Quantidade,
         p80Giro,
       }),
-    [data, diasPeriodo, p80Giro, p80Quantidade, p90Quantidade, saidasResumo],
+    [diasPeriodo, estoqueBase, p80Giro, p80Quantidade, p90Quantidade, saidasResumo],
   )
 
   const paretoQuantidade = useMemo(
@@ -404,8 +418,8 @@ export function useDashboardEstoque(onError) {
 
   const totalMovimentacoes = entradasDetalhadasFiltradas.length + saidasDetalhadasFiltradas.length
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
-  const materiaisEmAlerta = data?.estoqueAtual?.alertas?.length ?? 0
-  const totalMateriais = data?.estoqueAtual?.itens?.length ?? 0
+  const materiaisEmAlerta = estoqueBase?.alertas?.length ?? data?.estoqueAtual?.alertas?.length ?? 0
+  const totalMateriais = estoqueBase?.itens?.length ?? data?.estoqueAtual?.itens?.length ?? 0
 
   const highlightCards = useMemo(
     () => [
@@ -495,23 +509,38 @@ export function useDashboardEstoque(onError) {
     setExpandedChartId,
     seriesHistorica,
     valorMovimentadoSeries,
+    estoquePorMaterial,
     estoquePorMaterialTop,
     estoquePorCategoria,
+    rankingFabricantes,
     rankingFabricantesTop,
+    topCentrosServico,
     topCentrosServicoTop,
+    topSetores,
     topSetoresTop,
+    topPessoas,
     topPessoasTop,
+    topTrocasMateriais,
     topTrocasMateriaisTop,
+    topTrocasSetores,
     topTrocasSetoresTop,
+    topTrocasPessoas,
     topTrocasPessoasTop,
     paretoQuantidadeTop,
     paretoFinanceiroTop,
     paretoRiscoTop,
+    paretoQuantidade,
+    paretoFinanceiro,
+    paretoRisco,
+    saidasResumo,
+    riscoOperacional,
+    diasPeriodo,
     highlightCards,
     formatPeriodoLabel,
     formatCurrency,
     reportStatus,
     reportLoading,
     handleGenerateReport,
+    estoqueBase,
   }
 }
