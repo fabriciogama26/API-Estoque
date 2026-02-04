@@ -10,10 +10,12 @@ import { EntradasPage } from './pages/EntradasPage.jsx'
 import { SaidasPage } from './pages/SaidasPage.jsx'
 import { EstoquePage } from './pages/EstoquePage.jsx'
 import { DashboardPage } from './pages/DashboardPage.jsx'
+import { AnaliseEstoqueProviderPage } from './pages/AnaliseEstoquePage.jsx'
 import { DashboardAcidentes } from './pages/DashboardAcidentes.jsx'
 import { AcidentesPage } from './pages/Acidentes.jsx'
 import { HhtMensalAcidentesPage } from './pages/HhtMensalAcidentes.jsx'
 import { TermosEpiPage } from './pages/TermosEpiPage.jsx'
+import { RelatorioEstoquePage } from './pages/RelatorioEstoque.jsx'
 import { NoAccessPage } from './pages/NoAccessPage.jsx'
 import { ErrorBoundaryWithLogger } from './components/ErrorBoundary.jsx'
 import { CadastroBasePage } from './pages/CadastroBase.jsx'
@@ -29,6 +31,7 @@ function App() {
           <Route element={<MainLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="analise-estoque" element={<AnaliseEstoqueProviderPage />} />
             <Route path="dashboard/acidentes" element={<DashboardAcidentes />} />
             <Route path="estoque" element={<EstoquePage />} />
 
@@ -57,6 +60,7 @@ function App() {
             {/* Documentos */}
             <Route path="documentos/termo-epi" element={<TermosEpiPage />} />
             <Route path="termos/epi" element={<Navigate to="/documentos/termo-epi" replace />} />
+            <Route path="relatorios/estoque" element={<RelatorioEstoquePage />} />
           </Route>
         </Route>
 

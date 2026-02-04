@@ -25,6 +25,34 @@ const normalizeParetoKey = (value) => {
   return String(value).trim().toLowerCase()
 }
 
+const consolidateByMaterialId = (items = []) => {
+  const mapa = new Map()
+  items.forEach((item) => {
+    const key =
+      normalizeParetoKey(item?.materialIdDisplay) ||
+      normalizeParetoKey(item?.materialId) ||
+      normalizeParetoKey(item?.id) ||
+      normalizeParetoKey(item?.nome)
+    const finalKey = key || `__item_${mapa.size + 1}`
+    const atual = mapa.get(finalKey)
+    if (!atual) {
+      mapa.set(finalKey, { ...item })
+      return
+    }
+    const merged = { ...atual }
+    merged.quantidade = toNumber(atual?.quantidade) + toNumber(item?.quantidade)
+    merged.valorTotal = Number((toNumber(atual?.valorTotal) + toNumber(item?.valorTotal)).toFixed(2))
+    merged.score = toNumber(atual?.score) + toNumber(item?.score)
+    if (!merged.descricaoCompleta && item?.descricaoCompleta) merged.descricaoCompleta = item.descricaoCompleta
+    if (!merged.descricao && item?.descricao) merged.descricao = item.descricao
+    if (!merged.nome && item?.nome) merged.nome = item.nome
+    if (!merged.materialId && item?.materialId) merged.materialId = item.materialId
+    if (!merged.materialIdDisplay && item?.materialIdDisplay) merged.materialIdDisplay = item.materialIdDisplay
+    mapa.set(finalKey, merged)
+  })
+  return Array.from(mapa.values())
+}
+
 const resolveParetoSortKey = (item = {}) => {
   const candidatos = [item.materialIdDisplay, item.materialId, item.id, item.nome]
   for (const candidato of candidatos) {
@@ -39,39 +67,52 @@ const resolveParetoSortKey = (item = {}) => {
 const mergeParetoItems = (items = [], valueKey) => {
   const safeKey = valueKey || 'valor'
   const mapa = new Map()
+  const mapaId = new Map()
+  const mapaNome = new Map()
 
   items.forEach((item, index) => {
-    const keyRaw = item?.materialId ?? item?.id ?? item?.nome
-    const key = normalizeParetoKey(keyRaw) || `__idx_${index}`
+    const idKey =
+      normalizeParetoKey(item?.materialIdDisplay) ||
+      normalizeParetoKey(item?.materialId) ||
+      normalizeParetoKey(item?.id)
+    const nomeKey = normalizeParetoKey(item?.descricaoCompleta) || normalizeParetoKey(item?.descricao) || normalizeParetoKey(item?.nome)
+    let key = ''
+
+    if (idKey && mapaId.has(idKey)) {
+      key = mapaId.get(idKey)
+    } else if (nomeKey && mapaNome.has(nomeKey)) {
+      key = mapaNome.get(nomeKey)
+    } else {
+      key = idKey || nomeKey || `__idx_${index}`
+      mapa.set(key, { ...item })
+      if (idKey) mapaId.set(idKey, key)
+      if (nomeKey) mapaNome.set(nomeKey, key)
+      return
+    }
+
     const atual = mapa.get(key)
     if (!atual) {
       mapa.set(key, { ...item })
+      if (idKey) mapaId.set(idKey, key)
+      if (nomeKey) mapaNome.set(nomeKey, key)
       return
     }
 
     const merged = { ...atual }
     merged[safeKey] = toNumber(atual?.[safeKey]) + toNumber(item?.[safeKey])
+    merged.quantidade = toNumber(atual?.quantidade) + toNumber(item?.quantidade)
+    merged.valorTotal = Number((toNumber(atual?.valorTotal) + toNumber(item?.valorTotal)).toFixed(2))
+    merged.score = toNumber(atual?.score) + toNumber(item?.score)
 
-    if (item?.quantidade !== undefined) {
-      merged.quantidade = toNumber(atual?.quantidade) + toNumber(item?.quantidade)
-    }
-    if (item?.valorTotal !== undefined) {
-      merged.valorTotal = Number((toNumber(atual?.valorTotal) + toNumber(item?.valorTotal)).toFixed(2))
-    }
-    if (!merged.descricaoCompleta && item?.descricaoCompleta) {
-      merged.descricaoCompleta = item.descricaoCompleta
-    }
-    if (!merged.descricao && item?.descricao) {
-      merged.descricao = item.descricao
-    }
-    if (!merged.nome && item?.nome) {
-      merged.nome = item.nome
-    }
-    if (!merged.materialId && item?.materialId) {
-      merged.materialId = item.materialId
-    }
+    if (!merged.descricaoCompleta && item?.descricaoCompleta) merged.descricaoCompleta = item.descricaoCompleta
+    if (!merged.descricao && item?.descricao) merged.descricao = item.descricao
+    if (!merged.nome && item?.nome) merged.nome = item.nome
+    if (!merged.materialId && item?.materialId) merged.materialId = item.materialId
+    if (!merged.materialIdDisplay && item?.materialIdDisplay) merged.materialIdDisplay = item.materialIdDisplay
 
     mapa.set(key, merged)
+    if (idKey) mapaId.set(idKey, key)
+    if (nomeKey) mapaNome.set(nomeKey, key)
   })
 
   return Array.from(mapa.values())
@@ -158,7 +199,7 @@ function resolveMaterialLabel(material = {}) {
 function resolveMaterialDescricao(material = {}) {
   const base = material.resumo || [material.nome, resolveFabricanteDisplay(material)].filter(Boolean).join(' | ')
   const tamanhoNumero = resolveMaterialNumeroTamanho(material)
-  return [base, tamanhoNumero].filter(Boolean).join(' | ')
+  return [base, tamanhoNumero, material.ca].filter(Boolean).join(' | ')
 }
 
 export function buildSaidasResumo(saidasDetalhadas = []) {
@@ -168,10 +209,14 @@ export function buildSaidasResumo(saidasDetalhadas = []) {
     const material = saida?.material
     if (!material) return
 
-    const materialIdDisplay = material.id ?? null
+    const materialIdDisplay = saida?.materialId ?? material.id ?? null
     const chaveNormalizada =
-      normalizeParetoKey(material.id) || normalizeParetoKey(material.nome) || normalizeParetoKey(resolveMaterialLabel(material))
-    const chave = chaveNormalizada || material.id || material.nome || resolveMaterialLabel(material)
+      normalizeParetoKey(saida?.materialId) ||
+      normalizeParetoKey(material.id) ||
+      normalizeParetoKey(material.nome) ||
+      normalizeParetoKey(resolveMaterialLabel(material))
+    const chave =
+      chaveNormalizada || saida?.materialId || material.id || material.nome || resolveMaterialLabel(material)
     const atual = mapa.get(chave) || {
       materialId: materialIdDisplay || chave,
       materialIdDisplay,
@@ -193,7 +238,8 @@ export function buildSaidasResumo(saidasDetalhadas = []) {
     mapa.set(chave, atual)
   })
 
-  return Array.from(mapa.values()).filter((item) => item.quantidade > 0)
+  const lista = Array.from(mapa.values()).filter((item) => item.quantidade > 0)
+  return consolidateByMaterialId(lista)
 }
 
 export function buildRiscoOperacional({
@@ -234,11 +280,11 @@ export function buildRiscoOperacional({
       (tipoCritico ? weights.tipoCritico : 0) +
       (rupturaPressao ? weights.rupturaPressao : 0)
 
-    let classe = 'CONTROLADO'
-    if (score >= thresholds.critico) {
-      classe = 'CRITICO'
-    } else if (score >= thresholds.atencao) {
-      classe = 'ATENCAO'
+    let classeRisco = 'C'
+    if (estoqueBaixo && giroAlto) {
+      classeRisco = 'A'
+    } else if (estoqueBaixo) {
+      classeRisco = 'B'
     }
 
     return {
@@ -257,7 +303,8 @@ export function buildRiscoOperacional({
         tipoCritico,
       },
       score,
-      classe,
+      classe: classeRisco,
+      classeRisco,
     }
   })
 }

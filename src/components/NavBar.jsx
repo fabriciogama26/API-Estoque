@@ -22,6 +22,7 @@ const navSections = [
     collapsible: false,
     items: [
       { to: '/', label: 'Dashboard Estoque', icon: DashboardIcon, pageId: 'dashboard' },
+      { to: '/analise-estoque', label: 'Analise de Estoque', icon: DashboardIcon, pageId: 'dashboard-analise-estoque' },
       { to: '/dashboard/acidentes', label: 'Dashboard Acidentes', icon: AlertIcon, pageId: 'dashboard-acidentes' },
     ],
   },
@@ -59,6 +60,19 @@ const navSections = [
     title: 'Termos',
     icon: ChecklistIcon,
     items: [{ to: '/documentos/termo-epi', label: 'Termo de EPI', icon: ChecklistIcon, pageId: 'termo-epi' }],
+  },
+  {
+    id: 'relatorios',
+    title: 'Relatorios',
+    icon: ChecklistIcon,
+    items: [
+      {
+        to: '/relatorios/estoque',
+        label: 'Relatorio de Estoque',
+        icon: ChecklistIcon,
+        pageId: 'relatorio-estoque',
+      },
+    ],
   },
 ]
 

@@ -5,6 +5,21 @@ import { CONSUME_LOCAL_DATA } from './environment.js'
 export function withAuth(handler) {
   return async (req, res) => {
     try {
+      if (req.method === 'OPTIONS') {
+        const origin = req.headers?.origin || '*'
+        res.setHeader('Access-Control-Allow-Origin', origin)
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Cron-Secret')
+        res.setHeader('Vary', 'Origin')
+        res.statusCode = 204
+        res.end()
+        return
+      }
+
+      const origin = req.headers?.origin || '*'
+      res.setHeader('Access-Control-Allow-Origin', origin)
+      res.setHeader('Vary', 'Origin')
+
       let user = null
       const cronSecret = process.env.CRON_SECRET || ''
       const cronHeader =

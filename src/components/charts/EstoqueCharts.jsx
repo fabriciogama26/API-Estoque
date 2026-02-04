@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { copyTextToClipboard } from '../../utils/clipboard.js'
 
 function MaterialTooltip({ active, payload, label, valueFormatter, valueLabel }) {
   if (!active || !payload?.length) {
@@ -25,6 +26,12 @@ function MaterialTooltip({ active, payload, label, valueFormatter, valueLabel })
 
 export function EstoquePorMaterialChart({ data, valueFormatter, height = 320, onItemClick }) {
   const valueLabel = 'Quantidade'
+  const handleCopyId = (payload) => {
+    const id = payload?.materialIdDisplay || payload?.materialId || payload?.id
+    if (id) {
+      copyTextToClipboard(id)
+    }
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout="vertical" margin={{ top: 12, right: 24, left: 16, bottom: 12 }}>
@@ -50,6 +57,7 @@ export function EstoquePorMaterialChart({ data, valueFormatter, height = 320, on
           fill="#22d3ee"
           cursor={onItemClick ? 'pointer' : 'default'}
           onClick={(entry) => {
+            handleCopyId(entry?.payload)
             if (onItemClick) {
               onItemClick(entry?.payload)
             }

@@ -1,0 +1,28 @@
+﻿{
+  "relatorioEstoque": {
+    "title": "Relatorio de estoque",
+    "summary": "Consulte relatorios gerados automaticamente e baixe o PDF com os dados gravados no historico.",
+    "steps": [
+      {
+        "title": "Filtrar periodo",
+        "description": "Selecione mensal (mes) ou trimestral (trimestre + ano) e clique em Buscar.",
+        "mediaHint": "Formulario de filtros com seletor de tipo e periodo."
+      },
+      {
+        "title": "Gerar PDF",
+        "description": "Clique em Gerar PDF na linha do relatorio. O sistema usa os dados salvos e respeita o limite mensal por relatorio.",
+        "mediaHint": "Tabela de historico com botao Gerar PDF."
+      },
+      {
+        "title": "Pre-visualizar",
+        "description": "A pre-visualizacao mostra o HTML que sera convertido em PDF.",
+        "mediaHint": "Iframe de pre-visualizacao do relatorio."
+      }
+    ],
+    "notes": [
+      "Relatorios sao gerados automaticamente pelo cron no ultimo dia do mes.",
+      "Se nao houver dados no periodo, o relatorio nao e criado.",
+      "PDF pode ser gerado apenas uma vez por mes para cada relatorio."
+    ]
+  }
+}

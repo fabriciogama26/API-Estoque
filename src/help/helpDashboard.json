@@ -15,18 +15,13 @@
       },
       {
         "title": "Interagir com os graficos",
-        "description": "Clique em uma barra ou fatia para filtrar o restante dos graficos pelo mesmo termo. Use o chip Limpar que aparece acima do grafico para remover o filtro.",
+        "description": "Clique em uma barra ou fatia para filtrar o restante dos graficos pelo mesmo termo. Em graficos com ID, clicar na barra copia o materialId para a area de transferencia. Use o chip Limpar que aparece acima do grafico para remover o filtro.",
         "mediaHint": "Grafico com tooltip e chip de filtro ativo."
       },
       {
         "title": "Expandir graficos",
         "description": "Para analisar um grafico com mais espaco, clique no botao de expandir (canto superior direito do card). Feche clicando fora ou no icone de fechar.",
         "mediaHint": "Botao de expandir no cabecalho do card."
-      },
-      {
-        "title": "Interpretar os Paretos",
-        "description": "Pareto 80/20 - Saida por quantidade responde: \"O que mais sai fisicamente?\". Pareto por risco operacional responde: \"O que nao pode faltar de jeito nenhum?\". Pareto financeiro - Saida por valor responde: \"O que doi mais no caixa?\".",
-        "mediaHint": "Cards dos Paretos com curva acumulada e linha de 80%."
       }
     ],
     "notes": [

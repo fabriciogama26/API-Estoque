@@ -27,6 +27,7 @@ import {
   DEFAULT_RISK_WEIGHTS,
   DEFAULT_VARIACAO_RELEVANTE,
 } from '../../src/utils/inventoryReportUtils.js'
+import { PDF_REPORT_LIMIT_PER_MONTH } from '../../src/config/RelatorioEstoqueConfig.js'
 import { resolveUsuarioNome } from './auth.js'
 import { createHttpError } from './http.js'
 
@@ -201,6 +202,96 @@ const toEndOfDayIso = (value) => {
   }
   date.setHours(23, 59, 59, 999)
   return date.toISOString()
+}
+
+const toStartOfMonthUtc = (date) =>
+  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
+
+const toEndOfMonthUtc = (date) =>
+  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0))
+
+const isLastDayOfMonthUtc = (date) => {
+  const end = toEndOfMonthUtc(date)
+  return (
+    date.getUTCFullYear() === end.getUTCFullYear() &&
+    date.getUTCMonth() === end.getUTCMonth() &&
+    date.getUTCDate() === end.getUTCDate()
+  )
+}
+
+const buildMonthPeriods = (startDate, endDate) => {
+  const periods = []
+  if (!startDate || !endDate) {
+    return periods
+  }
+  let cursor = toStartOfMonthUtc(startDate)
+  const end = toEndOfMonthUtc(endDate)
+  while (cursor <= end) {
+    const start = new Date(cursor)
+    const finish = toEndOfMonthUtc(cursor)
+    periods.push({ start, end: finish })
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))
+  }
+  return periods
+}
+
+const resolveQuarterStart = (date) => {
+  const startMonth = Math.floor(date.getUTCMonth() / 3) * 3
+  return new Date(Date.UTC(date.getUTCFullYear(), startMonth, 1))
+}
+
+const resolveQuarterEnd = (date) => {
+  const startMonth = Math.floor(date.getUTCMonth() / 3) * 3
+  return new Date(Date.UTC(date.getUTCFullYear(), startMonth + 3, 0))
+}
+
+const resolvePreviousQuarterRange = (quarterStart) => {
+  const prevStart = new Date(Date.UTC(quarterStart.getUTCFullYear(), quarterStart.getUTCMonth() - 3, 1))
+  const prevEnd = new Date(Date.UTC(quarterStart.getUTCFullYear(), quarterStart.getUTCMonth(), 0))
+  return { start: prevStart, end: prevEnd }
+}
+
+const resolveMonthRangeFromString = (mes) => {
+  const raw = trim(mes)
+  if (!raw) return null
+  const match = raw.match(/^(\d{4})-(\d{2})$/)
+  if (!match) return null
+  const year = Number(match[1])
+  const monthIndex = Number(match[2]) - 1
+  if (Number.isNaN(year) || Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return null
+  }
+  const start = new Date(Date.UTC(year, monthIndex, 1))
+  const end = new Date(Date.UTC(year, monthIndex + 1, 0))
+  return { start, end }
+}
+
+const resolveQuarterRangeFromParams = (ano, trimestre) => {
+  const year = Number(ano)
+  const quarter = Number(trimestre)
+  if (!year || !quarter || quarter < 1 || quarter > 4) {
+    return null
+  }
+  const startMonth = (quarter - 1) * 3
+  const start = new Date(Date.UTC(year, startMonth, 1))
+  const end = new Date(Date.UTC(year, startMonth + 3, 0))
+  return { start, end }
+}
+
+const buildQuarterPeriods = (startDate, endDate) => {
+  const periods = []
+  if (!startDate || !endDate) {
+    return periods
+  }
+  let cursor = resolveQuarterStart(startDate)
+  const endQuarter = resolveQuarterEnd(endDate)
+  while (cursor <= endQuarter) {
+    const start = new Date(cursor)
+    const finish = resolveQuarterEnd(cursor)
+    periods.push({ start, end: finish })
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 3, 1))
+  }
+  return periods
 }
 
 const toDateOnlyUtcIso = (value) => {
@@ -2505,6 +2596,36 @@ function renderReportTemplate(template, context = {}) {
   })
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function renderReportHtml(template, context = {}) {
+  const texto = renderReportTemplate(template, context)
+  const safe = escapeHtml(texto)
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Relatorio de estoque</title>
+    <style>
+      body { font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; margin: 32px; }
+      .report { white-space: pre-wrap; line-height: 1.5; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="report">${safe}</div>
+  </body>
+</html>`
+}
+
+
 function calcularVariacaoPercentual(atual, anterior) {
   const atualNum = Number(atual ?? 0)
   const anteriorNum = Number(anterior ?? 0)
@@ -2593,7 +2714,7 @@ function buildNivelRiscoResumo(qtdCriticos, qtdAtencao) {
   return 'OK'
 }
 
-function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo }) {
+function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo, estoqueBase }) {
   const termoNormalizado = normalizarTermo(termo)
   const entradasDetalhadas = filtrarPorTermo(dashboard?.entradasDetalhadas ?? [], termoNormalizado)
   const saidasDetalhadas = filtrarPorTermo(dashboard?.saidasDetalhadas ?? [], termoNormalizado)
@@ -2627,7 +2748,7 @@ function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo }) {
 
   const riscoLista = buildRiscoOperacional({
     saidasResumo,
-    estoqueAtual: dashboard?.estoqueAtual?.itens ?? [],
+    estoqueAtual: estoqueBase?.itens ?? dashboard?.estoqueAtual?.itens ?? [],
     diasPeriodo,
     p80Quantidade,
     p90Quantidade,
@@ -2644,11 +2765,11 @@ function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo }) {
   const centros = buildResumoPorCentroServico(saidasDetalhadas)
   const centrosCusto = buildResumoPorCentroCusto(saidasDetalhadas)
 
-  const qtdCriticos = riscoLista.filter((item) => item.classe === 'CRITICO').length
-  const qtdAtencao = riscoLista.filter((item) => item.classe === 'ATENCAO').length
-  const qtdControlados = riscoLista.filter((item) => item.classe === 'CONTROLADO').length
+  const qtdCriticos = riscoLista.filter((item) => item.classe === 'A').length
+  const qtdAtencao = riscoLista.filter((item) => item.classe === 'B').length
+  const qtdControlados = riscoLista.filter((item) => item.classe === 'C').length
 
-  const criticosLista = riscoLista.filter((item) => item.classe === 'CRITICO')
+  const criticosLista = riscoLista.filter((item) => item.classe === 'A')
   const criticosIds = new Set(criticosLista.map((item) => item.materialId))
 
   const hoje = new Date()
@@ -2713,7 +2834,7 @@ function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo }) {
     coberturaResumo,
     giroMedioCriticos,
     valorTotalMovimentado: totalEntradasValor + totalSaidasValor,
-    alertasAtivos: dashboard?.estoqueAtual?.alertas?.length ?? 0,
+    alertasAtivos: estoqueBase?.alertas?.length ?? dashboard?.estoqueAtual?.alertas?.length ?? 0,
   }
 }
 
@@ -2957,8 +3078,8 @@ async function sendBrevoEmail({ sender, to, subject, text }) {
   return { ok: true }
 }
 
-function buildReportSummaryPayload({ dashboard, pessoas, periodoRange, termo }) {
-  const resumo = buildReportSummary({ dashboard, pessoas, periodoRange, termo })
+function buildReportSummaryPayload({ dashboard, pessoas, periodoRange, termo, estoqueBase }) {
+  const resumo = buildReportSummary({ dashboard, pessoas, periodoRange, termo, estoqueBase })
   return resumo
 }
 
@@ -2980,6 +3101,7 @@ async function buildInventoryReport({
     pessoas: dadosAtual.pessoas,
     periodoRange,
     termo,
+    estoqueBase: dadosAtual.estoqueBase,
   })
 
   const resumoAnterior = dadosAnterior
@@ -2988,6 +3110,7 @@ async function buildInventoryReport({
         pessoas: dadosAnterior.pessoas,
         periodoRange: periodoRangeAnterior,
         termo,
+        estoqueBase: dadosAnterior.estoqueBase,
       })
     : null
 
@@ -3007,6 +3130,7 @@ async function buildInventoryReport({
   const metadados = {
     tipo,
     origem,
+    contexto: context,
     periodo_inicio: periodoInicio,
     periodo_fim: periodoFim,
     pesos_risco: DEFAULT_RISK_WEIGHTS,
@@ -3046,6 +3170,62 @@ async function buildInventoryReport({
   }
 }
 
+async function resolveEarliestMovimentacao(ownerId) {
+  const [entrada, saida] = await Promise.all([
+    executeMaybeSingle(
+      supabaseAdmin
+        .from('entradas')
+        .select('dataEntrada')
+        .eq('account_owner_id', ownerId)
+        .order('dataEntrada', { ascending: true })
+        .limit(1),
+      'Falha ao consultar entradas.'
+    ),
+    executeMaybeSingle(
+      supabaseAdmin
+        .from('saidas')
+        .select('dataEntrega')
+        .eq('account_owner_id', ownerId)
+        .order('dataEntrega', { ascending: true })
+        .limit(1),
+      'Falha ao consultar saidas.'
+    ),
+  ])
+
+  const datas = []
+  if (entrada?.dataEntrada) {
+    const data = new Date(entrada.dataEntrada)
+    if (!Number.isNaN(data.getTime())) datas.push(data)
+  }
+  if (saida?.dataEntrega) {
+    const data = new Date(saida.dataEntrega)
+    if (!Number.isNaN(data.getTime())) datas.push(data)
+  }
+  if (!datas.length) {
+    return null
+  }
+  return new Date(Math.min(...datas.map((data) => data.getTime())))
+}
+
+async function loadReportRegistry(ownerId, tipo) {
+  const registros = await execute(
+    supabaseAdmin
+      .from('inventory_report')
+      .select('periodo_inicio, periodo_fim')
+      .eq('account_owner_id', ownerId)
+      .eq('metadados->>tipo', tipo),
+    'Falha ao consultar relatorios.'
+  )
+  const set = new Set()
+  registros?.forEach((item) => {
+    const key = `${item?.periodo_inicio || ''}|${item?.periodo_fim || ''}`
+    if (key !== '|') {
+      set.add(key)
+    }
+  })
+  return set
+}
+
 export const EstoqueOperations = {
   async current(params = {}) {
     const { materiais, entradas, saidas, periodo } = await carregarMovimentacoes(params)
@@ -3077,6 +3257,12 @@ export const EstoqueOperations = {
     }
 
     const dadosAtual = await carregarMovimentacoesPorOwner({ ownerId, periodoRange })
+    const estoqueBaseAtual = montarEstoqueAtual(
+      dadosAtual.materiais,
+      dadosAtual.entradas,
+      dadosAtual.saidas,
+      null,
+    )
     const dashboardAtual = montarDashboard(
       {
         materiais: dadosAtual.materiais,
@@ -3092,6 +3278,7 @@ export const EstoqueOperations = {
       pessoas: dadosAtual.pessoas,
       periodoRange,
       termo,
+      estoqueBase: estoqueBaseAtual,
     })
     if (resumoAtual.totalMovimentacoes === 0) {
       throw createHttpError(404, 'Nenhuma movimentacao encontrada para o periodo informado.')
@@ -3107,6 +3294,12 @@ export const EstoqueOperations = {
       periodoRangeAnterior = { start: inicioAnterior, end: fimAnterior }
 
       const dadosPrev = await carregarMovimentacoesPorOwner({ ownerId, periodoRange: periodoRangeAnterior })
+      const estoqueBasePrev = montarEstoqueAtual(
+        dadosPrev.materiais,
+        dadosPrev.entradas,
+        dadosPrev.saidas,
+        null,
+      )
       const dashboardPrev = montarDashboard(
         {
           materiais: dadosPrev.materiais,
@@ -3124,11 +3317,12 @@ export const EstoqueOperations = {
         pessoas: dadosPrev.pessoas,
         periodoRange: periodoRangeAnterior,
         termo,
+        estoqueBase: estoqueBasePrev,
       })
       if (resumoAnterior.totalMovimentacoes === 0) {
         throw createHttpError(404, 'Sem dados no trimestre anterior para comparacao.')
       }
-      dadosAnterior = { dashboard: dashboardPrev, pessoas: dadosPrev.pessoas }
+      dadosAnterior = { dashboard: dashboardPrev, pessoas: dadosPrev.pessoas, estoqueBase: estoqueBasePrev }
     }
 
     const report = await buildInventoryReport({
@@ -3141,7 +3335,7 @@ export const EstoqueOperations = {
       origem: 'manual',
       periodoRange,
       periodoRangeAnterior,
-      dadosAtual: { dashboard: dashboardAtual, pessoas: dadosAtual.pessoas },
+      dadosAtual: { dashboard: dashboardAtual, pessoas: dadosAtual.pessoas, estoqueBase: estoqueBaseAtual },
       dadosAnterior,
     })
 
@@ -3173,6 +3367,133 @@ export const EstoqueOperations = {
       emailError: emailStatus.ok ? null : emailStatus.error,
     }
   },
+  async reportHistory(params = {}, user) {
+    if (!user?.id) {
+      throw createHttpError(401, 'Usuario nao autenticado para consultar relatorios.')
+    }
+    const ownerId = await resolveOwnerId(user.id)
+    const tipoRaw = trim(params.tipo)
+    const tipo = tipoRaw && tipoRaw !== 'todos' ? tipoRaw.toLowerCase() : ''
+    const mesRange = resolveMonthRangeFromString(params.mes)
+    const trimestreRange = resolveQuarterRangeFromParams(params.ano, params.trimestre)
+
+    let query = supabaseAdmin
+      .from('inventory_report')
+      .select(
+        'id, created_at, created_by, periodo_inicio, periodo_fim, termo, metadados, pdf_gerado_em, pdf_gerado_por'
+      )
+      .eq('account_owner_id', ownerId)
+
+    if (tipo) {
+      query = query.eq('metadados->>tipo', tipo)
+    }
+    if (mesRange) {
+      query = query
+        .eq('periodo_inicio', toDateOnly(mesRange.start))
+        .eq('periodo_fim', toDateOnly(mesRange.end))
+        .eq('metadados->>tipo', REPORT_TYPE_MENSAL)
+    }
+    if (trimestreRange) {
+      query = query
+        .eq('periodo_inicio', toDateOnly(trimestreRange.start))
+        .eq('periodo_fim', toDateOnly(trimestreRange.end))
+        .eq('metadados->>tipo', REPORT_TYPE_TRIMESTRAL)
+    }
+
+    const items = await execute(
+      query.order('periodo_inicio', { ascending: false }).order('created_at', { ascending: false }),
+      'Falha ao listar relatorios de estoque.'
+    )
+
+    return { items: items ?? [] }
+  },
+  async reportPdf(params = {}, user) {
+    if (!user?.id) {
+      throw createHttpError(401, 'Usuario nao autenticado para gerar PDF.')
+    }
+    const reportId = trim(params.reportId || params.id)
+    if (!reportId) {
+      throw createHttpError(400, 'ID do relatorio obrigatorio.')
+    }
+    const ownerId = await resolveOwnerId(user.id)
+    const registro = await executeMaybeSingle(
+      supabaseAdmin
+        .from('inventory_report')
+        .select('id, periodo_inicio, periodo_fim, metadados, pdf_gerado_em')
+        .eq('account_owner_id', ownerId)
+        .eq('id', reportId)
+        .limit(1),
+      'Falha ao consultar relatorio de estoque.'
+    )
+    if (!registro) {
+      throw createHttpError(404, 'Relatorio nao encontrado.')
+    }
+
+    const agora = new Date()
+    const mesRef = `${agora.getUTCFullYear()}-${String(agora.getUTCMonth() + 1).padStart(2, '0')}`
+    const metadados = registro?.metadados && typeof registro.metadados === 'object' ? registro.metadados : {}
+    const geracoesRef = metadados.pdf_geracoes_mes_ref || ''
+    const geracoesAtual =
+      geracoesRef === mesRef ? Number(metadados.pdf_geracoes_mes ?? 0) : 0
+    if (geracoesAtual >= PDF_REPORT_LIMIT_PER_MONTH) {
+      throw createHttpError(429, 'PDF ja gerado para este relatorio no mes atual.')
+    }
+
+    const tipo = registro?.metadados?.tipo
+    const contexto = registro?.metadados?.contexto
+    if (!tipo || !contexto) {
+      throw createHttpError(400, 'Contexto do relatorio nao encontrado para gerar PDF.')
+    }
+
+    const template = await loadReportTemplate(tipo)
+    const html = renderReportHtml(template, contexto)
+    const atualizacao = await executeSingle(
+      supabaseAdmin
+        .from('inventory_report')
+        .update({
+          pdf_gerado_em: nowIso(),
+          pdf_gerado_por: user.id,
+          metadados: {
+            ...metadados,
+            pdf_geracoes_mes_ref: mesRef,
+            pdf_geracoes_mes: geracoesAtual + 1,
+          },
+        })
+        .eq('account_owner_id', ownerId)
+        .eq('id', reportId)
+        .select('pdf_gerado_em'),
+      'Falha ao registrar geracao de PDF.'
+    )
+
+    return {
+      reportId: registro.id,
+      tipo,
+      periodo_inicio: registro.periodo_inicio,
+      periodo_fim: registro.periodo_fim,
+      pdfGeradoEm: atualizacao?.pdf_gerado_em ?? null,
+      html,
+    }
+  },
+  async forecast(params = {}, user) {
+    if (!user?.id) {
+      throw createHttpError(401, 'Usuario nao autenticado para previsao de gasto.')
+    }
+    const ownerId = await resolveOwnerId(user.id)
+    const fatorInput = params?.fator_tendencia ?? params?.fatorTendencia ?? params?.fator
+    if (fatorInput !== undefined && fatorInput !== null && String(fatorInput).trim() !== '') {
+      return execute(
+        supabaseAdmin.rpc('rpc_previsao_gasto_mensal_calcular', {
+          p_owner_id: ownerId,
+          p_fator_tendencia: Number(fatorInput),
+        }),
+        'Falha ao calcular previsao de gasto.'
+      )
+    }
+    return execute(
+      supabaseAdmin.rpc('rpc_previsao_gasto_mensal_consultar', { p_owner_id: ownerId }),
+      'Falha ao consultar previsao de gasto.'
+    )
+  },
   async reportAuto() {
     const credenciaisAdminIds = await carregarCredenciaisAdminIds()
     const owners = await execute(
@@ -3185,21 +3506,16 @@ export const EstoqueOperations = {
 
     const resultados = []
     const agora = new Date()
-    const inicioMesAtual = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), 1))
-    const fimMesAnterior = new Date(inicioMesAtual.getTime() - 1)
-    const inicioMesAnterior = new Date(Date.UTC(fimMesAnterior.getUTCFullYear(), fimMesAnterior.getUTCMonth(), 1))
-
-    const currentQuarterStartMonth = Math.floor(agora.getUTCMonth() / 3) * 3
-    let prevQuarterMonth = currentQuarterStartMonth - 3
-    let prevQuarterYear = agora.getUTCFullYear()
-    if (prevQuarterMonth < 0) {
-      prevQuarterMonth += 12
-      prevQuarterYear -= 1
-    }
-    const inicioQuarterAnterior = new Date(Date.UTC(prevQuarterYear, prevQuarterMonth, 1))
-    const fimQuarterAnterior = new Date(Date.UTC(prevQuarterYear, prevQuarterMonth + 3, 0))
-    const inicioQuarterComparacao = new Date(Date.UTC(prevQuarterYear, prevQuarterMonth - 3, 1))
-    const fimQuarterComparacao = new Date(Date.UTC(prevQuarterYear, prevQuarterMonth, 0))
+    const isUltimoDiaMes = isLastDayOfMonthUtc(agora)
+    const monthLimit = isUltimoDiaMes
+      ? toEndOfMonthUtc(agora)
+      : toEndOfMonthUtc(new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), 0)))
+    const currentQuarterStart = resolveQuarterStart(agora)
+    const currentQuarterEnd = resolveQuarterEnd(agora)
+    const isQuarterEndMonth = [2, 5, 8, 11].includes(agora.getUTCMonth())
+    const quarterLimit = isUltimoDiaMes && isQuarterEndMonth
+      ? currentQuarterEnd
+      : new Date(Date.UTC(currentQuarterStart.getUTCFullYear(), currentQuarterStart.getUTCMonth(), 0))
 
     for (const owner of owners ?? []) {
       if (owner?.ativo === false) {
@@ -3212,23 +3528,34 @@ export const EstoqueOperations = {
       const senderEmail = trim(owner.email ?? '') || ownerAdmins[0]?.email || ''
       const senderName = trim(owner.display_name ?? owner.username ?? owner.email ?? 'Sistema')
 
-      // Mensal
-      const mensalExiste = await executeMaybeSingle(
-        supabaseAdmin
-          .from('inventory_report')
-          .select('id')
-          .eq('account_owner_id', ownerId)
-          .eq('periodo_inicio', toDateOnly(inicioMesAnterior))
-          .eq('periodo_fim', toDateOnly(fimMesAnterior))
-          .eq('metadados->>tipo', REPORT_TYPE_MENSAL)
-          .eq('metadados->>origem', 'auto')
-          .limit(1),
-        'Falha ao consultar relatorio mensal.'
-      )
+      const earliestDate = await resolveEarliestMovimentacao(ownerId)
+      if (!earliestDate) {
+        resultados.push({
+          ownerId,
+          skipped: true,
+          reason: 'sem_movimentacoes',
+        })
+        continue
+      }
 
-      if (!mensalExiste) {
-        const periodoRange = { start: inicioMesAnterior, end: fimMesAnterior }
+      const mensalRegistrados = await loadReportRegistry(ownerId, REPORT_TYPE_MENSAL)
+      const trimestralRegistrados = await loadReportRegistry(ownerId, REPORT_TYPE_TRIMESTRAL)
+
+      // Mensal (mes corrente fechado no ultimo dia, com backfill)
+      const meses = buildMonthPeriods(earliestDate, monthLimit)
+      for (const periodoRange of meses) {
+        const chave = `${toDateOnly(periodoRange.start)}|${toDateOnly(periodoRange.end)}`
+        if (mensalRegistrados.has(chave)) {
+          continue
+        }
+
         const dadosAtual = await carregarMovimentacoesPorOwner({ ownerId, periodoRange })
+        const estoqueBaseAtual = montarEstoqueAtual(
+          dadosAtual.materiais,
+          dadosAtual.entradas,
+          dadosAtual.saidas,
+          null,
+        )
         const dashboardAtual = montarDashboard(
           {
             materiais: dadosAtual.materiais,
@@ -3237,8 +3564,8 @@ export const EstoqueOperations = {
             pessoas: dadosAtual.pessoas,
           },
           parsePeriodo({
-            periodoInicio: `${inicioMesAnterior.getUTCFullYear()}-${String(inicioMesAnterior.getUTCMonth() + 1).padStart(2, '0')}`,
-            periodoFim: `${fimMesAnterior.getUTCFullYear()}-${String(fimMesAnterior.getUTCMonth() + 1).padStart(2, '0')}`,
+            periodoInicio: `${periodoRange.start.getUTCFullYear()}-${String(periodoRange.start.getUTCMonth() + 1).padStart(2, '0')}`,
+            periodoFim: `${periodoRange.end.getUTCFullYear()}-${String(periodoRange.end.getUTCMonth() + 1).padStart(2, '0')}`,
           })
         )
         const resumoAtual = buildReportSummary({
@@ -3246,6 +3573,7 @@ export const EstoqueOperations = {
           pessoas: dadosAtual.pessoas,
           periodoRange,
           termo: '',
+          estoqueBase: estoqueBaseAtual,
         })
         if (resumoAtual.totalMovimentacoes === 0) {
           resultados.push({
@@ -3253,6 +3581,8 @@ export const EstoqueOperations = {
             tipo: REPORT_TYPE_MENSAL,
             skipped: true,
             reason: 'sem_dados_periodo',
+            periodo_inicio: toDateOnly(periodoRange.start),
+            periodo_fim: toDateOnly(periodoRange.end),
           })
           continue
         }
@@ -3260,13 +3590,13 @@ export const EstoqueOperations = {
         const report = await buildInventoryReport({
           ownerId,
           createdById: ownerId,
-          periodoInicio: toDateOnly(inicioMesAnterior),
-          periodoFim: toDateOnly(fimMesAnterior),
+          periodoInicio: toDateOnly(periodoRange.start),
+          periodoFim: toDateOnly(periodoRange.end),
           termo: '',
           tipo: REPORT_TYPE_MENSAL,
           origem: 'auto',
           periodoRange,
-          dadosAtual: { dashboard: dashboardAtual, pessoas: dadosAtual.pessoas },
+          dadosAtual: { dashboard: dashboardAtual, pessoas: dadosAtual.pessoas, estoqueBase: estoqueBaseAtual },
         })
 
         let emailStatus = { ok: false, error: 'Sem destinatarios.' }
@@ -3279,123 +3609,160 @@ export const EstoqueOperations = {
           })
         }
 
+        mensalRegistrados.add(chave)
         resultados.push({
           ownerId,
           tipo: REPORT_TYPE_MENSAL,
+          periodo_inicio: toDateOnly(periodoRange.start),
+          periodo_fim: toDateOnly(periodoRange.end),
           reportId: report.registro?.id ?? null,
           sent: Boolean(emailStatus.ok),
           emailError: emailStatus.ok ? null : emailStatus.error,
         })
       }
 
-      // Trimestral
-      const trimestralExiste = await executeMaybeSingle(
-        supabaseAdmin
-          .from('inventory_report')
-          .select('id')
-          .eq('account_owner_id', ownerId)
-          .eq('periodo_inicio', toDateOnly(inicioQuarterAnterior))
-          .eq('periodo_fim', toDateOnly(fimQuarterAnterior))
-          .eq('metadados->>tipo', REPORT_TYPE_TRIMESTRAL)
-          .eq('metadados->>origem', 'auto')
-          .limit(1),
-        'Falha ao consultar relatorio trimestral.'
-      )
+      // Trimestral (trimestres fechados com backfill)
+      const trimestreLimiteValido = quarterLimit && quarterLimit.getTime() > 0
+      if (trimestreLimiteValido) {
+        const trimestres = buildQuarterPeriods(earliestDate, quarterLimit)
+        for (const periodoRange of trimestres) {
+          const chave = `${toDateOnly(periodoRange.start)}|${toDateOnly(periodoRange.end)}`
+          if (trimestralRegistrados.has(chave)) {
+            continue
+          }
 
-      if (!trimestralExiste && inicioQuarterComparacao && fimQuarterComparacao) {
-        const periodoRange = { start: inicioQuarterAnterior, end: fimQuarterAnterior }
-        const periodoRangeAnterior = { start: inicioQuarterComparacao, end: fimQuarterComparacao }
+          const periodoRangeAnterior = resolvePreviousQuarterRange(periodoRange.start)
+          if (!periodoRangeAnterior?.start || !periodoRangeAnterior?.end) {
+            continue
+          }
 
-        const dadosAtual = await carregarMovimentacoesPorOwner({ ownerId, periodoRange })
-        const dashboardAtual = montarDashboard(
-          {
-            materiais: dadosAtual.materiais,
-            entradas: dadosAtual.entradas,
-            saidas: dadosAtual.saidas,
+          const dadosAtual = await carregarMovimentacoesPorOwner({ ownerId, periodoRange })
+          const estoqueBaseAtual = montarEstoqueAtual(
+            dadosAtual.materiais,
+            dadosAtual.entradas,
+            dadosAtual.saidas,
+            null,
+          )
+          const dashboardAtual = montarDashboard(
+            {
+              materiais: dadosAtual.materiais,
+              entradas: dadosAtual.entradas,
+              saidas: dadosAtual.saidas,
+              pessoas: dadosAtual.pessoas,
+            },
+            parsePeriodo({
+              periodoInicio: `${periodoRange.start.getUTCFullYear()}-${String(periodoRange.start.getUTCMonth() + 1).padStart(2, '0')}`,
+              periodoFim: `${periodoRange.end.getUTCFullYear()}-${String(periodoRange.end.getUTCMonth() + 1).padStart(2, '0')}`,
+            })
+          )
+          const resumoAtual = buildReportSummary({
+            dashboard: dashboardAtual,
             pessoas: dadosAtual.pessoas,
-          },
-          parsePeriodo({
-            periodoInicio: `${inicioQuarterAnterior.getUTCFullYear()}-${String(inicioQuarterAnterior.getUTCMonth() + 1).padStart(2, '0')}`,
-            periodoFim: `${fimQuarterAnterior.getUTCFullYear()}-${String(fimQuarterAnterior.getUTCMonth() + 1).padStart(2, '0')}`,
+            periodoRange,
+            termo: '',
+            estoqueBase: estoqueBaseAtual,
           })
-        )
-        const resumoAtual = buildReportSummary({
-          dashboard: dashboardAtual,
-          pessoas: dadosAtual.pessoas,
-          periodoRange,
-          termo: '',
-        })
-        if (resumoAtual.totalMovimentacoes === 0) {
-          resultados.push({
-            ownerId,
-            tipo: REPORT_TYPE_TRIMESTRAL,
-            skipped: true,
-            reason: 'sem_dados_trimestre_atual',
-          })
-          continue
-        }
+          if (resumoAtual.totalMovimentacoes === 0) {
+            resultados.push({
+              ownerId,
+              tipo: REPORT_TYPE_TRIMESTRAL,
+              skipped: true,
+              reason: 'sem_dados_trimestre_atual',
+              periodo_inicio: toDateOnly(periodoRange.start),
+              periodo_fim: toDateOnly(periodoRange.end),
+            })
+            continue
+          }
 
-        const dadosPrev = await carregarMovimentacoesPorOwner({ ownerId, periodoRange: periodoRangeAnterior })
-        const dashboardPrev = montarDashboard(
-          {
-            materiais: dadosPrev.materiais,
-            entradas: dadosPrev.entradas,
-            saidas: dadosPrev.saidas,
+          const dadosPrev = await carregarMovimentacoesPorOwner({ ownerId, periodoRange: periodoRangeAnterior })
+          const estoqueBasePrev = montarEstoqueAtual(
+            dadosPrev.materiais,
+            dadosPrev.entradas,
+            dadosPrev.saidas,
+            null,
+          )
+          const dashboardPrev = montarDashboard(
+            {
+              materiais: dadosPrev.materiais,
+              entradas: dadosPrev.entradas,
+              saidas: dadosPrev.saidas,
+              pessoas: dadosPrev.pessoas,
+            },
+            parsePeriodo({
+              periodoInicio: `${periodoRangeAnterior.start.getUTCFullYear()}-${String(periodoRangeAnterior.start.getUTCMonth() + 1).padStart(2, '0')}`,
+              periodoFim: `${periodoRangeAnterior.end.getUTCFullYear()}-${String(periodoRangeAnterior.end.getUTCMonth() + 1).padStart(2, '0')}`,
+            })
+          )
+          const resumoAnterior = buildReportSummary({
+            dashboard: dashboardPrev,
             pessoas: dadosPrev.pessoas,
-          },
-          parsePeriodo({
-            periodoInicio: `${inicioQuarterComparacao.getUTCFullYear()}-${String(inicioQuarterComparacao.getUTCMonth() + 1).padStart(2, '0')}`,
-            periodoFim: `${fimQuarterComparacao.getUTCFullYear()}-${String(fimQuarterComparacao.getUTCMonth() + 1).padStart(2, '0')}`,
+            periodoRange: periodoRangeAnterior,
+            termo: '',
+            estoqueBase: estoqueBasePrev,
           })
-        )
+          if (resumoAnterior.totalMovimentacoes === 0) {
+            resultados.push({
+              ownerId,
+              tipo: REPORT_TYPE_TRIMESTRAL,
+              skipped: true,
+              reason: 'sem_dados_trimestre_anterior',
+              periodo_inicio: toDateOnly(periodoRange.start),
+              periodo_fim: toDateOnly(periodoRange.end),
+            })
+            continue
+          }
 
-        const resumoAnterior = buildReportSummary({
-          dashboard: dashboardPrev,
-          pessoas: dadosPrev.pessoas,
-          periodoRange: periodoRangeAnterior,
-          termo: '',
-        })
-        if (resumoAnterior.totalMovimentacoes === 0) {
+          const report = await buildInventoryReport({
+            ownerId,
+            createdById: ownerId,
+            periodoInicio: toDateOnly(periodoRange.start),
+            periodoFim: toDateOnly(periodoRange.end),
+            termo: '',
+            tipo: REPORT_TYPE_TRIMESTRAL,
+            origem: 'auto',
+            periodoRange,
+            periodoRangeAnterior,
+            dadosAtual: { dashboard: dashboardAtual, pessoas: dadosAtual.pessoas, estoqueBase: estoqueBaseAtual },
+            dadosAnterior: { dashboard: dashboardPrev, pessoas: dadosPrev.pessoas, estoqueBase: estoqueBasePrev },
+          })
+
+          let emailStatus = { ok: false, error: 'Sem destinatarios.' }
+          if (senderEmail && ownerAdmins.length) {
+            emailStatus = await sendBrevoEmail({
+              sender: { name: senderName, email: senderEmail },
+              to: ownerAdmins.map((admin) => ({ name: admin.nome || admin.email, email: admin.email })),
+              subject: `Relatorio trimestral de estoque - ${formatQuarterLabel(periodoRange.start)}`,
+              text: report.texto,
+            })
+          }
+
+          trimestralRegistrados.add(chave)
           resultados.push({
             ownerId,
             tipo: REPORT_TYPE_TRIMESTRAL,
+            periodo_inicio: toDateOnly(periodoRange.start),
+            periodo_fim: toDateOnly(periodoRange.end),
+            reportId: report.registro?.id ?? null,
+            sent: Boolean(emailStatus.ok),
+            emailError: emailStatus.ok ? null : emailStatus.error,
+          })
+        }
+      }
+
+      if (isUltimoDiaMes) {
+        try {
+          await execute(
+            supabaseAdmin.rpc('rpc_previsao_gasto_mensal_calcular', { p_owner_id: ownerId }),
+            'Falha ao calcular previsao de gasto.'
+          )
+        } catch (error) {
+          resultados.push({
+            ownerId,
+            tipo: 'previsao',
             skipped: true,
-            reason: 'sem_dados_trimestre_anterior',
-          })
-          continue
-        }
-
-        const report = await buildInventoryReport({
-          ownerId,
-          createdById: ownerId,
-          periodoInicio: toDateOnly(inicioQuarterAnterior),
-          periodoFim: toDateOnly(fimQuarterAnterior),
-          termo: '',
-          tipo: REPORT_TYPE_TRIMESTRAL,
-          origem: 'auto',
-          periodoRange,
-          periodoRangeAnterior,
-          dadosAtual: { dashboard: dashboardAtual, pessoas: dadosAtual.pessoas },
-          dadosAnterior: { dashboard: dashboardPrev, pessoas: dadosPrev.pessoas },
-        })
-
-        let emailStatus = { ok: false, error: 'Sem destinatarios.' }
-        if (senderEmail && ownerAdmins.length) {
-          emailStatus = await sendBrevoEmail({
-            sender: { name: senderName, email: senderEmail },
-            to: ownerAdmins.map((admin) => ({ name: admin.nome || admin.email, email: admin.email })),
-            subject: `Relatorio trimestral de estoque - ${formatQuarterLabel(periodoRange.start)}`,
-            text: report.texto,
+            reason: 'erro_previsao',
           })
         }
-
-        resultados.push({
-          ownerId,
-          tipo: REPORT_TYPE_TRIMESTRAL,
-          reportId: report.registro?.id ?? null,
-          sent: Boolean(emailStatus.ok),
-          emailError: emailStatus.ok ? null : emailStatus.error,
-        })
       }
     }
 

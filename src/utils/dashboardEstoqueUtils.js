@@ -11,9 +11,6 @@ export const chartInfoMessagesEstoque = {
   valor: 'Evolucao do valor financeiro movimentado (entradas x saidas) no periodo filtrado.',
   estoqueMaterial: 'Ranking dos materiais com maior volume de saidas dentro do periodo filtrado.',
   estoqueCategoria: 'Categorias dos materiais que mais geraram saidas no periodo.',
-  paretoQuantidade: 'Pareto 80/20 - Saida por quantidade. Responde: "O que mais sai fisicamente?"',
-  paretoRisco: 'Pareto por risco operacional. Responde: "O que nao pode faltar de jeito nenhum?"',
-  paretoFinanceiro: 'Pareto financeiro - Saida por valor. Responde: "O que doi mais no caixa?"',
   topFabricantes: 'Fabricantes com maior movimentacao (entradas + saidas) dentro do periodo.',
   topCentros: 'Total de EPIs entregues por centro de servico de acordo com as saidas filtradas.',
   topSetores: 'Total de entregas por setor considerando as saidas filtradas.',
@@ -68,11 +65,12 @@ export function resolveMaterialDescricaoCompleta(material = {}) {
   const item = sanitizeDisplayText(material.materialItemNome || material.nome)
   const grupo = sanitizeDisplayText(material.grupoMaterialNome || material.grupoMaterial)
   const tamanhoNumero = resolveMaterialNumeroTamanho(material)
+  const ca = sanitizeDisplayText(material.ca)
   const caracteristicas = resolveListText(material.caracteristicasTexto || material.caracteristicaEpi)
   const cor = resolveListText(material.corMaterial || material.coresTexto || material.cores)
   const fabricante = resolveFabricanteDisplay(material)
 
-  return [item, grupo, tamanhoNumero, caracteristicas, cor, fabricante].filter(Boolean).join(' | ')
+  return [item, grupo, tamanhoNumero, ca, caracteristicas, cor, fabricante].filter(Boolean).join(' | ')
 }
 
 export function resolveFabricanteDisplay(material = {}) {
@@ -134,6 +132,15 @@ export function resolvePessoaDisplay(saida = {}) {
   return 'Nao informado'
 }
 
+export function resolvePessoaLabel(saida = {}) {
+  const nome = resolvePessoaDisplay(saida)
+  const matricula = sanitizeDisplayText(saida.pessoa?.matricula || saida.pessoaMatricula)
+  if (matricula && nome !== 'Nao informado') {
+    return `${nome} (${matricula})`
+  }
+  return nome
+}
+
 const normalizeStatusText = (value) => sanitizeDisplayText(value).toLowerCase()
 
 const isSaidaCancelada = (saida = {}) => {
@@ -143,9 +150,10 @@ const isSaidaCancelada = (saida = {}) => {
 
 export function formatEstoqueMaterialLabel(item = {}) {
   const tamanhoNumero = resolveMaterialNumeroTamanho(item)
-  const base = item.resumo || [item.nome, resolveFabricanteDisplay(item), tamanhoNumero].filter(Boolean).join(' | ')
+  const ca = sanitizeDisplayText(item.ca)
+  const base = item.resumo || [item.nome, resolveFabricanteDisplay(item), tamanhoNumero, ca].filter(Boolean).join(' | ')
   const partes = base.split('|').map((parte) => sanitizeDisplayText(parte)).filter(Boolean)
-  const compacto = partes.slice(0, 3).join(' | ')
+  const compacto = partes.slice(0, 4).join(' | ')
   if (compacto.length <= 55) {
     return compacto
   }
@@ -300,7 +308,7 @@ export const montarTopMateriaisSaida = (saidas = [], termoNormalizado) => {
     const descricaoCompleta = resolveMaterialDescricaoCompleta(material)
     const descricao =
       material.resumo ||
-      [material.nome, resolveFabricanteDisplay(material), resolveMaterialNumeroTamanho(material)]
+      [material.nome, resolveFabricanteDisplay(material), resolveMaterialNumeroTamanho(material), material.ca]
         .filter(Boolean)
         .join(' | ')
     const atual = materiais.get(chave) ?? {
@@ -427,7 +435,7 @@ export const montarTopPessoas = (saidas = [], termoNormalizado) => {
     if (!combinaSaidaComTermo(saida, termoNormalizado)) {
       return
     }
-    const pessoaNome = resolvePessoaDisplay(saida)
+    const pessoaNome = resolvePessoaLabel(saida)
     const pessoaId = saida.pessoaId || pessoaNome
     const atual = pessoas.get(pessoaId) ?? {
       id: pessoaId,
@@ -461,7 +469,7 @@ export const montarTopTrocasMateriais = (saidas = [], termoNormalizado) => {
     const descricaoCompleta = resolveMaterialDescricaoCompleta(material)
     const descricao =
       material.resumo ||
-      [material.nome, resolveFabricanteDisplay(material), resolveMaterialNumeroTamanho(material)]
+      [material.nome, resolveFabricanteDisplay(material), resolveMaterialNumeroTamanho(material), material.ca]
         .filter(Boolean)
         .join(' | ')
     const atual = materiais.get(chave) ?? {
@@ -516,7 +524,7 @@ export const montarTopTrocasPessoas = (saidas = [], termoNormalizado) => {
     if (!combinaSaidaComTermo(saida, termoNormalizado)) {
       return
     }
-    const pessoaNome = resolvePessoaDisplay(saida)
+    const pessoaNome = resolvePessoaLabel(saida)
     const pessoaId = saida.pessoaId || pessoaNome
     const atual = pessoas.get(pessoaId) ?? {
       id: pessoaId,

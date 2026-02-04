@@ -11,35 +11,104 @@ No período analisado, o estoque registrou {{total_movimentacoes}} movimentaçõ
 
 Alertas ativos: {{alertas_ativos}}
 Nível de risco geral: {{nivel_risco_geral}}
+Materiais críticos: {{qtd_materiais_criticos}}
 
 Status geral do estoque: {{status_estoque}}
 
-3. Pareto 80/20 – Saída por quantidade
+3. Pareto 80/20 – Saída por quantidade (ação operacional)
 
-A análise de Pareto demonstrou que {{percentual_pareto}}% das saídas estão concentradas em {{percentual_materiais}}% dos materiais.
+Conclusão objetiva
+A análise de Pareto indica que {{percentual_pareto}}% das saídas concentram-se em {{percentual_materiais}}% dos materiais, evidenciando os itens de maior giro operacional.
 
+O que fazer:
+
+    -Priorizar reposição rápida e estoque mínimo mais alto para esses materiais.
+
+    -Garantir fornecedores homologados e disponibilidade contínua.
+
+    -Monitorar consumo por equipe/obra para evitar uso indevido ou desperdício.
+
+Itens com maior giro
 {{lista_pareto_quantidade}}
-
 (Material – Quantidade – % acumulado)
 
-4. Pareto por risco operacional
+4. Pareto por risco operacional (ação preventiva)
 
-Classificação no período:
-Críticos: {{qtd_criticos}}
-Em atenção: {{qtd_atencao}}
-Controlados: {{qtd_controlados}}
+Conclusão objetiva
+Os materiais classificados como Críticos representam itens cuja falta gera risco direto à segurança, paralisação de atividade ou não conformidade legal.
 
-Materiais críticos:
+Classificação de risco:
+
+    CRÍTICOS: {{qtd_criticos}}
+
+    EM ATENÇÃO: {{qtd_atencao}}
+
+    CONTROLADOS: {{qtd_controlados}}
+
+O que fazer:
+
+    Críticos:
+
+        -Estoque mínimo obrigatório
+
+        -Alerta automático de ruptura
+
+        -Reposição antes do consumo médio
+
+    Em atenção:
+
+        -Monitoramento semanal
+
+        -Reavaliação de risco conforme tipo de serviço
+
+    Controlados:
+
+        -Gestão simplificada
+
+        -Reposição sob demanda
+
+Materiais críticos
 {{lista_materiais_criticos}}
 
-5. Pareto financeiro – Para onde está indo o dinheiro
+5. Pareto financeiro – Para onde está indo o dinheiro (ação financeira)
 
-Materiais e categorias com maior valor de saída:
+Conclusão objetiva
+O Pareto financeiro mostra que poucos materiais concentram a maior parte do custo total, indicando onde estão os principais vetores de gasto do estoque.
+
+O que fazer:
+
+    -Focar negociação de preço e contrato apenas nos itens do topo do Pareto.
+
+    -Avaliar padronização de marcas/modelos para reduzir custo.
+
+    -Analisar se o consumo está compatível com:
+
+        -Tipo de serviço
+
+        -Quantidade de equipes
+
+        -Produção executada
+
+Regras de decisão aplicadas:
+
+    -Alto valor + alta saída: controle rígido
+
+    -Alto valor + baixa saída: excesso/desperdício → ajuste de compra
+
+Materiais com maior impacto financeiro
 {{lista_pareto_valor}}
 
 6. Consumo por setor / centro de serviço
 
-{{lista_consumo_setor}}
+O consumo concentrou-se nos seguintes centros/setores:
+
+{{ranking_consumo_por_centro}}
+(Centro/Setor – Quantidade – % – Valor)
+
+Centros/setores com desvio e recomendação:
+
+{{lista_centros_desvio_recomendacao}}
+(Centro – Diagnóstico – Recomendação)
 
 7. Vencidos / Vencendo / Excesso
 
@@ -52,6 +121,11 @@ Excesso (estoque_atual > pressao_vida_util * 1,5): {{qtd_excesso}}
 Status: {{status_cobertura}}
 Interpretação: {{interpretacao_cobertura}}
 
+A cobertura média por trabalhador (por setor/centro) foi classificada como:
+
+{{ranking_cobertura_por_centro}}
+(Centro/Setor – Trabalhadores – Cobertura (ciclos) – Status – Recomendação)
+
 9. Síntese de alertas
 
 Materiais abaixo do mínimo: {{qtd_abaixo_minimo}}
@@ -59,4 +133,4 @@ Riscos imediatos de ruptura: {{qtd_riscos_imediatos}}
 
 10. Conclusão mensal
 
-Situação geral: {{status_final}}
+A situação mensal do estoque é {{status_final}}.
