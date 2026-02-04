@@ -100,7 +100,7 @@ Quando houver erros, a Edge Function retorna:
 - errorSamples: amostras de erros
 
 Formato do CSV:
-linha,coluna,motivo
+linha,matricula,coluna,motivo
 
 Limpeza automatica dos arquivos de erro
 --------------------------------------
