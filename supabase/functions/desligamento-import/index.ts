@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
     let processed = 0
     let success = 0
     let errors = 0
-    const errorLines: string[] = ["linha,coluna,motivo"]
+    const errorLines: string[] = ["linha,matricula,coluna,motivo"]
 
     // Coleta matriculas únicas do arquivo e gera variantes (com/sem zeros à esquerda)
     const matriculasArquivo = new Set<string>()
@@ -197,9 +197,9 @@ Deno.serve(async (req) => {
       dataDemissaoArquivo: string
       dataDemissaoAtual: string | null
     }[] = []
-    const pushError = (line: number, col: string, motivo: string) => {
+    const pushError = (line: number, matricula: string, col: string, motivo: string) => {
       errors += 1
-      errorLines.push(`${line},${col},"${motivo}"`)
+      errorLines.push(`${line},"${matricula}",${col},"${motivo}"`)
     }
 
     for (let i = 0; i < rows.length; i++) {
@@ -213,12 +213,12 @@ Deno.serve(async (req) => {
       const matriculaTexto = (matriculaValor ?? "").toString().trim()
       const matriculaKeys = buildMatriculaKeys(matriculaValor as string | number | null)
       if (!matriculaKeys.length) {
-        pushError(idx, "matricula", "obrigatoria")
+        pushError(idx, matriculaTexto, "matricula", "obrigatoria")
         continue
       }
       const pessoaData = matriculaKeys.map((k) => matriculaMap.get(k)).find(Boolean)
       if (!pessoaData) {
-        pushError(idx, "matricula", `inexistente (${matriculaKeys.join("/") || "vazio"})`)
+        pushError(idx, matriculaTexto, "matricula", `inexistente (${matriculaKeys.join("/") || "vazio"})`)
         continue
       }
 
@@ -226,13 +226,13 @@ Deno.serve(async (req) => {
         ? ""
         : String(dataDemissaoValor).trim()
       if (!dataDemissaoTexto) {
-        pushError(idx, "data_demissao", "obrigatoria")
+        pushError(idx, matriculaTexto, "data_demissao", "obrigatoria")
         continue
       }
 
       const dataDemissaoIso = parseDate(dataDemissaoValor)
       if (!dataDemissaoIso) {
-        pushError(idx, "data_demissao", "invalida")
+        pushError(idx, matriculaTexto, "data_demissao", "invalida")
         continue
       }
 

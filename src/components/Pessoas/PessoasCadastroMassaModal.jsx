@@ -6,7 +6,6 @@ export function PessoasCadastroMassaModal({
   onClose,
   onDownloadTemplate,
   onUploadFile,
-  onUpdateFile,
   info,
   disabled,
   loading = false,
@@ -33,11 +32,6 @@ export function PessoasCadastroMassaModal({
     onUploadFile?.(file)
   }
 
-  const handleUpdate = () => {
-    if (!file) return
-    onUpdateFile?.(file)
-  }
-
   const handleDrop = (event) => {
     event.preventDefault()
     setDragging(false)
@@ -56,7 +50,6 @@ export function PessoasCadastroMassaModal({
 
   const canUpload = Boolean(file) && !disabled
   const isUploading = loading && loadingAction === 'insert'
-  const isUpdating = loading && loadingAction === 'update'
 
   const stopPropagation = (event) => event.stopPropagation()
 
@@ -146,14 +139,6 @@ export function PessoasCadastroMassaModal({
               >
                 {isUploading ? 'Importando...' : 'Importar planilha'}
               </button>
-              <button
-                type="button"
-                className="button button--ghost desligamento-help__import"
-                onClick={handleUpdate}
-                disabled={!canUpload || loading || !onUpdateFile}
-              >
-                {isUpdating ? 'Atualizando...' : 'Atualizar dados'}
-              </button>
             </div>
           </section>
 
@@ -166,7 +151,6 @@ export function PessoasCadastroMassaModal({
               <li>Campos de texto sao convertidos para MAIUSCULO.</li>
               <li>Referencias nao encontradas: erro.</li>
               <li>Importar: matricula ja existente (mesma familia) gera erro.</li>
-              <li>Atualizar: matricula nao encontrada gera erro.</li>
             </ul>
           </details>
 

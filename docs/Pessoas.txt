@@ -36,14 +36,15 @@ Desligamento em massa (novo)
 - Se a pessoa ja estiver inativa, ela aparece na lista de "ja inativos" no retorno.
 - O fluxo completo (frontend + Supabase + Edge Functions + Storage) esta documentado em:
   - docs/DesligamentoEmMassa.txt
+- Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.
 
 Cadastro em massa (novo)
 ------------------------
 - Existe um botao "Cadastrar em massa" ao lado do Salvar pessoa.
 - A planilha exige matricula, nome, centro_servico, setor, cargo, tipo_execucao e data_admissao.
 - Campos de texto sao convertidos para MAIUSCULO; centro_custo vem do centro_servico.
-- O modal tem dois botoes: Importar planilha (insere novos registros) e Atualizar planilha (atualiza existentes).
-- Importar bloqueia matriculas ja existentes; Atualizar exige matriculas existentes.
+- O modal tem o botao "Importar planilha" para inserir novos registros.
+- Importar bloqueia matriculas ja existentes.
 - O fluxo completo esta documentado em:
   - docs/CadastroEmMassa.txt
 - Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.

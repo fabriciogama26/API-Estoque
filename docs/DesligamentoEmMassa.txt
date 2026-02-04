@@ -101,7 +101,7 @@ Quando houver erros, a Edge Function retorna:
 - skipped: lista de registros ja inativos (id, matricula, data_demissao)
 
 Formato do CSV:
-linha,coluna,motivo
+linha,matricula,coluna,motivo
 
 
 Problemas comuns (checklist)
