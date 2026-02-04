@@ -10,7 +10,7 @@
       },
       {
         "title": "Cadastro em massa",
-        "description": "Use o botao Cadastrar em massa ao lado do Salvar pessoa para importar uma planilha XLSX com matricula, nome, centro_servico, setor, cargo, tipo_execucao e data_admissao. No modal, Importar insere novos registros e Atualizar altera os existentes.",
+        "description": "Use o botao Cadastrar em massa ao lado do Salvar pessoa para importar uma planilha XLSX com matricula, nome, centro_servico, setor, cargo, tipo_execucao e data_admissao. No modal, Importar insere novos registros.",
         "mediaHint": "Modal de cadastro em massa com upload de XLSX."
       },
       {

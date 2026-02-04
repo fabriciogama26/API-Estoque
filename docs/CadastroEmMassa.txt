@@ -33,7 +33,6 @@ Como usar (passo a passo)
 5) Selecione o arquivo XLSX (drag-and-drop ou clique para selecionar).
 6) Clique em:
    - "Importar planilha" para INSERIR novos registros.
-   - "Atualizar planilha" para ATUALIZAR registros existentes.
 7) Ao final, o modal mostra:
    - quantos registros foram processados
    - quantos foram importados/atualizados
@@ -45,8 +44,7 @@ Regras de importacao
 - matricula obrigatoria:
   - Se estiver vazia: erro na coluna matricula.
   - Se tiver letras/simbolos: erro "deve ser numerica".
-  - Importar: se ja existir na mesma familia (account_owner_id), gera erro.
-  - Atualizar: se nao existir, gera erro.
+- Importar: se ja existir na mesma familia (account_owner_id), gera erro.
 - nome/centro_servico/setor/cargo/tipo_execucao obrigatorios:
   - Se vazio: erro.
   - Se nao encontrar referencia por nome: erro.
@@ -60,10 +58,7 @@ Impacto no banco:
 - public.pessoas.dataDemissao = null
 - public.pessoas.usuarioCadastro = <usuario logado>
 - public.pessoas.account_owner_id = <owner>
-No modo Atualizar:
-- Atualiza nome, matricula, centro_servico_id, setor_id, cargo_id, centro_custo_id, tipo_execucao_id e dataAdmissao.
-- Define usuarioEdicao e atualizadoEm.
-- Mantem ativo/dataDemissao inalterados.
+O modo Atualizar nao faz parte da UI no momento.
 
 Mapa do fluxo (frontend -> Supabase)
 ------------------------------------
