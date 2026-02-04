@@ -9,7 +9,7 @@ import { ChartExpandModal } from '../components/Dashboard/ChartExpandModal.jsx'
 import { DashboardEstoqueProvider, useDashboardEstoqueContext } from '../context/DashboardEstoqueContext.jsx'
 import { computePercentile, formatNumber, formatPercent, formatCurrency } from '../utils/inventoryReportUtils.js'
 import { copyTextToClipboard } from '../utils/clipboard.js'
-import { fetchEstoqueForecast, updateEstoqueForecast } from '../services/estoqueApi.js'
+import { fetchEstoqueForecast } from '../services/estoqueApi.js'
 
 import '../styles/DashboardPage.css'
 
@@ -467,6 +467,7 @@ export function AnaliseEstoquePage() {
   const [forecastLoading, setForecastLoading] = useState(false)
   const [forecastError, setForecastError] = useState(null)
   const [forecastFactor, setForecastFactor] = useState('')
+  const [forecastFactorApplied, setForecastFactorApplied] = useState(1)
 
   const loadForecast = async (params = {}) => {
     setForecastLoading(true)
@@ -474,10 +475,8 @@ export function AnaliseEstoquePage() {
     try {
       const data = await fetchEstoqueForecast(params)
       setForecastPayload(data || null)
-      const fator = data?.resumo?.fator_tendencia
-      if (fator !== undefined && fator !== null) {
-        setForecastFactor(String(fator))
-      }
+      setForecastFactor('1')
+      setForecastFactorApplied(1)
     } catch (err) {
       setForecastError(err?.message || 'Erro ao carregar previsao de gasto.')
       setForecastPayload(null)
@@ -721,7 +720,7 @@ export function AnaliseEstoquePage() {
   const forecastBase = forecastPayload?.resumo || null
   const historicoSerie = forecastPayload?.historico || []
   const previsaoSerie = forecastPayload?.previsao || []
-  const forecastCalcLocked = forecastStatus === 'ok'
+  const forecastCalcLocked = false
 
   const chartForecastData = useMemo(() => {
     if (!forecastHasData) {
@@ -732,12 +731,13 @@ export function AnaliseEstoquePage() {
       historico: item.valor_saida,
       mediaMovel: item.media_movel,
     }))
+    const fator = Number.isFinite(forecastFactorApplied) ? forecastFactorApplied : 1
     const previsaoData = previsaoSerie.map((item) => ({
       label: item.label,
-      previsao: item.valor_previsto,
+      previsao: Number(item.valor_previsto || 0) * fator,
     }))
     return [...historicoData, ...previsaoData]
-  }, [forecastHasData, historicoSerie, previsaoSerie])
+  }, [forecastHasData, historicoSerie, previsaoSerie, forecastFactorApplied])
 
   const handleForecastUpdate = async () => {
     const parsed = Number(String(forecastFactor).replace(',', '.'))
@@ -745,20 +745,12 @@ export function AnaliseEstoquePage() {
       setForecastError('Informe um fator valido (ex: 1.05).')
       return
     }
-    setForecastLoading(true)
-    setForecastError(null)
-    try {
-      const data = await updateEstoqueForecast({ fator_tendencia: parsed })
-      setForecastPayload(data || null)
-      const fator = data?.resumo?.fator_tendencia
-      if (fator !== undefined && fator !== null) {
-        setForecastFactor(String(fator))
-      }
-    } catch (err) {
-      setForecastError(err?.message || 'Erro ao atualizar previsao de gasto.')
-    } finally {
-      setForecastLoading(false)
+    if (forecastStatus !== 'ok') {
+      setForecastError('Previsao base ainda nao calculada.')
+      return
     }
+    setForecastError(null)
+    setForecastFactorApplied(parsed)
   }
 
   return (
@@ -787,8 +779,8 @@ export function AnaliseEstoquePage() {
         </header>
         <div className="analysis-forecast-grid">
           <div className="analysis-forecast-card">
-            {forecastLoading ? (
-              <p>Carregando previsao...</p>
+          {forecastLoading ? (
+            <p>Carregando previsao...</p>
             ) : forecastError ? (
               <p className="analysis-forecast-error">{forecastError}</p>
             ) : forecastStatus === 'insufficient' ? (
@@ -801,7 +793,12 @@ export function AnaliseEstoquePage() {
             ) : (
               <>
                 <p className="analysis-forecast-label">Previsao de gasto anual (12 meses)</p>
-                <p className="analysis-forecast-value">{formatCurrency(forecastBase?.previsao_anual || 0)}</p>
+                <p className="analysis-forecast-value">
+                  {formatCurrency(
+                    (forecastBase?.previsao_anual || 0) *
+                      (Number.isFinite(forecastFactorApplied) ? forecastFactorApplied : 1),
+                  )}
+                </p>
                 <p className="analysis-forecast-subtitle">Baseado no consumo medio dos ultimos 12 meses</p>
                 <div className="analysis-forecast-meta">
                   <span>
@@ -821,7 +818,7 @@ export function AnaliseEstoquePage() {
             )}
             <div className="analysis-forecast-actions">
               <label className="field">
-                <span>Fator de tendencia</span>
+                <span>Fator de tendencia (aplicado ao grafico)</span>
                 <input
                   type="number"
                   step="0.01"
@@ -837,7 +834,7 @@ export function AnaliseEstoquePage() {
                 onClick={handleForecastUpdate}
                 disabled={forecastLoading || forecastCalcLocked}
               >
-                {forecastCalcLocked ? 'Previsao ja calculada' : 'Calcular previsao'}
+                Calcular previsao
               </button>
             </div>
           </div>

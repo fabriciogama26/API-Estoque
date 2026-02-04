@@ -177,9 +177,15 @@ declare
 begin
   select min(data) into v_min_date
   from (
-    select min(data_entrada)::date as data from public.entradas where account_owner_id = p_owner_id
+    select min("dataEntrada")::date as data
+    from public.entradas
+    where nullif(account_owner_id::text, '') is not null
+      and account_owner_id::text = p_owner_id::text
     union all
-    select min(data_entrega)::date from public.saidas where account_owner_id = p_owner_id
+    select min("dataEntrega")::date
+    from public.saidas
+    where nullif(account_owner_id::text, '') is not null
+      and account_owner_id::text = p_owner_id::text
   ) datas;
 
   if v_min_date is null then
@@ -193,20 +199,23 @@ begin
     from generate_series(date_trunc('month', v_min_date)::date, date_trunc('month', v_max_date)::date, interval '1 month') gs
   ),
   saidas as (
-    select date_trunc('month', s.data_entrega)::date as ano_mes,
-           sum(s.quantidade * m.valor_unitario) as valor_saida
+    select date_trunc('month', s."dataEntrega")::date as ano_mes,
+           sum(s.quantidade * m."valorUnitario") as valor_saida
     from public.saidas s
-    join public.materiais m on m.id = s.material_id
-    where s.account_owner_id = p_owner_id
-      and coalesce(s.status, '') <> 'cancelado'
+    left join public.status_saida ss on ss.id = s.status
+    join public.materiais m on m.id::text = s."materialId"::text
+    where nullif(s.account_owner_id::text, '') is not null
+      and s.account_owner_id::text = p_owner_id::text
+      and coalesce(lower(ss.status), '') <> 'cancelado'
     group by 1
   ),
   entradas as (
-    select date_trunc('month', e.data_entrada)::date as ano_mes,
-           sum(e.quantidade * m.valor_unitario) as valor_entrada
+    select date_trunc('month', e."dataEntrada")::date as ano_mes,
+           sum(e.quantidade * m."valorUnitario") as valor_entrada
     from public.entradas e
-    join public.materiais m on m.id = e.material_id
-    where e.account_owner_id = p_owner_id
+    join public.materiais m on m.id::text = e."materialId"::text
+    where nullif(e.account_owner_id::text, '') is not null
+      and e.account_owner_id::text = p_owner_id::text
     group by 1
   )
   insert into public.agg_gasto_mensal (account_owner_id, ano_mes, valor_saida, valor_entrada, created_at, updated_at)
