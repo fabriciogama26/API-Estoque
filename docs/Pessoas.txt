@@ -36,6 +36,7 @@ Desligamento em massa (novo)
 - Se a pessoa ja estiver inativa, ela aparece na lista de "ja inativos" no retorno.
 - O fluxo completo (frontend + Supabase + Edge Functions + Storage) esta documentado em:
   - docs/DesligamentoEmMassa.txt
+- Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.
 
 Cadastro em massa (novo)
 ------------------------
