@@ -1,4 +1,4 @@
-import { parseCurrencyToNumber, sanitizeDigits } from '../utils/MateriaisUtils.js'
+import { parseCurrencyToNumber, sanitizeDigits } from '../../utils/MateriaisUtils.js'
 
 export const GRUPO_MATERIAL_CALCADO = 'Calcado'
 export const GRUPO_MATERIAL_VESTIMENTA = 'Vestimenta'

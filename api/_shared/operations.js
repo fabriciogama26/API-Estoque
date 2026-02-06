@@ -2,7 +2,10 @@
 import { readFile } from 'node:fs/promises'
 import { supabaseAdmin } from './supabaseClient.js'
 import { CONSUME_LOCAL_DATA } from './environment.js'
-import { getLocalTermoContext } from './localDocumentContext.js'
+const loadLocalTermoContext = async () => {
+  const module = await import('./localDocumentContext.js')
+  return module.getLocalTermoContext
+}
 import {
   parsePeriodo,
   resolvePeriodoRange,
@@ -130,6 +133,24 @@ async function executeMaybeSingle(builder, fallbackMessage) {
     throw mapSupabaseError(error, fallbackMessage)
   }
   return data
+}
+
+function formatAnoMesLabel(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return String(value)
+  }
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  return `${month}/${year}`
+}
+
+function buildMediaMovel(series, index) {
+  const start = Math.max(0, index - 2)
+  const slice = series.slice(start, index + 1)
+  if (!slice.length) return 0
+  const total = slice.reduce((acc, item) => acc + item, 0)
+  return Number((total / slice.length).toFixed(2))
 }
 
 function mapSupabaseError(error, fallbackMessage = GENERIC_SUPABASE_ERROR) {
@@ -3479,20 +3500,127 @@ export const EstoqueOperations = {
       throw createHttpError(401, 'Usuario nao autenticado para previsao de gasto.')
     }
     const ownerId = await resolveOwnerId(user.id)
-    const fatorInput = params?.fator_tendencia ?? params?.fatorTendencia ?? params?.fator
-    if (fatorInput !== undefined && fatorInput !== null && String(fatorInput).trim() !== '') {
-      return execute(
-        supabaseAdmin.rpc('rpc_previsao_gasto_mensal_calcular', {
-          p_owner_id: ownerId,
-          p_fator_tendencia: Number(fatorInput),
-        }),
-        'Falha ao calcular previsao de gasto.'
+    const periodoInicioInput = params?.periodo_inicio ?? params?.periodoInicio
+    const periodoFimInput = params?.periodo_fim ?? params?.periodoFim
+
+    const loadPeriodos = () =>
+      execute(
+        supabaseAdmin
+          .from('inventory_forecast')
+          .select(
+            'id, periodo_base_inicio, periodo_base_fim, previsao_anual, metodo_previsao, nivel_confianca, created_at'
+          )
+          .eq('account_owner_id', ownerId)
+          .order('created_at', { ascending: false }),
+        'Falha ao listar periodos de previsao.'
       )
+
+    const loadPeriodosSafe = async () => {
+      try {
+        const periodos = await loadPeriodos()
+        return Array.isArray(periodos) ? periodos : []
+      } catch {
+        return []
+      }
     }
-    return execute(
-      supabaseAdmin.rpc('rpc_previsao_gasto_mensal_consultar', { p_owner_id: ownerId }),
-      'Falha ao consultar previsao de gasto.'
-    )
+
+    const buildForecastFromTables = async (periodoInicio, periodoFim, forecastId) => {
+      const resumo = await executeMaybeSingle(
+        supabaseAdmin
+          .from('inventory_forecast')
+          .select(
+            'id, periodo_base_inicio, periodo_base_fim, qtd_meses_base, gasto_total_periodo, media_mensal, fator_tendencia, tipo_tendencia, variacao_percentual, previsao_anual, gasto_ano_anterior, metodo_previsao, nivel_confianca, created_at'
+          )
+          .eq('account_owner_id', ownerId)
+          .eq('periodo_base_inicio', periodoInicio)
+          .eq('periodo_base_fim', periodoFim)
+          .order('created_at', { ascending: false })
+          .limit(1),
+        'Falha ao carregar resumo de previsao.'
+      )
+
+      let historicoQuery = supabaseAdmin
+        .from('agg_gasto_mensal')
+        .select('ano_mes, valor_saida, valor_entrada')
+        .eq('account_owner_id', ownerId)
+        .order('ano_mes', { ascending: true })
+
+      if (periodoInicio && periodoFim) {
+        historicoQuery = historicoQuery.gte('ano_mes', periodoInicio).lte('ano_mes', periodoFim)
+      }
+
+      const historicoRows = await execute(historicoQuery, 'Falha ao carregar historico de previsao.')
+
+      let previsaoQuery = supabaseAdmin
+        .from('f_previsao_gasto_mensal')
+        .select('ano_mes, valor_previsto, metodo, cenario')
+        .eq('account_owner_id', ownerId)
+        .eq('cenario', 'base')
+        .order('ano_mes', { ascending: true })
+
+      if (forecastId) {
+        previsaoQuery = previsaoQuery.eq('inventory_forecast_id', forecastId)
+      }
+
+      if (periodoFim) {
+        const inicioPrev = new Date(periodoFim)
+        inicioPrev.setUTCMonth(inicioPrev.getUTCMonth() + 1, 1)
+        const fimPrev = new Date(inicioPrev)
+        fimPrev.setUTCMonth(fimPrev.getUTCMonth() + 11, 1)
+        previsaoQuery = previsaoQuery
+          .gte('ano_mes', inicioPrev.toISOString().split('T')[0])
+          .lte('ano_mes', fimPrev.toISOString().split('T')[0])
+      }
+
+      const previsaoRows = await execute(previsaoQuery, 'Falha ao carregar serie de previsao.')
+
+      const historicoValores = historicoRows.map((row) => Number(row.valor_saida || 0))
+      const historico = historicoRows.map((row, index) => ({
+        ano_mes: row.ano_mes,
+        label: formatAnoMesLabel(row.ano_mes),
+        valor_saida: Number(row.valor_saida || 0),
+        valor_entrada: Number(row.valor_entrada || 0),
+        media_movel: buildMediaMovel(historicoValores, index),
+      }))
+
+      const previsao = previsaoRows.map((row) => ({
+        ano_mes: row.ano_mes,
+        label: formatAnoMesLabel(row.ano_mes),
+        valor_previsto: Number(row.valor_previsto || 0),
+        metodo: row.metodo || 'media_simples',
+        cenario: row.cenario || 'base',
+      }))
+
+      return {
+        status: historico.length && previsao.length ? 'ok' : 'missing',
+        resumo: resumo || null,
+        historico,
+        previsao,
+      }
+    }
+    const periodos = await loadPeriodosSafe()
+
+    try {
+      if (periodoInicioInput && periodoFimInput) {
+        const forecastIdInput = params?.forecast_id ?? params?.forecastId
+        const forecast = await buildForecastFromTables(periodoInicioInput, periodoFimInput, forecastIdInput)
+        return { ...forecast, periodos }
+      }
+
+      const latest = periodos?.[0]
+      if (!latest) {
+        return { status: 'missing', resumo: null, historico: [], previsao: [], periodos }
+      }
+
+      const forecast = await buildForecastFromTables(
+        latest.periodo_base_inicio,
+        latest.periodo_base_fim,
+        latest.id
+      )
+      return { ...forecast, periodos }
+    } catch {
+      return { status: 'missing', resumo: null, historico: [], previsao: [], periodos }
+    }
   },
   async reportAuto() {
     const credenciaisAdminIds = await carregarCredenciaisAdminIds()
@@ -3773,6 +3901,7 @@ export const EstoqueOperations = {
 export const DocumentosOperations = {
   async termoEpiContext(params = {}) {
     if (CONSUME_LOCAL_DATA) {
+      const getLocalTermoContext = await loadLocalTermoContext()
       return getLocalTermoContext(params)
     }
 

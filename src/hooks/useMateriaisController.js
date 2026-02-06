@@ -17,7 +17,7 @@ import {
   sortMateriaisByNome,
   updateMaterialPayload,
   validateMaterialForm,
-} from '../rules/MateriaisRules.js'
+} from '../routes/rules/MateriaisRules.js'
 import { formatCurrency } from '../utils/MateriaisUtils.js'
 import {
   normalizeSelectionItem,

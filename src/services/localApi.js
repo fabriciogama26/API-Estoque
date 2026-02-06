@@ -14,7 +14,7 @@ import {
   extractCargos,
   extractSetores,
   extractTiposExecucao,
-} from '../rules/PessoasRules.js'
+} from '../routes/rules/PessoasRules.js'
 import { logError } from './errorLogService.js'
 
 const nowIso = () => new Date().toISOString()
