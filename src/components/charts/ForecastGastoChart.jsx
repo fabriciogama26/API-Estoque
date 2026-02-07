@@ -9,6 +9,7 @@ function ForecastTooltip({ active, payload, label, valueFormatter }) {
   if (!values.length) {
     return null
   }
+  const payloadData = payload?.[0]?.payload || {}
   return (
     <div className="chart-tooltip">
       <span className="chart-tooltip__label">{label}</span>
@@ -18,6 +19,33 @@ function ForecastTooltip({ active, payload, label, valueFormatter }) {
             <strong>{item.name}:</strong> {valueFormatter ? valueFormatter(item.value) : item.value}
           </li>
         ))}
+        {payloadData?.contingencia ? (
+          <li>
+            <strong>Contingencia (P75):</strong>{' '}
+            {valueFormatter ? valueFormatter(payloadData.contingencia) : payloadData.contingencia}
+          </li>
+        ) : null}
+        {payloadData?.p90 ? (
+          <li>
+            <strong>P90:</strong> {valueFormatter ? valueFormatter(payloadData.p90) : payloadData.p90}
+          </li>
+        ) : null}
+        {payloadData?.mediana ? (
+          <li>
+            <strong>Mediana:</strong>{' '}
+            {valueFormatter ? valueFormatter(payloadData.mediana) : payloadData.mediana}
+          </li>
+        ) : null}
+        {payloadData?.cv ? (
+          <li>
+            <strong>CV:</strong> {payloadData.cv.toFixed ? payloadData.cv.toFixed(2) : payloadData.cv}
+          </li>
+        ) : null}
+        {payloadData?.alertaVolatil ? (
+          <li>
+            <strong>Alerta:</strong> mes com historico volatil
+          </li>
+        ) : null}
       </ul>
     </div>
   )
@@ -42,12 +70,32 @@ export function ForecastGastoChart({ data, valueFormatter, height = 320 }) {
         <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
         <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
         <Tooltip content={<ForecastTooltip valueFormatter={valueFormatter} />} />
-        <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ color: '#475569' }} />
+        <Legend
+          verticalAlign="top"
+          height={32}
+          iconType="circle"
+          wrapperStyle={{ color: '#475569' }}
+          payload={[
+            { value: 'Gasto real', type: 'circle', id: 'historico', color: '#0ea5e9' },
+            { value: 'Media movel (3m)', type: 'circle', id: 'mediaMovel', color: '#22c55e' },
+            { value: 'Saida prevista', type: 'circle', id: 'previsao', color: '#7c3aed' },
+            { value: 'Entrada prevista', type: 'circle', id: 'previsaoEntrada', color: '#f97316' },
+          ]}
+        />
         <Line type="monotone" dataKey="historico" name="Gasto real" stroke="#0ea5e9" strokeWidth={2} dot={false} />
         <Line
           type="monotone"
+          dataKey="mediaMovel"
+          name="Media movel (3m)"
+          stroke="#22c55e"
+          strokeDasharray="2 2"
+          strokeWidth={2}
+          dot={false}
+        />
+        <Line
+          type="monotone"
           dataKey="previsao"
-          name="Previsao"
+          name="Saida prevista"
           stroke="#7c3aed"
           strokeDasharray="5 5"
           strokeWidth={2}
@@ -55,10 +103,10 @@ export function ForecastGastoChart({ data, valueFormatter, height = 320 }) {
         />
         <Line
           type="monotone"
-          dataKey="mediaMovel"
-          name="Media movel (3m)"
-          stroke="#22c55e"
-          strokeDasharray="2 2"
+          dataKey="previsaoEntrada"
+          name="Entrada prevista"
+          stroke="#f97316"
+          strokeDasharray="3 3"
           strokeWidth={2}
           dot={false}
         />

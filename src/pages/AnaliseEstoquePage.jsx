@@ -476,6 +476,14 @@ export function AnaliseEstoquePage() {
   const [forecastValidationOpen, setForecastValidationOpen] = useState(false)
   const [forecastValidationPage, setForecastValidationPage] = useState(1)
   const [forecastValidationPrevPage, setForecastValidationPrevPage] = useState(1)
+  const [forecastCopiedHistorico, setForecastCopiedHistorico] = useState(false)
+  const [forecastCopiedPrevisao, setForecastCopiedPrevisao] = useState(false)
+  const [diagnosticoOpen, setDiagnosticoOpen] = useState(false)
+  const [diagnosticoLoading, setDiagnosticoLoading] = useState(false)
+  const [diagnosticoError, setDiagnosticoError] = useState(null)
+  const [diagnosticoRows, setDiagnosticoRows] = useState([])
+  const [diagnosticoPage, setDiagnosticoPage] = useState(1)
+  const [diagnosticoCopied, setDiagnosticoCopied] = useState(false)
 
   const formatLabelFromDate = (value) => {
     const date = value instanceof Date ? value : new Date(value)
@@ -496,7 +504,7 @@ export function AnaliseEstoquePage() {
     const { data: periodosData, error: periodosError } = await supabase
       .from('inventory_forecast')
       .select(
-        'id, periodo_base_inicio, periodo_base_fim, previsao_anual, metodo_previsao, nivel_confianca, created_at'
+        'id, periodo_base_inicio, periodo_base_fim, previsao_anual, previsao_anual_entrada, previsao_anual_saida, previsao_anual_saldo, metodo_previsao, nivel_confianca, created_at'
       )
       .eq('account_owner_id', ownerId)
       .order('created_at', { ascending: false })
@@ -526,7 +534,7 @@ export function AnaliseEstoquePage() {
     const resumoQuery = supabase
       .from('inventory_forecast')
       .select(
-        'id, periodo_base_inicio, periodo_base_fim, qtd_meses_base, gasto_total_periodo, media_mensal, fator_tendencia, tipo_tendencia, variacao_percentual, previsao_anual, gasto_ano_anterior, metodo_previsao, nivel_confianca, created_at'
+        'id, periodo_base_inicio, periodo_base_fim, qtd_meses_base, gasto_total_periodo, media_mensal, fator_tendencia, tipo_tendencia, variacao_percentual, previsao_anual, previsao_anual_entrada, previsao_anual_saida, previsao_anual_saldo, gasto_ano_anterior, metodo_previsao, nivel_confianca, created_at'
       )
       .eq('account_owner_id', ownerId)
       .eq('id', selectedPeriodo.id)
@@ -556,9 +564,19 @@ export function AnaliseEstoquePage() {
       throw historicoError
     }
 
+    const { data: historicoAllRows, error: historicoAllError } = await supabase
+      .from('agg_gasto_mensal')
+      .select('ano_mes, valor_saida, valor_entrada')
+      .eq('account_owner_id', ownerId)
+      .order('ano_mes', { ascending: true })
+
+    if (historicoAllError) {
+      throw historicoAllError
+    }
+
     let previsaoQuery = supabase
       .from('f_previsao_gasto_mensal')
-      .select('ano_mes, valor_previsto, metodo, cenario')
+      .select('ano_mes, valor_previsto, valor_previsto_entrada, metodo, cenario, contingencia_p75, p90, mediana, coef_var, media_robusta, alerta_volatil')
       .eq('account_owner_id', ownerId)
       .eq('cenario', 'base')
       .eq('inventory_forecast_id', selectedPeriodo.id)
@@ -583,18 +601,40 @@ export function AnaliseEstoquePage() {
       }
     })
 
+    const historicoAllValores = (historicoAllRows || []).map((row) => Number(row.valor_saida || 0))
+    const historico_full = (historicoAllRows || []).map((row, index) => {
+      const start = Math.max(0, index - 2)
+      const slice = historicoAllValores.slice(start, index + 1)
+      const media = slice.length ? slice.reduce((acc, val) => acc + val, 0) / slice.length : 0
+      return {
+        ano_mes: row.ano_mes,
+        label: formatLabelFromDate(row.ano_mes),
+        valor_saida: Number(row.valor_saida || 0),
+        valor_entrada: Number(row.valor_entrada || 0),
+        media_movel: Number(media.toFixed(2)),
+      }
+    })
+
     const previsao = (previsaoRows || []).map((row) => ({
       ano_mes: row.ano_mes,
       label: formatLabelFromDate(row.ano_mes),
       valor_previsto: Number(row.valor_previsto || 0),
+      valor_previsto_entrada: Number(row.valor_previsto_entrada || 0),
       metodo: row.metodo || 'regressao_linear',
       cenario: row.cenario || 'base',
+      contingencia: Number(row.contingencia_p75 || 0),
+      p90: Number(row.p90 || 0),
+      mediana: Number(row.mediana || 0),
+      cv: Number(row.coef_var || 0),
+      mediaRobusta: Number(row.media_robusta || 0),
+      alertaVolatil: !!row.alerta_volatil,
     }))
 
     return {
       status: historico.length && previsao.length ? 'ok' : 'missing',
       resumo: resumo || null,
       historico,
+      historico_full,
       previsao,
       periodos,
     }
@@ -867,12 +907,22 @@ export function AnaliseEstoquePage() {
   const forecastHasData = forecastStatus === 'ok'
   const forecastBase = forecastPayload?.resumo || null
   const historicoSerie = forecastPayload?.historico || []
+  const historicoSerieFull = forecastPayload?.historico_full || []
   const previsaoSerie = forecastPayload?.previsao || []
   const forecastPageSize = 10
   const historicoStart = (forecastValidationPage - 1) * forecastPageSize
-  const historicoPageItems = historicoSerie.slice(historicoStart, historicoStart + forecastPageSize)
+  const historicoValidationList = historicoSerieFull.length ? historicoSerieFull : historicoSerie
+  const historicoPageItems = historicoValidationList.slice(historicoStart, historicoStart + forecastPageSize)
+
+  const previsaoValidationList = previsaoSerie
+
   const previsaoStart = (forecastValidationPrevPage - 1) * forecastPageSize
-  const previsaoPageItems = previsaoSerie.slice(previsaoStart, previsaoStart + forecastPageSize)
+  const previsaoPageItems = previsaoValidationList.slice(previsaoStart, previsaoStart + forecastPageSize)
+  const diagnosticoStart = (diagnosticoPage - 1) * forecastPageSize
+  const diagnosticoPageItems = diagnosticoRows.slice(diagnosticoStart, diagnosticoStart + forecastPageSize)
+  const diagnosticoCopyLabel = diagnosticoCopied ? 'Tabela copiada' : 'Copiar tabela'
+  const forecastCopyLabelHistorico = forecastCopiedHistorico ? 'Tabela copiada' : 'Copiar tabela'
+  const forecastCopyLabelPrevisao = forecastCopiedPrevisao ? 'Tabela copiada' : 'Copiar tabela'
 
   const chartForecastData = useMemo(() => {
     if (!forecastHasData) {
@@ -886,6 +936,13 @@ export function AnaliseEstoquePage() {
     const previsaoData = previsaoSerie.map((item) => ({
       label: item.label,
       previsao: Number(item.valor_previsto || 0),
+      previsaoEntrada: Number(item.valor_previsto_entrada || 0),
+      contingencia: Number(item.contingencia || 0),
+      p90: Number(item.p90 || 0),
+      mediana: Number(item.mediana || 0),
+      cv: Number(item.cv || 0),
+      mediaRobusta: Number(item.mediaRobusta || 0),
+      alertaVolatil: !!item.alertaVolatil,
     }))
     return [...historicoData, ...previsaoData]
   }, [forecastHasData, historicoSerie, previsaoSerie])
@@ -903,6 +960,91 @@ export function AnaliseEstoquePage() {
     const fatores = baseValores.map((value) => value / mediaBase)
     return fatores.reduce((acc, value) => acc + value, 0) / Math.max(1, fatores.length)
   }, [forecastHasData, historicoSerie])
+
+  const previsaoEntradaTotal = Number(forecastBase?.previsao_anual_entrada || 0)
+  const previsaoSaidaTotal = Number(forecastBase?.previsao_anual_saida || 0)
+  const previsaoFluxoTotal = previsaoEntradaTotal + previsaoSaidaTotal
+  const previsaoSaldoTotal = previsaoEntradaTotal - previsaoSaidaTotal
+
+  const buildForecastHistoricoClipboardText = () => {
+    const historicoHeader = ['Mes', 'Valor saida', 'Valor entrada', 'Media movel (3m)'].join('\t')
+    const historicoRows = historicoValidationList.map((item) => [
+      formatLabelFromDate(item.ano_mes),
+      formatCurrency(item.valor_saida || 0),
+      formatCurrency(item.valor_entrada || 0),
+      formatCurrency(item.media_movel || 0),
+    ].join('\t'))
+    return [
+      historicoHeader,
+      ...historicoRows,
+    ].join('\n')
+  }
+
+  const buildForecastPrevisaoClipboardText = () => {
+    const previsaoHeader = [
+      'Mes',
+      'Valor previsto',
+      'Entrada prevista',
+      'Contingencia (P75)',
+      'P90',
+      'Mediana',
+      'CV',
+      'Media robusta',
+      'Metodo',
+      'Cenario',
+    ].join('\t')
+    const previsaoRows = previsaoValidationList.map((item) => [
+      formatLabelFromDate(item.ano_mes),
+      formatCurrency(item.valor_previsto || 0),
+      formatCurrency(item.valor_previsto_entrada || 0),
+      formatCurrency(item.contingencia || 0),
+      formatCurrency(item.p90 || 0),
+      formatCurrency(item.mediana || 0),
+      formatNumber(item.cv || 0, 2),
+      formatCurrency(item.mediaRobusta || 0),
+      item.metodo || '-',
+      item.cenario || '-',
+    ].join('\t'))
+    return [previsaoHeader, ...previsaoRows].join('\n')
+  }
+
+  const handleCopyForecastHistoricoTable = async () => {
+    const ok = await copyTextToClipboard(buildForecastHistoricoClipboardText())
+    setForecastCopiedHistorico(ok)
+    if (ok) {
+      window.setTimeout(() => setForecastCopiedHistorico(false), 1500)
+    }
+  }
+
+  const handleCopyForecastPrevisaoTable = async () => {
+    const ok = await copyTextToClipboard(buildForecastPrevisaoClipboardText())
+    setForecastCopiedPrevisao(ok)
+    if (ok) {
+      window.setTimeout(() => setForecastCopiedPrevisao(false), 1500)
+    }
+  }
+
+  const buildDiagnosticoClipboardText = () => {
+    const header = ['Mes', 'Registros', 'Valores', 'Mediana', 'P75', 'P90', 'Recomendacao'].join('\t')
+    const rows = diagnosticoRows.map((row) => [
+      row.mes_nome || '-',
+      formatNumber(row.registros || 0),
+      row.valores || '-',
+      formatCurrency(row.mediana_calc || 0),
+      formatCurrency(row.p75_calc || 0),
+      formatCurrency(row.p90_calc || 0),
+      row.recomendacao || '-',
+    ].join('\t'))
+    return [header, ...rows].join('\n')
+  }
+
+  const handleCopyDiagnosticoTable = async () => {
+    const ok = await copyTextToClipboard(buildDiagnosticoClipboardText())
+    setDiagnosticoCopied(ok)
+    if (ok) {
+      window.setTimeout(() => setDiagnosticoCopied(false), 1500)
+    }
+  }
 
   const handlePeriodoChange = async (event) => {
     const value = event.target.value
@@ -926,6 +1068,32 @@ export function AnaliseEstoquePage() {
       return
     }
     await loadForecast({ periodo_inicio, periodo_fim, forecast_id })
+  }
+
+  const loadDiagnostico = async () => {
+    const ownerId = profile?.owner_id
+    setDiagnosticoOpen(true)
+    if (!ownerId || !supabase) {
+      setDiagnosticoError('Owner nao identificado.')
+      return
+    }
+    setDiagnosticoLoading(true)
+    setDiagnosticoError(null)
+    try {
+      const { data, error } = await supabase.rpc('diagnosticar_estatisticas_mensais', {
+        p_owner_id: ownerId,
+      })
+      if (error) {
+        throw error
+      }
+      setDiagnosticoRows(Array.isArray(data) ? data : [])
+      setDiagnosticoPage(1)
+    } catch (err) {
+      setDiagnosticoError(err?.message || 'Erro ao carregar diagnostico.')
+      setDiagnosticoRows([])
+    } finally {
+      setDiagnosticoLoading(false)
+    }
   }
 
   return (
@@ -963,6 +1131,14 @@ export function AnaliseEstoquePage() {
             </button>
             <button
               type="button"
+              className="dashboard-card__toggle"
+              onClick={loadDiagnostico}
+              disabled={diagnosticoLoading}
+            >
+              {diagnosticoLoading ? 'Carregando...' : 'Diagnostico'}
+            </button>
+            <button
+              type="button"
               className="dashboard-card__expand"
               onClick={() => setForecastExpanded(true)}
               aria-label="Expandir grafico de previsao"
@@ -986,21 +1162,20 @@ export function AnaliseEstoquePage() {
               <p>Previsao ainda nao calculada para este periodo.</p>
             ) : (
               <>
-                <p className="analysis-forecast-label">Previsao de gasto (rolling 12 meses)</p>
-                <p className="analysis-forecast-value">{formatCurrency(forecastBase?.previsao_anual || 0)}</p>
+                <p className="analysis-forecast-label">Previsao de fluxo (rolling 12 meses)</p>
+                <p className="analysis-forecast-value">
+                  {formatCurrency(previsaoFluxoTotal)} / {formatCurrency(previsaoSaldoTotal)}
+                </p>
                 <p className="analysis-forecast-subtitle">Baseado no consumo medio dos ultimos 12 meses</p>
                 <div className="analysis-forecast-meta">
                   <span>
-                    Variacao vs periodo anterior:{' '}
-                    {forecastBase?.variacao_percentual !== null && forecastBase?.variacao_percentual !== undefined
-                      ? `${forecastBase.variacao_percentual > 0 ? '+' : ''}${formatNumber(
-                          forecastBase.variacao_percentual,
-                          1,
-                        )}%`
-                      : 'Sem base anterior'}
+                    Gasto total do periodo: {formatCurrency(forecastBase?.gasto_total_periodo || 0)}
                   </span>
                   <span>
-                    Gasto total do periodo: {formatCurrency(forecastBase?.gasto_total_periodo || 0)}
+                    Entradas previstas: {formatCurrency(previsaoEntradaTotal)}
+                  </span>
+                  <span>
+                    Saidas previstas: {formatCurrency(previsaoSaidaTotal)}
                   </span>
                   <span>
                     Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}
@@ -1062,6 +1237,16 @@ export function AnaliseEstoquePage() {
         <div className="analysis-audit-summary">
           <p>Gasto mensal (agg_gasto_mensal)</p>
         </div>
+        <div className="analysis-audit-actions">
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleCopyForecastHistoricoTable}
+            disabled={!historicoValidationList.length}
+          >
+            {forecastCopyLabelHistorico}
+          </button>
+        </div>
         <div className="table-wrapper">
           <table className="data-table analysis-audit-table">
             <thead>
@@ -1085,7 +1270,7 @@ export function AnaliseEstoquePage() {
           </table>
         </div>
         <TablePagination
-          totalItems={historicoSerie.length}
+          totalItems={historicoValidationList.length}
           pageSize={forecastPageSize}
           currentPage={forecastValidationPage}
           onPageChange={setForecastValidationPage}
@@ -1093,12 +1278,28 @@ export function AnaliseEstoquePage() {
         <div className="analysis-audit-summary">
           <p>Previsao mensal (f_previsao_gasto_mensal)</p>
         </div>
+        <div className="analysis-audit-actions">
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleCopyForecastPrevisaoTable}
+            disabled={!previsaoSerie.length}
+          >
+            {forecastCopyLabelPrevisao}
+          </button>
+        </div>
         <div className="table-wrapper">
           <table className="data-table analysis-audit-table">
             <thead>
               <tr>
                 <th>Mes</th>
                 <th>Valor previsto</th>
+                <th>Entrada prevista</th>
+                <th>Contingencia (P75)</th>
+                <th>P90</th>
+                <th>Mediana</th>
+                <th>CV</th>
+                <th>Media robusta</th>
                 <th>Metodo</th>
                 <th>Cenario</th>
               </tr>
@@ -1108,6 +1309,12 @@ export function AnaliseEstoquePage() {
                 <tr key={`prev-${item.ano_mes}`}>
                   <td>{formatLabelFromDate(item.ano_mes)}</td>
                   <td>{formatCurrency(item.valor_previsto || 0)}</td>
+                  <td>{formatCurrency(item.valor_previsto_entrada || 0)}</td>
+                  <td>{formatCurrency(item.contingencia || 0)}</td>
+                  <td>{formatCurrency(item.p90 || 0)}</td>
+                  <td>{formatCurrency(item.mediana || 0)}</td>
+                  <td>{formatNumber(item.cv || 0, 2)}</td>
+                  <td>{formatCurrency(item.mediaRobusta || 0)}</td>
                   <td>{item.metodo || '-'}</td>
                   <td>{item.cenario || '-'}</td>
                 </tr>
@@ -1120,6 +1327,57 @@ export function AnaliseEstoquePage() {
           pageSize={forecastPageSize}
           currentPage={forecastValidationPrevPage}
           onPageChange={setForecastValidationPrevPage}
+        />
+      </ChartExpandModal>
+      <ChartExpandModal
+        open={diagnosticoOpen}
+        title="Diagnostico de estatisticas mensais"
+        onClose={() => setDiagnosticoOpen(false)}
+      >
+        {diagnosticoError ? <p className="analysis-forecast-error">{diagnosticoError}</p> : null}
+        <div className="analysis-audit-actions">
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleCopyDiagnosticoTable}
+            disabled={!diagnosticoRows.length}
+          >
+            {diagnosticoCopyLabel}
+          </button>
+        </div>
+        <div className="table-wrapper">
+          <table className="data-table analysis-audit-table">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Registros</th>
+                <th>Valores</th>
+                <th>Mediana</th>
+                <th>P75</th>
+                <th>P90</th>
+                <th>Recomendacao</th>
+              </tr>
+            </thead>
+            <tbody>
+              {diagnosticoPageItems.map((row) => (
+                <tr key={row.mes_ref}>
+                  <td>{row.mes_nome}</td>
+                  <td>{formatNumber(row.registros || 0)}</td>
+                  <td>{row.valores || '-'}</td>
+                  <td>{formatCurrency(row.mediana_calc || 0)}</td>
+                  <td>{formatCurrency(row.p75_calc || 0)}</td>
+                  <td>{formatCurrency(row.p90_calc || 0)}</td>
+                  <td>{row.recomendacao || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <TablePagination
+          totalItems={diagnosticoRows.length}
+          pageSize={forecastPageSize}
+          currentPage={diagnosticoPage}
+          onPageChange={setDiagnosticoPage}
         />
       </ChartExpandModal>
       <div className="analysis-pareto-list">
