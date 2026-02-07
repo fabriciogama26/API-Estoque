@@ -6,6 +6,25 @@ declare
   v_min_date date;
   v_max_date date;
 begin
+  select min(data) into v_min_date
+  from (
+    select min("dataEntrada")::date as data
+    from public.entradas
+    where account_owner_id = p_owner_id
+    union all
+    select max("dataEntrada")::date as data
+    from public.entradas
+    where account_owner_id = p_owner_id
+    union all
+    select min("dataEntrega")::date
+    from public.saidas
+    where account_owner_id = p_owner_id
+    union all
+    select max("dataEntrega")::date
+    from public.saidas
+    where account_owner_id = p_owner_id
+  ) datas;
+
   select max(data) into v_max_date
   from (
     select max("dataEntrada")::date as data
@@ -17,12 +36,12 @@ begin
     where account_owner_id = p_owner_id
   ) datas;
 
-  if v_max_date is null then
+  if v_max_date is null or v_min_date is null then
     return;
   end if;
 
   v_max_date := date_trunc('month', v_max_date)::date;
-  v_min_date := (date_trunc('month', v_max_date) - interval '11 months')::date;
+  v_min_date := date_trunc('month', v_min_date)::date;
 
   with meses as (
     select date_trunc('month', gs)::date as ano_mes

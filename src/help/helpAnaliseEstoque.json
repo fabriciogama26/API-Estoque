@@ -17,7 +17,7 @@
       },
       {
         "title": "Previsao rolling",
-        "description": "O card mostra a previsao rolling de gasto com fator_tendencia = media dos ultimos 3 meses / media de 6 meses atras."
+        "description": "O card mostra a previsao de fluxo (entradas, saidas e saldo) com sazonalidade e fator_tendencia robusto."
       },
       {
         "title": "Copiar IDs",
@@ -32,10 +32,15 @@
       "A previsao rolling nao usa filtros de periodo: considera sempre os ultimos 12 meses completos.",
       "O periodo exibido pode ser selecionado no combo com historicos gerados.",
       "O botao Validacao da previsao mostra as tabelas de gasto mensal e previsao mensal.",
+      "O botao Diagnostico abre um modal com estatisticas mensais (mediana, P75, P90).",
       "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes.",
       "Os dados do card e grafico de previsao sao lidos das tabelas agregadas (nao ha calculo no client).",
-      "Fator_tendencia usa comparacao de periodos: media ultimos 3 meses / media de 6 meses atras.",
-      "Sazonalidade media do periodo e calculada a partir da media movel de 3 meses (aplicada junto com fator_tendencia)."
+      "Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m).",
+      "Sazonalidade media do periodo e calculada a partir da media movel de 3 meses (aplicada junto com fator_tendencia).",
+      "Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.",
+      "Tooltip da previsao mostra contingencia (P75), P90, mediana e alerta de volatilidade (CV > 1) calculados no RPC.",
+      "Previsao inclui entradas e saidas, com saldo anual no card.",
+      "Diagnostico usa agg_gasto_mensal (valor_saida) para estatisticas mensais."
       ]
     }
 }

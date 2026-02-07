@@ -6,7 +6,7 @@ Visao geral
 - Tela dedicada a interpretacao dos Paretos e acoes recomendadas de estoque.
 - Usa os mesmos filtros do Dashboard de Estoque (periodo e termo).
 - Exibe cartoes de decisao, Paretos e blocos de interpretacao/acao ao lado.
-- Inclui previsao de gasto anual baseada no consumo medio dos ultimos 12 meses.
+- Inclui previsao de fluxo anual (entradas, saidas e saldo) baseada no consumo medio dos ultimos 12 meses.
 
 Arquitetura
 -----------
@@ -45,9 +45,10 @@ Boas praticas
 - Se existir previsao aberta (qtd_meses_base < 12), o RPC reutiliza o mesmo periodo_base_inicio e atualiza ate completar 12.
 - Previsao mensal e agregados sao gerados por cron via Edge Function.
 - A previsao mensal usa metodo sazonal: media movel 3m e fator sazonal por mes, multiplicado pelo fator_tendencia.
-- Fator_tendencia = media dos ultimos 3 meses / media dos meses de 6 meses atras (janela de 3 meses).
+- Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m).
 - O periodo exibido pode ser trocado pelo select com historicos gravados em `inventory_forecast`.
 - O botao Validacao na previsao exibe tabelas de `agg_gasto_mensal` e `f_previsao_gasto_mensal`.
+- O botao Diagnostico executa `diagnosticar_estatisticas_mensais` e exibe percentis mensais.
 - O modal de validacao mostra as formulas de fator_tendencia, sazonalidade e previsao mensal.
 - Cron oficial roda via Edge Function `forecast-gasto-mensal` (schedule 0 3 28-31 * *), com checagem de ultimo dia do mes e suporte a force no body.
 - Para testes por periodo, usar `rpc_previsao_gasto_mensal_calcular_periodo(p_owner_id, p_periodo_inicio, p_periodo_fim, p_fator_tendencia)` (grava forecast e inventory_forecast).
@@ -60,6 +61,10 @@ Boas praticas
 - O select de periodo usa `inventory_forecast` e lista todos os historicos do tenant (por id).
 - RPCs de previsao atualizam `inventory_forecast_id` automaticamente em `f_previsao_gasto_mensal` (backfill do periodo).
 - O card exibe a sazonalidade media do periodo com base na media movel de 3 meses.
+- Tooltip da previsao inclui contingencia (P75), P90, mediana e alerta de volatilidade (CV > 1) calculados no RPC.
+- Previsao considera entradas, saidas e saldo anual no card e no grafico.
+- Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.
+- Diagnostico usa agg_gasto_mensal (valor_saida) como base estatistica.
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
 
 Cancelamento e saldo
