@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ACIDENTES_FILTER_DEFAULT } from '../config/AcidentesConfig.js'
-import { filterAcidentes } from '../rules/AcidentesRules.js'
+import { filterAcidentes } from '../routes/rules/AcidentesRules.js'
 
 export function useAcidenteFiltro(acidentes = []) {
   const [filters, setFilters] = useState(() => ({ ...ACIDENTES_FILTER_DEFAULT }))

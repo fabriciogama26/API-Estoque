@@ -8,7 +8,7 @@ import {
   extractTipos,
   extractLesoes,
   extractPartesLesionadas,
-} from '../rules/AcidentesRules.js'
+} from '../routes/rules/AcidentesRules.js'
 
 const AcidentesContext = createContext(null)
 

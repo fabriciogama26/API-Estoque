@@ -1,4 +1,4 @@
-import { uniqueSorted } from '../utils/pessoasUtils.js'
+import { uniqueSorted } from '../../utils/pessoasUtils.js'
 
 function sanitizeCampo(valor) {
   return valor?.trim() ?? ''

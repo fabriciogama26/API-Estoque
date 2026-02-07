@@ -10,6 +10,9 @@ import { DashboardEstoqueProvider, useDashboardEstoqueContext } from '../context
 import { computePercentile, formatNumber, formatPercent, formatCurrency } from '../utils/inventoryReportUtils.js'
 import { copyTextToClipboard } from '../utils/clipboard.js'
 import { fetchEstoqueForecast } from '../services/estoqueApi.js'
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
+import { isLocalMode } from '../config/runtime.js'
+import { usePermissions } from '../context/PermissionsContext.jsx'
 
 import '../styles/DashboardPage.css'
 
@@ -463,20 +466,165 @@ export function AnaliseEstoquePage() {
     saidasResumo,
     diasPeriodo,
   } = useDashboardEstoqueContext()
+  const { profile } = usePermissions()
   const [forecastPayload, setForecastPayload] = useState(null)
   const [forecastLoading, setForecastLoading] = useState(false)
   const [forecastError, setForecastError] = useState(null)
-  const [forecastFactor, setForecastFactor] = useState('')
-  const [forecastFactorApplied, setForecastFactorApplied] = useState(1)
+  const [forecastPeriodos, setForecastPeriodos] = useState([])
+  const [forecastPeriodoSelecionado, setForecastPeriodoSelecionado] = useState('')
+  const [forecastExpanded, setForecastExpanded] = useState(false)
+  const [forecastValidationOpen, setForecastValidationOpen] = useState(false)
+  const [forecastValidationPage, setForecastValidationPage] = useState(1)
+  const [forecastValidationPrevPage, setForecastValidationPrevPage] = useState(1)
+
+  const formatLabelFromDate = (value) => {
+    const date = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return String(value || '')
+    }
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const year = date.getUTCFullYear()
+    return `${month}/${year}`
+  }
+
+  const loadForecastFromSupabase = async (params = {}) => {
+    const ownerId = profile?.owner_id
+    if (!ownerId || !supabase) {
+      throw new Error('Owner nao identificado.')
+    }
+
+    const { data: periodosData, error: periodosError } = await supabase
+      .from('inventory_forecast')
+      .select(
+        'id, periodo_base_inicio, periodo_base_fim, previsao_anual, metodo_previsao, nivel_confianca, created_at'
+      )
+      .eq('account_owner_id', ownerId)
+      .order('created_at', { ascending: false })
+
+    if (periodosError) {
+      throw periodosError
+    }
+
+    const periodos = Array.isArray(periodosData) ? periodosData : []
+    const periodoInicio = params?.periodo_inicio ?? params?.periodoInicio
+    const periodoFim = params?.periodo_fim ?? params?.periodoFim
+    const forecastId = params?.forecast_id ?? params?.forecastId
+
+    const selectedPeriodo =
+      periodos.find((item) => String(item.id) === String(forecastId)) ||
+      periodos.find(
+        (item) =>
+          item.periodo_base_inicio === periodoInicio &&
+          item.periodo_base_fim === periodoFim
+      ) ||
+      periodos[0]
+
+    if (!selectedPeriodo) {
+      return { status: 'missing', resumo: null, historico: [], previsao: [], periodos }
+    }
+
+    const resumoQuery = supabase
+      .from('inventory_forecast')
+      .select(
+        'id, periodo_base_inicio, periodo_base_fim, qtd_meses_base, gasto_total_periodo, media_mensal, fator_tendencia, tipo_tendencia, variacao_percentual, previsao_anual, gasto_ano_anterior, metodo_previsao, nivel_confianca, created_at'
+      )
+      .eq('account_owner_id', ownerId)
+      .eq('id', selectedPeriodo.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const { data: resumo, error: resumoError } = await resumoQuery
+    if (resumoError) {
+      throw resumoError
+    }
+
+    let historicoQuery = supabase
+      .from('agg_gasto_mensal')
+      .select('ano_mes, valor_saida, valor_entrada')
+      .eq('account_owner_id', ownerId)
+      .order('ano_mes', { ascending: true })
+
+    if (selectedPeriodo.periodo_base_inicio && selectedPeriodo.periodo_base_fim) {
+      historicoQuery = historicoQuery
+        .gte('ano_mes', selectedPeriodo.periodo_base_inicio)
+        .lte('ano_mes', selectedPeriodo.periodo_base_fim)
+    }
+
+    const { data: historicoRows, error: historicoError } = await historicoQuery
+    if (historicoError) {
+      throw historicoError
+    }
+
+    let previsaoQuery = supabase
+      .from('f_previsao_gasto_mensal')
+      .select('ano_mes, valor_previsto, metodo, cenario')
+      .eq('account_owner_id', ownerId)
+      .eq('cenario', 'base')
+      .eq('inventory_forecast_id', selectedPeriodo.id)
+      .order('ano_mes', { ascending: true })
+
+    const { data: previsaoRows, error: previsaoError } = await previsaoQuery
+    if (previsaoError) {
+      throw previsaoError
+    }
+
+    const historicoValores = (historicoRows || []).map((row) => Number(row.valor_saida || 0))
+    const historico = (historicoRows || []).map((row, index) => {
+      const start = Math.max(0, index - 2)
+      const slice = historicoValores.slice(start, index + 1)
+      const media = slice.length ? slice.reduce((acc, val) => acc + val, 0) / slice.length : 0
+      return {
+        ano_mes: row.ano_mes,
+        label: formatLabelFromDate(row.ano_mes),
+        valor_saida: Number(row.valor_saida || 0),
+        valor_entrada: Number(row.valor_entrada || 0),
+        media_movel: Number(media.toFixed(2)),
+      }
+    })
+
+    const previsao = (previsaoRows || []).map((row) => ({
+      ano_mes: row.ano_mes,
+      label: formatLabelFromDate(row.ano_mes),
+      valor_previsto: Number(row.valor_previsto || 0),
+      metodo: row.metodo || 'regressao_linear',
+      cenario: row.cenario || 'base',
+    }))
+
+    return {
+      status: historico.length && previsao.length ? 'ok' : 'missing',
+      resumo: resumo || null,
+      historico,
+      previsao,
+      periodos,
+    }
+  }
 
   const loadForecast = async (params = {}) => {
     setForecastLoading(true)
     setForecastError(null)
     try {
-      const data = await fetchEstoqueForecast(params)
+      const shouldUseSupabase = !isLocalMode && isSupabaseConfigured() && supabase && profile?.owner_id
+      const data = shouldUseSupabase
+        ? await loadForecastFromSupabase(params)
+        : await fetchEstoqueForecast(params)
       setForecastPayload(data || null)
-      setForecastFactor('1')
-      setForecastFactorApplied(1)
+      const periodos = Array.isArray(data?.periodos) ? data.periodos : []
+      if (!periodos.length && data?.resumo?.periodo_base_inicio && data?.resumo?.periodo_base_fim) {
+        periodos.push({
+          id: `${data.resumo.periodo_base_inicio}|${data.resumo.periodo_base_fim}`,
+          periodo_base_inicio: data.resumo.periodo_base_inicio,
+          periodo_base_fim: data.resumo.periodo_base_fim,
+        })
+      }
+      setForecastPeriodos(periodos)
+      if (!params?.periodo_inicio && !params?.periodo_fim && periodos.length) {
+        const resumoPeriodo = data?.resumo
+          ? `${data.resumo.periodo_base_inicio}|${data.resumo.periodo_base_fim}`
+          : `${periodos[0].periodo_base_inicio}|${periodos[0].periodo_base_fim}`
+        const periodoId = data?.resumo?.id || periodos[0]?.id || ''
+        setForecastPeriodoSelecionado(periodoId || resumoPeriodo)
+      }
     } catch (err) {
       setForecastError(err?.message || 'Erro ao carregar previsao de gasto.')
       setForecastPayload(null)
@@ -720,7 +868,11 @@ export function AnaliseEstoquePage() {
   const forecastBase = forecastPayload?.resumo || null
   const historicoSerie = forecastPayload?.historico || []
   const previsaoSerie = forecastPayload?.previsao || []
-  const forecastCalcLocked = false
+  const forecastPageSize = 10
+  const historicoStart = (forecastValidationPage - 1) * forecastPageSize
+  const historicoPageItems = historicoSerie.slice(historicoStart, historicoStart + forecastPageSize)
+  const previsaoStart = (forecastValidationPrevPage - 1) * forecastPageSize
+  const previsaoPageItems = previsaoSerie.slice(previsaoStart, previsaoStart + forecastPageSize)
 
   const chartForecastData = useMemo(() => {
     if (!forecastHasData) {
@@ -731,26 +883,49 @@ export function AnaliseEstoquePage() {
       historico: item.valor_saida,
       mediaMovel: item.media_movel,
     }))
-    const fator = Number.isFinite(forecastFactorApplied) ? forecastFactorApplied : 1
     const previsaoData = previsaoSerie.map((item) => ({
       label: item.label,
-      previsao: Number(item.valor_previsto || 0) * fator,
+      previsao: Number(item.valor_previsto || 0),
     }))
     return [...historicoData, ...previsaoData]
-  }, [forecastHasData, historicoSerie, previsaoSerie, forecastFactorApplied])
+  }, [forecastHasData, historicoSerie, previsaoSerie])
 
-  const handleForecastUpdate = async () => {
-    const parsed = Number(String(forecastFactor).replace(',', '.'))
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setForecastError('Informe um fator valido (ex: 1.05).')
+  const sazonalidadeMedia = useMemo(() => {
+    if (!forecastHasData || historicoSerie.length === 0) {
+      return null
+    }
+    const baseValores = historicoSerie.map((item) => Number(item.media_movel ?? item.valor_saida ?? 0))
+    const mediaBase =
+      baseValores.reduce((acc, value) => acc + value, 0) / Math.max(1, baseValores.length)
+    if (!mediaBase) {
+      return null
+    }
+    const fatores = baseValores.map((value) => value / mediaBase)
+    return fatores.reduce((acc, value) => acc + value, 0) / Math.max(1, fatores.length)
+  }, [forecastHasData, historicoSerie])
+
+  const handlePeriodoChange = async (event) => {
+    const value = event.target.value
+    setForecastPeriodoSelecionado(value)
+    if (!value) {
       return
     }
-    if (forecastStatus !== 'ok') {
-      setForecastError('Previsao base ainda nao calculada.')
+    const period = forecastPeriodos.find((item) => String(item.id) === String(value))
+    let periodo_inicio = period?.periodo_base_inicio
+    let periodo_fim = period?.periodo_base_fim
+    let forecast_id = period?.id
+    if (!periodo_inicio || !periodo_fim) {
+      const parts = value.split('|')
+      if (parts.length === 2) {
+        periodo_inicio = parts[0]
+        periodo_fim = parts[1]
+        forecast_id = undefined
+      }
+    }
+    if (!periodo_inicio || !periodo_fim) {
       return
     }
-    setForecastError(null)
-    setForecastFactorApplied(parsed)
+    await loadForecast({ periodo_inicio, periodo_fim, forecast_id })
   }
 
   return (
@@ -768,13 +943,32 @@ export function AnaliseEstoquePage() {
           <div className="dashboard-card__title-group">
             <button type="button" className="summary-tooltip dashboard-card__info" aria-label="Informacoes de previsao">
               <InfoIcon size={14} />
-              <span>
-                Previsao baseada no consumo medio dos ultimos 12 meses. O fator de tendencia ajusta a projecao.
-              </span>
+              <span>Previsao rolling baseada nos ultimos 12 meses, preenchendo meses sem movimento com zero.</span>
             </button>
             <h2 className="dashboard-card__title">
-              <RevenueIcon size={20} /> <span>Previsao de gasto anual (12 meses)</span>
+              <RevenueIcon size={20} /> <span>Previsao de gasto (rolling 12 meses)</span>
             </h2>
+          </div>
+          <div className="dashboard-card__actions">
+            <button
+              type="button"
+              className="dashboard-card__toggle"
+              onClick={() => {
+                setForecastValidationOpen(true)
+                setForecastValidationPage(1)
+                setForecastValidationPrevPage(1)
+              }}
+            >
+              Validacao
+            </button>
+            <button
+              type="button"
+              className="dashboard-card__expand"
+              onClick={() => setForecastExpanded(true)}
+              aria-label="Expandir grafico de previsao"
+            >
+              <ExpandIcon size={16} />
+            </button>
           </div>
         </header>
         <div className="analysis-forecast-grid">
@@ -792,23 +986,27 @@ export function AnaliseEstoquePage() {
               <p>Previsao ainda nao calculada para este periodo.</p>
             ) : (
               <>
-                <p className="analysis-forecast-label">Previsao de gasto anual (12 meses)</p>
-                <p className="analysis-forecast-value">
-                  {formatCurrency(
-                    (forecastBase?.previsao_anual || 0) *
-                      (Number.isFinite(forecastFactorApplied) ? forecastFactorApplied : 1),
-                  )}
-                </p>
+                <p className="analysis-forecast-label">Previsao de gasto (rolling 12 meses)</p>
+                <p className="analysis-forecast-value">{formatCurrency(forecastBase?.previsao_anual || 0)}</p>
                 <p className="analysis-forecast-subtitle">Baseado no consumo medio dos ultimos 12 meses</p>
                 <div className="analysis-forecast-meta">
                   <span>
-                    Variacao vs ano anterior:{' '}
+                    Variacao vs periodo anterior:{' '}
                     {forecastBase?.variacao_percentual !== null && forecastBase?.variacao_percentual !== undefined
                       ? `${forecastBase.variacao_percentual > 0 ? '+' : ''}${formatNumber(
                           forecastBase.variacao_percentual,
                           1,
                         )}%`
                       : 'Sem base anterior'}
+                  </span>
+                  <span>
+                    Gasto total do periodo: {formatCurrency(forecastBase?.gasto_total_periodo || 0)}
+                  </span>
+                  <span>
+                    Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}
+                  </span>
+                  <span>
+                    Sazonalidade media do periodo: {formatNumber(sazonalidadeMedia ?? 1, 2)}
                   </span>
                   <span>
                     Confianca do dado: {forecastBase?.qtd_meses_base || 12} meses
@@ -818,24 +1016,20 @@ export function AnaliseEstoquePage() {
             )}
             <div className="analysis-forecast-actions">
               <label className="field">
-                <span>Fator de tendencia (aplicado ao grafico)</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.1"
-                  value={forecastFactor}
-                  onChange={(event) => setForecastFactor(event.target.value)}
-                  placeholder="1.00"
-                />
+                <span>Periodo da previsao</span>
+                <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
+                  <option value="">Selecione um periodo</option>
+                  {forecastPeriodos.map((periodo) => {
+                    const value = String(periodo.id)
+                    const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
+                    return (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  })}
+                </select>
               </label>
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={handleForecastUpdate}
-                disabled={forecastLoading || forecastCalcLocked}
-              >
-                Calcular previsao
-              </button>
             </div>
           </div>
           <div className="analysis-forecast-chart">
@@ -843,6 +1037,91 @@ export function AnaliseEstoquePage() {
           </div>
         </div>
       </section>
+      <ChartExpandModal
+        open={forecastExpanded}
+        title="Previsao de gasto (rolling 12 meses)"
+        onClose={() => setForecastExpanded(false)}
+      >
+        <ForecastGastoChart data={chartForecastData} valueFormatter={formatCurrency} height={520} />
+      </ChartExpandModal>
+      <ChartExpandModal
+        open={forecastValidationOpen}
+        title="Validacao da previsao de gasto"
+        onClose={() => setForecastValidationOpen(false)}
+      >
+        <div className="analysis-audit-summary">
+          <button type="button" className="summary-tooltip" aria-label="Formulas da previsao">
+            <InfoIcon size={14} />
+            <span>
+              Fator de tendencia = media(ultimos 3 meses) / media(6 meses atras).
+              Sazonalidade (mes) = media_movel_3m(mes) / media_movel_3m(geral).
+              Previsao mensal = media_mensal * fator_sazonal(mes) * fator de tendencia.
+            </span>
+          </button>
+        </div>
+        <div className="analysis-audit-summary">
+          <p>Gasto mensal (agg_gasto_mensal)</p>
+        </div>
+        <div className="table-wrapper">
+          <table className="data-table analysis-audit-table">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Valor saida</th>
+                <th>Valor entrada</th>
+                <th>Media movel (3m)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historicoPageItems.map((item) => (
+                <tr key={`hist-${item.ano_mes}`}>
+                  <td>{formatLabelFromDate(item.ano_mes)}</td>
+                  <td>{formatCurrency(item.valor_saida || 0)}</td>
+                  <td>{formatCurrency(item.valor_entrada || 0)}</td>
+                  <td>{formatCurrency(item.media_movel || 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <TablePagination
+          totalItems={historicoSerie.length}
+          pageSize={forecastPageSize}
+          currentPage={forecastValidationPage}
+          onPageChange={setForecastValidationPage}
+        />
+        <div className="analysis-audit-summary">
+          <p>Previsao mensal (f_previsao_gasto_mensal)</p>
+        </div>
+        <div className="table-wrapper">
+          <table className="data-table analysis-audit-table">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Valor previsto</th>
+                <th>Metodo</th>
+                <th>Cenario</th>
+              </tr>
+            </thead>
+            <tbody>
+              {previsaoPageItems.map((item) => (
+                <tr key={`prev-${item.ano_mes}`}>
+                  <td>{formatLabelFromDate(item.ano_mes)}</td>
+                  <td>{formatCurrency(item.valor_previsto || 0)}</td>
+                  <td>{item.metodo || '-'}</td>
+                  <td>{item.cenario || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <TablePagination
+          totalItems={previsaoSerie.length}
+          pageSize={forecastPageSize}
+          currentPage={forecastValidationPrevPage}
+          onPageChange={setForecastValidationPrevPage}
+        />
+      </ChartExpandModal>
       <div className="analysis-pareto-list">
         <ParetoSection
           title="Pareto 80/20 - Saida por quantidade"

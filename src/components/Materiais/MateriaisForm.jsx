@@ -5,7 +5,7 @@ import {
   GRUPO_MATERIAL_CALCADO,
   GRUPO_MATERIAL_VESTIMENTA,
   GRUPO_MATERIAL_PROTECAO_MAOS,
-} from '../../rules/MateriaisRules.js'
+} from '../../routes/rules/MateriaisRules.js'
 import {
   normalizeSelectionItem,
   normalizeSelectionList,

@@ -2,7 +2,7 @@ import {
   GRUPO_MATERIAL_CALCADO,
   GRUPO_MATERIAL_PROTECAO_MAOS,
   GRUPO_MATERIAL_VESTIMENTA,
-} from '../rules/MateriaisRules.js'
+} from '../routes/rules/MateriaisRules.js'
 import { normalizeSelectionItem } from './selectionUtils.js'
 
 export const sanitizeDigits = (value) => (value ? String(value).replace(/\D+/g, '') : '')

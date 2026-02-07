@@ -4,7 +4,7 @@ import {
   validateAcidenteForm,
   createAcidentePayload,
   updateAcidentePayload,
-} from '../rules/AcidentesRules.js'
+} from '../routes/rules/AcidentesRules.js'
 import {
   toInputDateTime,
   parseList,

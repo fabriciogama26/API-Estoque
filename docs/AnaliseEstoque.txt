@@ -40,12 +40,26 @@ Boas praticas
 - Use os cartoes de recomendacao para orientar compras e revisao de politicas.
 - Filtros de periodo afetam consumo, nao afetam estoque atual (sempre acumulado).
 - Pareto de score de risco ordena pelo score e usa cores por faixa (alto/medio/baixo).
-- Previsao anual usa sempre os ultimos 12 meses completos (nao depende do filtro aplicado).
-- Base de previsao considera o ultimo mes com dados (meses vazios atuais nao travam o forecast).
+- Previsao rolling usa os ultimos 12 meses quando disponiveis, mas aceita minimo de 6 meses com dados.
+- Base de previsao considera o ultimo mes com dados e preenche meses sem movimento com zero.
+- Se existir previsao aberta (qtd_meses_base < 12), o RPC reutiliza o mesmo periodo_base_inicio e atualiza ate completar 12.
 - Previsao mensal e agregados sao gerados por cron via Edge Function.
-- O botao "Calcular previsao" aplica o fator de tendencia apenas no grafico e no card (nao grava no banco).
+- A previsao mensal usa metodo sazonal: media movel 3m e fator sazonal por mes, multiplicado pelo fator_tendencia.
+- Fator_tendencia = media dos ultimos 3 meses / media dos meses de 6 meses atras (janela de 3 meses).
+- O periodo exibido pode ser trocado pelo select com historicos gravados em `inventory_forecast`.
+- O botao Validacao na previsao exibe tabelas de `agg_gasto_mensal` e `f_previsao_gasto_mensal`.
+- O modal de validacao mostra as formulas de fator_tendencia, sazonalidade e previsao mensal.
 - Cron oficial roda via Edge Function `forecast-gasto-mensal` (schedule 0 3 28-31 * *), com checagem de ultimo dia do mes e suporte a force no body.
 - Para testes por periodo, usar `rpc_previsao_gasto_mensal_calcular_periodo(p_owner_id, p_periodo_inicio, p_periodo_fim, p_fator_tendencia)` (grava forecast e inventory_forecast).
+- A RPC por periodo nao bloqueia por falta de movimento; registra `monthsSpan`, `monthsWithMovement` e ajusta `nivel_confianca`.
+- A RPC por periodo usa a maior sequencia continua de meses com movimento (6..12). Se a melhor sequencia for < 6, retorna `insufficient`.
+- Retorna `usedMonths`, `periodo_usado_inicio` e `periodo_usado_fim`, com confianca baseada no tamanho da sequencia (6-7 baixo, 8-10 medio, 11-12 alto).
+- `variacao_percentual` e `tipo_tendencia` nunca sao nulos. Regra: sem base -> 0 e `sem_base`, senao usa +-2% como corte.
+- `tipo_tendencia` e baseado na variacao vs periodo anterior (>=2% subida, <=-2% queda, senao estavel).
+- Previsao no front le direto do Supabase quando em modo remoto (sem depender de API).
+- O select de periodo usa `inventory_forecast` e lista todos os historicos do tenant (por id).
+- RPCs de previsao atualizam `inventory_forecast_id` automaticamente em `f_previsao_gasto_mensal` (backfill do periodo).
+- O card exibe a sazonalidade media do periodo com base na media movel de 3 meses.
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
 
 Cancelamento e saldo

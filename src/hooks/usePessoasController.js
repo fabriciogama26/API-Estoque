@@ -15,7 +15,7 @@ import {
   sortPessoasByNome,
   filterPessoas,
   updatePessoaPayload,
-} from '../rules/PessoasRules.js'
+} from '../routes/rules/PessoasRules.js'
 import { resolveUsuarioNome } from '../utils/pessoasUtils.js'
 import { buildPessoasQuery, formatDateInputValue, mapOptionsById, uniqueSorted } from '../utils/pessoasUtils.js'
 import {

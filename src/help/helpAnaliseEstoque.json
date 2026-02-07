@@ -16,8 +16,8 @@
         "description": "Cada Pareto vem com interpretacao e acao recomendada ao lado. Use o bloco para orientar compras e controle."
       },
       {
-        "title": "Previsao anual",
-        "description": "O card mostra a previsao de gasto anual baseada na media dos ultimos 12 meses. Use \"Calcular previsao\" para gravar na tabela."
+        "title": "Previsao rolling",
+        "description": "O card mostra a previsao rolling de gasto com fator_tendencia = media dos ultimos 3 meses / media de 6 meses atras."
       },
       {
         "title": "Copiar IDs",
@@ -29,10 +29,13 @@
       "Pareto de score de risco responde: \"O que nao pode faltar de jeito nenhum?\". Ordena pelo score (alto para baixo) e colore as barras por faixa de score (alto/medio/baixo).",
       "Pareto financeiro - Saida por valor responde: \"O que doi mais no caixa?\".",
       "Risco operacional: Classe A = abaixo minimo + giro alto; Classe B = abaixo minimo; Classe C = acima do minimo.",
-      "A previsao anual nao usa filtros de periodo: considera sempre os ultimos 12 meses completos.",
-        "O botao \"Calcular previsao\" aplica o fator de tendencia sobre os dados ja calculados na tabela.",
-        "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes.",
-        "Os dados do card e grafico de previsao sao lidos das tabelas agregadas (nao ha calculo no client)."
+      "A previsao rolling nao usa filtros de periodo: considera sempre os ultimos 12 meses completos.",
+      "O periodo exibido pode ser selecionado no combo com historicos gerados.",
+      "O botao Validacao da previsao mostra as tabelas de gasto mensal e previsao mensal.",
+      "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes.",
+      "Os dados do card e grafico de previsao sao lidos das tabelas agregadas (nao ha calculo no client).",
+      "Fator_tendencia usa comparacao de periodos: media ultimos 3 meses / media de 6 meses atras.",
+      "Sazonalidade media do periodo e calculada a partir da media movel de 3 meses (aplicada junto com fator_tendencia)."
       ]
     }
 }
