@@ -79,6 +79,7 @@ Fluxos principais
 5) Tabela e detalhes
    - Colunas exibidas: Nome, Matricula, Status (ativo/cancelado), Data, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
    - Acoes: editar, historico, detalhar e cancelar (X vermelho). O botao "Detalhar" abre um modal com os demais campos (agente/tipo/lesoes/partes, dias, eSOCIAL, SESMT, observacao) e inclui o status atual.
+   - Exportacao: botao "Exportar Excel (CSV)" gera planilha com acidentes filtrados.
    - Cancelar abre modal (mesmo estilo do HHT mensal) solicitando motivo; define `ativo = false`, grava `cancel_motivo` e adiciona no historico. O registro continua visivel, mas sai dos calculos/dashboard.
 
 Cadastro em massa (novo)
@@ -141,6 +142,7 @@ Atualizacao 2026-01
 Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
+- Botao "Exportar Excel (CSV)" adicionado na lista de acidentes.
 
 Atualizacao 2026-01 (schema)
 -----------------------------

@@ -475,6 +475,7 @@ Opcionais / por feature:
     - `layout.css`: estilos.
     - `variables.css`: estilos.
   - `utils/`:
+    - `acidentesExport.js`: utilitario.
     - `MateriaisUtils.js`: utilitario.
     - `TermoEpiUtils.js`: utilitario.
     - `acidentesUtils.js`: utilitario.
