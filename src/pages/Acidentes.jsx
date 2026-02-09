@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { AlertIcon, RefreshIcon } from '../components/icons.jsx'
+import { AlertIcon, RefreshIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { AcidentesForm } from '../components/Acidentes/Form/AcidentesForm.jsx'
 import { AcidentesFilters } from '../components/Acidentes/Filters/AcidentesFilters.jsx'
 import { AcidentesTable } from '../components/Acidentes/Table/AcidentesTable.jsx'
@@ -10,6 +10,7 @@ import { AcidenteCancelModal } from '../components/Acidentes/Modal/AcidenteCance
 import { AcidentesImportModal } from '../components/Acidentes/AcidentesImportModal.jsx'
 import { ACIDENTES_HISTORY_DEFAULT } from '../config/AcidentesConfig.js'
 import { cancelAcidente, getAcidenteHistory, downloadAcidenteTemplate, importAcidentePlanilha } from '../services/acidentesService.js'
+import { downloadAcidentesCsv } from '../utils/acidentesExport.js'
 import { usePessoas } from '../hooks/usePessoas.js'
 import { useLocais } from '../hooks/useLocais.js'
 import { usePartes } from '../hooks/usePartes.js'
@@ -59,6 +60,11 @@ function AcidentesPageContent() {
   const [importOpen, setImportOpen] = useState(false)
   const [importInfo, setImportInfo] = useState(null)
   const [importLoading, setImportLoading] = useState(false)
+
+  const handleExportCsv = () => {
+    const filename = `acidentes-${new Date().toISOString().slice(0, 10)}.csv`
+    downloadAcidentesCsv(acidentesFiltrados, { filename })
+  }
 
   const {
     form,
@@ -222,17 +228,29 @@ function AcidentesPageContent() {
       <section className="card">
         <header className="card__header">
           <h2>Registros de Acidentes</h2>
-          <button
-            type="button"
-            className="button button--ghost"
-            onClick={reloadAcidentes}
-            disabled={isLoadingAcidentes}
-            aria-label="Atualizar lista de acidentes"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <RefreshIcon size={16} />
-            <span>Atualizar</span>
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleExportCsv}
+              aria-label="Exportar lista de acidentes em CSV"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SpreadsheetIcon size={16} />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={reloadAcidentes}
+              disabled={isLoadingAcidentes}
+              aria-label="Atualizar lista de acidentes"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <RefreshIcon size={16} />
+              <span>Atualizar</span>
+            </button>
+          </div>
         </header>
         {listError ? <p className="feedback feedback--error">{listError}</p> : null}
         {isLoadingAcidentes ? <p className="feedback">Carregando...</p> : null}
