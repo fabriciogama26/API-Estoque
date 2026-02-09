@@ -97,6 +97,10 @@ Atualizacao 2026-01
 - Exportacao CSV com base na lista filtrada da tela.
 - Bloqueio adicional no formulario quando saldo do material <= 0 ou quantidade > saldo.
 
+Atualizacao 2026-02
+-------------------
+- Botao "Atualizar" da lista padronizado com icone de refresh.
+
 Atualizacao 2026-01 (estoque)
 -----------------------------
 - Arquivos alterados:

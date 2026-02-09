@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { EntryIcon, EditIcon, HistoryIcon, CancelIcon, SpreadsheetIcon } from '../components/icons.jsx'
+import { EntryIcon, EditIcon, HistoryIcon, CancelIcon, SpreadsheetIcon, RefreshIcon } from '../components/icons.jsx'
 import { EntradasHistoryModal } from '../components/Entradas/EntradasHistoryModal.jsx'
 import { EntradasImportModal } from '../components/Entradas/EntradasImportModal.jsx'
 import { EntradaDetailsModal } from '../components/Entradas/Modal/EntradaDetailsModal.jsx'
@@ -335,7 +335,7 @@ function EntradasContent() {
 
       <section className="card">
         <header className="card__header">
-          <h2>Historico de entradas</h2>
+          <h2>Registros de Entradas</h2>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
               type="button"
@@ -352,8 +352,11 @@ function EntradasContent() {
               className="button button--ghost"
               onClick={() => load(filters, { refreshCatalogs: true })}
               disabled={isLoading}
+              aria-label="Atualizar lista de entradas"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              Atualizar
+              <RefreshIcon size={16} />
+              <span>Atualizar</span>
             </button>
           </div>
         </header>

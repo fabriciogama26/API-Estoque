@@ -99,3 +99,6 @@ Ajuda contextual
 Atualizacao 2026-01 (UI)
 - Modais dedicados: src/components/Pessoas/Modal/PessoaNomeIgualModal.jsx, PessoaDetailsModal.jsx, PessoaCancelModal.jsx.
 - Ajuda: src/help/helpPessoas.json (helpContent.json removido).
+
+Atualizacao 2026-02 (UI)
+- Botao "Atualizar" da lista padronizado com icone de refresh.

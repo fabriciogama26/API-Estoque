@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { MaterialIcon } from '../components/icons.jsx'
+import { MaterialIcon, RefreshIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { MateriaisForm } from '../components/Materiais/MateriaisForm.jsx'
 import { MateriaisFilters } from '../components/Materiais/MateriaisFilters.jsx'
 import { MateriaisTable } from '../components/Materiais/MateriaisTable.jsx'
@@ -9,7 +9,7 @@ import { MaterialBaseDiffModal } from '../components/Materiais/Modal/MaterialBas
 import { MaterialDetailsModal } from '../components/Materiais/Modal/MaterialDetailsModal.jsx'
 import { MateriaisProvider, useMateriaisContext } from '../context/MateriaisContext.jsx'
 import { formatDisplayDateTime } from '../utils/saidasUtils.js'
-import { formatCurrency } from '../utils/MateriaisUtils.js'
+import { downloadMateriaisCsv, formatCurrency } from '../utils/MateriaisUtils.js'
 import { getMaterial } from '../services/materiaisService.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/MateriaisPage.css'
@@ -80,6 +80,21 @@ function MateriaisContent() {
 
   const handleCloseDetalhe = () => setDetalhe({ open: false, material: null })
 
+  const handleExportCsv = () => {
+    const now = new Date()
+    const localDate = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+    ].join('-')
+    const filename = `materiais-${localDate}.csv`
+    downloadMateriaisCsv(materiaisOrdenados, { filename })
+  }
+
+  const handleRefresh = () => {
+    loadMateriais()
+  }
+
   return (
     <div className="stack">
       <PageHeader
@@ -139,9 +154,29 @@ function MateriaisContent() {
       <section className="card">
         <header className="card__header">
           <h2>Lista de Materiais</h2>
-          <button type="button" className="button button--ghost" onClick={loadMateriais} disabled={isLoading}>
-            Atualizar
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleExportCsv}
+              aria-label="Exportar lista de materiais em CSV"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SpreadsheetIcon size={16} />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleRefresh}
+              disabled={isLoading}
+              aria-label="Atualizar lista de materiais"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <RefreshIcon size={16} />
+              <span>Atualizar</span>
+            </button>
+          </div>
         </header>
         {isLoading ? <p className="feedback">Carregando...</p> : null}
         {!isLoading ? (

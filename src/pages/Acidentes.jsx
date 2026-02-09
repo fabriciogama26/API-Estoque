@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { AlertIcon } from '../components/icons.jsx'
+import { AlertIcon, RefreshIcon } from '../components/icons.jsx'
 import { AcidentesForm } from '../components/Acidentes/Form/AcidentesForm.jsx'
 import { AcidentesFilters } from '../components/Acidentes/Filters/AcidentesFilters.jsx'
 import { AcidentesTable } from '../components/Acidentes/Table/AcidentesTable.jsx'
@@ -221,14 +221,17 @@ function AcidentesPageContent() {
 
       <section className="card">
         <header className="card__header">
-          <h2>Acidentes registrados</h2>
+          <h2>Registros de Acidentes</h2>
           <button
             type="button"
             className="button button--ghost"
             onClick={reloadAcidentes}
             disabled={isLoadingAcidentes}
+            aria-label="Atualizar lista de acidentes"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            Atualizar
+            <RefreshIcon size={16} />
+            <span>Atualizar</span>
           </button>
         </header>
         {listError ? <p className="feedback feedback--error">{listError}</p> : null}
