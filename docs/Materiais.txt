@@ -17,7 +17,7 @@ Fluxos principais
 
 - FormulÃ¡rio: dados bÃ¡sicos (item/grupo/fabricante), medidas (calÃ§ado/vestimenta), CA, validade, valor unitÃ¡rio, estoque mÃ­nimo, ativo; prevenÃ§Ã£o de duplicidade via preflight + gatilhos.
 - Lista: colunas Grupo, Material, DescriÃ§Ã£o, Valor unitÃ¡rio, Validade (dias), Fabricante, Registrado por, Cadastrado em; aÃ§Ãµes Ver (detalhes em cartÃµes), Editar, HistÃ³rico.
-- ExportaÃ§Ã£o: botÃ£o "Exportar Excel (CSV)" baixa a lista filtrada de materiais.
+- ExportaÃ§Ã£o: botÃ£o "Exportar Excel (CSV)" baixa a lista filtrada com ID, CA, grupo, material, descricao, valor, validade, fabricante, registrado por e cadastrado em.
 - Filtros: termo livre, grupo, tamanho/nÃºmero, fabricante, caracterÃ­sticas, cores, status e intervalo de valor unitÃ¡rio (mÃ­n/mÃ¡x); ajuste os campos e clique em Aplicar para recalcular (sem refiltro automÃ¡tico); limpar restaura defaults.
 - Detalhes: modal em cartÃµes (padrÃ£o acidentes) com todos os campos, buscando o material completo por id.
 - HistÃ³rico: modal no padrÃ£o â€œHistÃ³rico do acidenteâ€, exibindo ediÃ§Ãµes campo a campo (usuÃ¡rio/data).
@@ -32,6 +32,7 @@ AtualizaÃ§Ãµes recentes
 
 - 2025-12: Lista reordenada, filtro de valor unitÃ¡rio adicionado, detalhes/histÃ³rico padronizados, datas de cadastro mapeadas, botÃ£o de olho para detalhes.
 - 2026-02: Exportar Excel (CSV) na lista de materiais.
+- 2026-02: Exportacao CSV inclui ID e CA na lista de materiais.
 - 2026-01: Preflight `material_preflight_check` compara base completa (fabricante+grupo+item+numero+cores+caracteristicas) e retorna: `ca_conflict` (mesma base + CA), `base_conflict_empty` (bloqueia) e `base_match_ca_diff` (alerta/modal). Em update o proprio id e ignorado (`p_material_id`). Os gatilhos de INSERT/UPDATE usam os hashes `hash_base`/`hash_completo` para impedir base igual com CA vazio ou duplicidade exata.
 - 2026-02: CA pode repetir em bases diferentes; conflito apenas quando base completa + CA forem iguais.
 - 2026-01: RPCs material_create_full e material_update_full gravam material + vinculos (cores/caracteristicas) em uma unica transacao; evita 42501 em RLS de tabelas de vinculo.
