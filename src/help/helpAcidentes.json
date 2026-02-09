@@ -29,11 +29,11 @@
         "mediaHint": "Modal de importacao em massa com upload de XLSX."
       },
       {
-      {
         "title": "Exportar lista",
-        "description": "Use o bot?o Exportar Excel (CSV) para baixar a lista filtrada de acidentes.",
-        "mediaHint": "Bot?o Exportar Excel (CSV) ao lado de Atualizar na lista."
+        "description": "Use o botao Exportar Excel (CSV) para baixar a lista filtrada de acidentes.",
+        "mediaHint": "Botao Exportar Excel (CSV) ao lado de Atualizar na lista."
       },
+      {
         "title": "Historico, detalhes e cancelamento",
         "description": "Use o botao de relogio para ver historico, o botao de olho para detalhes e o X para cancelar (exige motivo e marca como Cancelado).",
         "mediaHint": "Acoes na lista de acidentes."
