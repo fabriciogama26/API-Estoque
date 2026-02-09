@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { AlertIcon } from '../components/icons.jsx'
+import { AlertIcon, RefreshIcon } from '../components/icons.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { HhtMensalForm } from '../components/Acidentes/HhtMensal/Form/HhtMensalForm.jsx'
 import { HhtMensalFilters } from '../components/Acidentes/HhtMensal/Filters/HhtMensalFilters.jsx'
@@ -344,8 +344,11 @@ export function HhtMensalAcidentesPage() {
             className="button button--ghost"
             onClick={() => loadRegistros(appliedFilters)}
             disabled={isLoading}
+            aria-label="Atualizar lista de HHT"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            Atualizar
+            <RefreshIcon size={16} />
+            <span>Atualizar</span>
           </button>
         </header>
         {listError ? <p className="feedback feedback--error">{listError}</p> : null}

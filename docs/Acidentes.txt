@@ -138,6 +138,10 @@ Atualizacao 2026-01
 - Classificacao separada em "Classificacao Agentes" (com combinacoes por agente/tipo/lesao) e "Classificacao Partes lesionadas".
 - CAT e CID passaram a ser unicos por owner no front e no banco.
 
+Atualizacao 2026-02
+-------------------
+- Botao "Atualizar" da lista padronizado com icone de refresh.
+
 Atualizacao 2026-01 (schema)
 -----------------------------
 - Arquivos alterados: supabase/migrations/20260228_register_missing_tables.sql.

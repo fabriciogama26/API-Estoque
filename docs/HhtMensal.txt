@@ -57,6 +57,10 @@ Paginação e listagem
 - Lista paginada (20 linhas/pagina) com colunas: Mes, Centro, Status, Modo, HHT final, Registrado por, Cadastrado em, Acoes.
 - Acoes ativas apenas se status != Cancelado (detalhes e historico sempre disponiveis).
 
+Atualizacao 2026-02
+-------------------
+- Botao "Atualizar" da lista padronizado com icone de refresh.
+
 Historico com nomes
 -------------------
 - history() resolve nomes de usuarios (app_users) e nomes de status (status_hht) antes de enviar ao front, evitando UUIDs.

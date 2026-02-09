@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { PeopleIcon, SpreadsheetIcon } from '../components/icons.jsx'
+import { PeopleIcon, SpreadsheetIcon, RefreshIcon } from '../components/icons.jsx'
 import { PessoasForm } from '../components/Pessoas/PessoasForm.jsx'
 import { PessoasFilters } from '../components/Pessoas/PessoasFilters.jsx'
 import { PessoasTable } from '../components/Pessoas/PessoasTable.jsx'
@@ -119,7 +119,7 @@ function PessoasContent() {
 
       <section className="card">
         <header className="card__header">
-          <h2>Lista de pessoas</h2>
+          <h2>Registros de Pessoas</h2>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
               type="button"
@@ -131,8 +131,16 @@ function PessoasContent() {
               <SpreadsheetIcon size={16} />
               <span>Exportar Excel (CSV)</span>
             </button>
-            <button type="button" className="button button--ghost" onClick={() => loadPessoas(filters, true)} disabled={isLoading}>
-              Atualizar
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => loadPessoas(filters, true)}
+              disabled={isLoading}
+              aria-label="Atualizar lista de pessoas"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <RefreshIcon size={16} />
+              <span>Atualizar</span>
             </button>
           </div>
         </header>

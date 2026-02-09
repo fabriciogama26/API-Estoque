@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CancelIcon, EditIcon, HistoryIcon } from '../icons.jsx'
+import { CancelIcon, EditIcon, HistoryIcon, RefreshIcon } from '../icons.jsx'
 import { formatDisplayDateTime } from '../../utils/saidasUtils.js'
 import { TablePagination } from '../TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../../config/pagination.js'
@@ -103,10 +103,18 @@ export function CadastroBaseTable({
   return (
     <section className="card cadastro-base__table">
       <header className="card__header">
-        <h2>Lista de Cadastro Base</h2>
+        <h2>Registros de Cadastro Base</h2>
         {onRefresh ? (
-          <button type="button" className="button button--ghost" onClick={onRefresh} disabled={isLoading}>
-            Atualizar
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={onRefresh}
+            disabled={isLoading}
+            aria-label="Atualizar lista de cadastro base"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <RefreshIcon size={16} />
+            <span>Atualizar</span>
           </button>
         ) : null}
       </header>

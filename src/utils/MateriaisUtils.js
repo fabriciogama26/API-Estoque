@@ -76,3 +76,90 @@ export const mapHistoryWithUsuario = (registros = [], material = {}) =>
       usuarioResponsavel: usuarioResolved || registro.usuarioResponsavel || '-',
     }
   })
+
+const sanitizeCsvValue = (value) => {
+  if (value === undefined || value === null) {
+    return ''
+  }
+  const text = typeof value === 'string' ? value : String(value)
+  const clean = text.replace(/"/g, '""').replace(/\r?\n/g, ' ').trim()
+  if (/[;"\n]/.test(clean)) {
+    return `"${clean}"`
+  }
+  return clean
+}
+
+const formatCsvNumber = (value, decimals = null) => {
+  const num = Number(value)
+  if (!Number.isFinite(num)) {
+    return ''
+  }
+  if (decimals === null) {
+    return String(num)
+  }
+  return num.toFixed(decimals)
+}
+
+const formatCsvDate = (value) => {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  return date.toLocaleString('pt-BR')
+}
+
+export const buildMateriaisCsv = (materiais = []) => {
+  const headers = [
+    'Grupo',
+    'Material',
+    'Descricao',
+    'Valor unitario',
+    'Validade (dias)',
+    'Fabricante',
+    'Registrado por',
+    'Cadastrado em',
+  ]
+
+  const rows = (Array.isArray(materiais) ? materiais : []).map((material) => {
+    const registradoPor =
+      material?.usuarioCadastroUsername ||
+      material?.registradoPor ||
+      material?.usuarioCadastroNome ||
+      material?.usuarioCadastro ||
+      ''
+    const cadastradoEm = material?.criadoEm || material?.created_at || material?.createdAt
+    const valores = [
+      material?.grupoMaterialNome || material?.grupoMaterial || '',
+      material?.nomeItemRelacionado || material?.nome || '',
+      material?.descricao?.trim() || '',
+      formatCsvNumber(material?.valorUnitario ?? material?.valorUnitarioHistorico ?? 0, 2),
+      material?.validadeDias ?? material?.validade ?? '',
+      material?.fabricanteNome || material?.fabricante || '',
+      registradoPor,
+      formatCsvDate(cadastradoEm),
+    ]
+    return valores.map(sanitizeCsvValue).join(';')
+  })
+
+  return [headers.join(';'), ...rows].join('\n')
+}
+
+export const downloadMateriaisCsv = (materiais = [], options = {}) => {
+  const filename =
+    typeof options.filename === 'string' && options.filename.trim()
+      ? options.filename.trim()
+      : 'materiais.csv'
+  const csvContent = buildMateriaisCsv(materiais)
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}

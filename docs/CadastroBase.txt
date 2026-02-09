@@ -64,6 +64,10 @@ Atualizacao 2026-01
 - Importacao em massa por tabela via XLSX.
 - Auditoria ajustada para ignorar INSERT no historico.
 
+Atualizacao 2026-02
+-------------------
+- Botao "Atualizar" da lista padronizado com icone de refresh.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

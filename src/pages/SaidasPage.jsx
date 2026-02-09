@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { ExitIcon, EditIcon, HistoryIcon, CancelIcon, SpreadsheetIcon } from '../components/icons.jsx'
+import { ExitIcon, EditIcon, HistoryIcon, CancelIcon, SpreadsheetIcon, RefreshIcon } from '../components/icons.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import { TABLE_PAGE_SIZE } from '../config/pagination.js'
 import { SaidasHistoryModal } from '../components/Saidas/SaidasHistoryModal.jsx'
@@ -26,8 +26,6 @@ function SaidasContent() {
     materiais,
     centrosEstoqueOptions,
     statusOptions,
-    centroEstoqueFilterOptions,
-    centroServicoFilterOptions,
     registradoPorFilterOptions,
     editingSaida,
     isSaving,
@@ -80,7 +78,6 @@ function SaidasContent() {
     saidasFiltradas,
     formatCurrency,
     formatDisplayDateSimple,
-    formatDisplayDate,
     formatDisplayDateTime,
     formatMaterialSummary,
     formatPessoaSummary,
@@ -417,7 +414,7 @@ function SaidasContent() {
 
       <section className="card">
         <header className="card__header">
-          <h2>Lista de saídas</h2>
+          <h2>Registros de Saídas</h2>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
               type="button"
@@ -434,8 +431,11 @@ function SaidasContent() {
               className="button button--ghost"
               onClick={() => load(filters, { resetPage: true })}
               disabled={isLoading}
+              aria-label="Atualizar lista de saídas"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              Atualizar
+              <RefreshIcon size={16} />
+              <span>Atualizar</span>
             </button>
           </div>
         </header>
