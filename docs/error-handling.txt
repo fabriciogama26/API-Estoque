@@ -1,43 +1,44 @@
-API Estoque – Tratamento de Erros
+﻿API Estoque â€“ Tratamento de Erros
 =================================
 
-Visão geral
-- Objetivo: rastrear falhas no backend e frontend em pontos críticos, com logs estruturados no Supabase.
-- Tabelas de log: `api_errors` (backend) e `app_errors` (frontend). Backend não usa `app_errors`.
+VisÃ£o geral
+- Objetivo: rastrear falhas no backend e frontend em pontos crÃ­ticos, com logs estruturados no Supabase.
+- Tabelas de log: `api_errors` (backend) e `app_errors` (frontend). Backend nÃ£o usa `app_errors`.
 
-Backend (Node/Express – pasta api/ + src/app.js)
-- Função central: `handleError` (`api/_shared/http.js`).
+Backend (Node/Express â€“ pasta api/ + src/app.js)
+- FunÃ§Ã£o central: `handleError` (`api/_shared/http.js`).
   - Sempre loga no console e escreve em `api_errors` com method, path, status, userId, code, stack e context, usando `logApiError`.
   - Responde JSON `{ error }` com status do erro ou 500.
 - Logger Supabase: `api/_shared/logger.js`.
-  - Usa `SUPABASE_SERVICE_ROLE_KEY`. Campos: environment (APP_ENV/RUNTIME_ENV/NODE_ENV), service (SERVICE_NAME ou “api”), method, path, status, code, user_id, message, stack, context, fingerprint.
+  - Usa `SUPABASE_SERVICE_ROLE_KEY`. Campos: environment (APP_ENV/RUNTIME_ENV/NODE_ENV), service (SERVICE_NAME ou â€œapiâ€), method, path, status, code, user_id, message, stack, context, fingerprint.
 - Supabase errors: `mapSupabaseError` (`api/_shared/operations.js`) cria HttpError com code/status e loga detalhes (code, table, hint, details).
-- Autenticação: `requireAuth` (`api/_shared/auth.js`) registra avisos para header ausente/token vazio/inválido e exceções de getUser, além de responder 401.
-- withAuth: anexa `req.user` para que `handleError` registre usuário no log.
+- AutenticaÃ§Ã£o: `requireAuth` (`api/_shared/auth.js`) registra avisos para header ausente/token vazio/invÃ¡lido e exceÃ§Ãµes de getUser, alÃ©m de responder 401.
+- withAuth: anexa `req.user` para que `handleError` registre usuÃ¡rio no log.
 - Express (src/app.js):
   - Middleware de requestId (aceita `x-request-id` ou gera `req-...`) e inclui no JSON de erro/404.
   - Middleware de erro usa `logApiError` e devolve `{ error, requestId }`.
-  - Access log só para requisições lentas (>= `SLOW_REQUEST_THRESHOLD_MS`, padrão 2000 ms) e que não sejam 5xx, para não lotar o banco.
+  - Access log sÃ³ para requisiÃ§Ãµes lentas (>= `SLOW_REQUEST_THRESHOLD_MS`, padrÃ£o 2000 ms) e que nÃ£o sejam 5xx, para nÃ£o lotar o banco.
 - Migration: `supabase/migrations/0068_create_api_errors.sql` cria tabela `api_errors` com RLS para `service_role`. Aplicar no Supabase antes de usar.
-- Captcha (Supabase Auth): se Authentication → Attack Protection estiver ativado, o backend exige `captchaToken` no `signInWithPassword`. Para login sem captcha, mantenha desativado. O captcha do app fica apenas na página de redefinição de senha (ver `docs/captcha.txt`).
+- Captcha (Supabase Auth): se Authentication â†’ Attack Protection estiver ativado, o backend exige `captchaToken` no `signInWithPassword`. Para login sem captcha, mantenha desativado. O captcha do app fica apenas na pÃ¡gina de redefiniÃ§Ã£o de senha (ver `docs/captcha.txt`).
 
 Edge Functions (Supabase)
 - As funcoes de importacao (cadastro, desligamento, entradas, acidentes, cadastro base) registram erros em `api_errors`.
 - Quando ha validacao com CSV de erros, grava um resumo com contadores e amostras em `api_errors`.
 
-Frontend (React – pasta src/)
+Frontend (React â€“ pasta src/)
 - Pipeline de log: `useErrorLogger` + `logError` (`src/hooks/useErrorLogger.js`, `src/services/errorLogService.js`).
   - Envia para `app_errors` com message, stack, page, context, userId, severity.
-  - Não quebra UX; falha de log fica em console warn.
-- Error boundary: `ErrorBoundaryWithLogger` (`src/components/ErrorBoundary.jsx`) captura erros de renderização e envia via `useErrorLogger(page)`. Usada em `src/App.jsx` na raiz.
-- Padrão de warns críticos: `reportClientError` em `src/services/api.js` substitui `console.warn` em pontos sensíveis (resolver centros/material/pessoa, históricos, caches, filtros, buscas, RLS etc.), encaminhando para `app_errors` com contexto. Outros módulos (AuthContext, Permissions, Configurações, localData/localApi, authService, controllers) também enviam para `app_errors`.
+  - Deduplicacao por `fingerprint`: duplicados sao ignorados (upsert com `ignoreDuplicates`).
+  - NÃ£o quebra UX; falha de log fica em console warn.
+- Error boundary: `ErrorBoundaryWithLogger` (`src/components/ErrorBoundary.jsx`) captura erros de renderizaÃ§Ã£o e envia via `useErrorLogger(page)`. Usada em `src/App.jsx` na raiz.
+- PadrÃ£o de warns crÃ­ticos: `reportClientError` em `src/services/api.js` substitui `console.warn` em pontos sensÃ­veis (resolver centros/material/pessoa, histÃ³ricos, caches, filtros, buscas, RLS etc.), encaminhando para `app_errors` com contexto. Outros mÃ³dulos (AuthContext, Permissions, ConfiguraÃ§Ãµes, localData/localApi, authService, controllers) tambÃ©m enviam para `app_errors`.
 - System health: `src/components/SystemStatus.jsx` usa `useErrorLogger('system_status')` para falhas de health check e perfil.
 
 Como adicionar novos logs
 - Backend: use `handleError` nos handlers; para logs manuais, chame `logApiError({ message, method, path, status, code, userId, context, stack, requestId })`.
-- Frontend: injete `const { reportError } = useErrorLogger('<page>')` e chame `reportError(err, { contexto })`; em serviços reutilize `reportClientError` (já importado em `src/services/api.js`).
+- Frontend: injete `const { reportError } = useErrorLogger('<page>')` e chame `reportError(err, { contexto })`; em serviÃ§os reutilize `reportClientError` (jÃ¡ importado em `src/services/api.js`).
 
-Checklist de operação
-- Variáveis: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, opcional `APP_ENV`/`SERVICE_NAME`, `SLOW_REQUEST_THRESHOLD_MS` (padrão 2000 ms).
+Checklist de operaÃ§Ã£o
+- VariÃ¡veis: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, opcional `APP_ENV`/`SERVICE_NAME`, `SLOW_REQUEST_THRESHOLD_MS` (padrÃ£o 2000 ms).
 - Aplicar migrations, incluindo `0068_create_api_errors.sql` (backend) e a existente `0052_create_app_errors.sql` (frontend).
-- Validar: provocar erro 500 no backend e conferir registro em `api_errors`; provocar exceção no front (ErrorBoundary) ou `reportClientError` e conferir em `app_errors`; simular requisição lenta (> limiar) para ver log de performance.
+- Validar: provocar erro 500 no backend e conferir registro em `api_errors`; provocar exceÃ§Ã£o no front (ErrorBoundary) ou `reportClientError` e conferir em `app_errors`; simular requisiÃ§Ã£o lenta (> limiar) para ver log de performance.

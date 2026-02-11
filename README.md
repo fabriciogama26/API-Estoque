@@ -216,6 +216,7 @@ Opcionais / por feature:
       - `Modal/`:
         - `AcidenteCancelModal.jsx`: componente React.
         - `AcidenteDetailsModal.jsx`: componente React.
+        - `AcidenteDuplicateModal.jsx`: componente React.
         - `AcidentesHistoryModal.jsx`: componente React.
         - `AcidentesHistoryTimeline.jsx`: componente React.
       - `Table/`:
@@ -681,6 +682,8 @@ Opcionais / por feature:
     - `20250218_fix_saidas_troca_sequencia.sql`: migration SQL.
     - `20250218_update_rpc_admin_write_credential_history.sql`: migration SQL.
     - `20260201_create_inventory_report.sql`: migration SQL.
+    - `20260211_allow_duplicate_cid_accidents.sql`: migration SQL.
+    - `20260211_accidents_import_hash.sql`: migration SQL.
     - `20260219_refactor_acidentes_to_accidents.sql`: migration SQL.
     - `20260220_update_vw_indicadores_acidentes_accidents.sql`: migration SQL.
     - `20260221_fix_accident_group_and_pessoas_view.sql`: migration SQL.

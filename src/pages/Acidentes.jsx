@@ -7,6 +7,7 @@ import { AcidentesTable } from '../components/Acidentes/Table/AcidentesTable.jsx
 import { AcidentesHistoryModal } from '../components/Acidentes/Modal/AcidentesHistoryModal.jsx'
 import { AcidenteDetailsModal } from '../components/Acidentes/Modal/AcidenteDetailsModal.jsx'
 import { AcidenteCancelModal } from '../components/Acidentes/Modal/AcidenteCancelModal.jsx'
+import { AcidenteDuplicateModal } from '../components/Acidentes/Modal/AcidenteDuplicateModal.jsx'
 import { AcidentesImportModal } from '../components/Acidentes/AcidentesImportModal.jsx'
 import { ACIDENTES_HISTORY_DEFAULT } from '../config/AcidentesConfig.js'
 import { cancelAcidente, getAcidenteHistory, downloadAcidenteTemplate, importAcidentePlanilha } from '../services/acidentesService.js'
@@ -70,8 +71,11 @@ function AcidentesPageContent() {
     form,
     formError,
     isSaving,
+    duplicateState,
     handleFormChange,
     handleSubmit,
+    confirmDuplicate,
+    closeDuplicateModal,
     startEdit,
     cancelEdit,
     editingAcidente,
@@ -213,6 +217,13 @@ function AcidentesPageContent() {
         onPessoaFocus={handlePessoaFocus}
         onPessoaBlur={handlePessoaBlur}
         onPessoaClear={clearPessoaSelection}
+      />
+
+      <AcidenteDuplicateModal
+        state={duplicateState}
+        onClose={closeDuplicateModal}
+        onConfirm={confirmDuplicate}
+        isSaving={isSaving}
       />
 
       <AcidentesFilters

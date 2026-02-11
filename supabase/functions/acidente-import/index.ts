@@ -1,11 +1,11 @@
-// Setup type definitions for built-in Supabase Runtime APIs
+﻿// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import * as XLSX from "npm:xlsx"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-session-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Expose-Headers": "x-deno-execution-id, x-sb-request-id",
 }
@@ -188,6 +188,23 @@ const buildDateTimeIso = (dateStr: string, timeStr: string) => {
   return date.toISOString()
 }
 
+const buildDateKeyFromIso = (iso: string) => {
+  const ms = Date.parse(iso)
+  if (Number.isNaN(ms)) return null
+  const local = new Date(ms + tzOffsetHours * 60 * 60 * 1000)
+  const yyyy = local.getUTCFullYear()
+  const mm = String(local.getUTCMonth() + 1).padStart(2, "0")
+  const dd = String(local.getUTCDate()).padStart(2, "0")
+  return `${yyyy}-${mm}-${dd}`
+}
+
+const buildUtcBoundaryFromDateKey = (dateKey: string, addDays = 0) => {
+  const [yyyy, mm, dd] = dateKey.split("-").map((val) => Number(val))
+  if (!yyyy || !mm || !dd) return null
+  const utc = Date.UTC(yyyy, mm - 1, dd + addDays, 0 - tzOffsetHours, 0, 0)
+  return new Date(utc).toISOString()
+}
+
 const integerOrNull = (value?: unknown) => {
   if (value === null || value === undefined) return null
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -198,6 +215,14 @@ const integerOrNull = (value?: unknown) => {
   if (!/^-?\d+$/.test(raw)) return null
   const parsed = Number.parseInt(raw, 10)
   return Number.isNaN(parsed) ? null : parsed
+}
+
+const hashText = async (value: string) => {
+  const data = new TextEncoder().encode(value)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
 }
 
 const buildMatriculaKeys = (value?: string | number | null) => {
@@ -224,11 +249,11 @@ const normalizeError = (message: string) => message.toLowerCase()
 
 const mapRpcError = (message: string) => {
   const normalized = normalizeError(message)
+  if (normalized.includes("acidente_import_duplicate")) {
+    return { column: "duplicado", reason: "registro ja importado" }
+  }
   if (normalized.includes("acidente_cat_duplicate") || normalized.includes("cat")) {
     return { column: "cat", reason: "ja cadastrado" }
-  }
-  if (normalized.includes("acidente_cid_duplicate") || normalized.includes("cid")) {
-    return { column: "cid", reason: "ja cadastrado" }
   }
   if (normalized.includes("acidente_agente_required")) {
     return { column: "agentes", reason: "obrigatorio" }
@@ -247,6 +272,14 @@ const mapRpcError = (message: string) => {
   }
   if (normalized.includes("acidente_partes_invalidas")) {
     return { column: "partes", reason: "inexistente" }
+  }
+  if (
+    normalized.includes("does not exist") ||
+    normalized.includes("column") ||
+    normalized.includes("operator does not exist") ||
+    normalized.includes("syntax error")
+  ) {
+    return { column: "db", reason: "erro interno" }
   }
   if (normalized.includes("local")) {
     return { column: "local", reason: "invalido" }
@@ -267,6 +300,12 @@ Deno.serve(async (req) => {
 
     const requestPath = new URL(req.url).pathname
     const requestMethod = req.method
+    const requestId =
+      req.headers.get("x-sb-request-id") ||
+      req.headers.get("x-request-id") ||
+      req.headers.get("x-deno-execution-id") ||
+      null
+    const sessionId = req.headers.get("x-session-id") || null
     const logError = async (
       status: number,
       message: string,
@@ -292,6 +331,8 @@ Deno.serve(async (req) => {
           function: SERVICE_NAME,
           bucket: errorsBucket,
           path: sourcePath,
+          requestId,
+          sessionId,
         },
       })
     }
@@ -422,30 +463,42 @@ Deno.serve(async (req) => {
     const locaisMap = buildNameMap(
       (locaisRaw as CatalogRow[] | null)?.filter((item) => item?.ativo !== false) ?? null,
     )
-    const agentesMap = buildNameMap(
-      (agentesRaw as CatalogRow[] | null)?.filter((item) => item?.ativo !== false) ?? null,
-    )
+    const agentesAtivos = (agentesRaw as CatalogRow[] | null)?.filter((item) => item?.ativo !== false) ?? null
+    const agentesMap = buildNameMap(agentesAtivos)
     const partesMap = buildNameMap(
       (partesRaw as CatalogRow[] | null)?.filter((item) => item?.ativo !== false) ?? null,
     )
 
     const tiposMap = new Map<string, string>()
+    const tiposByName = new Map<string, Set<string>>()
     ;(tiposRaw as CatalogRow[] | null)?.forEach((row) => {
       if (row?.ativo === false) return
       if (!row?.agente_id) return
       const nome = normalizeLookupKey(row.nome)
       if (!nome) return
       tiposMap.set(`${row.agente_id}::${nome}`, row.id)
+      if (!tiposByName.has(nome)) {
+        tiposByName.set(nome, new Set())
+      }
+      tiposByName.get(nome)?.add(row.agente_id)
     })
 
     const lesoesMap = new Map<string, string>()
+    const lesoesByName = new Map<string, Set<string>>()
     ;(lesoesRaw as CatalogRow[] | null)?.forEach((row) => {
       if (row?.ativo === false) return
       if (!row?.agente_id) return
       const nome = normalizeLookupKey(row.nome)
       if (!nome) return
       lesoesMap.set(`${row.agente_id}::${nome}`, row.id)
+      if (!lesoesByName.has(nome)) {
+        lesoesByName.set(nome, new Set())
+      }
+      lesoesByName.get(nome)?.add(row.agente_id)
     })
+
+    const formatMismatch = (agenteLabel: string, valor: string) =>
+      `nao pertence ao agente (${agenteLabel}): ${valor}`
 
     const matriculasArquivo = new Set<string>()
     rows.forEach((linha) => {
@@ -480,10 +533,59 @@ Deno.serve(async (req) => {
     let success = 0
     let errors = 0
     const errorLines: string[] = ["linha,matricula,coluna,motivo"]
+    const duplicateKeys = new Set<string>()
+    const existingAccidentes = new Map<string, string>()
 
     const pushError = (line: number, matricula: string, col: string, motivo: string) => {
       errors += 1
       errorLines.push(`${line},"${matricula}",${col},"${motivo}"`)
+    }
+
+    if (matriculaMap.size && rows.length) {
+      const pessoasSet = new Set<string>()
+      const dateKeys: string[] = []
+      rows.forEach((linha) => {
+        const matriculaRaw = resolveField(linha, ["matricula"])
+        const matricula = matriculaRaw === null || matriculaRaw === undefined ? "" : String(matriculaRaw).trim()
+        if (!matricula) return
+        const pessoaId = buildMatriculaKeys(matricula).map((k) => matriculaMap.get(k)).find(Boolean)
+        if (!pessoaId) return
+        const dataRaw = resolveField(linha, ["data", "data_acidente", "data_do_acidente"])
+        const dataStr = parseDate(dataRaw)
+        if (!dataStr) return
+        pessoasSet.add(pessoaId)
+        dateKeys.push(dataStr)
+      })
+
+      if (pessoasSet.size && dateKeys.length) {
+        const minDate = dateKeys.reduce((min, val) => (val < min ? val : min), dateKeys[0])
+        const maxDate = dateKeys.reduce((max, val) => (val > max ? val : max), dateKeys[0])
+        const rangeStart = buildUtcBoundaryFromDateKey(minDate)
+        const rangeEnd = buildUtcBoundaryFromDateKey(maxDate, 1)
+        if (rangeStart && rangeEnd) {
+          const pessoasArray = Array.from(pessoasSet)
+          const chunkSize = 100
+          for (let i = 0; i < pessoasArray.length; i += chunkSize) {
+            const slice = pessoasArray.slice(i, i + chunkSize)
+            const { data: acidentesRaw, error: acidentesErr } = await supabaseAdmin
+              .from("accidents")
+              .select("id, people_id, accident_date")
+              .eq("account_owner_id", owner)
+              .in("people_id", slice)
+              .gte("accident_date", rangeStart)
+              .lt("accident_date", rangeEnd)
+            if (acidentesErr) {
+              await logError(500, acidentesErr.message, { error: acidentesErr.message }, importUserId, acidentesErr.code)
+              return new Response(acidentesErr.message, { status: 500, headers: corsHeaders })
+            }
+            ;(acidentesRaw || []).forEach((acidente) => {
+              const dateKey = acidente?.accident_date ? buildDateKeyFromIso(acidente.accident_date) : null
+              if (!dateKey || !acidente?.people_id || !acidente?.id) return
+              existingAccidentes.set(`${acidente.people_id}::${dateKey}`, acidente.id)
+            })
+          }
+        }
+      }
     }
 
     for (let i = 0; i < rows.length; i++) {
@@ -520,6 +622,21 @@ Deno.serve(async (req) => {
       const dataIso = buildDateTimeIso(dataStr, horaStr)
       if (!dataIso) {
         pushError(idx, matricula, "data", "invalida")
+        continue
+      }
+
+      const duplicateKey = `${pessoaId}::${dataStr}`
+      if (existingAccidentes.has(duplicateKey)) {
+        pushError(
+          idx,
+          matricula,
+          "data",
+          `ja existe acidente nessa data (id=${existingAccidentes.get(duplicateKey)})`,
+        )
+        continue
+      }
+      if (duplicateKeys.has(duplicateKey)) {
+        pushError(idx, matricula, "data", "duplicado na planilha")
         continue
       }
 
@@ -610,7 +727,11 @@ Deno.serve(async (req) => {
         if (tipoNome) {
           const tipoId = tiposMap.get(`${agente.id}::${tipoNome}`)
           if (!tipoId) {
-            pushError(idx, matricula, "tipos", `inexistente (${tipos[a]})`)
+            if (tiposByName.get(tipoNome)?.size) {
+              pushError(idx, matricula, "tipos", formatMismatch(agentes[a] || agente.nome || "agente", tipos[a]))
+            } else {
+              pushError(idx, matricula, "tipos", `inexistente (${tipos[a]})`)
+            }
             agentesIds.length = 0
             break
           }
@@ -623,7 +744,11 @@ Deno.serve(async (req) => {
         if (lesaoNome) {
           const lesaoId = lesoesMap.get(`${agente.id}::${lesaoNome}`)
           if (!lesaoId) {
-            pushError(idx, matricula, "lesoes", `inexistente (${lesoes[a]})`)
+            if (lesoesByName.get(lesaoNome)?.size) {
+              pushError(idx, matricula, "lesoes", formatMismatch(agentes[a] || agente.nome || "agente", lesoes[a]))
+            } else {
+              pushError(idx, matricula, "lesoes", `inexistente (${lesoes[a]})`)
+            }
             agentesIds.length = 0
             break
           }
@@ -668,6 +793,24 @@ Deno.serve(async (req) => {
         ? ""
         : String(observacaoRaw).trim()
 
+      const importHash = await hashText(
+        [
+          pessoaId,
+          dataIso,
+          String(diasPerdidos),
+          String(diasDebitados),
+          centro.id,
+          local.id,
+          agentesIds.join(","),
+          tiposIds.map((v) => v ?? "").join(","),
+          lesoesIds.map((v) => v ?? "").join(","),
+          partesIds.join(","),
+          cat,
+          cid,
+          observacao,
+        ].join("|"),
+      )
+
       stage = "db_insert_acidente"
       const { error: insertErr } = await supabaseUser.rpc("rpc_acidentes_create_full", {
         p_pessoa_id: pessoaId,
@@ -684,12 +827,14 @@ Deno.serve(async (req) => {
         p_lesoes_ids: lesoesIds,
         p_partes_ids: partesIds,
         p_registrado_por: importUserId,
+        p_import_hash: importHash,
       })
       if (insertErr) {
         const mapped = mapRpcError(insertErr.message || "erro")
         pushError(idx, matricula, mapped.column, mapped.reason)
         continue
       }
+      duplicateKeys.add(duplicateKey)
       success += 1
     }
 
@@ -801,6 +946,11 @@ Deno.serve(async (req) => {
         function: SERVICE_NAME,
         bucket: errorsBucket,
         path: sourcePath,
+        requestId: req.headers.get("x-sb-request-id") ||
+          req.headers.get("x-request-id") ||
+          req.headers.get("x-deno-execution-id") ||
+          null,
+        sessionId: req.headers.get("x-session-id") || null,
       },
     })
     return new Response(
@@ -814,3 +964,4 @@ Deno.serve(async (req) => {
     )
   }
 })
+

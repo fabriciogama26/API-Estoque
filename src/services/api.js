@@ -1806,9 +1806,6 @@ function mapSupabaseError(error, fallbackMessage = GENERIC_ERROR) {
   if (combined.includes('acidente_cat_duplicate') || combined.includes('accidents_unique_cat_per_owner')) {
     return new Error('CAT ja cadastrada em outro acidente.')
   }
-  if (combined.includes('acidente_cid_duplicate') || combined.includes('accidents_unique_cid_per_owner')) {
-    return new Error('CID ja cadastrado em outro acidente.')
-  }
   const err = new Error(rawMessage)
   err.code = error.code
   err.hint = error.hint
