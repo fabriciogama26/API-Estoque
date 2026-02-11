@@ -51,10 +51,13 @@ Atualizacao 2026-02
 - `src/services/api.js`
 - `src/services/authService.js`
 - `src/hooks/useChangePassword.js`
+- `src/hooks/useResetPassword.js`
 - `src/layouts/MainLayout.jsx`
 - Antes/Depois:
 - Antes: expiracao ocorria apenas no front e nao havia timebox/idle no servidor.
 - Depois: servidor valida timebox (12h), idle (30min) e reauth (15min), e o front limpa tokens ao receber SESSION_EXPIRED/REAUTH_REQUIRED.
+- Antes: pagina de reset podia falhar com `securityConfig is not defined` ao validar captcha.
+- Depois: hook de reset importa `securityConfig` e a validacao roda sem erro de referencia.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
