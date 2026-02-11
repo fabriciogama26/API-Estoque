@@ -33,6 +33,7 @@ AtualizaÃ§Ãµes recentes
 - 2025-12: Lista reordenada, filtro de valor unitÃ¡rio adicionado, detalhes/histÃ³rico padronizados, datas de cadastro mapeadas, botÃ£o de olho para detalhes.
 - 2026-02: Exportar Excel (CSV) na lista de materiais.
 - 2026-02: Exportacao CSV inclui ID e CA na lista de materiais.
+- 2026-02: Catalogos de grupos/itens agora ordenam por nome; removida dependencia da coluna ordem.
 - 2026-01: Preflight `material_preflight_check` compara base completa (fabricante+grupo+item+numero+cores+caracteristicas) e retorna: `ca_conflict` (mesma base + CA), `base_conflict_empty` (bloqueia) e `base_match_ca_diff` (alerta/modal). Em update o proprio id e ignorado (`p_material_id`). Os gatilhos de INSERT/UPDATE usam os hashes `hash_base`/`hash_completo` para impedir base igual com CA vazio ou duplicidade exata.
 - 2026-02: CA pode repetir em bases diferentes; conflito apenas quando base completa + CA forem iguais.
 - 2026-01: RPCs material_create_full e material_update_full gravam material + vinculos (cores/caracteristicas) em uma unica transacao; evita 42501 em RLS de tabelas de vinculo.
@@ -61,6 +62,8 @@ FunÃ§Ãµes utilitÃ¡rias relacionadas
 ServiÃ§os e integraÃ§Ãµes externas
 -------------------------------
 - materiaisService â€” serviÃ§o de API (src/services/materiaisService.js); listar/criar/atualizar, detalhes completos (get), histÃ³rico de preÃ§o, catÃ¡logos (grupos, itens, fabricantes, cores, caracterÃ­sticas, calÃ§ados, tamanhos).
+- api (src/services/api.js); resolveGrupoMaterialId, materials.groups e materials.items sem ordenacao por coluna ordem.
+- MateriaisOperations.groups (api/_shared/operations.js); lista grupos apenas por nome.
 
 Ajuda contextual
 ----------------
@@ -76,3 +79,8 @@ Atualizacao 2026-01 (schema)
 - Tabelas registradas: public.material_grupo_cor, public.material_grupo_caracteristica_epi, public.cor, public.caracteristica_epi, public.fabricantes, public.medidas_calcado, public.medidas_vestimentas, public.epi_classe.
 - Colunas registradas: public.material_grupo_cor.created_at, public.material_grupo_caracteristica_epi.created_at.
 - Antes/Depois: antes existiam no banco sem migration; depois estao versionadas na pasta supabase/migrations.
+
+Atualizacao 2026-02 (catalogos)
+- Arquivos alterados: src/services/api.js, api/_shared/operations.js.
+- Funcoes: resolveGrupoMaterialId, materials.groups, materials.items, MateriaisOperations.groups.
+- Antes/Depois: antes selecionava/ordenava por coluna ordem; agora remove ordem e ordena por nome.

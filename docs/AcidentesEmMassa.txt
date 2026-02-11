@@ -27,6 +27,7 @@ Colunas opcionais:
 
 Observacoes importantes:
 - O arquivo deve ser .xlsx (nao CSV).
+- O upload bloqueia arquivos acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
 - Agentes, tipos, lesoes e partes devem usar ";" como separador.
 - A ordem precisa ser coerente:
   Ex.: agentes="A1;A2", tipos="T1;T2", lesoes="L1;L2".
@@ -91,6 +92,7 @@ Quando houver erros, a Edge Function retorna:
 - errorsUrl: URL assinada para baixar o CSV (se configurado)
 - firstError: primeira linha de erro
 - errorSamples: amostras de erros
+- Um resumo e amostras ficam registrados em public.api_errors.
 
 Formato do CSV:
-linha,coluna,motivo
+linha,matricula,coluna,motivo

@@ -2003,8 +2003,7 @@ export const MateriaisOperations = {
       (await execute(
         supabaseAdmin
           .from('grupos_material')
-          .select('id, nome, ativo, ordem')
-          .order('ordem', { ascending: true, nullsFirst: false })
+          .select('id, nome, ativo')
           .order('nome', { ascending: true }),
         'Falha ao listar grupos de materiais.'
       )) ?? []

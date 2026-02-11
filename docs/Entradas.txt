@@ -46,6 +46,7 @@ Cadastro
   - Botao "Importar em massa" abre modal com download do modelo XLSX.
   - Colunas obrigatorias: centro_estoque, material_id, quantidade, data_entrada.
   - Hora da entrada e definida automaticamente no momento do import.
+  - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
   - Centro de estoque e material precisam existir no catalogo do owner.
 
 Filtros, auto-complete e listagem

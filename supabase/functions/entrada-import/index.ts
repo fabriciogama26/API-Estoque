@@ -21,6 +21,56 @@ const tzOffsetHours = Number(Deno.env.get("ENTRADAS_TZ_OFFSET") ?? "-3")
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
 const supabaseAuth = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } })
+const SERVICE_NAME = "entrada-import"
+
+const limitText = (value: unknown, max = 500) => {
+  if (value === null || value === undefined) return ""
+  const text = typeof value === "string" ? value : String(value)
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}...`
+}
+
+const resolveSeverity = (status?: number | null) => (status && status >= 500 ? "error" : "warn")
+
+const buildFingerprint = (service: string, message: string, stageValue?: string | null, status?: number | null) =>
+  [service, message, stageValue ? `stage=${stageValue}` : "", status ? `status=${status}` : ""]
+    .filter(Boolean)
+    .join("|")
+    .slice(0, 200)
+
+const logApiError = async (payload: {
+  message: string
+  status?: number | null
+  code?: string | null
+  userId?: string | null
+  stage?: string | null
+  context?: Record<string, unknown> | null
+  severity?: string | null
+  stack?: string | null
+  path?: string | null
+  method?: string | null
+}) => {
+  try {
+    const message = limitText(payload.message || "Erro desconhecido")
+    const fingerprint = buildFingerprint(SERVICE_NAME, message, payload.stage, payload.status ?? null)
+    await supabaseAdmin.from("api_errors").insert({
+      environment: "api",
+      service: SERVICE_NAME,
+      method: payload.method ?? null,
+      path: payload.path ?? null,
+      status: payload.status ?? null,
+      code: payload.code ?? null,
+      user_id: payload.userId ?? null,
+      message,
+      stack: payload.stack ? limitText(payload.stack, 2000) : null,
+      context: payload.context ?? null,
+      severity: payload.severity ?? resolveSeverity(payload.status ?? null),
+      fingerprint,
+    })
+  } catch (_) {
+    // nao propaga falha de log
+  }
+}
 
 type CentroRow = { id: string; almox?: string | null; ativo?: boolean | null }
 
@@ -112,15 +162,52 @@ Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
     if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: corsHeaders })
 
+    const requestPath = new URL(req.url).pathname
+    const requestMethod = req.method
+    const logError = async (
+      status: number,
+      message: string,
+      extraContext: Record<string, unknown> = {},
+      userId: string | null = null,
+      code: string | null = null,
+      stack: string | null = null,
+      severity?: string,
+    ) => {
+      await logApiError({
+        message,
+        status,
+        code,
+        userId,
+        stage,
+        stack,
+        severity,
+        method: requestMethod,
+        path: requestPath,
+        context: {
+          ...extraContext,
+          stage,
+          function: SERVICE_NAME,
+          bucket: errorsBucket,
+          path: sourcePath,
+        },
+      })
+    }
+
     stage = "auth_header"
     const authHeader = req.headers.get("authorization") || ""
     const tokenMatch = authHeader.match(/Bearer\s+(.+)/i)
     const accessToken = tokenMatch?.[1]?.trim()
-    if (!accessToken) return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    if (!accessToken) {
+      await logError(401, "Unauthorized")
+      return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    }
 
     stage = "auth_getUser"
     const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(accessToken)
-    if (userErr || !userData?.user?.id) return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    if (userErr || !userData?.user?.id) {
+      await logError(401, "Unauthorized", { error: userErr?.message || null })
+      return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    }
     const importUserId = userData.user.id
 
     stage = "resolve_owner"
@@ -132,6 +219,7 @@ Deno.serve(async (req) => {
     const owner =
       typeof ownerId === "string" ? ownerId : (ownerId as { account_owner_id?: string } | null)?.account_owner_id
     if (ownerErr || !owner) {
+      await logError(403, "Owner nao encontrado", { error: ownerErr?.message || null }, importUserId)
       return new Response("Owner nao encontrado", { status: 403, headers: corsHeaders })
     }
 
@@ -140,20 +228,28 @@ Deno.serve(async (req) => {
     try {
       body = await req.json()
     } catch {
+      await logError(400, "Body precisa ser JSON: { path: string }", {}, importUserId)
       return new Response(
         JSON.stringify({ ok: false, stage, message: "Body precisa ser JSON: { path: string }" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       )
     }
     const path = body?.path
-    if (!path || typeof path !== "string") return new Response("path obrigatorio", { status: 400, headers: corsHeaders })
-    if (!path.toLowerCase().endsWith(".xlsx")) return new Response("Apenas XLSX", { status: 400, headers: corsHeaders })
+    if (!path || typeof path !== "string") {
+      await logError(400, "path obrigatorio", {}, importUserId)
+      return new Response("path obrigatorio", { status: 400, headers: corsHeaders })
+    }
+    if (!path.toLowerCase().endsWith(".xlsx")) {
+      await logError(400, "Apenas XLSX", {}, importUserId)
+      return new Response("Apenas XLSX", { status: 400, headers: corsHeaders })
+    }
     sourcePath = path
 
     stage = "storage_download"
     const download = await supabaseAdmin.storage.from(errorsBucket).download(path)
     if (download.error || !download.data) {
       const msg = download.error?.message || "Falha ao baixar arquivo"
+      await logError(400, msg, { error: download.error?.message || null }, importUserId)
       return new Response(msg, { status: 400, headers: corsHeaders })
     }
 
@@ -170,7 +266,10 @@ Deno.serve(async (req) => {
       .select("id, almox, ativo")
       .eq("account_owner_id", owner)
       .eq("ativo", true)
-    if (centrosErr) return new Response(centrosErr.message, { status: 500, headers: corsHeaders })
+    if (centrosErr) {
+      await logError(500, centrosErr.message, { error: centrosErr.message }, importUserId, centrosErr.code)
+      return new Response(centrosErr.message, { status: 500, headers: corsHeaders })
+    }
 
     const centrosMap = new Map<string, CentroRow>()
     ;(centrosRaw as CentroRow[] | null)?.forEach((row) => {
@@ -200,7 +299,10 @@ Deno.serve(async (req) => {
           .select("id")
           .eq("account_owner_id", owner)
           .in("id", slice)
-        if (materiaisErr) return new Response(materiaisErr.message, { status: 500, headers: corsHeaders })
+        if (materiaisErr) {
+          await logError(500, materiaisErr.message, { error: materiaisErr.message }, importUserId, materiaisErr.code)
+          return new Response(materiaisErr.message, { status: 500, headers: corsHeaders })
+        }
         ;(materiais || []).forEach((m) => {
           if (m?.id) materialMap.add(m.id)
         })
@@ -317,6 +419,23 @@ Deno.serve(async (req) => {
 
       await deleteSource()
 
+      await logError(
+        200,
+        "Importacao concluida com erros",
+        {
+          processed,
+          success,
+          errors,
+          errorsUrl,
+          firstError: errorLines[1],
+          errorSamples,
+        },
+        importUserId,
+        "IMPORT_PARTIAL",
+        null,
+        "warn",
+      )
+
       return new Response(
         JSON.stringify({
           processed,
@@ -364,6 +483,22 @@ Deno.serve(async (req) => {
     }
     const e = err instanceof Error ? err : new Error(String(err))
     console.error("entrada-import error", stage, e.message, e.stack)
+    await logApiError({
+      message: e.message,
+      status: 500,
+      userId: null,
+      stage,
+      stack: e.stack ?? null,
+      severity: "error",
+      method: req.method,
+      path: new URL(req.url).pathname,
+      context: {
+        stage,
+        function: SERVICE_NAME,
+        bucket: errorsBucket,
+        path: sourcePath,
+      },
+    })
     return new Response(
       JSON.stringify({
         ok: false,
