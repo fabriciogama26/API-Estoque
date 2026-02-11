@@ -21,6 +21,10 @@ Backend (Node/Express – pasta api/ + src/app.js)
 - Migration: `supabase/migrations/0068_create_api_errors.sql` cria tabela `api_errors` com RLS para `service_role`. Aplicar no Supabase antes de usar.
 - Captcha (Supabase Auth): se Authentication → Attack Protection estiver ativado, o backend exige `captchaToken` no `signInWithPassword`. Para login sem captcha, mantenha desativado. O captcha do app fica apenas na página de redefinição de senha (ver `docs/captcha.txt`).
 
+Edge Functions (Supabase)
+- As funcoes de importacao (cadastro, desligamento, entradas, acidentes, cadastro base) registram erros em `api_errors`.
+- Quando ha validacao com CSV de erros, grava um resumo com contadores e amostras em `api_errors`.
+
 Frontend (React – pasta src/)
 - Pipeline de log: `useErrorLogger` + `logError` (`src/hooks/useErrorLogger.js`, `src/services/errorLogService.js`).
   - Envia para `app_errors` com message, stack, page, context, userId, severity.

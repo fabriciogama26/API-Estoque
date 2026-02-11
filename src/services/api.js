@@ -14,6 +14,7 @@ import { resolveEffectiveAppUser } from './effectiveUserService.js'
 
 const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+const IMPORTS_MAX_MB = Number(import.meta.env.VITE_IMPORTS_MAX_MB) || 50
 
 const GENERIC_ERROR = 'Falha ao comunicar com o Supabase.'
 
@@ -132,6 +133,26 @@ const normalizeDisplayText = (valor) => {
     return ''
   }
   return typeof texto.normalize === 'function' ? texto.normalize('NFC') : texto
+}
+
+const formatMbValue = (bytes) => {
+  const mb = bytes / (1024 * 1024)
+  return Number.isFinite(mb) ? mb.toFixed(2) : '0.00'
+}
+
+const assertFileSizeWithinLimit = (file, limitMb = IMPORTS_MAX_MB) => {
+  if (!file || !Number.isFinite(limitMb) || limitMb <= 0) {
+    return
+  }
+  const sizeBytes = Number(file.size || 0)
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return
+  }
+  const limitBytes = limitMb * 1024 * 1024
+  if (sizeBytes > limitBytes) {
+    const sizeLabel = formatMbValue(sizeBytes)
+    throw new Error(`Arquivo excede o limite de ${limitMb} MB (tamanho: ${sizeLabel} MB).`)
+  }
 }
 
 const resolveTextValue = (value) => {
@@ -2165,7 +2186,6 @@ async function resolveGrupoMaterialId(valor) {
       .from('grupos_material')
       .select('id')
       .ilike('nome', texto)
-      .order('ordem', { ascending: true, nullsFirst: false })
       .limit(1),
     'Falha ao resolver grupo de material.',
   )
@@ -4565,6 +4585,7 @@ export const api = {
         if (!isSupabaseConfigured) {
           throw new Error('Supabase nao configurado.')
         }
+        assertFileSizeWithinLimit(file)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
         const path = `desligamento/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
@@ -4665,6 +4686,7 @@ export const api = {
         if (!isSupabaseConfigured) {
           throw new Error('Supabase nao configurado.')
         }
+        assertFileSizeWithinLimit(file)
 
         const modeRaw = typeof options?.mode === 'string' ? options.mode.trim().toLowerCase() : 'insert'
         const mode = modeRaw === 'update' ? 'update' : 'insert'
@@ -5115,8 +5137,7 @@ export const api = {
       const data = await execute(
         supabase
           .from('grupos_material')
-          .select('id, nome, ativo, ordem')
-          .order('ordem', { ascending: true, nullsFirst: false })
+          .select('id, nome, ativo')
           .order('nome', { ascending: true }),
         'Falha ao listar grupos de materiais.'
       )
@@ -5201,9 +5222,8 @@ export const api = {
       const data = await execute(
         supabase
           .from('grupos_material_itens')
-          .select('id, nome, ativo, ordem')
+          .select('id, nome, ativo')
           .eq('grupo_id', id)
-          .order('ordem', { ascending: true, nullsFirst: false })
           .order('nome', { ascending: true }),
         'Falha ao listar EPIs do grupo.'
       )
@@ -5255,6 +5275,7 @@ export const api = {
         if (!isSupabaseConfigured) {
           throw new Error('Supabase nao configurado.')
         }
+        assertFileSizeWithinLimit(file)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
         const path = `entradas/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
@@ -6099,6 +6120,7 @@ export const api = {
         if (!isSupabaseConfigured) {
           throw new Error('Supabase nao configurado.')
         }
+        assertFileSizeWithinLimit(file)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
         const path = `acidentes/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
@@ -7240,6 +7262,7 @@ export const api = {
         if (!isSupabaseConfigured) {
           throw new Error('Supabase nao configurado.')
         }
+        assertFileSizeWithinLimit(file)
         const { key } = resolveBasicRegistrationConfig(table)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'

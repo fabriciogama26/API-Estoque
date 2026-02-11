@@ -30,6 +30,7 @@ Colunas opcionais:
 
 Regras de importacao
 --------------------
+- Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
 - Todos os valores sao texto (UUID nao e aceito).
 - Nomes precisam bater com os catalogos relacionados.
 - Itens duplicados na mesma planilha ou ja existentes geram erro.
@@ -65,6 +66,7 @@ Quando houver erros, a Edge Function retorna:
 - errorsUrl: URL assinada para baixar o CSV
 - firstError: primeira linha de erro
 - errorSamples: amostras de erros
+- Um resumo e amostras ficam registrados em public.api_errors.
 
 Formato do CSV:
 linha,coluna,motivo

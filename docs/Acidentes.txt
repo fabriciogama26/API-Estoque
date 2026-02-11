@@ -88,8 +88,10 @@ Cadastro em massa (novo)
 - A planilha exige: matricula, data, hora, dias_debitados, dias_perdidos, centro_servico, local, agentes, tipos, lesoes e partes.
 - Campos opcionais: cat, cid, observacao.
 - Agentes/tipos/lesoes/partes usam ";" como separador.
+- Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
 - O fluxo completo esta documentado em:
   - docs/AcidentesEmMassa.txt
+- Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.
 
 Carregamento de dados
 ---------------------

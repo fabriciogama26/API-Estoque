@@ -20,6 +20,7 @@ Colunas obrigatorias (cabecalho na 1a linha):
 
 Observacoes importantes:
 - O arquivo deve ser .xlsx (nao CSV).
+- O upload bloqueia arquivos acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
 - Campos de texto sao convertidos para MAIUSCULO no backend.
 - centro_custo e preenchido automaticamente a partir do centro_servico.
 - A data pode vir como texto (dd/MM/yyyy), serial do Excel ou Date.
@@ -93,6 +94,7 @@ Quando houver erros, a Edge Function retorna:
 - errorsUrl: URL assinada para baixar o CSV (se configurado)
 - firstError: primeira linha de erro
 - errorSamples: amostras de erros
+- Um resumo e amostras ficam registrados em public.api_errors.
 
 Formato do CSV:
 linha,matricula,coluna,motivo
@@ -106,8 +108,8 @@ Existe a Edge Function `cleanup-import-errors` que remove arquivos mais antigos
 que `ERRORS_RETENTION_DAYS` (padrao 7 dias). Ela roda via cron externo (pg_cron),
 chamando a function com `x-cron-secret`.
 
-Exemplo (domingo 03:00 horario de Brasilia):
-- Cron (UTC): 0 6 * * 0
+Exemplo (todos os dias 00:00 horario de Brasilia):
+- Cron (UTC): 0 3 * * *
 - URL: https://<project-ref>.supabase.co/functions/v1/cleanup-import-errors
 
 Payload de chamada:

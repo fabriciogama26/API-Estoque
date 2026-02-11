@@ -15,6 +15,7 @@ Colunas obrigatorias (cabecalho na 1a linha):
 
 Observacoes importantes:
 - O arquivo deve ser .xlsx (nao CSV).
+- O upload bloqueia arquivos acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
 - O centro_estoque deve existir no catalogo (centros_estoque.almox).
 - O material_id deve existir no catalogo de materiais (mesma familia).
 - A hora e definida automaticamente no momento do import.
@@ -72,6 +73,7 @@ Quando houver erros, a Edge Function retorna:
 - errorsUrl: URL assinada para baixar o CSV (se configurado)
 - firstError: primeira linha de erro
 - errorSamples: amostras de erros
+- Um resumo e amostras ficam registrados em public.api_errors.
 
 Formato do CSV:
 linha,coluna,motivo

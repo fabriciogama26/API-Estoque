@@ -36,6 +36,7 @@ Cadastro
   - Botao "Importar em massa" abre modal com selecao de tabela.
   - Modelo XLSX varia por tabela (nome + relacoes).
   - Todos os campos sao texto; ativo e opcional (true/false).
+  - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
   - Itens duplicados na planilha ou ja existentes sao bloqueados.
 
 Filtros, auto-complete e listagem

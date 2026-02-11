@@ -21,6 +21,56 @@ const tzOffsetHours = Number(Deno.env.get("ACIDENTES_TZ_OFFSET") ?? "-3")
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
 const supabaseAuth = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } })
+const SERVICE_NAME = "acidente-import"
+
+const limitText = (value: unknown, max = 500) => {
+  if (value === null || value === undefined) return ""
+  const text = typeof value === "string" ? value : String(value)
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}...`
+}
+
+const resolveSeverity = (status?: number | null) => (status && status >= 500 ? "error" : "warn")
+
+const buildFingerprint = (service: string, message: string, stageValue?: string | null, status?: number | null) =>
+  [service, message, stageValue ? `stage=${stageValue}` : "", status ? `status=${status}` : ""]
+    .filter(Boolean)
+    .join("|")
+    .slice(0, 200)
+
+const logApiError = async (payload: {
+  message: string
+  status?: number | null
+  code?: string | null
+  userId?: string | null
+  stage?: string | null
+  context?: Record<string, unknown> | null
+  severity?: string | null
+  stack?: string | null
+  path?: string | null
+  method?: string | null
+}) => {
+  try {
+    const message = limitText(payload.message || "Erro desconhecido")
+    const fingerprint = buildFingerprint(SERVICE_NAME, message, payload.stage, payload.status ?? null)
+    await supabaseAdmin.from("api_errors").insert({
+      environment: "api",
+      service: SERVICE_NAME,
+      method: payload.method ?? null,
+      path: payload.path ?? null,
+      status: payload.status ?? null,
+      code: payload.code ?? null,
+      user_id: payload.userId ?? null,
+      message,
+      stack: payload.stack ? limitText(payload.stack, 2000) : null,
+      context: payload.context ?? null,
+      severity: payload.severity ?? resolveSeverity(payload.status ?? null),
+      fingerprint,
+    })
+  } catch (_) {
+    // nao propaga falha de log
+  }
+}
 
 type CatalogRow = { id: string; nome: string; ativo?: boolean | null; agente_id?: string | null }
 
@@ -215,15 +265,52 @@ Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
     if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: corsHeaders })
 
+    const requestPath = new URL(req.url).pathname
+    const requestMethod = req.method
+    const logError = async (
+      status: number,
+      message: string,
+      extraContext: Record<string, unknown> = {},
+      userId: string | null = null,
+      code: string | null = null,
+      stack: string | null = null,
+      severity?: string,
+    ) => {
+      await logApiError({
+        message,
+        status,
+        code,
+        userId,
+        stage,
+        stack,
+        severity,
+        method: requestMethod,
+        path: requestPath,
+        context: {
+          ...extraContext,
+          stage,
+          function: SERVICE_NAME,
+          bucket: errorsBucket,
+          path: sourcePath,
+        },
+      })
+    }
+
     stage = "auth_header"
     const authHeader = req.headers.get("authorization") || ""
     const tokenMatch = authHeader.match(/Bearer\s+(.+)/i)
     const accessToken = tokenMatch?.[1]?.trim()
-    if (!accessToken) return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    if (!accessToken) {
+      await logError(401, "Unauthorized")
+      return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    }
 
     stage = "auth_getUser"
     const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(accessToken)
-    if (userErr || !userData?.user?.id) return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    if (userErr || !userData?.user?.id) {
+      await logError(401, "Unauthorized", { error: userErr?.message || null })
+      return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+    }
     const importUserId = userData.user.id
 
     stage = "resolve_owner"
@@ -235,6 +322,7 @@ Deno.serve(async (req) => {
     const owner =
       typeof ownerId === "string" ? ownerId : (ownerId as { account_owner_id?: string } | null)?.account_owner_id
     if (ownerErr || !owner) {
+      await logError(403, "Owner nao encontrado", { error: ownerErr?.message || null }, importUserId)
       return new Response("Owner nao encontrado", { status: 403, headers: corsHeaders })
     }
 
@@ -243,20 +331,28 @@ Deno.serve(async (req) => {
     try {
       body = await req.json()
     } catch {
+      await logError(400, "Body precisa ser JSON: { path: string }", {}, importUserId)
       return new Response(
         JSON.stringify({ ok: false, stage, message: "Body precisa ser JSON: { path: string }" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       )
     }
     const path = body?.path
-    if (!path || typeof path !== "string") return new Response("path obrigatorio", { status: 400, headers: corsHeaders })
-    if (!path.toLowerCase().endsWith(".xlsx")) return new Response("Apenas XLSX", { status: 400, headers: corsHeaders })
+    if (!path || typeof path !== "string") {
+      await logError(400, "path obrigatorio", {}, importUserId)
+      return new Response("path obrigatorio", { status: 400, headers: corsHeaders })
+    }
+    if (!path.toLowerCase().endsWith(".xlsx")) {
+      await logError(400, "Apenas XLSX", {}, importUserId)
+      return new Response("Apenas XLSX", { status: 400, headers: corsHeaders })
+    }
     sourcePath = path
 
     stage = "storage_download"
     const download = await supabaseAdmin.storage.from(errorsBucket).download(path)
     if (download.error || !download.data) {
       const msg = download.error?.message || "Falha ao baixar arquivo"
+      await logError(400, msg, { error: download.error?.message || null }, importUserId)
       return new Response(msg, { status: 400, headers: corsHeaders })
     }
 
@@ -272,37 +368,55 @@ Deno.serve(async (req) => {
       .from("centros_servico")
       .select("id, nome")
       .eq("account_owner_id", owner)
-    if (centrosErr) return new Response(centrosErr.message, { status: 500, headers: corsHeaders })
+    if (centrosErr) {
+      await logError(500, centrosErr.message, { error: centrosErr.message }, importUserId, centrosErr.code)
+      return new Response(centrosErr.message, { status: 500, headers: corsHeaders })
+    }
 
     stage = "catalog_locais"
     const { data: locaisRaw, error: locaisErr } = await supabaseAdmin
       .from("acidente_locais")
       .select("id, nome, ativo")
-    if (locaisErr) return new Response(locaisErr.message, { status: 500, headers: corsHeaders })
+    if (locaisErr) {
+      await logError(500, locaisErr.message, { error: locaisErr.message }, importUserId, locaisErr.code)
+      return new Response(locaisErr.message, { status: 500, headers: corsHeaders })
+    }
 
     stage = "catalog_agentes"
     const { data: agentesRaw, error: agentesErr } = await supabaseAdmin
       .from("acidente_agentes")
       .select("id, nome, ativo")
-    if (agentesErr) return new Response(agentesErr.message, { status: 500, headers: corsHeaders })
+    if (agentesErr) {
+      await logError(500, agentesErr.message, { error: agentesErr.message }, importUserId, agentesErr.code)
+      return new Response(agentesErr.message, { status: 500, headers: corsHeaders })
+    }
 
     stage = "catalog_tipos"
     const { data: tiposRaw, error: tiposErr } = await supabaseAdmin
       .from("acidente_tipos")
       .select("id, nome, agente_id, ativo")
-    if (tiposErr) return new Response(tiposErr.message, { status: 500, headers: corsHeaders })
+    if (tiposErr) {
+      await logError(500, tiposErr.message, { error: tiposErr.message }, importUserId, tiposErr.code)
+      return new Response(tiposErr.message, { status: 500, headers: corsHeaders })
+    }
 
     stage = "catalog_lesoes"
     const { data: lesoesRaw, error: lesoesErr } = await supabaseAdmin
       .from("acidente_lesoes")
       .select("id, nome, agente_id, ativo")
-    if (lesoesErr) return new Response(lesoesErr.message, { status: 500, headers: corsHeaders })
+    if (lesoesErr) {
+      await logError(500, lesoesErr.message, { error: lesoesErr.message }, importUserId, lesoesErr.code)
+      return new Response(lesoesErr.message, { status: 500, headers: corsHeaders })
+    }
 
     stage = "catalog_partes"
     const { data: partesRaw, error: partesErr } = await supabaseAdmin
       .from("acidente_partes")
       .select("id, nome, ativo")
-    if (partesErr) return new Response(partesErr.message, { status: 500, headers: corsHeaders })
+    if (partesErr) {
+      await logError(500, partesErr.message, { error: partesErr.message }, importUserId, partesErr.code)
+      return new Response(partesErr.message, { status: 500, headers: corsHeaders })
+    }
 
     const centrosMap = buildNameMap(centrosRaw as CatalogRow[] | null)
     const locaisMap = buildNameMap(
@@ -352,7 +466,10 @@ Deno.serve(async (req) => {
           .select("id, matricula")
           .eq("account_owner_id", owner)
           .in("matricula", slice)
-        if (pessoasErr) return new Response(pessoasErr.message, { status: 500, headers: corsHeaders })
+        if (pessoasErr) {
+          await logError(500, pessoasErr.message, { error: pessoasErr.message }, importUserId, pessoasErr.code)
+          return new Response(pessoasErr.message, { status: 500, headers: corsHeaders })
+        }
         ;(pessoas || []).forEach((p) => {
           buildMatriculaKeys(p.matricula).forEach((key) => matriculaMap.set(key, p.id))
         })
@@ -362,11 +479,11 @@ Deno.serve(async (req) => {
     let processed = 0
     let success = 0
     let errors = 0
-    const errorLines: string[] = ["linha,coluna,motivo"]
+    const errorLines: string[] = ["linha,matricula,coluna,motivo"]
 
-    const pushError = (line: number, col: string, motivo: string) => {
+    const pushError = (line: number, matricula: string, col: string, motivo: string) => {
       errors += 1
-      errorLines.push(`${line},${col},"${motivo}"`)
+      errorLines.push(`${line},"${matricula}",${col},"${motivo}"`)
     }
 
     for (let i = 0; i < rows.length; i++) {
@@ -377,32 +494,32 @@ Deno.serve(async (req) => {
       const matriculaRaw = resolveField(linha, ["matricula"])
       const matricula = matriculaRaw === null || matriculaRaw === undefined ? "" : String(matriculaRaw).trim()
       if (!matricula) {
-        pushError(idx, "matricula", "obrigatoria")
+        pushError(idx, matricula, "matricula", "obrigatoria")
         continue
       }
       const pessoaId = buildMatriculaKeys(matricula).map((k) => matriculaMap.get(k)).find(Boolean)
       if (!pessoaId) {
-        pushError(idx, "matricula", "nao encontrada")
+        pushError(idx, matricula, "matricula", "nao encontrada")
         continue
       }
 
       const dataRaw = resolveField(linha, ["data", "data_acidente", "data_do_acidente"])
       const dataStr = parseDate(dataRaw)
       if (!dataStr) {
-        pushError(idx, "data", "invalida")
+        pushError(idx, matricula, "data", "invalida")
         continue
       }
 
       const horaRaw = resolveField(linha, ["hora", "hora_acidente"])
       const horaStr = parseTime(horaRaw)
       if (!horaStr) {
-        pushError(idx, "hora", "invalida")
+        pushError(idx, matricula, "hora", "invalida")
         continue
       }
 
       const dataIso = buildDateTimeIso(dataStr, horaStr)
       if (!dataIso) {
-        pushError(idx, "data", "invalida")
+        pushError(idx, matricula, "data", "invalida")
         continue
       }
 
@@ -411,35 +528,35 @@ Deno.serve(async (req) => {
       const diasDebitados = integerOrNull(diasDebitadosRaw)
       const diasPerdidos = integerOrNull(diasPerdidosRaw)
       if (diasDebitados === null) {
-        pushError(idx, "dias_debitados", "invalido")
+        pushError(idx, matricula, "dias_debitados", "invalido")
         continue
       }
       if (diasPerdidos === null) {
-        pushError(idx, "dias_perdidos", "invalido")
+        pushError(idx, matricula, "dias_perdidos", "invalido")
         continue
       }
 
       const centroRaw = resolveField(linha, ["centro_servico", "centroservico"])
       const centroNome = normalizeLookupKey(centroRaw)
       if (!centroNome) {
-        pushError(idx, "centro_servico", "obrigatorio")
+        pushError(idx, matricula, "centro_servico", "obrigatorio")
         continue
       }
       const centro = centrosMap.get(centroNome)
       if (!centro?.id) {
-        pushError(idx, "centro_servico", "inexistente")
+        pushError(idx, matricula, "centro_servico", "inexistente")
         continue
       }
 
       const localRaw = resolveField(linha, ["local"])
       const localNome = normalizeLookupKey(localRaw)
       if (!localNome) {
-        pushError(idx, "local", "obrigatorio")
+        pushError(idx, matricula, "local", "obrigatorio")
         continue
       }
       const local = locaisMap.get(localNome)
       if (!local?.id) {
-        pushError(idx, "local", "inexistente")
+        pushError(idx, matricula, "local", "inexistente")
         continue
       }
 
@@ -450,28 +567,28 @@ Deno.serve(async (req) => {
 
       const agentes = splitList(agentesRaw)
       if (!agentes.length) {
-        pushError(idx, "agentes", "obrigatorio")
+        pushError(idx, matricula, "agentes", "obrigatorio")
         continue
       }
 
       const tipos = splitList(tiposRaw)
       const lesoes = splitList(lesoesRaw)
       if (!tipos.length && !lesoes.length) {
-        pushError(idx, "tipos/lesoes", "obrigatorio")
+        pushError(idx, matricula, "tipos/lesoes", "obrigatorio")
         continue
       }
       if (tipos.length > agentes.length) {
-        pushError(idx, "tipos", "quantidade maior que agentes")
+        pushError(idx, matricula, "tipos", "quantidade maior que agentes")
         continue
       }
       if (lesoes.length > agentes.length) {
-        pushError(idx, "lesoes", "quantidade maior que agentes")
+        pushError(idx, matricula, "lesoes", "quantidade maior que agentes")
         continue
       }
 
       const partes = splitList(partesRaw)
       if (!partes.length) {
-        pushError(idx, "partes", "obrigatorio")
+        pushError(idx, matricula, "partes", "obrigatorio")
         continue
       }
 
@@ -483,7 +600,7 @@ Deno.serve(async (req) => {
         const agenteNome = normalizeLookupKey(agentes[a])
         const agente = agentesMap.get(agenteNome)
         if (!agente?.id) {
-          pushError(idx, "agentes", `inexistente (${agentes[a]})`)
+          pushError(idx, matricula, "agentes", `inexistente (${agentes[a]})`)
           agentesIds.length = 0
           break
         }
@@ -493,7 +610,7 @@ Deno.serve(async (req) => {
         if (tipoNome) {
           const tipoId = tiposMap.get(`${agente.id}::${tipoNome}`)
           if (!tipoId) {
-            pushError(idx, "tipos", `inexistente (${tipos[a]})`)
+            pushError(idx, matricula, "tipos", `inexistente (${tipos[a]})`)
             agentesIds.length = 0
             break
           }
@@ -506,7 +623,7 @@ Deno.serve(async (req) => {
         if (lesaoNome) {
           const lesaoId = lesoesMap.get(`${agente.id}::${lesaoNome}`)
           if (!lesaoId) {
-            pushError(idx, "lesoes", `inexistente (${lesoes[a]})`)
+            pushError(idx, matricula, "lesoes", `inexistente (${lesoes[a]})`)
             agentesIds.length = 0
             break
           }
@@ -526,7 +643,7 @@ Deno.serve(async (req) => {
         const parteNome = normalizeLookupKey(parte)
         const parteRow = partesMap.get(parteNome)
         if (!parteRow?.id) {
-          pushError(idx, "partes", `inexistente (${parte})`)
+          pushError(idx, matricula, "partes", `inexistente (${parte})`)
           partesInvalidas = true
           break
         }
@@ -542,7 +659,7 @@ Deno.serve(async (req) => {
 
       const cat = catRaw === null || catRaw === undefined ? "" : String(catRaw).trim()
       if (cat && !/^\d+$/.test(cat)) {
-        pushError(idx, "cat", "apenas numeros")
+        pushError(idx, matricula, "cat", "apenas numeros")
         continue
       }
 
@@ -570,7 +687,7 @@ Deno.serve(async (req) => {
       })
       if (insertErr) {
         const mapped = mapRpcError(insertErr.message || "erro")
-        pushError(idx, mapped.column, mapped.reason)
+        pushError(idx, matricula, mapped.column, mapped.reason)
         continue
       }
       success += 1
@@ -601,6 +718,23 @@ Deno.serve(async (req) => {
       errorsUrl = signed.data?.signedUrl || null
 
       await deleteSource()
+
+      await logError(
+        200,
+        "Importacao concluida com erros",
+        {
+          processed,
+          success,
+          errors,
+          errorsUrl,
+          firstError: errorLines[1],
+          errorSamples,
+        },
+        importUserId,
+        "IMPORT_PARTIAL",
+        null,
+        "warn",
+      )
 
       return new Response(
         JSON.stringify({
@@ -653,6 +787,22 @@ Deno.serve(async (req) => {
     }
     const e = err instanceof Error ? err : new Error(String(err))
     console.error("acidente-import error", stage, e.message, e.stack)
+    await logApiError({
+      message: e.message,
+      status: 500,
+      userId: null,
+      stage,
+      stack: e.stack ?? null,
+      severity: "error",
+      method: req.method,
+      path: new URL(req.url).pathname,
+      context: {
+        stage,
+        function: SERVICE_NAME,
+        bucket: errorsBucket,
+        path: sourcePath,
+      },
+    })
     return new Response(
       JSON.stringify({
         ok: false,

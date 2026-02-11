@@ -16,6 +16,7 @@ Colunas obrigatorias (cabecalho na 1a linha):
 
 Observacoes importantes:
 - O arquivo deve ser .xlsx (nao CSV).
+- O upload bloqueia arquivos acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
 - O Excel pode transformar matriculas com zeros a esquerda (ex.: "0001") em "1".
   Recomendacao: formatar a coluna "matricula" como TEXTO no Excel antes de preencher.
   O import tambem tenta localizar a pessoa usando a matricula com e sem zeros a esquerda.
@@ -99,6 +100,7 @@ Quando houver erros, a Edge Function retorna:
 - firstError: primeira linha de erro
 - errorSamples: amostras de erros
 - skipped: lista de registros ja inativos (id, matricula, data_demissao)
+- Um resumo e amostras ficam registrados em public.api_errors.
 
 Formato do CSV:
 linha,matricula,coluna,motivo
