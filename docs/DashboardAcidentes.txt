@@ -134,3 +134,15 @@ Atualizacao 2026-01
 Atualizacao 2026-01 (UI)
 - Modal de expansao isolado em src/components/Dashboard/ChartExpandModal.jsx.
 - Ajuda: src/help/helpDashboardAcidentes.json.
+
+Atualizacao 2026-02
+-------------------
+- Hook `useDashboardAcidentes` (src/hooks/useDashboardAcidentes.js): evita recarregar filtros iniciais quando contexto/estado muda.
+- Respostas de requests antigos sao descartadas para evitar "piscar e zerar" ao aplicar filtros.
+- Antes: resposta tardia podia sobrescrever dados filtrados. Depois: apenas o ultimo load atualizado altera o state.
+- Grafico `ChartPartesLesionadas` (src/components/charts/ChartPartesLesionadas.jsx): autoHeight opcional (usado no modal) e labels truncados para evitar sobreposicao.
+- DashboardAcidentes (src/pages/DashboardAcidentes.jsx): graficos principais limitados aos 8 itens com mais ocorrencias; expansao mostra lista completa com scroll no modal.
+- DashboardAcidentes (src/pages/DashboardAcidentes.jsx): "Agente causador" movido para o par com "Tendencia mensal"; "Distribuicao por tipo" fica ao lado de "Acidentes por cargo".
+- Cores das barras padronizadas com o grafico de top materiais (#22d3ee) em Parte lesionada, Lesoes e Acidentes por cargo.
+- ChartAgentes (src/components/charts/ChartAgentes.jsx): grafico voltou para rosca com paleta baseada no azul do Top materiais.
+- ChartAgentes (src/components/charts/ChartAgentes.jsx): paleta alinhada com o grafico Top categorias (estoque).

@@ -37,15 +37,27 @@ CustomTooltip.propTypes = {
   label: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 }
 
-export function ChartPartesLesionadas({ data, nameKey, valueKey, height }) {
+export function ChartPartesLesionadas({ data, nameKey, valueKey, height, autoHeight, labelMaxLength }) {
   if (!Array.isArray(data) || data.length === 0) {
     return <div className="dashboard-card__empty">Nenhum dado disponivel</div>
   }
 
   const sortedData = data
+  const baseHeight = Number.isFinite(height) ? height : 360
+  const rowHeight = 26
+  const padding = 140
+  const computedHeight = autoHeight ? Math.max(baseHeight, sortedData.length * rowHeight + padding) : baseHeight
+  const maxLabelLength = Number.isFinite(labelMaxLength) ? labelMaxLength : 34
+  const formatLabel = (value) => {
+    const text = value === undefined || value === null ? '' : String(value).trim()
+    if (!text || text.length <= maxLabelLength) {
+      return text
+    }
+    return `${text.slice(0, maxLabelLength - 3)}...`
+  }
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={computedHeight}>
       <BarChart
         data={sortedData}
         layout="vertical"
@@ -62,13 +74,14 @@ export function ChartPartesLesionadas({ data, nameKey, valueKey, height }) {
         <YAxis
           type="category"
           dataKey={nameKey}
+          tickFormatter={formatLabel}
           tick={{ fill: '#475569', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
           width={140}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey={valueKey} name="Total" fill="#2563eb" radius={[0, 8, 8, 0]} barSize={18} />
+        <Bar dataKey={valueKey} name="Total" fill="#22d3ee" radius={[0, 8, 8, 0]} barSize={18} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -79,6 +92,8 @@ ChartPartesLesionadas.propTypes = {
   nameKey: PropTypes.string,
   valueKey: PropTypes.string,
   height: PropTypes.number,
+  autoHeight: PropTypes.bool,
+  labelMaxLength: PropTypes.number,
 }
 
 ChartPartesLesionadas.defaultProps = {
@@ -86,4 +101,6 @@ ChartPartesLesionadas.defaultProps = {
   nameKey: 'parte_lesionada',
   valueKey: 'total',
   height: 360,
+  autoHeight: false,
+  labelMaxLength: 34,
 }
