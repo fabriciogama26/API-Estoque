@@ -1,5 +1,6 @@
 ﻿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
+import { getSessionDeviceId, notifySessionGuardFromResponse } from './sessionService.js'
 import {
   montarEstoqueAtual,
   montarDashboard,
@@ -28,6 +29,21 @@ const reportClientError = (message, error, context = {}, severity = 'warn') => {
       errorMessage: error?.message,
     },
   }).catch(() => {})
+}
+
+const parseApiErrorResponse = async (response, fallbackMessage) => {
+  let message = fallbackMessage
+  let payload = null
+  try {
+    payload = await response.json()
+    if (payload?.error) {
+      message = payload.error
+    }
+  } catch {
+    // ignore
+  }
+  notifySessionGuardFromResponse(response.status, payload)
+  return message
 }
 
 const trim = (value) => {
@@ -2130,7 +2146,9 @@ async function buildAuthHeaders(extra = {}) {
   ensureSupabase()
   const { data } = await supabase.auth.getSession()
   const token = data?.session?.access_token
-  return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra }
+  const deviceId = getSessionDeviceId()
+  const sessionHeader = deviceId ? { 'X-Session-Id': deviceId } : {}
+  return token ? { ...extra, ...sessionHeader, Authorization: `Bearer ${token}` } : { ...extra, ...sessionHeader }
 }
 
 async function resolveGrupoMaterialId(valor) {
@@ -5741,9 +5759,8 @@ export const api = {
     },
     async report(params = {}) {
       ensureSupabase()
-      const { data } = await supabase.auth.getSession()
-      const token = data?.session?.access_token
-      if (!token) {
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
         throw new Error('Sessao expirada. Faça login novamente.')
       }
 
@@ -5752,23 +5769,15 @@ export const api = {
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify(params || {}),
       })
 
       if (!response.ok) {
-        let message = `Falha ao gerar relatorio (status ${response.status}).`
-        try {
-          const data = await response.json()
-          if (data?.error) {
-            message = data.error
-          }
-        } catch {
-          // ignore
-        }
+        const message = await parseApiErrorResponse(
+          response,
+          `Falha ao gerar relatorio (status ${response.status}).`
+        )
         throw new Error(message)
       }
 
@@ -5776,9 +5785,8 @@ export const api = {
     },
     async reportHistory(params = {}) {
       ensureSupabase()
-      const { data } = await supabase.auth.getSession()
-      const token = data?.session?.access_token
-      if (!token) {
+      const headers = await buildAuthHeaders()
+      if (!headers.Authorization) {
         throw new Error('Sessao expirada. Faça login novamente.')
       }
 
@@ -5793,21 +5801,14 @@ export const api = {
 
       const response = await fetch(endpoint, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       })
 
       if (!response.ok) {
-        let message = `Falha ao listar relatorios (status ${response.status}).`
-        try {
-          const data = await response.json()
-          if (data?.error) {
-            message = data.error
-          }
-        } catch {
-          // ignore
-        }
+        const message = await parseApiErrorResponse(
+          response,
+          `Falha ao listar relatorios (status ${response.status}).`
+        )
         throw new Error(message)
       }
 
@@ -5815,9 +5816,8 @@ export const api = {
     },
     async reportPdf(params = {}) {
       ensureSupabase()
-      const { data } = await supabase.auth.getSession()
-      const token = data?.session?.access_token
-      if (!token) {
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
         throw new Error('Sessao expirada. Faça login novamente.')
       }
 
@@ -5826,23 +5826,15 @@ export const api = {
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify(params || {}),
       })
 
       if (!response.ok) {
-        let message = `Falha ao gerar PDF (status ${response.status}).`
-        try {
-          const data = await response.json()
-          if (data?.error) {
-            message = data.error
-          }
-        } catch {
-          // ignore
-        }
+        const message = await parseApiErrorResponse(
+          response,
+          `Falha ao gerar PDF (status ${response.status}).`
+        )
         throw new Error(message)
       }
 
@@ -5850,9 +5842,8 @@ export const api = {
     },
     async forecast(params = {}) {
       ensureSupabase()
-      const { data } = await supabase.auth.getSession()
-      const token = data?.session?.access_token
-      if (!token) {
+      const headers = await buildAuthHeaders()
+      if (!headers.Authorization) {
         throw new Error('Sessao expirada. Faça login novamente.')
       }
 
@@ -5867,21 +5858,14 @@ export const api = {
 
       const response = await fetch(endpoint, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       })
 
       if (!response.ok) {
-        let message = `Falha ao obter previsao (status ${response.status}).`
-        try {
-          const data = await response.json()
-          if (data?.error) {
-            message = data.error
-          }
-        } catch {
-          // ignore
-        }
+        const message = await parseApiErrorResponse(
+          response,
+          `Falha ao obter previsao (status ${response.status}).`
+        )
         throw new Error(message)
       }
 

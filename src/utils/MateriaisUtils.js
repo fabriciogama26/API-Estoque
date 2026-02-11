@@ -113,6 +113,8 @@ const formatCsvDate = (value) => {
 
 export const buildMateriaisCsv = (materiais = []) => {
   const headers = [
+    'ID',
+    'CA',
     'Grupo',
     'Material',
     'Descricao',
@@ -132,6 +134,8 @@ export const buildMateriaisCsv = (materiais = []) => {
       ''
     const cadastradoEm = material?.criadoEm || material?.created_at || material?.createdAt
     const valores = [
+      material?.id ?? '',
+      material?.ca ?? '',
       material?.grupoMaterialNome || material?.grupoMaterial || '',
       material?.nomeItemRelacionado || material?.nome || '',
       material?.descricao?.trim() || '',

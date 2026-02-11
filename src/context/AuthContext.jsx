@@ -1,12 +1,14 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import { sendPasswordRecovery } from '../services/authService.js'
 import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../services/effectiveUserService.js'
+import { markSessionReauth, touchSession } from '../services/sessionService.js'
 
 const STORAGE_KEY = 'api-estoque-auth'
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
+const TOUCH_THROTTLE_MS = 45 * 1000
+const PASSWORD_MAX_AGE_MS = 60 * 24 * 60 * 60 * 1000
 // Credenciais locais só são carregadas em ambiente de desenvolvimento.
 const LOCAL_AUTH = import.meta.env.DEV
   ? {
@@ -134,6 +136,12 @@ export function AuthProvider({ children }) {
     }
     return null
   })
+  const [reauthState, setReauthState] = useState({
+    open: false,
+    error: null,
+    isSubmitting: false,
+  })
+  const lastTouchRef = useRef(0)
 
   useEffect(() => {
     if (!hasSupabase || !supabase) {
@@ -155,6 +163,7 @@ export function AuthProvider({ children }) {
         reportError(sessionError, { stage: 'get_session' })
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
+        setReauthState({ open: false, error: null, isSubmitting: false })
         return
       }
 
@@ -162,6 +171,7 @@ export function AuthProvider({ children }) {
       if (!session) {
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
+        setReauthState({ open: false, error: null, isSubmitting: false })
         return
       }
 
@@ -171,6 +181,7 @@ export function AuthProvider({ children }) {
           await supabase.auth.signOut()
           setUser(null)
           window.localStorage.removeItem(STORAGE_KEY)
+          setReauthState({ open: false, error: null, isSubmitting: false })
           return
         }
         setUser(resolvedUser)
@@ -183,6 +194,7 @@ export function AuthProvider({ children }) {
         reportError(error, { stage: 'sync_user_profile' })
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
+        setReauthState({ open: false, error: null, isSubmitting: false })
       }
     }
 
@@ -194,6 +206,7 @@ export function AuthProvider({ children }) {
         if (!currentSessionUser) {
           setUser(null)
           window.localStorage.removeItem(STORAGE_KEY)
+          setReauthState({ open: false, error: null, isSubmitting: false })
           return
         }
         try {
@@ -202,6 +215,7 @@ export function AuthProvider({ children }) {
             await supabase.auth.signOut()
             setUser(null)
             window.localStorage.removeItem(STORAGE_KEY)
+            setReauthState({ open: false, error: null, isSubmitting: false })
             return
           }
           setUser(resolvedUser)
@@ -214,6 +228,7 @@ export function AuthProvider({ children }) {
           reportError(error, { stage: 'auth_state_change' })
           setUser(null)
           window.localStorage.removeItem(STORAGE_KEY)
+          setReauthState({ open: false, error: null, isSubmitting: false })
         }
       }
       applySessionUser()
@@ -242,6 +257,7 @@ export function AuthProvider({ children }) {
         const localUser = buildLocalUser(identifier)
         setUser(localUser)
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(localUser))
+        setReauthState({ open: false, error: null, isSubmitting: false })
         return localUser
       }
 
@@ -278,6 +294,7 @@ export function AuthProvider({ children }) {
       } else {
         window.localStorage.removeItem(STORAGE_KEY)
       }
+      setReauthState({ open: false, error: null, isSubmitting: false })
       return resolvedUser
     },
     [buildResolvedUser, hasSupabase]
@@ -313,70 +330,216 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     if (!isLocalMode && hasSupabase && supabase) {
-      await supabase.auth.signOut()
+      try {
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch (error) {
+        reportError(error, { stage: 'logout' })
+      }
     }
     invalidateEffectiveAppUserCache()
     setUser(null)
     window.localStorage.removeItem(STORAGE_KEY)
-  }, [hasSupabase])
+    setReauthState({ open: false, error: null, isSubmitting: false })
+  }, [hasSupabase, reportError])
+
+  const openReauthPrompt = useCallback(() => {
+    if (!user || isLocalMode || !hasSupabase) {
+      return
+    }
+    setReauthState((prev) => ({
+      ...prev,
+      open: true,
+      error: null,
+      isSubmitting: false,
+    }))
+  }, [user, hasSupabase])
+
+  const cancelReauth = useCallback(() => {
+    setReauthState({ open: false, error: null, isSubmitting: false })
+  }, [])
+
+  const confirmReauth = useCallback(
+    async (password) => {
+      const senha = (password || '').trim()
+      if (!senha) {
+        setReauthState((prev) => ({ ...prev, error: 'Informe sua senha.' }))
+        return false
+      }
+
+      if (isLocalMode) {
+        if (!LOCAL_AUTH || senha !== LOCAL_AUTH.password) {
+          setReauthState((prev) => ({ ...prev, error: 'Senha invalida.' }))
+          return false
+        }
+        setReauthState({ open: false, error: null, isSubmitting: false })
+        return true
+      }
+
+      if (!hasSupabase || !supabase) {
+        setReauthState((prev) => ({
+          ...prev,
+          error: 'Supabase nao configurado. Nao foi possivel reautenticar.',
+        }))
+        return false
+      }
+
+      if (!user?.email) {
+        setReauthState((prev) => ({ ...prev, error: 'Email do usuario nao encontrado.' }))
+        return false
+      }
+
+      setReauthState((prev) => ({ ...prev, isSubmitting: true, error: null }))
+      try {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: senha,
+        })
+        if (error) {
+          throw new Error('Senha invalida.')
+        }
+        const reauthResult = await markSessionReauth()
+        if (!reauthResult?.ok) {
+          throw new Error('Falha ao registrar reautenticacao.')
+        }
+        setReauthState({ open: false, error: null, isSubmitting: false })
+        return true
+      } catch (error) {
+        setReauthState((prev) => ({
+          ...prev,
+          isSubmitting: false,
+          error: error?.message || 'Falha ao reautenticar.',
+        }))
+        return false
+      }
+    },
+    [hasSupabase, user?.email]
+  )
 
   useEffect(() => {
     if (typeof window === 'undefined') {
       return undefined
     }
-    if (!user) {
+
+    const handleExpired = () => {
+      const run = async () => {
+        try {
+          await logout()
+        } catch (error) {
+          reportError(error, { stage: 'logout_expired' })
+        } finally {
+          window.location.href = '/login'
+        }
+      }
+      run()
+    }
+
+    const handleReauthRequired = () => {
+      openReauthPrompt()
+    }
+
+    window.addEventListener('session-expired', handleExpired)
+    window.addEventListener('session-reauth-required', handleReauthRequired)
+
+    return () => {
+      window.removeEventListener('session-expired', handleExpired)
+      window.removeEventListener('session-reauth-required', handleReauthRequired)
+    }
+  }, [logout, openReauthPrompt, reportError])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+    if (!user || isLocalMode || !hasSupabase || !supabase) {
       return undefined
     }
 
-    let timeoutId = null
-    let loggedOut = false
-
-    const triggerLogout = async () => {
-      if (loggedOut) {
-        return
+    const handleActivity = (event) => {
+      if (typeof document !== 'undefined') {
+        if (event?.type === 'visibilitychange') {
+          if (!document.hidden) {
+            scheduleTouch()
+          }
+          return
+        }
+        if (document.hidden) {
+          return
+        }
       }
-      loggedOut = true
-      try {
-        await logout()
-      } catch (error) {
-        reportError(error, { stage: 'logout_inactivity' })
-      } finally {
-        window.location.href = '/login'
-      }
+      scheduleTouch()
     }
 
-    const resetTimer = () => {
-      clearTimeout(timeoutId)
-      timeoutId = window.setTimeout(() => {
-        triggerLogout()
-      }, INACTIVITY_TIMEOUT_MS)
-    }
-
-    const handleActivity = () => {
-      if (typeof document !== 'undefined' && document.hidden) {
+    const scheduleTouch = () => {
+      const now = Date.now()
+      if (now - lastTouchRef.current < TOUCH_THROTTLE_MS) {
         return
       }
-      resetTimer()
+      lastTouchRef.current = now
+      touchSession().catch((error) => {
+        reportError(error, { stage: 'session_touch' })
+      })
     }
 
     const listeners = [
-      { target: window, event: 'mousemove' },
-      { target: window, event: 'mousedown' },
+      { target: window, event: 'mousemove', options: { passive: true } },
+      { target: window, event: 'mousedown', options: { passive: true } },
+      { target: window, event: 'pointerdown', options: { passive: true } },
+      { target: window, event: 'pointermove', options: { passive: true } },
       { target: window, event: 'keydown' },
-      { target: window, event: 'wheel' },
-      { target: window, event: 'touchstart' },
+      { target: window, event: 'wheel', options: { passive: true } },
+      { target: window, event: 'touchstart', options: { passive: true } },
+      { target: window, event: 'touchmove', options: { passive: true } },
       { target: window, event: 'focus' },
+      { target: document, event: 'focusin' },
+      { target: document, event: 'scroll', options: { passive: true, capture: true } },
       { target: document, event: 'visibilitychange' },
     ]
 
-    listeners.forEach(({ target, event }) => target.addEventListener(event, handleActivity))
-    resetTimer()
+    listeners.forEach(({ target, event, options }) => target.addEventListener(event, handleActivity, options))
+    scheduleTouch()
 
     return () => {
-      clearTimeout(timeoutId)
-      listeners.forEach(({ target, event }) => target.removeEventListener(event, handleActivity))
+      listeners.forEach(({ target, event, options }) => target.removeEventListener(event, handleActivity, options))
     }
-  }, [user, logout])
+  }, [user, reportError])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+    if (!user || isLocalMode || !hasSupabase) {
+      return undefined
+    }
+
+    const metadata = user.metadata || {}
+    const raw = user.raw || {}
+    const passwordChangedAt =
+      metadata.password_changed_at ||
+      metadata.passwordChangedAt ||
+      raw.user_metadata?.password_changed_at ||
+      raw.created_at ||
+      null
+
+    if (!passwordChangedAt) {
+      return undefined
+    }
+
+    const last = new Date(passwordChangedAt)
+    if (!Number.isFinite(last.getTime())) {
+      return undefined
+    }
+
+    const expired = Date.now() - last.getTime() > PASSWORD_MAX_AGE_MS
+    if (!expired) {
+      return undefined
+    }
+
+    const path = window.location.pathname || ''
+    if (!path.startsWith('/reset-password')) {
+      window.location.href = '/reset-password?reason=expired'
+    }
+    return undefined
+  }, [user])
 
   const value = useMemo(
     () => ({
@@ -385,8 +548,11 @@ export function AuthProvider({ children }) {
       login,
       recoverPassword,
       logout,
+      reauthState,
+      confirmReauth,
+      cancelReauth,
     }),
-    [user, login, recoverPassword, logout]
+    [user, login, recoverPassword, logout, reauthState, confirmReauth, cancelReauth]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

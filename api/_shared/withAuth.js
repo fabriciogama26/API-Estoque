@@ -9,7 +9,10 @@ export function withAuth(handler) {
         const origin = req.headers?.origin || '*'
         res.setHeader('Access-Control-Allow-Origin', origin)
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
-        res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Cron-Secret')
+        res.setHeader(
+          'Access-Control-Allow-Headers',
+          'Authorization, Content-Type, X-Cron-Secret, X-User-Interaction, X-Session-Id'
+        )
         res.setHeader('Vary', 'Origin')
         res.statusCode = 204
         res.end()
@@ -19,6 +22,12 @@ export function withAuth(handler) {
       const origin = req.headers?.origin || '*'
       res.setHeader('Access-Control-Allow-Origin', origin)
       res.setHeader('Vary', 'Origin')
+
+      const method = (req.method || '').toUpperCase()
+      const path = (req.url || '').split('?')[0]
+      const reauthRequiredMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+      const reauthExemptPaths = new Set(['/api/session/touch', '/api/session/reauth', '/api/health'])
+      req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path)
 
       let user = null
       const cronSecret = process.env.CRON_SECRET || ''

@@ -26,7 +26,10 @@ export async function sendPasswordRecovery(email, redirectTo) {
 export async function updatePassword(newPassword) {
   assertSupabase()
   await validatePasswordOrThrow(newPassword)
-  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+    data: { password_changed_at: new Date().toISOString() },
+  })
   if (error) {
     throw new Error(error.message)
   }

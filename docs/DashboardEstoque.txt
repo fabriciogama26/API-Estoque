@@ -58,6 +58,10 @@ Atualizacao 2026-02
 - Modal de graficos expandidos agora suporta rolagem e exibe todas as linhas dos rankings (materiais, fabricantes, centros, setores e pessoas).
 - Top pessoas agora exibe matricula no label quando disponivel.
 - Clique em barras com ID copia o materialId para a area de transferencia.
+- Chamadas a `api.estoque.report` agora incluem `X-Session-Id` para manter o guard de sessao consistente.
+- Antes/Depois (sessao):
+- Antes: `api.estoque.report` nao enviava `X-Session-Id`.
+- Depois: `api.estoque.report` envia `X-Session-Id` para manter a sessao consistente no backend.
 - Antes/Depois:
   - Antes: Paretos e interpretacoes no dashboard principal.
   - Depois: Dashboard focado em movimentacao; Paretos migrados para Analise de Estoque.

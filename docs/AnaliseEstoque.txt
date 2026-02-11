@@ -93,6 +93,12 @@ Atualizacao 2026-02
 - Edge Function `forecast-gasto-mensal` dispara a previsao mensal para todos os tenants.
 - rpc_refresh_gasto_mensal agora ignora saidas canceladas via status_saida (evita erro de UUID e garante agregados corretos).
 - Ajuda contextual criada para a pagina.
+- Requisicao de previsao (`/api/estoque/previsao`) agora inclui `X-Session-Id` para manter o guard de sessao consistente.
+- Arquivos alterados:
+- `src/services/api.js`
+- Antes/Depois:
+- Antes: a previsao era solicitada sem `X-Session-Id`.
+- Depois: a previsao inclui `X-Session-Id` para manter a sessao consistente no backend.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
