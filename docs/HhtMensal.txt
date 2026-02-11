@@ -1,80 +1,126 @@
 Tela: HHT Mensal (Acidentes)
-================================
+============================
 
 Visao geral
 -----------
-- Registrar e manter HHT (homem-hora trabalhada) por mes e centro de servico.
+- Registra e mantem HHT (homem-hora trabalhada) por mes e centro de servico.
 - Calcula HHT final no Supabase conforme modo (manual, simples, completo).
-- Mantem historico (UPDATE/DELETE/cancelamento) com motivo e bloqueia cancelamento quando ha acidentes no mesmo centro/mes.
-- Usa status (status_hht) em vez de booleano ativo; cancelado continua visivel.
+- Mantem historico com motivo e bloqueia cancelamento quando ha acidente no mesmo centro/mes.
+- Usa status (status_hht) para ativo/cancelado; cancelado continua visivel na lista.
 
-Arquitetura e dados
--------------------
-- Tabelas: hht_mensal, hht_mensal_hist, status_hht (referencia).
-- View: hht_mensal_view (traz status_nome, centro_servico_nome, created/updated username).
-- Constraints:
-  - mes_ref sempre dia 01 (date_trunc), unique (mes_ref, centro_servico_id) exceto quando status = Cancelado.
-  - Checks para horas >= 0; modo in (manual, simples, completo); hht_informado apenas no manual.
-- Triggers/Funcoes:
-  - hht_mensal_apply_calcs: normaliza modo, status default, calcula hht_calculado/hht_final, zera campos no modo simples.
-  - hht_mensal_prevent_inactivation: impede delete/cancelar se houver acidente no centro/mes; libera se role = service_role ou flag de sessao `app.bypass_hht_guard = 'on'`.
-  - hht_mensal_log_update_delete: grava historico em hht_mensal_hist; usa trigger AFTER UPDATE e BEFORE DELETE (log antes de remover o pai).
-  - hht_mensal_delete(p_id, p_motivo): marca como cancelado (nao deleta) e loga motivo.
-- Status padrao armazenados em app.status_hht_default e app.status_hht_cancelado; fallback busca em status_hht.
+Arquitetura
+-----------
+- Tabelas: hht_mensal, hht_mensal_hist, status_hht.
+- View: hht_mensal_view (status_nome, centro_servico_nome, created/updated username).
+- Funcoes/Triggers:
+  - hht_mensal_apply_calcs (normaliza modo e calcula hht_calculado/hht_final).
+  - hht_mensal_prevent_inactivation (bloqueia cancelamento/delete quando ha acidentes no mes/centro).
+  - hht_mensal_log_update_delete (grava historico com before/after e motivo).
+  - hht_mensal_delete(p_id, p_motivo) (marca cancelado e dispara historico).
+- RPCs:
+  - rpc_catalog_list('centros_servico') para carregar opcoes do select.
+  - rpc_pessoas_count_centro para auto-preencher qtd. pessoas.
+- RLS: sempre ativo; consultas filtradas por account_owner_id via RPC security definer.
 
-Frontend (componentes principais)
+Cadastro
+--------
+- Campos obrigatorios:
+  - Mes de referencia (mes_ref).
+  - Centro de servico.
+  - Modo (manual, simples, completo).
+  - Manual: HHT informado.
+  - Simples/Completo: qtd. pessoas e horas mes base.
+- Comportamento:
+  - Ao trocar mes/centro, auto-preenche qtd. pessoas via peopleCount se o usuario ainda nao digitou manualmente.
+  - Modo simples zera descontos/extras e fixa escala = 1 no payload.
+  - Ao salvar com sucesso, limpa o form e recarrega a lista.
+- Payload:
+  - centroServicoId e centroServicoNome.
+  - campos numericos enviados como string e normalizados no backend.
+
+Filtros, auto-complete e listagem
 ---------------------------------
-- Pagina: src/pages/HhtMensalAcidentes.jsx
-  - Form: HhtMensalForm (modo com botao de ajuda, campos dependentes).
-  - Filtros: HhtMensalFilters (mes inicio/fim, centro).
-  - Lista: HhtMensalTable (usa hht_mensal_view, paginacao 20 por pagina).
-  - Historico: HhtMensalHistoryModal/HhtMensalHistoryTimeline (mostra mudanca de status como texto).
-  - Detalhes: HhtMensalDetailsModal (Status, modo, HHTs, descontos, registro por/ em).
-  - Cancelamento: HhtMensalDeleteModal (solicita motivo).
-- Servico: api.hhtMensal.list/create/update/delete/history/peopleCount (usa view).
-- IntegraÇõÇœo com acidentes: a ficha de acidente nao tem campo HHT; o dashboard cruza data + centro com o `hht_mensal` ativo do mes para calcular TF/TG.
+- Filtros:
+  - Mes inicio, mes fim, centro de servico.
+  - "Aplicar" chama listHhtMensal com os filtros.
+  - "Limpar" restaura defaults e recarrega a lista.
+- Listagem:
+  - Tabela paginada (20 por pagina) com colunas Mes, Centro, Status, Modo, HHT final, Registrado por, Cadastrado em, Acoes.
+  - Acoes de editar/cancelar apenas se status != Cancelado (detalhes e historico sempre disponiveis).
 
-Fluxos e regras de negocio
---------------------------
-- Modo:
-  - Manual: exige hht_informado; hht_final = informado.
-  - Simples: hht_final = pessoas * horas_base; zera descontos/extras e escala = 1.
-  - Completo: hht_calculado = (pessoas * horas_base * escala) - descontos + extras.
-- Status:
-  - Ativo (default) ou Cancelado (impede novas edicoes/cancelamentos no front).
-  - Cancelar via botao remove botoes de editar/cancelar na lista e registra historico.
-- Historico:
-  - UPDATE grava antes/depois e motivo (via app.hht_motivo).
-  - DELETE (na pratica cancelamento) grava snapshot e motivo.
-  - Timeline exibe campo Status com texto (resolve no history service).
-- Validacoes:
-  - Unico mes+centro se status != Cancelado.
-  - Impede cancelar se existir acidente no mesmo mes/centro.
-  - HHT mensal cancelado nao pode ser usado para registrar acidente; mensagem orienta cadastrar novo.
+Boas praticas
+-------------
+- Manter centros_servico sem duplicidade de nome para evitar ambiguidade no select e no cruzamento com acidentes.
+- Revisar status/mes/centro antes de cancelar, pois o cancelamento bloqueia edicoes futuras.
 
-Paginação e listagem
+Cancelamento e saldo
 --------------------
-- Lista paginada (20 linhas/pagina) com colunas: Mes, Centro, Status, Modo, HHT final, Registrado por, Cadastrado em, Acoes.
-- Acoes ativas apenas se status != Cancelado (detalhes e historico sempre disponiveis).
+- Cancelamento solicita motivo e atualiza status para Cancelado.
+- Supabase bloqueia cancelamento se houver acidente no mesmo mes/centro (mensagem aparece no modal).
+
+Atalhos
+-------
+- Nao ha atalhos de URL documentados para esta tela.
 
 Atualizacao 2026-02
 -------------------
+- Select de centro de servico deduplica nomes para evitar opcoes repetidas no HHT mensal.
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 
-Historico com nomes
--------------------
-- history() resolve nomes de usuarios (app_users) e nomes de status (status_hht) antes de enviar ao front, evitando UUIDs.
-- View ja fornece created_by_username/updated_by_username para exibir quem registrou/atualizou.
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
 
-Ajuda e conteudo
+Funcoes principais
+------------------
+- HhtMensalAcidentesPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/HhtMensalAcidentes.jsx
+  - Responsavel por: estado de filtros/form, carregamento de centros, CRUD de HHT mensal, historico e modais.
+- HhtMensalForm
+  - Tipo: componente de UI
+  - Caminho: src/components/Acidentes/HhtMensal/Form/HhtMensalForm.jsx
+  - Responsavel por: formulario de cadastro/edicao, select de centro e modo.
+- HhtMensalFilters
+  - Tipo: componente de UI
+  - Caminho: src/components/Acidentes/HhtMensal/Filters/HhtMensalFilters.jsx
+  - Responsavel por: filtros (mes inicio/fim, centro) e aplicacao/limpeza.
+- HhtMensalTable / HhtMensalHistoryModal / HhtMensalDetailsModal / HhtMensalDeleteModal
+  - Tipo: componentes de UI
+  - Caminho: src/components/Acidentes/HhtMensal/Table/* e Modal/*
+  - Responsavel por: tabela, historico, detalhes e cancelamento.
+
+Constantes e configuracoes
+--------------------------
+- HHT_MENSAL_FILTER_DEFAULT / HHT_MENSAL_FORM_DEFAULT / HHT_MENSAL_HISTORY_DEFAULT
+  - Tipo: configuracoes
+  - Caminho: src/config/HhtMensalConfig.js
+  - Uso: defaults de filtros, form e modais.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- buildMesRefFromMonth, computeHhtCalculado, computeHhtFinal, normalizeModo
+  - Tipo: utilitarios
+  - Caminho: src/utils/hhtMensalUtils.js
+  - Responsavel por: normalizar mes_ref, calcular previews e validar modo.
+
+Servicos e integracoes externas
+-------------------------------
+- hhtMensalService
+  - Tipo: servico de API
+  - Caminho: src/services/hhtMensalService.js
+  - Responsavel por: list/create/update/delete/history/peopleCount via dataClient.
+- listCentrosServico
+  - Tipo: servico de API
+  - Caminho: src/services/saidasService.js
+  - Responsavel por: carregar centros de servico para selects.
+- carregarCentrosServico (alterado)
+  - Tipo: integracao Supabase
+  - Caminho: src/services/api.js
+  - Responsavel por: listar catalogo de centros_servico e deduplicar por nome.
+  - Antes/Depois: antes retornava lista crua do RPC; agora remove nomes duplicados antes do select.
+
+Ajuda contextual
 ----------------
-- Help inline do campo Modo (botao "i") explicando Manual/Simples/Completo.
-- helpContent.json chave "hhtMensal" atualizada com detalhes de status, historico e auto-preenchimento do HHT no cadastro de acidente.
-
-Checklist de testes rapidos
----------------------------
-- Criar HHT (modo simples) e salvar: status Ativo, aparece na lista/paginacao.
-- Editar para modo completo (muda status? nao) e conferir historico registra alteracao.
-- Cancelar HHT: status muda para Cancelado, botoes editar/cancelar somem, historico registra status.
-- Tentar registrar acidente com HHT cancelado: deve bloquear e exibir mensagem.
-- Dashboard de acidentes deve usar o HHT mensal ativo (por centro/mes) ao calcular TF/TG; acidentes cancelados nao entram no somatorio.
+- HelpButton no header abre conteudo "hhtMensal".
+- Conteudo vem de src/help/helpHhtMensal.json e midias em public/help/hht-mensal.

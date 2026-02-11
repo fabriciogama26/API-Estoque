@@ -3193,7 +3193,7 @@ async function carregarCentrosServico() {
     supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
     'Falha ao listar centros de servico.'
   )
-  return normalizeDomainOptions(data ?? [])
+  return dedupeDomainOptionsByName(normalizeDomainOptions(data ?? []))
 }
 
 async function carregarPessoas() {
