@@ -68,7 +68,7 @@ export function ChartLesoes({ data, nameKey, valueKey, height }) {
           width={160}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey={valueKey} name="Total" fill="#f97316" radius={[0, 8, 8, 0]} barSize={18} />
+        <Bar dataKey={valueKey} name="Total" fill="#22d3ee" radius={[0, 8, 8, 0]} barSize={18} />
       </BarChart>
     </ResponsiveContainer>
   )

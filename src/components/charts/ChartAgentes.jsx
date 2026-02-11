@@ -9,7 +9,7 @@ import {
 } from 'recharts'
 import '../../styles/charts.css'
 
-const palette = ['#22d3ee', '#f97316', '#34d399', '#6366f1', '#facc15', '#f472b6', '#10b981', '#ef4444']
+const palette = ['#0ea5e9', '#14b8a6', '#f97316', '#6366f1', '#f43f5e', '#84cc16', '#ec4899', '#a855f7']
 const valueFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
 
 function CustomTooltip({ active, payload }) {

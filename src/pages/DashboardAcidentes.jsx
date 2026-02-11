@@ -38,6 +38,18 @@ function DashboardAcidentesContent() {
     helperText,
   } = useDashboardAcidentesContext()
 
+  const CHART_ITEMS_LIMIT = 8
+  const limitedCharts = useMemo(() => {
+    const sliceTop = (list) => (Array.isArray(list) ? list.slice(0, CHART_ITEMS_LIMIT) : [])
+    return {
+      tipos: sliceTop(dashboardData.tipos),
+      partesLesionadas: sliceTop(dashboardData.partesLesionadas),
+      lesoes: sliceTop(dashboardData.lesoes),
+      cargos: sliceTop(dashboardData.cargos),
+      agentes: sliceTop(dashboardData.agentes),
+    }
+  }, [dashboardData])
+
   const chartModalConfig = useMemo(
     () => ({
       tendencia: {
@@ -65,6 +77,7 @@ function DashboardAcidentesContent() {
             nameKey="parte_lesionada"
             valueKey="total"
             height={520}
+            autoHeight
           />
         ),
       },
@@ -145,24 +158,24 @@ function DashboardAcidentesContent() {
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="tipos" label="Informacoes sobre distribuicao por tipo" />
+              <ChartInfoButton infoKey="agentes" label="Informacoes sobre agentes causadores" />
               <h2 className="dashboard-card__title">
-                <PieIcon size={20} /> <span>Distribuicao por tipo</span>
+                <PieIcon size={20} /> <span>Agente causador</span>
               </h2>
             </div>
             <div className="dashboard-card__actions">
               <button
                 type="button"
                 className="dashboard-card__expand"
-                onClick={() => openChartModal('tipos')}
-                aria-label="Expandir grafico distribuicao por tipo"
+                onClick={() => openChartModal('agentes')}
+                aria-label="Expandir grafico agente causador"
               >
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
           <ChartContainer>
-            <ChartTipos data={dashboardData.tipos} nameKey="tipo" valueKey="total" />
+            <ChartAgentes data={limitedCharts.agentes} nameKey="agente" valueKey="total" />
           </ChartContainer>
         </section>
       </div>
@@ -189,7 +202,7 @@ function DashboardAcidentesContent() {
           </header>
           <ChartContainer>
             <ChartPartesLesionadas
-              data={dashboardData.partesLesionadas}
+              data={limitedCharts.partesLesionadas}
               nameKey="parte_lesionada"
               valueKey="total"
             />
@@ -216,7 +229,7 @@ function DashboardAcidentesContent() {
             </div>
           </header>
           <ChartContainer>
-            <ChartLesoes data={dashboardData.lesoes} nameKey="lesao" valueKey="total" />
+            <ChartLesoes data={limitedCharts.lesoes} nameKey="lesao" valueKey="total" />
           </ChartContainer>
         </section>
       </div>
@@ -242,31 +255,31 @@ function DashboardAcidentesContent() {
             </div>
           </header>
           <ChartContainer>
-            <ChartCargos data={dashboardData.cargos} nameKey="cargo" valueKey="total" />
+            <ChartCargos data={limitedCharts.cargos} nameKey="cargo" valueKey="total" />
           </ChartContainer>
         </section>
 
         <section className="card dashboard-card--chart dashboard-card--chart-lg">
           <header className="card__header dashboard-card__header">
             <div className="dashboard-card__title-group">
-              <ChartInfoButton infoKey="agentes" label="Informacoes sobre agentes causadores" />
+              <ChartInfoButton infoKey="tipos" label="Informacoes sobre distribuicao por tipo" />
               <h2 className="dashboard-card__title">
-                <PieIcon size={20} /> <span>Agente causador</span>
+                <PieIcon size={20} /> <span>Distribuicao por tipo</span>
               </h2>
             </div>
             <div className="dashboard-card__actions">
               <button
                 type="button"
                 className="dashboard-card__expand"
-                onClick={() => openChartModal('agentes')}
-                aria-label="Expandir grafico agente causador"
+                onClick={() => openChartModal('tipos')}
+                aria-label="Expandir grafico distribuicao por tipo"
               >
                 <ExpandIcon size={16} />
               </button>
             </div>
           </header>
           <ChartContainer>
-            <ChartAgentes data={dashboardData.agentes} nameKey="agente" valueKey="total" />
+            <ChartTipos data={limitedCharts.tipos} nameKey="tipo" valueKey="total" />
           </ChartContainer>
         </section>
       </div>

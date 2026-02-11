@@ -73,7 +73,7 @@ export function ChartCargos({ data, nameKey, valueKey, height }) {
           tickLine={false}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey={valueKey} name="Total" fill="#0ea5e9" radius={[8, 8, 0, 0]} minPointSize={6} />
+        <Bar dataKey={valueKey} name="Total" fill="#22d3ee" radius={[8, 8, 0, 0]} minPointSize={6} />
       </BarChart>
     </ResponsiveContainer>
   )

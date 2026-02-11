@@ -16,6 +16,7 @@ export function useDashboardAcidentes(onError) {
   const lastKeyRef = useRef(null)
   const dataRef = useRef(EMPTY_DASHBOARD_STATE)
   const optionsRef = useRef({ ...EMPTY_FILTER_OPTIONS })
+  const requestIdRef = useRef(0)
 
   const load = useCallback(
     async (params) => {
@@ -23,9 +24,14 @@ export function useDashboardAcidentes(onError) {
       if (lastKeyRef.current === key) {
         return
       }
+      const requestId = requestIdRef.current + 1
+      requestIdRef.current = requestId
       setError(null)
       try {
         const resultado = await fetchDashboardAcidentes(params)
+        if (requestId !== requestIdRef.current) {
+          return
+        }
         const {
           resumo = null,
           tendencia = [],
@@ -70,6 +76,9 @@ export function useDashboardAcidentes(onError) {
         }
         lastKeyRef.current = key
       } catch (err) {
+        if (requestId !== requestIdRef.current) {
+          return
+        }
         setError(err?.message ?? 'Falha ao carregar dashboard de acidentes.')
         setDashboardData(EMPTY_DASHBOARD_STATE)
         setFilterOptions({ ...EMPTY_FILTER_OPTIONS })
@@ -83,7 +92,8 @@ export function useDashboardAcidentes(onError) {
 
   useEffect(() => {
     load(initialDashboardFilters())
-  }, [load])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target
