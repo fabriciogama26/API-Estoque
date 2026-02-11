@@ -11,6 +11,7 @@ import {
   CentrosCustoOperations,
   healthCheck,
 } from './_shared/operations.js'
+import { touchSession, markSessionReauth } from './_shared/sessionActivity.js'
 
 export default withAuth(async (req, res, user) => {
   const { method, url } = req
@@ -168,6 +169,23 @@ export default withAuth(async (req, res, user) => {
 
     if (path === '/api/centros-custo' && method === 'GET') {
       return sendJson(res, 200, await CentrosCustoOperations.list())
+    }
+
+    // Session activity
+    if (path === '/api/session/touch' && method === 'POST') {
+      const result = await touchSession(req, user, req.authToken)
+      if (!result?.ok) {
+        return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+      }
+      return sendJson(res, 200, { ok: true, touched: result.touched })
+    }
+
+    if (path === '/api/session/reauth' && method === 'POST') {
+      const result = await markSessionReauth(req, user, req.authToken)
+      if (!result?.ok) {
+        return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+      }
+      return sendJson(res, 200, { ok: true })
     }
 
     // Health check

@@ -1,0 +1,58 @@
+.session-reauth__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1.5rem;
+}
+
+.session-reauth__card {
+  width: min(420px, 100%);
+  background: var(--color-card);
+  color: var(--color-text);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  padding: 1.5rem;
+}
+
+.session-reauth__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.session-reauth__header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.session-reauth__close {
+  border: none;
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-muted-dark);
+}
+
+.session-reauth__subtitle {
+  margin: 0 0 1rem;
+  color: var(--color-muted);
+}
+
+.session-reauth__form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.session-reauth__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}

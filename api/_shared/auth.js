@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabaseClient.js'
-import { sendError } from './http.js'
+import { sendError, sendJson } from './http.js'
+import { validateSession } from './sessionActivity.js'
 
 export async function requireAuth(req, res) {
   const header =
@@ -18,6 +19,7 @@ export async function requireAuth(req, res) {
   }
 
   const token = header.slice(7).trim()
+  req.authToken = token
   if (!token) {
     console.warn('[AUTH] Token vazio no header de autorizacao.', {
       method: req?.method,
@@ -40,6 +42,17 @@ export async function requireAuth(req, res) {
       return null
     }
 
+    const sessionGuard = await validateSession(req, data.user, token, {
+      requireReauth: Boolean(req?.requiresReauth),
+    })
+    if (!sessionGuard?.ok) {
+      sendJson(res, sessionGuard.status || 401, {
+        error: sessionGuard.message || 'Sessao expirada. Faca login novamente.',
+        code: sessionGuard.code || 'SESSION_EXPIRED',
+      })
+      return null
+    }
+
     return data.user
   } catch (error) {
     console.error('[AUTH] Falha ao validar token.', {
@@ -48,7 +61,9 @@ export async function requireAuth(req, res) {
       message: error?.message,
       stack: error?.stack,
     })
-    sendError(res, 401, 'Token invalido ou expirado.')
+    const status = error?.status || 401
+    const message = error?.message || 'Token invalido ou expirado.'
+    sendError(res, status, message)
     return null
   }
 }

@@ -33,6 +33,12 @@ Atualizacao 2026-02
 - Criada pagina de historico de relatorios de estoque.
 - Endpoints para listar relatorios e gerar HTML/PDF a partir do historico.
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
+- Chamadas de historico/PDF agora incluem `X-Session-Id` para manter o guard de sessao consistente.
+- Arquivos alterados:
+- `src/services/api.js`
+- Antes/Depois:
+- Antes: requisicoes de historico/PDF nao enviavam `X-Session-Id`.
+- Depois: requisicoes enviam `X-Session-Id` para manter a sessao consistente no backend.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

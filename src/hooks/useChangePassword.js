@@ -54,7 +54,10 @@ export function useChangePassword(user) {
           throw new Error('Senha atual incorreta.')
         }
 
-        const { error } = await supabase.auth.updateUser({ password: form.newPassword })
+        const { error } = await supabase.auth.updateUser({
+          password: form.newPassword,
+          data: { password_changed_at: new Date().toISOString() },
+        })
         if (error) {
           throw error
         }
