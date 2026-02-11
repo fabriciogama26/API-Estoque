@@ -92,12 +92,14 @@ async function insertError(payload) {
     fingerprint,
   }
 
-  const { error } = await supabase.from('app_errors').insert(record)
+  const { error } = await supabase
+    .from('app_errors')
+    .upsert(record, { onConflict: 'fingerprint', ignoreDuplicates: true })
   if (error) {
     if (userId && (error.code === '23503' || error.message?.includes('app_errors_user_id_fkey'))) {
       const { error: retryError } = await supabase
         .from('app_errors')
-        .insert({ ...record, user_id: null })
+        .upsert({ ...record, user_id: null }, { onConflict: 'fingerprint', ignoreDuplicates: true })
       if (!retryError || retryError.code === '23505') {
         return
       }

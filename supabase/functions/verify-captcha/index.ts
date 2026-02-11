@@ -1,4 +1,4 @@
-// Minimal hCaptcha verification function for Supabase Edge Functions (Deno).
+﻿// Minimal hCaptcha verification function for Supabase Edge Functions (Deno).
 // Expects a POST JSON body: { token: string }
 // Env vars:
 // - HCAPTCHA_SECRET: secret key from hCaptcha (required)
@@ -12,7 +12,7 @@ const HCAPTCHA_SITEKEY = Deno.env.get("HCAPTCHA_SITEKEY") ?? "";
 const headers = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type, authorization",
+  "Access-Control-Allow-Headers": "content-type, authorization, x-session-id",
 };
 
 serve(async (req) => {
@@ -86,4 +86,5 @@ serve(async (req) => {
     headers,
   });
 });
+
 

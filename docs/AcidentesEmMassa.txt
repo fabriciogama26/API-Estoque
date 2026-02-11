@@ -31,8 +31,10 @@ Observacoes importantes:
 - Agentes, tipos, lesoes e partes devem usar ";" como separador.
 - A ordem precisa ser coerente:
   Ex.: agentes="A1;A2", tipos="T1;T2", lesoes="L1;L2".
-- CAT e CID sao unicos por owner; duplicados geram erro.
+- CAT e unico por owner; CID pode se repetir.
 - Data/hora sao combinadas em timestamptz (fuso padrao -03).
+- O import calcula um hash do registro; se ja existir, a linha retorna erro "registro ja importado".
+- Se ja existir acidente para a mesma matricula e data, a linha e bloqueada.
 
 Como usar (passo a passo)
 -------------------------
@@ -58,7 +60,9 @@ Regras de importacao
 - tipos e/ou lesoes obrigatorios (ao menos 1).
 - partes obrigatorio (ao menos 1).
 - cat: somente numeros.
-- cid: texto livre (evitar duplicado).
+- cid: texto livre (pode repetir).
+- tipos/lesoes devem pertencer ao agente informado; se nao pertencer, retorna erro "nao pertence ao agente".
+- duplicidade: se houver acidente para a mesma matricula + data, retorna erro com ID do registro existente.
 
 Mapa do fluxo (frontend -> Supabase)
 ------------------------------------
@@ -92,7 +96,7 @@ Quando houver erros, a Edge Function retorna:
 - errorsUrl: URL assinada para baixar o CSV (se configurado)
 - firstError: primeira linha de erro
 - errorSamples: amostras de erros
-- Um resumo e amostras ficam registrados em public.api_errors.
+- Um resumo e amostras ficam registrados em public.api_errors (com requestId e sessionId).
 
 Formato do CSV:
 linha,matricula,coluna,motivo

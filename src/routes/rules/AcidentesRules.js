@@ -99,6 +99,20 @@ const normalizeCatValue = (value) => normalizeTextValue(value).replace(/\s+/g, '
 
 const normalizeCidValue = (value) => normalizeTextValue(value).replace(/\s+/g, '').toUpperCase()
 
+const normalizeDateKey = (value) => {
+  if (!value) {
+    return ''
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 const hasDuplicateAcidenteField = (acidentes, field, value, editingId) => {
   if (!value) {
     return false
@@ -114,6 +128,43 @@ const hasDuplicateAcidenteField = (acidentes, field, value, editingId) => {
     const raw = acidente[field] ?? ''
     return value === raw
   })
+}
+
+export const findDuplicateAcidenteByMatriculaData = (acidentes, form, editingId) => {
+  if (!form) {
+    return null
+  }
+  const dateKey = normalizeDateKey(form.data)
+  if (!dateKey) {
+    return null
+  }
+  const pessoaId = normalizeTextValue(form.pessoaId ?? form.pessoa_id)
+  const matricula = normalizeTextValue(form.matricula)
+  if (!pessoaId && !matricula) {
+    return null
+  }
+  const lista = Array.isArray(acidentes) ? acidentes : []
+  return (
+    lista.find((acidente) => {
+      if (!acidente || !acidente.id) {
+        return false
+      }
+      if (editingId && acidente.id === editingId) {
+        return false
+      }
+      const acidenteDateKey = normalizeDateKey(acidente.data)
+      if (!acidenteDateKey || acidenteDateKey !== dateKey) {
+        return false
+      }
+      if (pessoaId && acidente.pessoaId) {
+        return String(acidente.pessoaId) === pessoaId
+      }
+      if (matricula) {
+        return String(acidente.matricula ?? '') === matricula
+      }
+      return false
+    }) || null
+  )
 }
 
 const buildClassificacoesAgentes = (input) => {
@@ -279,22 +330,6 @@ export function validateAcidenteForm(form, acidentes = [], editingId = null) {
     )
     if (catDuplicado) {
       return 'CAT ja cadastrada em outro acidente.'
-    }
-  }
-
-  const cidNormalizado = normalizeCidValue(form.cid)
-  if (cidNormalizado) {
-    const cidDuplicado = hasDuplicateAcidenteField(
-      acidentes.map((acidente) => ({
-        ...acidente,
-        cidNormalized: normalizeCidValue(acidente.cid ?? acidente.cid_code ?? ''),
-      })),
-      'cidNormalized',
-      cidNormalizado,
-      editingId,
-    )
-    if (cidDuplicado) {
-      return 'CID ja cadastrado em outro acidente.'
     }
   }
 

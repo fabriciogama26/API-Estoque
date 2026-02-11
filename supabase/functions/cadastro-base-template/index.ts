@@ -1,10 +1,10 @@
-// Setup type definitions for built-in Supabase Runtime APIs
+﻿// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import * as XLSX from "npm:xlsx"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-session-id",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Expose-Headers": "x-deno-execution-id, x-sb-request-id",
 }
@@ -77,3 +77,4 @@ Deno.serve((req) => {
     },
   })
 })
+

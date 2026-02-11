@@ -1,11 +1,11 @@
-// Setup type definitions for built-in Supabase Runtime APIs
+﻿// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import * as XLSX from "npm:xlsx"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-session-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Expose-Headers": "x-deno-execution-id, x-sb-request-id",
 }
@@ -85,7 +85,7 @@ const parseDate = (valor?: unknown) => {
     return `${yyyy}-${mm}-${dd}`
   }
 
-  // Serial do Excel (número) - converte usando epoch 1899-12-30
+  // Serial do Excel (nÃºmero) - converte usando epoch 1899-12-30
   if (typeof valor === "number" && isFinite(valor)) {
     const excelEpoch = Date.UTC(1899, 11, 30) // Excel epoch in UTC
     const ms = excelEpoch + valor * 24 * 60 * 60 * 1000
@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
     let errors = 0
     const errorLines: string[] = ["linha,matricula,coluna,motivo"]
 
-    // Coleta matriculas únicas do arquivo e gera variantes (com/sem zeros à esquerda)
+    // Coleta matriculas Ãºnicas do arquivo e gera variantes (com/sem zeros Ã  esquerda)
     const matriculasArquivo = new Set<string>()
     rows.forEach((linha) => {
       const valor = resolveField(linha as Record<string, unknown>, "matricula")
@@ -257,7 +257,7 @@ Deno.serve(async (req) => {
       })
     })
 
-    // Busca apenas as matrículas presentes no arquivo (em blocos para evitar limites de IN)
+    // Busca apenas as matrÃ­culas presentes no arquivo (em blocos para evitar limites de IN)
     stage = "db_select_pessoas"
     let pessoasCount = 0
     const matriculaMap = new Map<string, { id: string; ativo: boolean | null; dataDemissao: string | null }>()
@@ -303,7 +303,7 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < rows.length; i++) {
       processed += 1
-      const idx = i + 2 // +1 cabeçalho
+      const idx = i + 2 // +1 cabeÃ§alho
       const linha = rows[i]
 
       const matriculaValor = resolveField(linha as Record<string, unknown>, "matricula")
@@ -490,7 +490,7 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     )
   } catch (err) {
-    // Tenta limpar o arquivo mesmo em erro, se já tivermos o path
+    // Tenta limpar o arquivo mesmo em erro, se jÃ¡ tivermos o path
     if (sourcePath) {
       try {
         stage = "storage_delete_source"
@@ -528,3 +528,4 @@ Deno.serve(async (req) => {
     )
   }
 })
+

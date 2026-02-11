@@ -4,6 +4,7 @@ import {
   validateAcidenteForm,
   createAcidentePayload,
   updateAcidentePayload,
+  findDuplicateAcidenteByMatriculaData,
 } from '../routes/rules/AcidentesRules.js'
 import {
   toInputDateTime,
@@ -46,6 +47,12 @@ export function useAcidenteForm({
   const [editingAcidente, setEditingAcidente] = useState(null)
   const [formError, setFormError] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [duplicateState, setDuplicateState] = useState({
+    open: false,
+    acidente: null,
+    data: '',
+    matricula: '',
+  })
 
   const [tipoOpcoes, setTipoOpcoes] = useState([])
   const [tiposError, setTiposError] = useState(null)
@@ -799,15 +806,30 @@ export function useAcidenteForm({
     resetForm()
   }, [resetForm])
 
-  const handleSubmit = useCallback(
-    async (event) => {
-      event.preventDefault()
+  const submitAcidente = useCallback(
+    async (event, { forceDuplicate = false } = {}) => {
+      if (event?.preventDefault) {
+        event.preventDefault()
+      }
       setFormError(null)
 
       const validationError = validateAcidenteForm(form, acidentes, editingAcidente?.id ?? null)
       if (validationError) {
         setFormError(validationError)
         return
+      }
+
+      if (!forceDuplicate) {
+        const duplicado = findDuplicateAcidenteByMatriculaData(acidentes, form, editingAcidente?.id ?? null)
+        if (duplicado) {
+          setDuplicateState({
+            open: true,
+            acidente: duplicado,
+            data: form.data || '',
+            matricula: form.matricula || duplicado.matricula || '',
+          })
+          return
+        }
       }
 
       setIsSaving(true)
@@ -836,6 +858,17 @@ export function useAcidenteForm({
     },
     [acidentes, editingAcidente, form, onError, onSaved, resetForm, user],
   )
+
+  const handleSubmit = useCallback((event) => submitAcidente(event), [submitAcidente])
+
+  const closeDuplicateModal = useCallback(() => {
+    setDuplicateState({ open: false, acidente: null, data: '', matricula: '' })
+  }, [])
+
+  const confirmDuplicate = useCallback(async () => {
+    closeDuplicateModal()
+    await submitAcidente(null, { forceDuplicate: true })
+  }, [closeDuplicateModal, submitAcidente])
 
   useEffect(() => {
     return () => {
@@ -896,8 +929,11 @@ export function useAcidenteForm({
     setForm,
     formError,
     isSaving,
+    duplicateState,
     handleFormChange,
     handleSubmit,
+    confirmDuplicate,
+    closeDuplicateModal,
     startEdit,
     cancelEdit,
     resetForm,

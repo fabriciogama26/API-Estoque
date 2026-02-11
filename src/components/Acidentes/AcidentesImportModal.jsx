@@ -148,7 +148,8 @@ export function AcidentesImportModal({
               <li>Data no formato dd/MM/yyyy.</li>
               <li>Hora no formato HH:mm.</li>
               <li>Agentes, tipos, lesoes e partes devem existir no catalogo.</li>
-              <li>CAT/CID duplicados sao bloqueados.</li>
+              <li>CAT duplicado e bloqueado; CID pode repetir.</li>
+              <li>Se ja existir acidente para a mesma matricula e data, a linha e bloqueada.</li>
             </ul>
           </details>
 

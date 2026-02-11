@@ -1,4 +1,4 @@
-Tela: Cadastro de Acidentes
+﻿Tela: Cadastro de Acidentes
 ===========================
 
 - Campos com * sao obrigatorios no formulario.
@@ -18,12 +18,12 @@ Escopo da tela
 Arquitetura (modular)
 ---------------------
 - Hooks principais:
-  - `useAcidentes`: carrega a lista de acidentes, controla `isLoading`, `error` e expõe `reload()`.
+  - `useAcidentes`: carrega a lista de acidentes, controla `isLoading`, `error` e expÃµe `reload()`.
   - `useAcidenteForm`: controla estado do formulario, validacao, submit, edicao/cancelamento.
   - `useAcidenteFiltro`: guarda `filters` e aplica `filterAcidentes` gerando a lista filtrada.
-  - `usePessoas`, `useAgentes`, `useLocais`, `usePartes`: carregam catálogos auxiliares de forma isolada, cada um com seu loading/erro.
+  - `usePessoas`, `useAgentes`, `useLocais`, `usePartes`: carregam catÃ¡logos auxiliares de forma isolada, cada um com seu loading/erro.
 - Contexto opcional:
-  - `AcidentesContext` pode centralizar acidentes, filtros, funcoes de recarga e catálogos para evitar prop-drilling entre formulario, filtros, tabela e modal de historico.
+  - `AcidentesContext` pode centralizar acidentes, filtros, funcoes de recarga e catÃ¡logos para evitar prop-drilling entre formulario, filtros, tabela e modal de historico.
 - Servicos:
   - `acidentesService`: listar, criar, atualizar, carregar historico, agentes, tipos, lesoes e partes.
   - `pessoasService`: lista pessoas com matricula, nome, cargo, centro de servico e local.
@@ -57,8 +57,9 @@ Fluxos principais
    - Preenche campos obrigatorios: matricula, data, dias perdidos/debitados, centro de servico, local, classificacao de agentes (com incluir) e partes lesionadas.
    - Campos auxiliares: CAT, observacao, CID, flags de lancamento (eSocial/SESMT).
    - Botao alterna entre "Registrar acidente" (novo) e "Salvar alteracoes" (edicao).
-   - "Cancelar edicao" limpa o formulario, reseta estado de edicao e limpa caches associados se necessario.
-   - HHT nao é informado na ficha; o dashboard cruza data + centro com `hht_mensal`.
+   - Se ja existir acidente para a mesma matricula + data, abre modal de confirmacao com o ID existente.
+    - "Cancelar edicao" limpa o formulario, reseta estado de edicao e limpa caches associados se necessario.
+   - HHT nao Ã© informado na ficha; o dashboard cruza data + centro com `hht_mensal`.
 
 2) Classificacao (agentes/partes)
    - Classificacao Agentes: cada agente tem tipos/lesoes selecionados com chips; clique em "Incluir" para gravar na tabela de combinacoes.
@@ -73,7 +74,7 @@ Fluxos principais
 4) Filtros
    - Formulario de filtros controla `filters` (termo, tipo, centro de servico, agente, lesao, parte lesionada).
    - Campos de texto/select aplicam apenas ao clicar em **Aplicar** (estado de rascunho vs aplicado).
-   - Checkboxes "Apenas SESMT" e "Apenas eSOCIAL" sÇõo aplicados imediatamente.
+   - Checkboxes "Apenas SESMT" e "Apenas eSOCIAL" sÃ‡Ãµo aplicados imediatamente.
    - "Aplicar" usa `filterAcidentes(acidentes, filters)` para gerar a lista filtrada; "Limpar" restaura `ACIDENTES_FILTER_DEFAULT` e recarrega a lista principal, se necessario.
 
 5) Tabela e detalhes
@@ -86,10 +87,12 @@ Cadastro em massa (novo)
 ------------------------
 - Existe um botao "Importar em massa" ao lado de "Registrar acidente".
 - A planilha exige: matricula, data, hora, dias_debitados, dias_perdidos, centro_servico, local, agentes, tipos, lesoes e partes.
-- Campos opcionais: cat, cid, observacao.
-- Agentes/tipos/lesoes/partes usam ";" como separador.
-- Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
-- O fluxo completo esta documentado em:
+  - Campos opcionais: cat, cid, observacao.
+  - Agentes/tipos/lesoes/partes usam ";" como separador.
+  - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+  - Importacao calcula hash do registro; linhas ja importadas retornam "registro ja importado".
+  - Se ja existir acidente para a mesma matricula e data, a linha e bloqueada.
+  - O fluxo completo esta documentado em:
   - docs/AcidentesEmMassa.txt
 - Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.
 
@@ -110,7 +113,7 @@ Regras e validacoes
   - Garante preenchimento de campos obrigatorios.
   - Converte texto para numero em campos como dias perdidos e dias debitados.
   - Checa se os grupos obrigatorios (agentes/tipos/lesoes/partes) estao preenchidos quando configurados.
-  - CAT e CID nao podem se repetir em outro acidente do mesmo owner (validacao no front + DB).
+  - CAT nao pode se repetir em outro acidente do mesmo owner (validacao no front + DB).
 - `createAcidentePayload` e `updateAcidentePayload`:
   - Montam o payload no formato esperado pela API/BD.
   - Mantem consistencia entre listas (`agentes`, `tipos`, `lesoes`, `partesLesionadas`) e campos unicos legados (`agente`, `tipo`, `lesao`, `parteLesionada`).
@@ -139,12 +142,14 @@ Atualizacao 2026-01
 - Status exibido na lista e detalhes; botao de cancelamento segue estilo do HHT mensal, grava `ativo=false` e `cancel_motivo` e permanece visivel (nao entra nos calculos).
 - Historico inclui alteracoes de status/motivo de cancelamento.
 - Classificacao separada em "Classificacao Agentes" (com combinacoes por agente/tipo/lesao) e "Classificacao Partes lesionadas".
-- CAT e CID passaram a ser unicos por owner no front e no banco.
+- CAT continua unico por owner; CID permite duplicidade.
 
 Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 - Botao "Exportar Excel (CSV)" adicionado na lista de acidentes.
+- CID deixou de ser unico (CAT segue unico); RPCs e validacao do formulario ajustadas.
+- Modal de confirmacao para duplicidade por matricula+data no cadastro manual.
 
 Atualizacao 2026-01 (schema)
 -----------------------------
@@ -174,7 +179,7 @@ Funcoes principais
   - Tipo: hook de filtros
   - Caminho: src/hooks/useAcidenteFiltro.js
   - Responsavel por: manter filters/appliedFilters, handleFilterChange/Clear/Submit e gerar acidentesFiltrados com filterAcidentes (checkboxes aplicam imediatamente).
-- Componentes AcidentesForm / AcidentesFilters / AcidentesTable / AcidentesHistoryModal / AcidenteDetailsModal
+- Componentes AcidentesForm / AcidentesFilters / AcidentesTable / AcidentesHistoryModal / AcidenteDetailsModal / AcidenteDuplicateModal
   - Tipo: componentes de UI
   - Caminho: src/components/Acidentes/*
   - Responsavel por: UI do form, filtros, tabela e modal usando props dos hooks/contexto.
@@ -192,6 +197,7 @@ Funcoes utilitarias relacionadas
   - Tipo: regras/validacao/filtro
   - Caminho: src/rules/AcidentesRules.js
   - Responsavel por: validar obrigatorios, montar payloads e extrair/filtro de dados auxiliares.
+  - Novo: findDuplicateAcidenteByMatriculaData detecta duplicidade por matricula+data para modal de confirmacao.
 - toInputDateTime, parseList, normalizeAgenteNome/Key, extractAgenteNome e helpers de normalizacao/filtro
   - Tipo: utilitarios de dados
   - Caminho: src/utils/acidentesUtils.js

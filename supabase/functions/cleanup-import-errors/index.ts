@@ -1,9 +1,9 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-session-id, x-cron-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 }
 
@@ -101,7 +101,7 @@ async function deleteInBatches(paths: string[], dryRun: boolean) {
   return { deleted, errors }
 }
 
-// tenta salvar e NUNCA derruba a função por causa disso
+// tenta salvar e NUNCA derruba a funÃ§Ã£o por causa disso
 async function saveRunToDb(row: Record<string, any>) {
   const { error } = await supabaseAdmin.from("edge_functions_error_report").insert(row)
   if (error) console.log("WARN insert edge_functions_error_report:", error.message)
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
     if (!hasAnyTs) {
   const durationMs = Date.now() - t0
 
-  // grava no histórico como execução OK (sem deleção)
+  // grava no histÃ³rico como execuÃ§Ã£o OK (sem deleÃ§Ã£o)
   await saveRunToDb({
     ...baseRow,
     http_status: 200,
@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     duration_ms: durationMs,
     details: {
       note: "Sem timestamps no storage.list(); tratando como pasta vazia/sem metadados. Nenhum arquivo deletado.",
-      hint: "Verifique prefixo. Às vezes 'desligamento' vs 'desligamento/' muda a resposta.",
+      hint: "Verifique prefixo. Ã€s vezes 'desligamento' vs 'desligamento/' muda a resposta.",
       sample_list_item: rootList?.[0] ?? null,
     },
   })
@@ -286,3 +286,4 @@ Deno.serve(async (req) => {
     })
   }
 })
+
