@@ -4,6 +4,7 @@ import { restoreResetSession, updatePassword } from '../services/authService.js'
 import { isSupabaseConfigured, supabase } from '../services/supabaseClient.js'
 import { logError } from '../services/errorLogService.js'
 import { validatePasswordOrThrow } from '../services/passwordPolicyService.js'
+import { securityConfig } from '../config/security.js'
 
 export function useResetPassword() {
   const navigate = useNavigate()
