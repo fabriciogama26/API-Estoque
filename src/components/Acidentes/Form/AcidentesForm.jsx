@@ -25,6 +25,7 @@ export function AcidentesForm({
   onPessoaFocus = () => {},
   onPessoaBlur = () => {},
   onPessoaClear = () => {},
+  disablePessoaEdit = false,
   locais = [],
   locaisError,
   isLoadingLocais = false,
@@ -174,13 +175,15 @@ export function AcidentesForm({
                   onBlur={onPessoaBlur}
                   placeholder={matriculaPlaceholder}
                   required
+                  disabled={disablePessoaEdit}
                 />
-                {pessoaSearchValue ? (
+                {pessoaSearchValue && !disablePessoaEdit ? (
                   <button type="button" className="autocomplete__clear" onClick={onPessoaClear}>
                     &times;
                   </button>
                 ) : null}
                 {pessoaDropdownOpen &&
+                !disablePessoaEdit &&
                 !form.matricula &&
                 (isSearchingPessoas || pessoaSearchError || pessoaSuggestions.length > 0) ? (
                   <div className="autocomplete__dropdown" role="listbox">

@@ -45,8 +45,7 @@ export function AcidentesTable({
             <tr>
               <th>Nome</th>
               <th>Matricula</th>
-              <th>Status</th>
-              <th>Data</th>
+              <th>Data do acidente</th>
               <th>Centro de servico</th>
               <th>Local</th>
               <th>CAT</th>

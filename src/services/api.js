@@ -6532,7 +6532,7 @@ export const api = {
 
       const usuario = await resolveUsuarioResponsavel()
       const registro = await executeSingle(
-        supabase.rpc('rpc_acidentes_update_full', {
+        supabase.rpc('rpc_acidentes_update_full_rehash', {
           p_id: id,
           p_pessoa_id: pessoaId,
           p_data: data,

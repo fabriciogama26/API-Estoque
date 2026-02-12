@@ -6,6 +6,7 @@ material_update_full
 pessoas_preflight_check
 rpc_acidentes_create_full
 rpc_acidentes_update_full
+rpc_acidentes_update_full_rehash
 rpc_admin_grant_permission_override
 rpc_admin_set_user_role
 rpc_admin_set_user_status

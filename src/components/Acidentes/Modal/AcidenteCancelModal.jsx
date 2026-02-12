@@ -33,7 +33,7 @@ export function AcidenteCancelModal({ state, onClose, onConfirm, onMotivoChange,
 
         <div className="modal__body">
           <p className="data-table__muted">{titulo}</p>
-          <p>Ao cancelar, o acidente sai da lista e dos cálculos do dashboard.</p>
+          <p>Ao cancelar, o acidente permanece na lista como inativo e sai dos calculos do dashboard.</p>
           <label className="field" style={{ marginTop: '0.5rem' }}>
             <span>Motivo do cancelamento</span>
             <textarea

@@ -221,6 +221,9 @@ export function useAcidenteForm({
   )
 
   const clearPessoaSelection = useCallback(() => {
+    if (editingAcidente) {
+      return
+    }
     setForm((prev) => ({
       ...prev,
       pessoaId: '',
@@ -237,7 +240,7 @@ export function useAcidenteForm({
     setPessoaSuggestions([])
     setPessoaDropdownOpen(false)
     setPessoaSearchError(null)
-  }, [])
+  }, [editingAcidente])
 
   const applyPessoaToForm = useCallback(
     (pessoa) => {
@@ -642,6 +645,9 @@ export function useAcidenteForm({
   )
 
   const handlePessoaInputChange = useCallback((event) => {
+    if (editingAcidente) {
+      return
+    }
     const value = event.target.value
     setPessoaSearchValue(value)
     setPessoaSearchError(null)
@@ -663,21 +669,27 @@ export function useAcidenteForm({
       setPessoaDropdownOpen(false)
       setPessoaSuggestions([])
     }
-  }, [])
+  }, [editingAcidente])
 
   const handlePessoaSelect = useCallback(
     (pessoa) => {
+      if (editingAcidente) {
+        return
+      }
       if (!pessoa) return
       applyPessoaToForm(pessoa)
     },
-    [applyPessoaToForm],
+    [applyPessoaToForm, editingAcidente],
   )
 
   const handlePessoaFocus = useCallback(() => {
+    if (editingAcidente) {
+      return
+    }
     if (!form.matricula && pessoaSearchValue.trim().length >= PESSOA_SEARCH_MIN_CHARS) {
       setPessoaDropdownOpen(true)
     }
-  }, [form.matricula, pessoaSearchValue])
+  }, [editingAcidente, form.matricula, pessoaSearchValue])
 
   const handlePessoaBlur = useCallback(() => {
     pessoaBlurTimeoutRef.current = setTimeout(() => {
