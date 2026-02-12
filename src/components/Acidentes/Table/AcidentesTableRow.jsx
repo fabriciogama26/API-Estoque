@@ -26,18 +26,12 @@ export function AcidentesTableRow({
   const criadoEm =
     acidente.criadoEm ?? acidente.criado_em ?? acidente.createdAt ?? acidente.created_at ?? null
 
-  const statusLabel = acidente.ativo === false ? 'Cancelado' : 'Ativo'
-  const statusClass = acidente.ativo === false ? 'status-chip status-chip--cancelado' : 'status-chip status-chip--ativo'
-
   return (
     <tr>
       <td>
         <strong>{acidente.nome}</strong>
       </td>
       <td>{acidente.matricula || '-'}</td>
-      <td>
-        <span className={statusClass}>{statusLabel}</span>
-      </td>
       <td>{formatDate(acidente.data)}</td>
       <td>{acidente.centroServico || acidente.setor || '-'}</td>
       <td>{acidente.local || '-'}</td>

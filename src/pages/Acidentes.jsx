@@ -217,6 +217,7 @@ function AcidentesPageContent() {
         onPessoaFocus={handlePessoaFocus}
         onPessoaBlur={handlePessoaBlur}
         onPessoaClear={clearPessoaSelection}
+        disablePessoaEdit={Boolean(editingAcidente)}
       />
 
       <AcidenteDuplicateModal

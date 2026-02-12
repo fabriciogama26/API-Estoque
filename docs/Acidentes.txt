@@ -78,7 +78,7 @@ Fluxos principais
    - "Aplicar" usa `filterAcidentes(acidentes, filters)` para gerar a lista filtrada; "Limpar" restaura `ACIDENTES_FILTER_DEFAULT` e recarrega a lista principal, se necessario.
 
 5) Tabela e detalhes
-   - Colunas exibidas: Nome, Matricula, Status (ativo/cancelado), Data, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
+  - Colunas exibidas: Nome, Matricula, Data do acidente, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
    - Acoes: editar, historico, detalhar e cancelar (X vermelho). O botao "Detalhar" abre um modal com os demais campos (agente/tipo/lesoes/partes, dias, eSOCIAL, SESMT, observacao) e inclui o status atual.
    - Exportacao: botao "Exportar Excel (CSV)" gera planilha com acidentes filtrados.
    - Cancelar abre modal (mesmo estilo do HHT mensal) solicitando motivo; define `ativo = false`, grava `cancel_motivo` e adiciona no historico. O registro continua visivel, mas sai dos calculos/dashboard.
@@ -150,6 +150,32 @@ Atualizacao 2026-02
 - Botao "Exportar Excel (CSV)" adicionado na lista de acidentes.
 - CID deixou de ser unico (CAT segue unico); RPCs e validacao do formulario ajustadas.
 - Modal de confirmacao para duplicidade por matricula+data no cadastro manual.
+
+Atualizacao 2026-03
+-------------------
+- Arquivos alterados:
+  - supabase/migrations/20260301_fix_rpc_acidentes_import_hash.sql
+  - supabase/migrations/20260302_fix_acidentes_cid_update_hash.sql
+  - supabase/migrations/20260303_fix_acidentes_rehash_digest.sql
+  - supabase/migrations/20260304_fix_acidentes_rehash_search_path.sql
+  - src/components/Acidentes/Table/AcidentesTable.jsx
+  - src/services/api.js
+  - src/hooks/useAcidenteForm.js
+  - src/components/Acidentes/Form/AcidentesForm.jsx
+  - src/pages/Acidentes.jsx
+- Funcoes tocadas:
+  - public.rpc_acidentes_create_full
+  - public.rpc_acidentes_update_full
+  - public.rpc_acidentes_update_full_rehash
+- Antes/Depois:
+  - Antes havia sobrecarga sem `p_import_hash` gerando ambiguidade no RPC de edicao; depois fica apenas a assinatura com `p_import_hash`.
+  - Antes o CID era validado como unico; agora CID pode repetir (CAT continua unico).
+  - Antes era possivel trocar a pessoa no formulario; agora a pessoa fica bloqueada na edicao.
+  - Update passou a usar RPC dedicado com recalculo de `import_hash` com os mesmos campos do cadastro/importacao.
+  - Digest agora usa pgcrypto com entrada em bytea para evitar erro de assinatura.
+  - search_path passou a incluir `extensions` para resolver `digest` no ambiente Supabase.
+  - Coluna "Data" da tabela foi renomeada para "Data do acidente".
+  - Coluna "Status" foi removida da tabela de registros.
 
 Atualizacao 2026-01 (schema)
 -----------------------------
