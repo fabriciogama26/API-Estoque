@@ -174,7 +174,19 @@ async function createSessionRecord({ req, userId, sessionId, now }) {
 
   const { error: insertError } = await supabaseAdmin.from(SESSION_TABLE).insert(payload)
   if (insertError && insertError.code !== '23505') {
-    throw createHttpError(500, 'Falha ao registrar sessao.')
+    const error = createHttpError(500, 'Falha ao registrar sessao.')
+    error.code = insertError.code
+    error.context = {
+      stage: 'insert_session',
+      table: SESSION_TABLE,
+      message: insertError.message,
+      details: insertError.details,
+      hint: insertError.hint,
+      status: insertError.status,
+      userId,
+      sessionId,
+    }
+    throw error
   }
 
   return {
@@ -193,7 +205,19 @@ async function loadSessionRecord({ req, userId, sessionId }) {
     .maybeSingle()
 
   if (error) {
-    throw createHttpError(500, 'Falha ao validar sessao.')
+    const err = createHttpError(500, 'Falha ao validar sessao.')
+    err.code = error.code
+    err.context = {
+      stage: 'load_session',
+      table: SESSION_TABLE,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      status: error.status,
+      userId,
+      sessionId,
+    }
+    throw err
   }
 
   if (data) {
@@ -282,10 +306,24 @@ export async function touchSession(req, user, token) {
     const ua = resolveUserAgent(req)
     const ipHash = ip ? hashValue(ip) : null
     const uaHash = ua ? hashValue(ua) : null
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from(SESSION_TABLE)
       .update({ last_seen_at: nowIso(), ip_hash: ipHash, ua_hash: uaHash })
       .eq('id', record.id)
+    if (updateError) {
+      const err = createHttpError(500, 'Falha ao atualizar sessao.')
+      err.code = updateError.code
+      err.context = {
+        stage: 'touch_session',
+        table: SESSION_TABLE,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        status: updateError.status,
+        sessionId: record.id,
+      }
+      throw err
+    }
   }
 
   return { ok: true, touched: Boolean(shouldTouch) }
@@ -299,10 +337,24 @@ export async function markSessionReauth(req, user, token) {
 
   const { record } = validated
   if (record?.id) {
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from(SESSION_TABLE)
       .update({ last_reauth_at: nowIso(), last_seen_at: nowIso() })
       .eq('id', record.id)
+    if (updateError) {
+      const err = createHttpError(500, 'Falha ao registrar reautenticacao.')
+      err.code = updateError.code
+      err.context = {
+        stage: 'mark_reauth',
+        table: SESSION_TABLE,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        status: updateError.status,
+        sessionId: record.id,
+      }
+      throw err
+    }
   }
   return { ok: true }
 }
