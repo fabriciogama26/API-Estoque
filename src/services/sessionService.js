@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 
-const DEVICE_KEY = 'api-estoque-device-id'
+const SESSION_KEY = 'api-estoque-session-id'
 
 const resolveApiBase = () => {
   const envBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
@@ -24,28 +24,57 @@ const safeDispatch = (name, detail) => {
   }
 }
 
-const resolveDeviceId = () => {
+const generateSessionId = () => {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const resolveSessionId = () => {
   if (typeof window === 'undefined') {
     return null
   }
   try {
-    const existing = window.localStorage.getItem(DEVICE_KEY)
+    const existing = window.localStorage.getItem(SESSION_KEY)
     if (existing) {
       return existing
     }
-    const generated =
-      (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`)
-    window.localStorage.setItem(DEVICE_KEY, generated)
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function getSessionId() {
+  return resolveSessionId()
+}
+
+export function getSessionDeviceId() {
+  return getSessionId()
+}
+
+export function rotateSessionId() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  try {
+    const generated = generateSessionId()
+    window.localStorage.setItem(SESSION_KEY, generated)
     return generated
   } catch {
     return null
   }
 }
 
-export function getSessionDeviceId() {
-  return resolveDeviceId()
+export function clearSessionId() {
+  if (typeof window === 'undefined') {
+    return
+  }
+  try {
+    window.localStorage.removeItem(SESSION_KEY)
+  } catch {
+    // ignore
+  }
 }
 
 const notifySessionGuard = (status, payload) => {
@@ -65,6 +94,14 @@ const safeJson = async (response) => {
   }
 }
 
+const ensureSessionId = () => {
+  const existing = resolveSessionId()
+  if (existing) {
+    return existing
+  }
+  return rotateSessionId()
+}
+
 const buildHeaders = async (includeInteraction) => {
   if (!isSupabaseConfigured() || !supabase) {
     return null
@@ -75,15 +112,15 @@ const buildHeaders = async (includeInteraction) => {
     safeDispatch('session-expired', { code: 'SESSION_EXPIRED' })
     return null
   }
-  const deviceId = resolveDeviceId()
+  const sessionId = includeInteraction ? ensureSessionId() : resolveSessionId()
   const headers = {
     Authorization: `Bearer ${token}`,
   }
   if (includeInteraction) {
     headers['X-User-Interaction'] = '1'
   }
-  if (deviceId) {
-    headers['X-Session-Id'] = deviceId
+  if (sessionId) {
+    headers['X-Session-Id'] = sessionId
   }
   return headers
 }
@@ -129,6 +166,31 @@ export async function markSessionReauth() {
   }
 
   const response = await fetch(`${base}/api/session/reauth`, {
+    method: 'POST',
+    headers,
+  })
+
+  if (!response.ok) {
+    const payload = await safeJson(response)
+    notifySessionGuard(response.status, payload)
+    return { ok: false, status: response.status, payload }
+  }
+
+  return { ok: true }
+}
+
+export async function revokeSession() {
+  const base = resolveApiBase()
+  if (!base) {
+    return { ok: false, skipped: true }
+  }
+
+  const headers = await buildHeaders(false)
+  if (!headers) {
+    return { ok: false }
+  }
+
+  const response = await fetch(`${base}/api/session/revoke`, {
     method: 'POST',
     headers,
   })

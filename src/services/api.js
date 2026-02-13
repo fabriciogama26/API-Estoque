@@ -1,6 +1,6 @@
 ﻿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
-import { getSessionDeviceId, notifySessionGuardFromResponse } from './sessionService.js'
+import { getSessionId, notifySessionGuardFromResponse } from './sessionService.js'
 import {
   montarEstoqueAtual,
   montarDashboard,
@@ -2164,8 +2164,8 @@ async function buildAuthHeaders(extra = {}) {
   ensureSupabase()
   const { data } = await supabase.auth.getSession()
   const token = data?.session?.access_token
-  const deviceId = getSessionDeviceId()
-  const sessionHeader = deviceId ? { 'X-Session-Id': deviceId } : {}
+  const sessionId = getSessionId()
+  const sessionHeader = sessionId ? { 'X-Session-Id': sessionId } : {}
   return token ? { ...extra, ...sessionHeader, Authorization: `Bearer ${token}` } : { ...extra, ...sessionHeader }
 }
 

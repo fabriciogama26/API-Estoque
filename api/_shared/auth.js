@@ -48,10 +48,14 @@ export async function requireAuth(req, res) {
       requireReauth: Boolean(req?.requiresReauth),
     })
     if (!sessionGuard?.ok) {
-      sendJson(res, sessionGuard.status || 401, {
+      const payload = {
         error: sessionGuard.message || 'Sessao expirada. Faca login novamente.',
         code: sessionGuard.code || 'SESSION_EXPIRED',
-      })
+      }
+      if (SESSION_TOUCH_DEBUG && (req?.url || '').startsWith('/api/session/touch')) {
+        payload.debug = sessionGuard.debug || null
+      }
+      sendJson(res, sessionGuard.status || 401, payload)
       return null
     }
 

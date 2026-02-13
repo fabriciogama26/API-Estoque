@@ -26,7 +26,12 @@ export function withAuth(handler) {
       const method = (req.method || '').toUpperCase()
       const path = (req.url || '').split('?')[0]
       const reauthRequiredMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
-      const reauthExemptPaths = new Set(['/api/session/touch', '/api/session/reauth', '/api/health'])
+      const reauthExemptPaths = new Set([
+        '/api/session/touch',
+        '/api/session/reauth',
+        '/api/session/revoke',
+        '/api/health',
+      ])
       req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path)
 
       let user = null

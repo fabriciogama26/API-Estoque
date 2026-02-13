@@ -11,7 +11,7 @@ import {
   CentrosCustoOperations,
   healthCheck,
 } from './_shared/operations.js'
-import { touchSession, markSessionReauth } from './_shared/sessionActivity.js'
+import { touchSession, markSessionReauth, revokeSession } from './_shared/sessionActivity.js'
 
 const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 
@@ -210,7 +210,11 @@ export default withAuth(async (req, res, user) => {
       try {
         const result = await touchSession(req, user, req.authToken)
         if (!result?.ok) {
-          return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+          const payload = { error: result.message, code: result.code }
+          if (SESSION_TOUCH_DEBUG && result?.debug) {
+            payload.debug = result.debug
+          }
+          return sendJson(res, result.status || 400, payload)
         }
         return sendJson(res, 200, { ok: true, touched: result.touched })
       } catch (error) {
@@ -228,6 +232,14 @@ export default withAuth(async (req, res, user) => {
 
     if (path === '/api/session/reauth' && method === 'POST') {
       const result = await markSessionReauth(req, user, req.authToken)
+      if (!result?.ok) {
+        return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+      }
+      return sendJson(res, 200, { ok: true })
+    }
+
+    if (path === '/api/session/revoke' && method === 'POST') {
+      const result = await revokeSession(req, user, req.authToken)
       if (!result?.ok) {
         return sendJson(res, result.status || 400, { error: result.message, code: result.code })
       }
