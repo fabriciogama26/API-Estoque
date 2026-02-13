@@ -13,9 +13,11 @@ export function ResetPasswordPage() {
     isCheckingSession,
     sessionError,
     isFormDisabled,
+    isForcedReset,
     handleChange,
     handleSubmit,
     handleCaptchaToken,
+    handleCancel,
   } = useResetPassword()
 
   return (
@@ -93,6 +95,16 @@ export function ResetPasswordPage() {
             >
               {isSubmitting ? 'Atualizando...' : 'Salvar nova senha'}
             </button>
+            {!isForcedReset ? (
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleCancel}
+                disabled={isSubmitting}
+              >
+                Voltar ao login
+              </button>
+            ) : null}
           </div>
         </form>
       </div>

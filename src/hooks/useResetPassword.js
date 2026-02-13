@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { restoreResetSession, updatePassword } from '../services/authService.js'
 import { isSupabaseConfigured, supabase } from '../services/supabaseClient.js'
 import { logError } from '../services/errorLogService.js'
@@ -8,6 +8,7 @@ import { securityConfig } from '../config/security.js'
 
 export function useResetPassword() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [form, setForm] = useState({ newPassword: '', confirmPassword: '' })
   const [status, setStatus] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -16,6 +17,8 @@ export function useResetPassword() {
   const [isReady, setIsReady] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
   const [userEmail, setUserEmail] = useState(null)
+  const resetReason = new URLSearchParams(location.search).get('reason') || ''
+  const isForcedReset = resetReason === 'expired'
 
   useEffect(() => {
     const ensureSession = async () => {
@@ -45,6 +48,22 @@ export function useResetPassword() {
     ensureSession()
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (!isSupabaseConfigured() || !supabase) {
+        return
+      }
+      supabase.auth.signOut({ scope: 'local' }).catch((err) => {
+        logError({
+          page: 'reset-password',
+          message: err?.message || 'Falha ao limpar sessao de redefinicao.',
+          context: { source: 'reset_cleanup' },
+          severity: 'warn',
+        })
+      })
+    }
+  }, [])
+
   const handleChange = (event) => {
     const { name, value } = event.target
     setStatus(null)
@@ -53,6 +72,25 @@ export function useResetPassword() {
 
   const handleCaptchaToken = (token) => {
     setCaptchaToken(token || '')
+  }
+
+  const handleCancel = async () => {
+    if (isSubmitting) {
+      return
+    }
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch (err) {
+        logError({
+          page: 'reset-password',
+          message: err?.message || 'Falha ao cancelar redefinicao.',
+          context: { source: 'reset_cancel' },
+          severity: 'warn',
+        })
+      }
+    }
+    navigate('/login', { replace: true })
   }
 
   const handleSubmit = async (event) => {
@@ -119,8 +157,11 @@ export function useResetPassword() {
     sessionError,
     isReady,
     isFormDisabled,
+    isForcedReset,
+    resetReason,
     handleChange,
     handleSubmit,
     handleCaptchaToken,
+    handleCancel,
   }
 }
