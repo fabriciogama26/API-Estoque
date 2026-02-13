@@ -61,6 +61,7 @@ Atualizacao 2026-02
 - Depois: hook de reset importa `securityConfig` e a validacao roda sem erro de referencia.
 - Antes: sessao de recuperacao podia manter o usuario preso no reset mesmo ao voltar para o login.
 - Depois: o reset limpa a sessao ao sair e permite voltar ao login quando nao for expiracao obrigatoria.
+- Logs de sessao agora incluem contexto do erro (code/message/hint) para diagnostico no backend.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
