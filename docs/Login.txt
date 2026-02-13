@@ -15,6 +15,7 @@ Fluxos
 - Login: email + senha; em modo local compara com VITE_LOCAL_USERNAME/PASSWORD; em modo remoto usa supabase.auth.signInWithPassword.
 - Recuperacao: envia resetPasswordForEmail com redirect configuravel; feedback de sucesso/erro.
 - ResetPasswordPage: valida sessao via getSession/getSessionFromUrl/exchangeCodeForSession/setSession; exige senha >=8 e confirmacao; redireciona ao login apos sucesso.
+- ResetPasswordPage: quando nao for expiracao obrigatoria, botao "Voltar ao login" limpa a sessao de recuperacao antes de sair.
 - Inatividade: monitora atividade (mouse, teclado, scroll, touch, foco) e envia /api/session/touch; expiracao vem do servidor e o front redireciona ao receber SESSION_EXPIRED.
 - Sessao (servidor): valida timebox de 12h e idle de 30min via tabela auth_session_activity; requests com X-User-Interaction atualizam last_seen_at; expiracao retorna 401 com code SESSION_EXPIRED.
 - Touch de sessao: front envia POST /api/session/touch com X-User-Interaction e X-Session-Id para marcar atividade humana (idle server).
@@ -58,6 +59,8 @@ Atualizacao 2026-02
 - Depois: servidor valida timebox (12h), idle (30min) e reauth (15min), e o front limpa tokens ao receber SESSION_EXPIRED/REAUTH_REQUIRED.
 - Antes: pagina de reset podia falhar com `securityConfig is not defined` ao validar captcha.
 - Depois: hook de reset importa `securityConfig` e a validacao roda sem erro de referencia.
+- Antes: sessao de recuperacao podia manter o usuario preso no reset mesmo ao voltar para o login.
+- Depois: o reset limpa a sessao ao sair e permite voltar ao login quando nao for expiracao obrigatoria.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -80,7 +83,7 @@ Funcoes principais
 - useResetPassword
   - Tipo: hook de reset
   - Caminho: src/hooks/useResetPassword.js
-  - Responsavel por: restaurar sessao do link, validar senha/confirmacao, enviar update e redirecionar.
+  - Responsavel por: restaurar sessao do link, validar senha/confirmacao, enviar update, limpar sessao ao sair e redirecionar.
 
 Constantes e configuracoes
 --------------------------
