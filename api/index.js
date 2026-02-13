@@ -13,6 +13,20 @@ import {
 } from './_shared/operations.js'
 import { touchSession, markSessionReauth } from './_shared/sessionActivity.js'
 
+const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
+
+const maskAuthHeader = (header) => {
+  if (!header || typeof header !== 'string') {
+    return null
+  }
+  if (header.toLowerCase().startsWith('bearer ')) {
+    const token = header.slice(7).trim()
+    if (!token) return 'Bearer <vazio>'
+    return `Bearer ${token.slice(0, 12)}...`
+  }
+  return `${header.slice(0, 12)}...`
+}
+
 export default withAuth(async (req, res, user) => {
   const { method, url } = req
   const path = url.split('?')[0]
@@ -173,11 +187,43 @@ export default withAuth(async (req, res, user) => {
 
     // Session activity
     if (path === '/api/session/touch' && method === 'POST') {
-      const result = await touchSession(req, user, req.authToken)
-      if (!result?.ok) {
-        return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+      if (SESSION_TOUCH_DEBUG) {
+        console.log('=== SESSION TOUCH DEBUG ===')
+        console.log('Headers:', {
+          'x-session-id': req?.headers?.['x-session-id'] || req?.headers?.['X-Session-Id'] || null,
+          'x-user-interaction':
+            req?.headers?.['x-user-interaction'] || req?.headers?.['X-User-Interaction'] || null,
+          'user-agent': req?.headers?.['user-agent'] || req?.headers?.['User-Agent'] || null,
+          'x-forwarded-for':
+            req?.headers?.['x-forwarded-for'] || req?.headers?.['X-Forwarded-For'] || null,
+          authorization: maskAuthHeader(
+            req?.headers?.authorization ||
+              req?.headers?.Authorization ||
+              req?.headers?.get?.('authorization') ||
+              req?.headers?.get?.('Authorization')
+          ),
+        })
+        console.log('Body:', req?.body || null)
+        console.log('User:', user?.id || null)
       }
-      return sendJson(res, 200, { ok: true, touched: result.touched })
+
+      try {
+        const result = await touchSession(req, user, req.authToken)
+        if (!result?.ok) {
+          return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+        }
+        return sendJson(res, 200, { ok: true, touched: result.touched })
+      } catch (error) {
+        if (SESSION_TOUCH_DEBUG) {
+          console.error('ERRO COMPLETO:', error)
+          console.error('Stack:', error?.stack)
+          return sendJson(res, 500, {
+            error: error?.message || 'Erro interno do servidor.',
+            stack: error?.stack || null,
+          })
+        }
+        throw error
+      }
     }
 
     if (path === '/api/session/reauth' && method === 'POST') {

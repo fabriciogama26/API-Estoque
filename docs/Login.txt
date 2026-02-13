@@ -62,6 +62,9 @@ Atualizacao 2026-02
 - Antes: sessao de recuperacao podia manter o usuario preso no reset mesmo ao voltar para o login.
 - Depois: o reset limpa a sessao ao sair e permite voltar ao login quando nao for expiracao obrigatoria.
 - Logs de sessao agora incluem contexto do erro (code/message/hint) para diagnostico no backend.
+- Falhas 5xx no guard de sessao agora registram erro em api_errors (backend).
+- Debug temporario: `SESSION_TOUCH_DEBUG=true` habilita log detalhado e resposta com stack no /api/session/touch.
+- Quando o erro ocorre antes do handler (requireAuth), o debug tambem retorna `context`/`stack` no /api/session/touch.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

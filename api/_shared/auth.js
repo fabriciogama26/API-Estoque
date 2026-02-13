@@ -1,5 +1,7 @@
 import { supabaseAdmin } from './supabaseClient.js'
-import { sendError, sendJson } from './http.js'
+import { sendError, sendJson, handleError } from './http.js'
+
+const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 import { validateSession } from './sessionActivity.js'
 
 export async function requireAuth(req, res) {
@@ -55,15 +57,31 @@ export async function requireAuth(req, res) {
 
     return data.user
   } catch (error) {
-    console.error('[AUTH] Falha ao validar token.', {
-      method: req?.method,
-      path: req?.url || req?.originalUrl,
-      message: error?.message,
-      stack: error?.stack,
-    })
     const status = error?.status || 401
     const message = error?.message || 'Token invalido ou expirado.'
-    sendError(res, status, message)
+    if (status >= 500) {
+      if (SESSION_TOUCH_DEBUG && (req?.url || '').startsWith('/api/session/touch')) {
+        console.error('[AUTH_DEBUG] Falha ao validar sessao.', {
+          method: req?.method,
+          path: req?.url || req?.originalUrl,
+          code: error?.code,
+          message: error?.message,
+          context: error?.context || null,
+          stack: error?.stack,
+        })
+        sendJson(res, status, {
+          error: message,
+          code: error?.code || null,
+          context: error?.context || null,
+          stack: error?.stack || null,
+        })
+        return null
+      }
+
+      handleError(res, error, message, req)
+    } else {
+      sendError(res, status, message)
+    }
     return null
   }
 }
