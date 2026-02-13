@@ -18,8 +18,8 @@ const clampInt = (value: string | undefined, fallback: number) => {
   return Math.max(1, Math.min(Math.trunc(parsed), 3650))
 }
 
-const retentionDays = clampInt(Deno.env.get("ERRORS_RETENTION_DAYS"), 7)
-const pageSize = clampInt(Deno.env.get("ERRORS_CLEANUP_PAGE_SIZE"), 500)
+const retentionDays = clampInt(Deno.env.get("ERRORS_RETENTION_DAYS"), 1) // o supabase-js tem um limite de 3650, mas na prática provavelmente não faz sentido reter por tanto tempo
+const pageSize = clampInt(Deno.env.get("ERRORS_CLEANUP_PAGE_SIZE"), 500) // o supabase-js tem um limite de 1000, mas na prática 500 é mais seguro pra evitar timeouts
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false },
@@ -40,12 +40,16 @@ const isAuthorized = (req: Request) => {
   return headerToken === cronSecret || bearerToken === cronSecret
 }
 
+const importPrefixes = ["desligamento/", "cadastro/", "entradas/", "acidentes/", "cadastro-base/"]
+
 function isErrorCsv(path: string) {
   const s = path.toLowerCase()
   return s.includes("_erros_") && s.endsWith(".csv")
 }
-function isInDesligamento(path: string) {
-  return path.toLowerCase().startsWith("desligamento/")
+
+function isImportSource(path: string) {
+  const s = path.toLowerCase()
+  return importPrefixes.some((prefix) => s.startsWith(prefix)) && s.endsWith(".xlsx")
 }
 
 function extractTs(obj: any): number | null {
@@ -82,6 +86,48 @@ async function listAll(prefix: string) {
     if (data.length < pageSize) break
   }
   return out
+}
+
+async function listImportEntries() {
+  const entries: { path: string; ts: number | null }[] = []
+
+  const rootList = await listAll("")
+  rootList.forEach((item) => {
+    const name = String(item?.name ?? "")
+    if (!name) return
+    entries.push({ path: name, ts: extractTs(item) })
+  })
+
+  for (const prefix of importPrefixes) {
+    const topLevel = await listAll(prefix)
+    topLevel.forEach((item) => {
+      const name = String(item?.name ?? "")
+      if (!name) return
+      entries.push({ path: `${prefix}${name}`, ts: extractTs(item) })
+    })
+
+    if (prefix === "cadastro-base/") {
+      for (const item of topLevel) {
+        const name = String(item?.name ?? "")
+        if (!name) continue
+        const nestedPrefix = `${prefix}${name}/`
+        const nested = await listAll(nestedPrefix)
+        nested.forEach((child) => {
+          const childName = String(child?.name ?? "")
+          if (!childName) return
+          entries.push({ path: `${nestedPrefix}${childName}`, ts: extractTs(child) })
+        })
+      }
+    }
+  }
+
+  const unique = new Map<string, number | null>()
+  entries.forEach((entry) => {
+    if (!entry.path) return
+    if (!unique.has(entry.path)) unique.set(entry.path, entry.ts ?? null)
+  })
+
+  return Array.from(unique.entries()).map(([path, ts]) => ({ path, ts }))
 }
 
 async function deleteInBatches(paths: string[], dryRun: boolean) {
@@ -181,20 +227,14 @@ Deno.serve(async (req) => {
     const cutoffIso = new Date(cutoffMs).toISOString()
     baseRow.cutoff = cutoffIso
 
-    const rootList = await listAll("")
-    const desligamentoList = await listAll("desligamento/")
-
-    const rootPaths = rootList.map((o: any) => String(o.name)).filter(Boolean)
-    const desligPaths = desligamentoList.map((o: any) => `desligamento/${String(o.name)}`).filter(Boolean)
-    const allPaths = Array.from(new Set([...rootPaths, ...desligPaths]))
-
+    const allEntries = await listImportEntries()
+    const allPaths = allEntries.map((entry) => entry.path)
     baseRow.total_listed = allPaths.length
 
     const tsMap = new Map<string, number | null>()
-    for (const o of rootList) tsMap.set(String(o.name), extractTs(o))
-    for (const o of desligamentoList) tsMap.set(`desligamento/${String(o.name)}`, extractTs(o))
+    allEntries.forEach((entry) => tsMap.set(entry.path, entry.ts ?? null))
 
-    const hasAnyTs = allPaths.some((p) => tsMap.get(p) != null)
+    const hasAnyTs = allEntries.some((entry) => entry.ts != null)
     if (!hasAnyTs) {
   const durationMs = Date.now() - t0
 
@@ -209,7 +249,7 @@ Deno.serve(async (req) => {
     details: {
       note: "Sem timestamps no storage.list(); tratando como pasta vazia/sem metadados. Nenhum arquivo deletado.",
       hint: "Verifique prefixo. Ã€s vezes 'desligamento' vs 'desligamento/' muda a resposta.",
-      sample_list_item: rootList?.[0] ?? null,
+      sample_list_item: allEntries?.[0] ?? null,
     },
   })
 
@@ -234,7 +274,7 @@ Deno.serve(async (req) => {
     const candidatesAll = allPaths.filter((p) => {
       const ts = tsMap.get(p)
       if (ts == null) return false
-      if (!(isErrorCsv(p) || isInDesligamento(p))) return false
+      if (!(isErrorCsv(p) || isImportSource(p))) return false
       return ts <= cutoffMs
     })
 
@@ -249,6 +289,7 @@ Deno.serve(async (req) => {
     baseRow.duration_ms = Date.now() - t0
     baseRow.details = {
       max_deletes: maxDeletes,
+      prefixes: importPrefixes,
       sample_candidates: candidates.slice(0, 10),
       sample_errors: errors.slice(0, 10),
     }
