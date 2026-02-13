@@ -4,7 +4,13 @@ import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import { sendPasswordRecovery } from '../services/authService.js'
 import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../services/effectiveUserService.js'
-import { markSessionReauth, touchSession } from '../services/sessionService.js'
+import {
+  markSessionReauth,
+  touchSession,
+  rotateSessionId,
+  clearSessionId,
+  revokeSession,
+} from '../services/sessionService.js'
 
 const STORAGE_KEY = 'api-estoque-auth'
 const TOUCH_THROTTLE_MS = 45 * 1000
@@ -294,6 +300,12 @@ export function AuthProvider({ children }) {
       } else {
         window.localStorage.removeItem(STORAGE_KEY)
       }
+      if (!isLocalMode && hasSupabase && supabase) {
+        rotateSessionId()
+        touchSession().catch((error) => {
+          reportError(error, { stage: 'login_touch' })
+        })
+      }
       setReauthState({ open: false, error: null, isSubmitting: false })
       return resolvedUser
     },
@@ -331,11 +343,13 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     if (!isLocalMode && hasSupabase && supabase) {
       try {
+        await revokeSession()
         await supabase.auth.signOut({ scope: 'local' })
       } catch (error) {
         reportError(error, { stage: 'logout' })
       }
     }
+    clearSessionId()
     invalidateEffectiveAppUserCache()
     setUser(null)
     window.localStorage.removeItem(STORAGE_KEY)

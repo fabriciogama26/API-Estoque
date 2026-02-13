@@ -3,6 +3,7 @@ import { supabaseAdmin } from './supabaseClient.js'
 import { createHttpError } from './http.js'
 
 const SESSION_TABLE = 'auth_session_activity'
+const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 
 const readNumberEnv = (value, fallback) => {
   if (value === undefined || value === null || value === '') {
@@ -49,22 +50,29 @@ function resolveSessionHeaderId(req) {
   return normalized || null
 }
 
-function resolveSessionId(req, token) {
+function resolveSessionIdInfo(req, token, payload = null) {
   const headerId = resolveSessionHeaderId(req)
   if (headerId) {
-    return headerId
+    return { id: headerId, source: 'header' }
   }
-  const payload = decodeJwtPayload(token)
+  const decoded = payload || decodeJwtPayload(token)
   const candidate =
-    payload?.session_id ||
-    payload?.sessionId ||
-    payload?.jti ||
-    payload?.sid ||
+    decoded?.session_id ||
+    decoded?.sessionId ||
+    decoded?.jti ||
+    decoded?.sid ||
     null
   if (candidate && typeof candidate === 'string') {
-    return candidate.trim()
+    return { id: candidate.trim(), source: 'jwt' }
   }
-  return hashValue(token)
+  if (token) {
+    return { id: hashValue(token), source: 'token-hash' }
+  }
+  return { id: null, source: 'none' }
+}
+
+function resolveSessionId(req, token) {
+  return resolveSessionIdInfo(req, token).id
 }
 
 function resolveInteractionHeader(req) {
@@ -211,6 +219,9 @@ async function loadSessionRecord({ req, userId, sessionId }) {
     .select('id, last_seen_at, last_reauth_at, created_at, expires_at, revoked_at')
     .eq('user_id', userId)
     .eq('session_id', sessionId)
+    .is('revoked_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (error) {
@@ -244,13 +255,16 @@ async function loadSessionRecord({ req, userId, sessionId }) {
     .select('id, last_seen_at, last_reauth_at, created_at, expires_at, revoked_at')
     .eq('user_id', userId)
     .eq('session_id', sessionId)
+    .is('revoked_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   return fallback || created
 }
 
-function buildSessionError({ status, code, message }) {
-  return { ok: false, status, code, message }
+function buildSessionError({ status, code, message, debug = null }) {
+  return { ok: false, status, code, message, debug }
 }
 
 export async function validateSession(req, user, token, { requireReauth = false } = {}) {
@@ -258,14 +272,72 @@ export async function validateSession(req, user, token, { requireReauth = false 
     throw createHttpError(401, 'Sessao invalida.')
   }
 
-  const sessionId = resolveSessionId(req, token)
+  const payload = decodeJwtPayload(token)
+  const sessionInfo = resolveSessionIdInfo(req, token, payload)
+  const sessionId = sessionInfo.id
+  const tokenIatMs = payload?.iat ? Number(payload.iat) * 1000 : null
+  const tokenExpMs = payload?.exp ? Number(payload.exp) * 1000 : null
   const now = new Date()
   const record = await loadSessionRecord({ req, userId: user.id, sessionId })
 
-  const expired =
-    Boolean(record?.revoked_at) ||
-    isExpiredByTimebox(record?.expires_at, now) ||
-    isExpiredByIdle(record?.last_seen_at, record?.created_at, now)
+  const nowMs = now.getTime()
+  const createdAtMs = record?.created_at ? new Date(record.created_at).getTime() : null
+  const lastSeenMs = record?.last_seen_at ? new Date(record.last_seen_at).getTime() : null
+  const lastReauthMs = record?.last_reauth_at ? new Date(record.last_reauth_at).getTime() : null
+  const expiresAtMs = record?.expires_at ? new Date(record.expires_at).getTime() : null
+  const revokedAtMs = record?.revoked_at ? new Date(record.revoked_at).getTime() : null
+  const baseMs = Math.max(
+    Number.isFinite(createdAtMs) ? createdAtMs : 0,
+    Number.isFinite(lastSeenMs) ? lastSeenMs : 0,
+    Number.isFinite(revokedAtMs) ? revokedAtMs : 0
+  )
+  const isNewLogin = Number.isFinite(tokenIatMs) && tokenIatMs > baseMs + 1000
+
+  const expiredByRevoked = Boolean(record?.revoked_at)
+  const expiredByTimebox = isExpiredByTimebox(record?.expires_at, now)
+  const expiredByIdle = isExpiredByIdle(record?.last_seen_at, record?.created_at, now)
+  const expired = expiredByRevoked || expiredByTimebox || expiredByIdle
+
+  const shouldDebug =
+    SESSION_TOUCH_DEBUG && typeof req?.url === 'string' && req.url.startsWith('/api/session/touch')
+  const debugPayload = shouldDebug
+    ? {
+        sessionId,
+        sessionIdSource: sessionInfo.source,
+        now: now.toISOString(),
+        tokenIat: tokenIatMs,
+        tokenExp: tokenExpMs,
+        config: {
+          idleMs: SESSION_IDLE_MS,
+          timeboxMs: SESSION_TIMEBOX_MS,
+          reauthWindowMs: SESSION_REAUTH_WINDOW_MS,
+          touchThrottleMs: SESSION_TOUCH_THROTTLE_MS,
+        },
+        record: record
+          ? {
+              id: record.id || null,
+              created_at: record.created_at || null,
+              last_seen_at: record.last_seen_at || null,
+              last_reauth_at: record.last_reauth_at || null,
+              expires_at: record.expires_at || null,
+              revoked_at: record.revoked_at || null,
+            }
+          : null,
+        expiredBy: {
+          revoked: expiredByRevoked,
+          timebox: expiredByTimebox,
+          idle: expiredByIdle,
+        },
+        derived: {
+          createdAgeMs: Number.isFinite(createdAtMs) ? nowMs - createdAtMs : null,
+          lastSeenAgeMs: Number.isFinite(lastSeenMs) ? nowMs - lastSeenMs : null,
+          reauthAgeMs: Number.isFinite(lastReauthMs) ? nowMs - lastReauthMs : null,
+          timeboxRemainingMs: Number.isFinite(expiresAtMs) ? expiresAtMs - nowMs : null,
+          baseMs,
+          isNewLogin,
+        },
+      }
+    : null
 
   if (expired) {
     if (record?.id && !record?.revoked_at) {
@@ -275,6 +347,7 @@ export async function validateSession(req, user, token, { requireReauth = false 
       status: 401,
       code: 'SESSION_EXPIRED',
       message: 'Sessao expirada. Faca login novamente.',
+      debug: debugPayload,
     })
   }
 
@@ -283,6 +356,7 @@ export async function validateSession(req, user, token, { requireReauth = false 
       status: 403,
       code: 'REAUTH_REQUIRED',
       message: 'Reautenticacao necessaria.',
+      debug: debugPayload,
     })
   }
 
@@ -355,6 +429,36 @@ export async function markSessionReauth(req, user, token) {
       err.code = updateError.code
       err.context = {
         stage: 'mark_reauth',
+        table: SESSION_TABLE,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        status: updateError.status,
+        sessionId: record.id,
+      }
+      throw err
+    }
+  }
+  return { ok: true }
+}
+
+export async function revokeSession(req, user, token) {
+  const validated = await validateSession(req, user, token)
+  if (!validated.ok) {
+    return validated
+  }
+
+  const { record } = validated
+  if (record?.id) {
+    const { error: updateError } = await supabaseAdmin
+      .from(SESSION_TABLE)
+      .update({ revoked_at: nowIso() })
+      .eq('id', record.id)
+    if (updateError) {
+      const err = createHttpError(500, 'Falha ao revogar sessao.')
+      err.code = updateError.code
+      err.context = {
+        stage: 'revoke_session',
         table: SESSION_TABLE,
         message: updateError.message,
         details: updateError.details,
