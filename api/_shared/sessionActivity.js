@@ -3,10 +3,19 @@ import { supabaseAdmin } from './supabaseClient.js'
 import { createHttpError } from './http.js'
 
 const SESSION_TABLE = 'auth_session_activity'
-const SESSION_TIMEBOX_MS = 12 * 60 * 60 * 1000 // 12 hours (1 * 60 * 60 * 1000) // 1 hour for testing
-const SESSION_IDLE_MS = 30 * 60 * 1000 // 30 minutes (1 * 60 * 1000) // 1 minutes for testing
-const SESSION_REAUTH_WINDOW_MS = 15 * 60 * 1000 // 15 minutes (1 * 60 * 1000) // 1 minute for testing
-const SESSION_TOUCH_THROTTLE_MS = 30 * 1000 // 30 seconds (1 * 1000) // 1 second for testing
+
+const readNumberEnv = (value, fallback) => {
+  if (value === undefined || value === null || value === '') {
+    return fallback
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const SESSION_TIMEBOX_MS = readNumberEnv(process.env.SESSION_TIMEBOX_MS, 12 * 60 * 60 * 1000)
+const SESSION_IDLE_MS = readNumberEnv(process.env.SESSION_IDLE_MS, 30 * 60 * 1000)
+const SESSION_REAUTH_WINDOW_MS = readNumberEnv(process.env.SESSION_REAUTH_WINDOW_MS, 15 * 60 * 1000)
+const SESSION_TOUCH_THROTTLE_MS = readNumberEnv(process.env.SESSION_TOUCH_THROTTLE_MS, 30 * 1000)
 
 const hashValue = (value) =>
   createHash('sha256')

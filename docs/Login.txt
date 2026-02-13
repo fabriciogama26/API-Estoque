@@ -28,6 +28,7 @@ Boas praticas
 - Registrar erros (login, recovery, updatePassword, restoreResetSession) em app_errors para auditoria.
 - Enviar X-User-Interaction somente em /api/session/touch; evitar polling para nao mascarar idle real.
 - Usar X-Session-Id (device_id persistente) para manter sessao estavel mesmo com refresh de token.
+- Se precisar ajustar tempos de sessao, use as envs: SESSION_TIMEBOX_MS, SESSION_IDLE_MS, SESSION_REAUTH_WINDOW_MS, SESSION_TOUCH_THROTTLE_MS.
 
 Atualizacao 2025-12
 
@@ -65,6 +66,7 @@ Atualizacao 2026-02
 - Falhas 5xx no guard de sessao agora registram erro em api_errors (backend).
 - Debug temporario: `SESSION_TOUCH_DEBUG=true` habilita log detalhado e resposta com stack no /api/session/touch.
 - Quando o erro ocorre antes do handler (requireAuth), o debug tambem retorna `context`/`stack` no /api/session/touch.
+- Migration corretiva adiciona colunas faltantes em `auth_session_activity` (ex.: `last_reauth_at`).
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
