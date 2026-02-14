@@ -1,0 +1,8 @@
+Backlog - Melhorias Pendentes
+
+- Criar RPCs master-only (security definer) para leitura segura das tabelas internas:
+  api_errors, app_errors, app_credentials_catalog, app_users, app_users_credential_history,
+  app_users_dependentes, auth_session_activity, edge_functions_error_report, permissions,
+  planos_users, role_permissions, roles, user_permission_overrides, user_roles.
+- Definir payload minimo e mascaramento de dados sensiveis para exibir em tela de auditoria.
+- Mapear consumo atual (frontend/API) para evitar regressao ao endurecer policies.
