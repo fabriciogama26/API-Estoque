@@ -2,14 +2,12 @@
 
 Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 
----
 
 ## Visao geral
 - Problema resolvido: centralizar cadastros, movimentacoes de estoque e historicos.
 - Solucao proposta: frontend React com Supabase Auth/Database/Storage e migrations versionadas.
 - Contexto de uso: times de seguranca e almoxarifado em ambiente multi-tenant.
 
----
 
 ## Tecnologias
 - React
@@ -18,7 +16,6 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 - Node.js
 - Vercel Serverless Functions (pasta `api/`)
 
----
 
 ## Requisitos
 - Node.js 20+
@@ -27,7 +24,6 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 - Supabase CLI disponivel via `npx` para backup de functions publicadas/configs
 - PostgreSQL client (pg_dump) para backup do banco
 
----
 
 ## Como rodar o projeto
 
@@ -37,15 +33,13 @@ npm install
 npm run dev
 ```
 
----
 
-### Build / Producao
+### Build / Producao (se aplicavel)
 ```bash
 npm run build
 npm run preview
 ```
 
----
 
 ## Variaveis de ambiente
 Obrigatorias (frontend remoto):
@@ -115,9 +109,8 @@ Opcionais / por feature:
 - `SUPABASE_SECRET_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`
 
----
 
-## Estrutura de pastas
+## Estrutura de pastas simplificada
 - `api/`: funcoes serverless (Vercel).
 - `docs/`: documentacao por tela e guias.
 - `public/`: assets estaticos.
@@ -126,7 +119,6 @@ Opcionais / por feature:
 - `supabase/`: migrations, functions e configuracoes.
 - `supabasebackup/`: scripts e artefatos de backup.
 
----
 
 ## Estrutura completa de pastas
 - Excecao explicita: pastas grandes nao listadas nesta secao: `.git/`, `node_modules/`, `dist/`, `supabasebackup/`.
@@ -810,9 +802,8 @@ vercel.json  # configuracao de deploy (Vercel)
 vite.config.js  # configuracao do Vite
 ```
 
----
 
-## Fluxo principal
+## Fluxo principal (happy path)
 - Autenticar no Supabase e carregar contexto do usuario.
 - Cadastrar catalogos base (grupos, fabricantes, cores, caracteristicas, medidas).
 - Cadastrar materiais e pessoas.
@@ -822,12 +813,10 @@ vite.config.js  # configuracao do Vite
 - Consultar dashboards e gerar relatorios mensais/trimestrais quando necessario.
 - Gerar termo de EPI quando aplicavel.
 
----
 
 ## Testes
 - Nao existem testes automatizados.
 
----
 
 ## Troubleshooting
 - Erro de RLS (42501): conferir `account_owner_id`, roles/permissions e policies do schema.
@@ -837,12 +826,10 @@ vite.config.js  # configuracao do Vite
 - Relatorio automatico nao executa: validar `CRON_SECRET` e a rota `/api/estoque/relatorio/auto`.
 - Nenhuma movimentacao encontrada: revisar filtros e periodo do relatorio.
 
----
 
 ## Status do projeto
-?? Em desenvolvimento
+🟡 Em desenvolvimento
 
----
 
 ## Licenca
 - Nao definida no repositorio.

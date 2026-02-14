@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
 const bucket = Deno.env.get("ERRORS_BUCKET") || "imports"
 const cronSecret = Deno.env.get("CRON_SECRET") || ""
 
@@ -30,6 +31,24 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
     },
   },
 })
+const supabaseAuth = supabaseUrl && anonKey
+  ? createClient(supabaseUrl, anonKey, { auth: { persistSession: false } })
+  : null
+
+const readBearerToken = (req: Request) => {
+  const authHeader = req.headers.get("authorization") || ""
+  const match = authHeader.match(/Bearer\s+(.+)/i)
+  return match?.[1]?.trim() || null
+}
+
+const resolveActorUserId = async (req: Request) => {
+  if (!supabaseAuth) return null
+  const token = readBearerToken(req)
+  if (!token) return null
+  const { data, error } = await supabaseAuth.auth.getUser(token)
+  if (error || !data?.user?.id) return null
+  return data.user.id
+}
 
 const isAuthorized = (req: Request) => {
   if (!cronSecret) return true
@@ -179,10 +198,12 @@ Deno.serve(async (req) => {
     error_stack: null,
     sb_request_id: getSbRequestId(req),
     details: null,
+    user_id: null,
   }
 
   try {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
+    baseRow.user_id = await resolveActorUserId(req)
     if (req.method !== "POST") {
       httpStatus = 405
       baseRow.http_status = httpStatus
@@ -327,4 +348,3 @@ Deno.serve(async (req) => {
     })
   }
 })
-
