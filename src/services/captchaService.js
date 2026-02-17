@@ -1,4 +1,5 @@
 import { securityConfig } from '../config/security.js'
+import { ApiError, request as httpRequest } from './httpClient.js'
 
 export async function verifyCaptchaOrThrow(token) {
   if (!securityConfig.captcha.enabled) {
@@ -11,21 +12,22 @@ export async function verifyCaptchaOrThrow(token) {
     throw new Error('Servico de verificacao do captcha nao configurado (VITE_HCAPTCHA_VERIFY_URL).')
   }
 
-  const response = await fetch(securityConfig.captcha.verifyUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  })
-
   let payload = {}
   try {
-    payload = await response.json()
-  } catch (_) {
-    payload = {}
+    payload = await httpRequest('POST', securityConfig.captcha.verifyUrl, {
+      body: { token },
+      headers: { 'Content-Type': 'application/json' },
+      skipSessionGuard: true,
+    })
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw new Error(err.message)
+    }
+    throw new Error(err?.message || 'Falha ao validar captcha.')
   }
 
-  if (!response.ok || payload.success === false) {
-    const reason = payload?.reason || payload?.message || `Falha ao validar captcha (status ${response.status}).`
+  if (payload.success === false) {
+    const reason = payload?.reason || payload?.message || 'Falha ao validar captcha.'
     throw new Error(reason)
   }
 

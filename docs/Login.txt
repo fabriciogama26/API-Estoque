@@ -43,6 +43,7 @@ Atualizacao 2026-02
 - Monitoramento de atividade reforcado (inclui scroll e eventos pointer) e touch de sessao; logout limpa sessao local quando disparado.
 - Guard de sessao no backend com timebox/idle e registro em auth_session_activity.
 - /api/session/touch + X-Session-Id para marcar atividade; reauth exigida para operacoes sensiveis.
+- /api/session/* no front agora usa httpClient para padronizar envelope e request_id.
 - Politica de senha: atualizacao a cada 60 dias via metadata password_changed_at.
 - Arquivos alterados/criados:
 - `supabase/migrations/20260211_auth_session_activity.sql`
@@ -67,6 +68,8 @@ Atualizacao 2026-02
 - Depois: hook de reset importa `securityConfig` e a validacao roda sem erro de referencia.
 - Antes: sessao de recuperacao podia manter o usuario preso no reset mesmo ao voltar para o login.
 - Depois: o reset limpa a sessao ao sair e permite voltar ao login quando nao for expiracao obrigatoria.
+- Antes: /api/session/* usava fetch direto e parse manual.
+- Depois: /api/session/* usa httpClient com envelope padronizado.
 - Logs de sessao agora incluem contexto do erro (code/message/hint) para diagnostico no backend.
 - Falhas 5xx no guard de sessao agora registram erro em api_errors (backend).
 - Debug temporario: `SESSION_TOUCH_DEBUG=true` habilita log detalhado e resposta com stack no /api/session/touch.

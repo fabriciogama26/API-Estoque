@@ -1,5 +1,10 @@
 import { Readable } from 'node:stream'
-import { logApiError } from './logger.js'
+import {
+  buildErrorEnvelope,
+  ensureRequestId,
+  logApiErrorNormalized,
+  normalizeError,
+} from './errorCore.js'
 
 export async function readJson(req) {
   if (req.body) {
@@ -35,23 +40,37 @@ export function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload))
 }
 
-export function sendError(res, status, message) {
-  sendJson(res, status, { error: message })
+export function sendError(res, status, message, options = {}) {
+  const normalized = normalizeError(
+    { status, message, code: options?.code },
+    { fallbackMessage: message }
+  )
+  const requestId = ensureRequestId(options?.req || options?.reqLike || null, res)
+  sendJson(res, normalized.status, buildErrorEnvelope(normalized, requestId))
 }
 
-export function methodNotAllowed(res, methods) {
+export function methodNotAllowed(res, methods, req = null) {
   res.setHeader('Allow', methods.join(', '))
-  sendError(res, 405, 'Método não permitido.')
+  sendError(res, 405, 'Método não permitido.', { code: 'VALIDATION_ERROR', req })
 }
 
-export function createHttpError(status, message) {
+export function createHttpError(status, message, options = {}) {
   const error = new Error(message)
   error.status = status
+  if (options?.code) {
+    error.code = options.code
+  }
+  if (options?.details) {
+    error.details = options.details
+  }
+  if (options?.context) {
+    error.context = options.context
+  }
   return error
 }
 
-function logServerError(error, req, fallbackMessage) {
-  const status = error?.status || 500
+function logServerError(normalized, req, fallbackMessage) {
+  const status = normalized?.status || 500
   const path = req?.url || req?.originalUrl || null
   const method = req?.method || null
   const user =
@@ -63,46 +82,30 @@ function logServerError(error, req, fallbackMessage) {
 
   console.error('[API_ERROR]', {
     status,
-    code: error?.code,
-    message: error?.message || fallbackMessage,
+    code: normalized?.code,
+    message: normalized?.message || fallbackMessage,
     method,
     path,
     user,
-    stack: error?.stack,
+    stack: normalized?.stack,
   })
 }
 
 export function handleError(res, error, fallbackMessage = 'Erro interno do servidor.', req = null) {
-  logServerError(error, req, fallbackMessage)
+  const normalized = normalizeError(error, { fallbackMessage })
+  const requestId = ensureRequestId(req, res)
+
+  logServerError(normalized, req, fallbackMessage)
 
   if (req) {
-    logApiError({
-      message: error?.message || fallbackMessage,
-      status: error?.status || 500,
-      code: error?.code,
-      method: req?.method,
-      path: req?.url || req?.originalUrl,
-      userId:
-        req?.user?.id ||
-        req?.user?.email ||
-        req?.user?.phone ||
-        req?.user?.user_metadata?.nome ||
-        null,
-      stack: error?.stack,
-      context: error?.context || null,
-    }).catch((logErr) => {
+    logApiErrorNormalized(normalized, req).catch((logErr) => {
       console.warn('[API_ERROR_LOG] Falha ao registrar erro no Supabase.', {
         message: logErr?.message,
       })
     })
   }
 
-  if (error?.status) {
-    sendError(res, error.status, error.message || fallbackMessage)
-    return
-  }
-
-  sendError(res, 500, fallbackMessage)
+  sendJson(res, normalized.status, buildErrorEnvelope(normalized, requestId))
 }
 
 export function parseQuery(req) {

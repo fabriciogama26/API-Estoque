@@ -1,7 +1,6 @@
 import { supabaseAdmin } from './supabaseClient.js'
-import { sendError, sendJson, handleError } from './http.js'
+import { sendError, handleError } from './http.js'
 
-const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 import { validateSession } from './sessionActivity.js'
 
 export async function requireAuth(req, res) {
@@ -16,7 +15,7 @@ export async function requireAuth(req, res) {
       method: req?.method,
       path: req?.url || req?.originalUrl,
     })
-    sendError(res, 401, 'Autorizacao requerida.')
+    sendError(res, 401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED', req })
     return null
   }
 
@@ -27,7 +26,7 @@ export async function requireAuth(req, res) {
       method: req?.method,
       path: req?.url || req?.originalUrl,
     })
-    sendError(res, 401, 'Token invalido.')
+    sendError(res, 401, 'Token invalido.', { code: 'AUTH_REQUIRED', req })
     return null
   }
 
@@ -40,7 +39,7 @@ export async function requireAuth(req, res) {
         code: error?.code,
         message: error?.message,
       })
-      sendError(res, 401, 'Token invalido ou expirado.')
+      sendError(res, 401, 'Token invalido ou expirado.', { code: 'AUTH_EXPIRED', req })
       return null
     }
 
@@ -48,14 +47,16 @@ export async function requireAuth(req, res) {
       requireReauth: Boolean(req?.requiresReauth),
     })
     if (!sessionGuard?.ok) {
-      const payload = {
-        error: sessionGuard.message || 'Sessao expirada. Faca login novamente.',
-        code: sessionGuard.code || 'SESSION_EXPIRED',
-      }
-      if (SESSION_TOUCH_DEBUG && (req?.url || '').startsWith('/api/session/touch')) {
-        payload.debug = sessionGuard.debug || null
-      }
-      sendJson(res, sessionGuard.status || 401, payload)
+      const status = sessionGuard.status || 401
+      const codeRaw = (sessionGuard.code || '').toString().trim().toUpperCase()
+      const code =
+        codeRaw === 'INTERACTION_REQUIRED'
+          ? 'VALIDATION_ERROR'
+          : 'AUTH_EXPIRED'
+      sendError(res, status, sessionGuard.message || 'Sessao expirada. Faca login novamente.', {
+        code,
+        req,
+      })
       return null
     }
 
@@ -64,27 +65,10 @@ export async function requireAuth(req, res) {
     const status = error?.status || 401
     const message = error?.message || 'Token invalido ou expirado.'
     if (status >= 500) {
-      if (SESSION_TOUCH_DEBUG && (req?.url || '').startsWith('/api/session/touch')) {
-        console.error('[AUTH_DEBUG] Falha ao validar sessao.', {
-          method: req?.method,
-          path: req?.url || req?.originalUrl,
-          code: error?.code,
-          message: error?.message,
-          context: error?.context || null,
-          stack: error?.stack,
-        })
-        sendJson(res, status, {
-          error: message,
-          code: error?.code || null,
-          context: error?.context || null,
-          stack: error?.stack || null,
-        })
-        return null
-      }
-
       handleError(res, error, message, req)
     } else {
-      sendError(res, status, message)
+      const fallbackCode = status === 401 ? 'AUTH_EXPIRED' : null
+      sendError(res, status, message, { code: fallbackCode, req })
     }
     return null
   }

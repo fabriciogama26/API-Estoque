@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { ApiError, request as httpRequest } from './httpClient.js'
 
 const SESSION_KEY = 'api-estoque-session-id'
 
@@ -77,20 +78,29 @@ export function clearSessionId() {
   }
 }
 
-const notifySessionGuard = (status, payload) => {
-  if (status === 401 && payload?.code === 'SESSION_EXPIRED') {
-    safeDispatch('session-expired', payload)
+const resolvePayloadCode = (payload) => {
+  if (!payload) {
+    return null
   }
-  if (status === 403 && payload?.code === 'REAUTH_REQUIRED') {
-    safeDispatch('session-reauth-required', payload)
+  if (payload.error && typeof payload.error === 'object') {
+    return payload.error.code || null
   }
+  if (payload.code) {
+    return payload.code
+  }
+  return null
 }
 
-const safeJson = async (response) => {
-  try {
-    return await response.json()
-  } catch {
-    return null
+const notifySessionGuard = (status, payload) => {
+  const code = (resolvePayloadCode(payload) || '').toString().trim().toUpperCase()
+  if (
+    status === 401 &&
+    (code === 'SESSION_EXPIRED' || code === 'AUTH_EXPIRED' || code === 'AUTH_REQUIRED')
+  ) {
+    safeDispatch('session-expired', payload)
+  }
+  if (status === 403 && (code === 'REAUTH_REQUIRED' || code === 'AUTH_EXPIRED')) {
+    safeDispatch('session-reauth-required', payload)
   }
 }
 
@@ -140,18 +150,15 @@ export async function touchSession() {
     return { ok: false }
   }
 
-  const response = await fetch(`${base}/api/session/touch`, {
-    method: 'POST',
-    headers,
-  })
-
-  if (!response.ok) {
-    const payload = await safeJson(response)
-    notifySessionGuard(response.status, payload)
-    return { ok: false, status: response.status, payload }
+  try {
+    await httpRequest('POST', `${base}/api/session/touch`, { headers })
+    return { ok: true }
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { ok: false, status: err.status ?? null, payload: err.raw?.payload ?? null }
+    }
+    return { ok: false }
   }
-
-  return { ok: true }
 }
 
 export async function markSessionReauth() {
@@ -165,18 +172,15 @@ export async function markSessionReauth() {
     return { ok: false }
   }
 
-  const response = await fetch(`${base}/api/session/reauth`, {
-    method: 'POST',
-    headers,
-  })
-
-  if (!response.ok) {
-    const payload = await safeJson(response)
-    notifySessionGuard(response.status, payload)
-    return { ok: false, status: response.status, payload }
+  try {
+    await httpRequest('POST', `${base}/api/session/reauth`, { headers })
+    return { ok: true }
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { ok: false, status: err.status ?? null, payload: err.raw?.payload ?? null }
+    }
+    return { ok: false }
   }
-
-  return { ok: true }
 }
 
 export async function revokeSession() {
@@ -190,16 +194,13 @@ export async function revokeSession() {
     return { ok: false }
   }
 
-  const response = await fetch(`${base}/api/session/revoke`, {
-    method: 'POST',
-    headers,
-  })
-
-  if (!response.ok) {
-    const payload = await safeJson(response)
-    notifySessionGuard(response.status, payload)
-    return { ok: false, status: response.status, payload }
+  try {
+    await httpRequest('POST', `${base}/api/session/revoke`, { headers })
+    return { ok: true }
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return { ok: false, status: err.status ?? null, payload: err.raw?.payload ?? null }
+    }
+    return { ok: false }
   }
-
-  return { ok: true }
 }
