@@ -9,8 +9,6 @@ export function useLoginForm() {
   const location = useLocation()
 
   const [form, setForm] = useState({ loginName: '', password: '' })
-  const [recoveryLogin, setRecoveryLogin] = useState('')
-  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [status, setStatus] = useState(null)
@@ -23,20 +21,6 @@ export function useLoginForm() {
     setError(null)
     setStatus(null)
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
-  }
-
-  const handleRecoveryChange = (event) => {
-    const { value } = event.target
-    setError(null)
-    setStatus(null)
-    setRecoveryLogin(value)
-  }
-
-  const handleToggleRecovery = () => {
-    if (!isRecoveryOpen && !recoveryLogin && form.loginName) {
-      setRecoveryLogin(form.loginName)
-    }
-    setIsRecoveryOpen((prev) => !prev)
   }
 
   const handleSubmit = async (event) => {
@@ -64,7 +48,7 @@ export function useLoginForm() {
     setStatus(null)
     setError(null)
 
-    const loginName = recoveryLogin?.trim() ?? ''
+    const loginName = form.loginName?.trim() ?? ''
     if (!loginName) {
       setError('Informe seu login para recuperar a senha.')
       return
@@ -79,7 +63,7 @@ export function useLoginForm() {
       logError({
         page: 'login',
         message: err.message,
-        context: { loginName: recoveryLogin, action: 'recoverPassword' },
+        context: { loginName, action: 'recoverPassword' },
         severity: 'error',
       })
     } finally {
@@ -89,15 +73,11 @@ export function useLoginForm() {
 
   return {
     form,
-    recoveryLogin,
-    isRecoveryOpen,
     isSubmitting,
     error,
     status,
     isRecovering,
     handleChange,
-    handleRecoveryChange,
-    handleToggleRecovery,
     handleSubmit,
     handlePasswordRecovery,
   }
