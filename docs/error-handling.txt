@@ -7,10 +7,10 @@ VisÃ£o geral
 
 Backend (Node/Express â€“ pasta api/ + src/app.js)
 - FunÃ§Ã£o central: `handleError` (`api/_shared/http.js`).
-  - Sempre loga no console e escreve em `api_errors` com method, path, status, userId, code, stack e context, usando `logApiError`.
+  - Sempre loga no console e escreve em `api_errors` com method, path, status_code, userId, code, stack e context, usando `logApiError`.
   - Responde JSON `{ error }` com status do erro ou 500.
 - Logger Supabase: `api/_shared/logger.js`.
-  - Usa `SUPABASE_SERVICE_ROLE_KEY`. Campos: environment (APP_ENV/RUNTIME_ENV/NODE_ENV), service (SERVICE_NAME ou â€œapiâ€), method, path, status, code, user_id, message, stack, context, fingerprint.
+  - Usa `SUPABASE_SERVICE_ROLE_KEY`. Campos: environment (APP_ENV/RUNTIME_ENV/NODE_ENV), service (SERVICE_NAME ou â€œapiâ€), method, path, status_code, code, user_id, message, stack, context, fingerprint.
 - Supabase errors: `mapSupabaseError` (`api/_shared/operations.js`) cria HttpError com code/status e loga detalhes (code, table, hint, details).
 - AutenticaÃ§Ã£o: `requireAuth` (`api/_shared/auth.js`) registra avisos para header ausente/token vazio/invÃ¡lido e exceÃ§Ãµes de getUser, alÃ©m de responder 401.
 - withAuth: anexa `req.user` para que `handleError` registre usuÃ¡rio no log.
@@ -19,6 +19,8 @@ Backend (Node/Express â€“ pasta api/ + src/app.js)
   - Middleware de erro usa `logApiError` e devolve `{ error, requestId }`.
   - Access log sÃ³ para requisiÃ§Ãµes lentas (>= `SLOW_REQUEST_THRESHOLD_MS`, padrÃ£o 2000 ms) e que nÃ£o sejam 5xx, para nÃ£o lotar o banco.
 - Migration: `supabase/migrations/0068_create_api_errors.sql` cria tabela `api_errors` com RLS para `service_role`. Aplicar no Supabase antes de usar.
+- api_errors agora tem campos de gestao: status (open/closed), resolved_at, resolved_by (app_users.id).
+- api_errors: status_code guarda o HTTP status do erro.
 - Captcha (Supabase Auth): se Authentication â†’ Attack Protection estiver ativado, o backend exige `captchaToken` no `signInWithPassword`. Para login sem captcha, mantenha desativado. O captcha do app fica apenas na pÃ¡gina de redefiniÃ§Ã£o de senha (ver `docs/captcha.txt`).
 
 Edge Functions (Supabase)
@@ -35,10 +37,10 @@ Frontend (React â€“ pasta src/)
 - System health: `src/components/SystemStatus.jsx` usa `useErrorLogger('system_status')` para falhas de health check e perfil.
 
 Como adicionar novos logs
-- Backend: use `handleError` nos handlers; para logs manuais, chame `logApiError({ message, method, path, status, code, userId, context, stack, requestId })`.
+- Backend: use `handleError` nos handlers; para logs manuais, chame `logApiError({ message, method, path, status (HTTP), code, userId, context, stack, requestId })`.
 - Frontend: injete `const { reportError } = useErrorLogger('<page>')` e chame `reportError(err, { contexto })`; em serviÃ§os reutilize `reportClientError` (jÃ¡ importado em `src/services/api.js`).
 
 Checklist de operaÃ§Ã£o
 - VariÃ¡veis: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, opcional `APP_ENV`/`SERVICE_NAME`, `SLOW_REQUEST_THRESHOLD_MS` (padrÃ£o 2000 ms).
-- Aplicar migrations, incluindo `0068_create_api_errors.sql` (backend) e a existente `0052_create_app_errors.sql` (frontend).
+- Aplicar migrations, incluindo `0068_create_api_errors.sql` e `20260217_add_api_errors_resolution_fields.sql` (backend) e a existente `0052_create_app_errors.sql` (frontend).
 - Validar: provocar erro 500 no backend e conferir registro em `api_errors`; provocar exceÃ§Ã£o no front (ErrorBoundary) ou `reportClientError` e conferir em `app_errors`; simular requisiÃ§Ã£o lenta (> limiar) para ver log de performance.
