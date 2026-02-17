@@ -82,6 +82,11 @@ export async function recoverWithLoginName(payload = {}) {
   }
 
   const email = String(userRow?.email ?? '').trim()
+  if (userRow && !email) {
+    throw createHttpError(422, 'Login sem email cadastrado. Procure um administrador.', {
+      code: 'MISSING_EMAIL',
+    })
+  }
   if (!email) {
     return { ok: true }
   }
