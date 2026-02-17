@@ -157,7 +157,7 @@ CREATE TABLE public.app_errors (
 CREATE TABLE public.app_users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   username text NOT NULL UNIQUE,
-  login_name text,
+  login_name text NOT NULL,
   display_name text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),

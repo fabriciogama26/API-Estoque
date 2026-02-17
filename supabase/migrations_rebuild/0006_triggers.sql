@@ -2,6 +2,8 @@ CREATE TRIGGER acidente_historico_set_account_owner_id BEFORE INSERT ON public.a
 
 CREATE TRIGGER acidentes_set_account_owner_id BEFORE INSERT ON public.accidents FOR EACH ROW EXECUTE FUNCTION public.set_account_owner_id_default();
 
+CREATE TRIGGER app_users_normalize_login_name BEFORE INSERT OR UPDATE ON public.app_users FOR EACH ROW EXECUTE FUNCTION public.normalize_login_name();
+
 CREATE TRIGGER app_users_dependentes_sync AFTER INSERT OR DELETE OR UPDATE ON public.app_user_dependents FOR EACH ROW EXECUTE FUNCTION public.sync_app_users_from_dependentes();
 
 CREATE TRIGGER caracteristica_epi_set_account_owner_id BEFORE INSERT ON public.ppe_characteristics FOR EACH ROW EXECUTE FUNCTION public.set_account_owner_id_default();

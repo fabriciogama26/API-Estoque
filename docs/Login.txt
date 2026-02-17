@@ -99,11 +99,18 @@ Atualizacao 2026-02 (Login por login_name)
 - Novo endpoint /api/auth/login retorna tokens sem expor email ao cliente.
 - Recuperacao de senha usa /api/auth/recover com mensagem generica.
 - Nova coluna login_name em app_users com unique por lower(login_name) e backfill a partir de username.
+- Rebuild schema: trigger normalize_login_name garante login_name antes de inserir/atualizar app_users.
+- Senha nao e normalizada (sem trim) no backend para evitar regressao.
 - Arquivos alterados/criados:
 - `api/_shared/authPublic.js`
 - `api/_shared/withAuth.js`
 - `api/index.js`
 - `supabase/migrations/20260306_add_login_name_to_app_users.sql`
+- `supabase/migrations_rebuild/0002_tables.sql`
+- `supabase/migrations_rebuild/0004_indexes.sql`
+- `supabase/migrations_rebuild/0005_functions.sql`
+- `supabase/migrations_rebuild/0006_triggers.sql`
+- `supabase/Scheme.sql`
 - `src/context/AuthContext.jsx`
 - `src/hooks/useLoginForm.js`
 - `src/pages/LoginPage.jsx`

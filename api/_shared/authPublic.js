@@ -19,7 +19,7 @@ const resolveRedirectTo = () => {
 
 export async function loginWithLoginName(payload = {}) {
   const loginName = normalizeLoginName(payload.loginName ?? payload.login_name ?? payload.username)
-  const password = String(payload.password ?? '').trim()
+  const password = payload.password ?? ''
 
   if (!loginName || !password) {
     throw createHttpError(400, 'Informe login e senha.', { code: 'VALIDATION_ERROR' })
