@@ -8,7 +8,9 @@ export function useLoginForm() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [form, setForm] = useState({ username: '', password: '' })
+  const [form, setForm] = useState({ loginName: '', password: '' })
+  const [recoveryLogin, setRecoveryLogin] = useState('')
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [status, setStatus] = useState(null)
@@ -21,6 +23,20 @@ export function useLoginForm() {
     setError(null)
     setStatus(null)
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
+  }
+
+  const handleRecoveryChange = (event) => {
+    const { value } = event.target
+    setError(null)
+    setStatus(null)
+    setRecoveryLogin(value)
+  }
+
+  const handleToggleRecovery = () => {
+    if (!isRecoveryOpen && !recoveryLogin && form.loginName) {
+      setRecoveryLogin(form.loginName)
+    }
+    setIsRecoveryOpen((prev) => !prev)
   }
 
   const handleSubmit = async (event) => {
@@ -36,7 +52,7 @@ export function useLoginForm() {
       logError({
         page: 'login',
         message: err.message,
-        context: { username: form.username },
+        context: { loginName: form.loginName },
         severity: 'error',
       })
     } finally {
@@ -48,22 +64,22 @@ export function useLoginForm() {
     setStatus(null)
     setError(null)
 
-    const email = form.username?.trim() ?? ''
-    if (!email) {
-      setError('Informe seu email para recuperar a senha.')
+    const loginName = recoveryLogin?.trim() ?? ''
+    if (!loginName) {
+      setError('Informe seu login para recuperar a senha.')
       return
     }
 
     setIsRecovering(true)
     try {
-      await recoverPassword(email)
+      await recoverPassword(loginName)
       setStatus('Enviamos um link de recuperacao para o seu email.')
     } catch (err) {
       setError(err.message)
       logError({
         page: 'login',
         message: err.message,
-        context: { username: form.username, action: 'recoverPassword' },
+        context: { loginName: recoveryLogin, action: 'recoverPassword' },
         severity: 'error',
       })
     } finally {
@@ -73,11 +89,15 @@ export function useLoginForm() {
 
   return {
     form,
+    recoveryLogin,
+    isRecoveryOpen,
     isSubmitting,
     error,
     status,
     isRecovering,
     handleChange,
+    handleRecoveryChange,
+    handleToggleRecovery,
     handleSubmit,
     handlePasswordRecovery,
   }

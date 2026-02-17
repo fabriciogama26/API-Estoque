@@ -58,6 +58,8 @@ CREATE INDEX app_users_dependentes_owner_idx ON public.app_user_dependents USING
 
 CREATE INDEX app_users_parent_user_idx ON public.app_users USING btree (parent_user_id);
 
+CREATE UNIQUE INDEX app_users_login_name_unique ON public.app_users USING btree (lower(login_name));
+
 CREATE INDEX app_users_plan_id_fkey_idx ON public.app_users USING btree (plan_id);
 
 CREATE INDEX cargos_ordem_idx ON public.job_roles USING btree (is_active DESC, sort_order, name);

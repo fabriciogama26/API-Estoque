@@ -85,6 +85,7 @@ CREATE TABLE public.hht_monthly (
 CREATE TABLE public.app_users (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     username text NOT NULL,
+    login_name text,
     display_name text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,

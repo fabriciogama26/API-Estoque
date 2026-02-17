@@ -34,6 +34,8 @@ export function withAuth(handler) {
         '/api/session/revoke',
         '/api/health',
       ])
+      const publicPaths = new Set(['/api/auth/login', '/api/auth/recover'])
+      const isPublicPath = publicPaths.has(path)
       req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path)
 
       let user = null
@@ -51,6 +53,12 @@ export function withAuth(handler) {
       const bearerMatch = typeof authHeader === 'string' ? authHeader.match(/Bearer\s+(.+)/i) : null
       const bearerToken = bearerMatch?.[1]?.trim() || ''
       const isCron = cronSecret && ((cronHeader || '').trim() === cronSecret || bearerToken === cronSecret)
+
+      if (isPublicPath) {
+        req.user = null
+        await handler(req, res, null)
+        return
+      }
 
       if (CONSUME_LOCAL_DATA) {
         user = {
