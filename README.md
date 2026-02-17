@@ -133,6 +133,7 @@ README.md  # documentacao do projeto
 api/
   _shared/
     auth.js  # helper compartilhado da API serverless
+    errorCore.js  # núcleo de padronização de erros da API serverless
     environment.js  # helper compartilhado da API serverless
     http.js  # helper compartilhado da API serverless
     localDocumentContext.js  # helper compartilhado da API serverless
@@ -490,6 +491,7 @@ src/
     errorLogService.js  # service frontend (API/data client)
     estoqueApi.js  # service frontend (API/data client)
     hhtMensalService.js  # service frontend (API/data client)
+    httpClient.js  # service frontend (API/data client)
     index.js  # service frontend (API/data client)
     localApi.js  # service frontend (API/data client)
     localDataStore.js  # service frontend (API/data client)
@@ -819,6 +821,7 @@ vite.config.js  # configuracao do Vite
 
 
 ## Troubleshooting
+- Erro de API: validar `error.request_id` e correlacionar com `api_errors`.
 - Erro de RLS (42501): conferir `account_owner_id`, roles/permissions e policies do schema.
 - Erro de auth/URL: validar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
 - Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.

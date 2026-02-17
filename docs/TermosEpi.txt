@@ -8,7 +8,7 @@ Arquitetura (modular)
 
 - Hook useTermoEpi: controla formulario, validacao, carga do contexto, preview HTML e download do PDF.
 - Servico: termoEpiService (fetchTermoEpiContext) usando dataClient (Supabase ou local).
-- Utils: TermoEpiUtils (download PDF) e template compartilhado `shared/documents/epiTermTemplate.js`.
+- Utils: TermoEpiUtils (download PDF via httpClient) e template compartilhado `shared/documents/epiTermTemplate.js`.
 - Erros: logError com page 'termo-epi' registra falhas de geracao e download em app_errors.
 
 Fluxos
@@ -26,6 +26,15 @@ Boas praticas
 Atualizacao 2025-12
 
 - Tela refatorada com hook/service/utils; logging de erros adicionado; preview e download separados por estado isLoading/isDownloading.
+
+Atualizacao 2026-02
+
+- Download do PDF agora usa httpClient para aplicar envelope de erro e request_id das Functions.
+- Arquivos alterados:
+- `src/utils/TermoEpiUtils.js`
+- Antes/Depois:
+- Antes: download usava fetch direto e tratava erro manualmente.
+- Depois: download usa httpClient com responseType blob e envelope padronizado.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -58,7 +67,7 @@ Funcoes utilitarias relacionadas
 - downloadTermoEpiPdf
   - Tipo: utilitario de download
   - Caminho: src/utils/TermoEpiUtils.js
-  - Responsavel por: gerar/baixar PDF a partir do HTML e contexto.
+  - Responsavel por: gerar/baixar PDF a partir do HTML e contexto via httpClient.
 
 Servicos e integracoes externas
 -------------------------------

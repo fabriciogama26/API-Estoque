@@ -1,5 +1,12 @@
 import { withAuth } from './_shared/withAuth.js'
-import { readJson, sendJson, methodNotAllowed, handleError, parseQuery } from './_shared/http.js'
+import {
+  readJson,
+  sendJson,
+  methodNotAllowed,
+  handleError,
+  parseQuery,
+  createHttpError,
+} from './_shared/http.js'
 import {
   PessoasOperations,
   MateriaisOperations,
@@ -27,6 +34,20 @@ const maskAuthHeader = (header) => {
   return `${header.slice(0, 12)}...`
 }
 
+const resolveSessionErrorCode = (result = {}) => {
+  const raw = (result.code || '').toString().trim().toUpperCase()
+  if (raw === 'INTERACTION_REQUIRED') {
+    return 'VALIDATION_ERROR'
+  }
+  if (raw === 'SESSION_EXPIRED' || raw === 'REAUTH_REQUIRED') {
+    return 'AUTH_EXPIRED'
+  }
+  if (result.status === 401 || result.status === 403) {
+    return 'AUTH_EXPIRED'
+  }
+  return 'VALIDATION_ERROR'
+}
+
 export default withAuth(async (req, res, user) => {
   const { method, url } = req
   const path = url.split('?')[0]
@@ -43,13 +64,19 @@ export default withAuth(async (req, res, user) => {
     }
     if (path.startsWith('/api/pessoas/') && method === 'PUT') {
       const id = path.split('/')[3]
-      if (!id) return sendJson(res, 400, { error: 'ID da pessoa não informado.' })
+      if (!id) {
+        throw createHttpError(400, 'ID da pessoa não informado.', { code: 'VALIDATION_ERROR' })
+      }
       const body = await readJson(req)
       return sendJson(res, 200, await PessoasOperations.update(id, body, user))
     }
     if (path.startsWith('/api/pessoas/history/') && method === 'GET') {
       const id = path.split('/')[4]
-      if (!id) return sendJson(res, 400, { error: 'ID da pessoa não informado para histórico.' })
+      if (!id) {
+        throw createHttpError(400, 'ID da pessoa não informado para histórico.', {
+          code: 'VALIDATION_ERROR',
+        })
+      }
       return sendJson(res, 200, await PessoasOperations.history(id))
     }
 
@@ -84,13 +111,19 @@ export default withAuth(async (req, res, user) => {
     }
     if (path.startsWith('/api/materiais/') && method === 'PUT') {
       const id = path.split('/')[3]
-      if (!id) return sendJson(res, 400, { error: 'ID do material não informado.' })
+      if (!id) {
+        throw createHttpError(400, 'ID do material não informado.', { code: 'VALIDATION_ERROR' })
+      }
       const body = await readJson(req)
       return sendJson(res, 200, await MateriaisOperations.update(id, body, user))
     }
     if (path.startsWith('/api/materiais/price-history/') && method === 'GET') {
       const id = path.split('/')[4]
-      if (!id) return sendJson(res, 400, { error: 'ID do material não informado para histórico de preços.' })
+      if (!id) {
+        throw createHttpError(400, 'ID do material não informado para histórico de preços.', {
+          code: 'VALIDATION_ERROR',
+        })
+      }
       return sendJson(res, 200, await MateriaisOperations.priceHistory(id))
     }
 
@@ -104,7 +137,9 @@ export default withAuth(async (req, res, user) => {
     }
     if (path.startsWith('/api/acidentes/') && method === 'PUT') {
       const id = path.split('/')[3]
-      if (!id) return sendJson(res, 400, { error: 'ID do acidente não informado.' })
+      if (!id) {
+        throw createHttpError(400, 'ID do acidente não informado.', { code: 'VALIDATION_ERROR' })
+      }
       const body = await readJson(req)
       return sendJson(res, 200, await AcidentesOperations.update(id, body, user))
     }
@@ -119,13 +154,19 @@ export default withAuth(async (req, res, user) => {
     }
     if (path.startsWith('/api/entradas/') && method === 'PUT') {
       const id = path.split('/')[3]
-      if (!id) return sendJson(res, 400, { error: 'ID da entrada nao informado.' })
+      if (!id) {
+        throw createHttpError(400, 'ID da entrada nao informado.', { code: 'VALIDATION_ERROR' })
+      }
       const body = await readJson(req)
       return sendJson(res, 200, await EntradasOperations.update(id, body, user))
     }
     if (path.startsWith('/api/entradas/history/') && method === 'GET') {
       const id = path.split('/')[4]
-      if (!id) return sendJson(res, 400, { error: 'ID da entrada nao informado para historico.' })
+      if (!id) {
+        throw createHttpError(400, 'ID da entrada nao informado para historico.', {
+          code: 'VALIDATION_ERROR',
+        })
+      }
       return sendJson(res, 200, await EntradasOperations.history(id))
     }
 
@@ -152,7 +193,9 @@ export default withAuth(async (req, res, user) => {
     }
     if (path === '/api/estoque/relatorio/auto' && method === 'POST') {
       if (!req.isCron) {
-        return sendJson(res, 401, { error: 'Nao autorizado para executar relatorio automatico.' })
+        throw createHttpError(401, 'Nao autorizado para executar relatorio automatico.', {
+          code: 'AUTH_REQUIRED',
+        })
       }
       return sendJson(res, 200, await EstoqueOperations.reportAuto())
     }
@@ -172,9 +215,11 @@ export default withAuth(async (req, res, user) => {
 
     if (path === '/api/documentos/termo-epi' && method === 'GET') {
       if (query.format && query.format !== 'json') {
-        return sendJson(res, 400, {
-          error: 'Formato nao suportado. Utilize format=json para obter o contexto do termo.',
-        })
+        throw createHttpError(
+          400,
+          'Formato nao suportado. Utilize format=json para obter o contexto do termo.',
+          { code: 'VALIDATION_ERROR' }
+        )
       }
 
       const contexto = await DocumentosOperations.termoEpiContext(query)
@@ -210,21 +255,19 @@ export default withAuth(async (req, res, user) => {
       try {
         const result = await touchSession(req, user, req.authToken)
         if (!result?.ok) {
-          const payload = { error: result.message, code: result.code }
-          if (SESSION_TOUCH_DEBUG && result?.debug) {
-            payload.debug = result.debug
-          }
-          return sendJson(res, result.status || 400, payload)
+          const status = result.status || 400
+          const code = resolveSessionErrorCode({ status, code: result.code })
+          throw createHttpError(
+            status,
+            result.message || 'Falha ao validar sessao.',
+            { code }
+          )
         }
         return sendJson(res, 200, { ok: true, touched: result.touched })
       } catch (error) {
         if (SESSION_TOUCH_DEBUG) {
           console.error('ERRO COMPLETO:', error)
           console.error('Stack:', error?.stack)
-          return sendJson(res, 500, {
-            error: error?.message || 'Erro interno do servidor.',
-            stack: error?.stack || null,
-          })
         }
         throw error
       }
@@ -233,7 +276,13 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/session/reauth' && method === 'POST') {
       const result = await markSessionReauth(req, user, req.authToken)
       if (!result?.ok) {
-        return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+        const status = result.status || 400
+        const code = resolveSessionErrorCode({ status, code: result.code })
+        throw createHttpError(
+          status,
+          result.message || 'Falha ao validar sessao.',
+          { code }
+        )
       }
       return sendJson(res, 200, { ok: true })
     }
@@ -241,7 +290,13 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/session/revoke' && method === 'POST') {
       const result = await revokeSession(req, user, req.authToken)
       if (!result?.ok) {
-        return sendJson(res, result.status || 400, { error: result.message, code: result.code })
+        const status = result.status || 400
+        const code = resolveSessionErrorCode({ status, code: result.code })
+        throw createHttpError(
+          status,
+          result.message || 'Falha ao validar sessao.',
+          { code }
+        )
       }
       return sendJson(res, 200, { ok: true })
     }
@@ -251,7 +306,7 @@ export default withAuth(async (req, res, user) => {
       return sendJson(res, 200, await healthCheck())
     }
 
-    methodNotAllowed(res, ['GET', 'POST', 'PUT'])
+    methodNotAllowed(res, ['GET', 'POST', 'PUT'], req)
   } catch (error) {
     handleError(res, error, 'Erro interno do servidor.', req)
   }

@@ -1,5 +1,5 @@
 const { MaterialService } = require('../services');
-const { mapError } = require('./helpers');
+const { mapError, createHttpError } = require('./helpers');
 
 function criar(req, res, next) {
   try {
@@ -23,7 +23,7 @@ function obter(req, res, next) {
   try {
     const material = MaterialService.obterMaterial(req.params.id);
     if (!material) {
-      return res.status(404).json({ error: 'Material nao encontrado' });
+      return next(createHttpError(404, 'Material nao encontrado'));
     }
     return res.json(material);
   } catch (error) {

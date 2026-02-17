@@ -1,6 +1,7 @@
 ﻿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
 import { getSessionId, notifySessionGuardFromResponse } from './sessionService.js'
+import { request as httpRequest } from './httpClient.js'
 import {
   montarEstoqueAtual,
   montarDashboard,
@@ -18,8 +19,26 @@ const IMPORTS_MAX_MB = Number(import.meta.env.VITE_IMPORTS_MAX_MB) || 50
 
 const GENERIC_ERROR = 'Falha ao comunicar com o Supabase.'
 
+const resolveRequestIdFromError = (error, context = {}) => {
+  return (
+    error?.requestId ||
+    error?.request_id ||
+    error?.details?.requestId ||
+    error?.details?.request_id ||
+    error?.context?.requestId ||
+    error?.context?.request_id ||
+    context?.requestId ||
+    context?.request_id ||
+    null
+  )
+}
+
 const reportClientError = (message, error, context = {}, severity = 'warn') => {
+  const requestId = resolveRequestIdFromError(error, context)
   console.warn(message, error)
+  if (requestId) {
+    return
+  }
   logError({
     message,
     stack: error?.stack,
@@ -38,7 +57,13 @@ const parseApiErrorResponse = async (response, fallbackMessage) => {
   try {
     payload = await response.json()
     if (payload?.error) {
-      message = payload.error
+      if (typeof payload.error === 'object') {
+        message = payload.error.message || message
+      } else if (typeof payload.error === 'string') {
+        message = payload.error
+      }
+    } else if (payload?.message) {
+      message = payload.message
     }
   } catch {
     // ignore
@@ -5784,22 +5809,7 @@ export const api = {
 
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/estoque/relatorio`
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(params || {}),
-      })
-
-      if (!response.ok) {
-        const message = await parseApiErrorResponse(
-          response,
-          `Falha ao gerar relatorio (status ${response.status}).`
-        )
-        throw new Error(message)
-      }
-
-      return response.json()
+      return httpRequest('POST', endpoint, { body: params || {}, headers })
     },
     async reportHistory(params = {}) {
       ensureSupabase()
@@ -5816,21 +5826,7 @@ export const api = {
         }
       })
       const endpoint = `${base}/api/estoque/relatorios${query.toString() ? `?${query.toString()}` : ''}`
-
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers,
-      })
-
-      if (!response.ok) {
-        const message = await parseApiErrorResponse(
-          response,
-          `Falha ao listar relatorios (status ${response.status}).`
-        )
-        throw new Error(message)
-      }
-
-      return response.json()
+      return httpRequest('GET', endpoint, { headers })
     },
     async reportPdf(params = {}) {
       ensureSupabase()
@@ -5841,22 +5837,7 @@ export const api = {
 
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/estoque/relatorio/pdf`
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(params || {}),
-      })
-
-      if (!response.ok) {
-        const message = await parseApiErrorResponse(
-          response,
-          `Falha ao gerar PDF (status ${response.status}).`
-        )
-        throw new Error(message)
-      }
-
-      return response.json()
+      return httpRequest('POST', endpoint, { body: params || {}, headers })
     },
     async forecast(params = {}) {
       ensureSupabase()
@@ -5873,21 +5854,7 @@ export const api = {
         }
       })
       const endpoint = `${base}/api/estoque/previsao${query.toString() ? `?${query.toString()}` : ''}`
-
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers,
-      })
-
-      if (!response.ok) {
-        const message = await parseApiErrorResponse(
-          response,
-          `Falha ao obter previsao (status ${response.status}).`
-        )
-        throw new Error(message)
-      }
-
-      return response.json()
+      return httpRequest('GET', endpoint, { headers })
     },
     async forecastUpdate(params = {}) {
       ensureSupabase()

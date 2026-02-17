@@ -1,3 +1,5 @@
+import { request as httpRequest } from "../services/httpClient.js";
+
 const DEFAULT_FILENAME = "termo-epi.pdf";
 
 function buildFunctionsUrl() {
@@ -52,30 +54,15 @@ export async function downloadTermoEpiPdf({ html, context } = {}) {
   const endpoint = `${buildFunctionsUrl()}/termo-epi`;
   const anonKey = resolveAnonKey();
 
-  const response = await fetch(endpoint, {
-    method: "POST",
+  const blob = await httpRequest("POST", endpoint, {
+    body: { html: normalizedHtml },
     headers: {
-      "Content-Type": "application/json",
       apikey: anonKey,
       Authorization: `Bearer ${anonKey}`,
     },
-    body: JSON.stringify({ html: normalizedHtml }),
+    responseType: "blob",
+    skipSessionGuard: true,
   });
-
-  if (!response.ok) {
-    let message = `Falha ao gerar o PDF (status ${response.status}).`;
-    try {
-      const data = await response.json();
-      if (data?.error) {
-        message = data.error;
-      }
-    } catch {
-      // ignore parse error and keep generic message
-    }
-    throw new Error(message);
-  }
-
-  const blob = await response.blob();
   const fileName = buildFileName(context) || DEFAULT_FILENAME;
   const url = URL.createObjectURL(blob);
 

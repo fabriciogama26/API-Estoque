@@ -1,5 +1,5 @@
 const { PessoaService } = require('../services')
-const { mapError } = require('./helpers')
+const { mapError, createHttpError } = require('./helpers')
 
 function criar(req, res, next) {
   try {
@@ -28,7 +28,7 @@ function obter(req, res, next) {
   try {
     const pessoa = PessoaService.buscarPorId(req.params.id)
     if (!pessoa) {
-      return res.status(404).json({ error: 'Pessoa nao encontrada' })
+      return next(createHttpError(404, 'Pessoa nao encontrada'))
     }
     return res.json(pessoa)
   } catch (error) {

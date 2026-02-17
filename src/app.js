@@ -3,17 +3,19 @@ import cors from 'cors'
 import env from './config/env.js'
 import routes from './routes.js'
 import { logApiError } from '../api/_shared/logger.js'
+import {
+  buildErrorEnvelope,
+  ensureRequestId,
+  logApiErrorNormalized,
+  normalizeError,
+} from '../api/_shared/errorCore.js'
 
 const app = express()
 const SLOW_REQUEST_THRESHOLD_MS = Number(process.env.SLOW_REQUEST_THRESHOLD_MS || 2000)
 
 // Request ID para correlacionar logs
 app.use((req, _res, next) => {
-  const headerId =
-    req.headers['x-request-id'] ||
-    req.headers['X-Request-Id'] ||
-    req.headers['x-requestid']
-  req.requestId = headerId || `req-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+  ensureRequestId(req, _res)
   next()
 })
 
@@ -70,35 +72,27 @@ app.use((req, res, next) => {
 app.use('/api', routes);
 
 app.use((req, res) => {
-  res.status(404).json({ error: 'Recurso nao encontrado: Aguardando frontend', requestId: req.requestId })
+  const requestId = ensureRequestId(req, res)
+  const normalized = normalizeError({
+    status: 404,
+    code: 'NOT_FOUND',
+    message: 'Recurso nao encontrado: Aguardando frontend',
+  })
+  res.status(normalized.status).json(buildErrorEnvelope(normalized, requestId))
 })
 
 app.use((err, req, res, next) => {
-  const status = err?.status || 500
-  const payload = {
-    message: err?.message || 'Erro interno do servidor',
-    status,
-    method: req?.method,
-    path: req?.originalUrl || req?.url,
-    userId: req?.user?.id || null,
-    stack: err?.stack,
-    requestId: req?.requestId,
-  }
+  const normalized = normalizeError(err, { fallbackMessage: 'Erro interno do servidor' })
+  const requestId = ensureRequestId(req, res)
 
   if (!err?.status) {
     console.error(err)
   }
 
   // Loga no Supabase sem bloquear a resposta
-  logApiError({
-    ...payload,
-    context: { requestId: req?.requestId },
-  }).catch(() => {})
+  logApiErrorNormalized(normalized, req).catch(() => {})
 
-  res.status(status).json({
-    error: payload.message,
-    requestId: req?.requestId,
-  })
+  res.status(normalized.status).json(buildErrorEnvelope(normalized, requestId))
 })
 
 if (process.argv[1] === decodeURI(new URL(import.meta.url).pathname)) {

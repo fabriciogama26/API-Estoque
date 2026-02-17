@@ -1,10 +1,12 @@
 import { requireAuth } from './auth.js'
 import { handleError } from './http.js'
 import { CONSUME_LOCAL_DATA } from './environment.js'
+import { ensureRequestId } from './errorCore.js'
 
 export function withAuth(handler) {
   return async (req, res) => {
     try {
+      ensureRequestId(req, res)
       if (req.method === 'OPTIONS') {
         const origin = req.headers?.origin || '*'
         res.setHeader('Access-Control-Allow-Origin', origin)
