@@ -50,7 +50,10 @@ Modelo de dados (Supabase)
 
 - Seeds de roles: `master`, `admin`, `supervisor`, `viewer`, `owner`, `operador`, `estagiario`, `visitante`.
 
-- Seeds de permissions: `estoque.read|write`, `pessoas.read|write`, `acidentes.read|write`, `hht.read|write`, `rbac.manage`, `users.manage`, `credentials.manage`.
+- Seeds de permissions: `estoque.read|write`, `pessoas.read|write`, `acidentes.read|write`, `hht.read|write`,
+  `estoque.dashboard`, `dashboard_analise_estoque`, `acidentes.dashboard`, `estoque.atual`, `estoque.entradas`,
+  `estoque.saidas`, `estoque.materiais`, `estoque.termo`, `estoque.relatorio`, `rbac.manage`, `users.manage`,
+  `credentials.manage`.
 
 - Mapeamentos principais:
 
@@ -148,17 +151,18 @@ Fluxo de uso (frontend)
 
 
 
-- Navegação/Rotas:
+- Navegacao/Rotas:
 
-  - `permissions.js`: `PAGE_CATALOG` e `PAGE_REQUIRED_PERMISSION` (ex.: dashboard -> estoque.read, dashboard-acidentes -> acidentes.read, entradas/saídas -> estoque.read, pessoas -> pessoas.read, materiais/termo -> estoque.read, hht -> hht.read, configuracoes -> estoque.write).
+  - `permissions.js`: `PAGE_CATALOG` e `PAGE_REQUIRED_PERMISSION` (ex.: dashboard -> estoque.dashboard, dashboard-acidentes -> acidentes.dashboard, entradas -> estoque.entradas, saidas -> estoque.saidas, pessoas -> pessoas.write, materiais -> estoque.materiais, termo -> estoque.termo, hht -> hht.write, configuracoes -> rbac.manage).
 
   - `resolveAllowedPaths`: paths liberados; master ignora checagem.
 
 
 
-**Permissões extras do front**
+**Permissoes por pagina (UI)**
 
-- Extras como `estoque.dashboard`, `estoque.entradas`, `estoque.saidas`, `estoque.materiais`, `estoque.termo` controlam UI/rotas; RLS valida apenas dominios read/write. Se quiser segurança fina, crie perms reais e policies específicas.
+- `permissions.js` usa chaves por pagina (ex.: `estoque.atual`, `estoque.relatorio`, `estoque.entradas`).
+- RLS continua validando dominios (`estoque.read|write`, `acidentes.read|write` etc). As chaves por pagina servem para menu/rotas.
 
 
 
@@ -228,10 +232,9 @@ Referências de migrations principais
 
 - 0094: dependente-admin não altera titular nem atribui master; alvo precisa ser dependente do mesmo owner, exceto para master.
 
-Pendencias (keys por modulo)
-----------------------------
-- Separar keys por modulo em permissions.js (sem estoque.read/write compartilhado).
-- Atualizar PAGE_REQUIRED_PERMISSION para as novas keys.
-- Ajustar RLS/RPC (checks de has_permission) para as novas keys.
-- Migrar permissions/role_permissions no banco para incluir as novas keys.
+Resolvido (2026-02)
+-------------------
+- Chaves por pagina em `permissions.js` (sem estoque.read/write compartilhado).
+- PAGE_REQUIRED_PERMISSION atualizado para chaves por pagina.
+- Migration adiciona permissoes e mapeia roles para manter comportamento.
 - Ver detalhes em docs/PermissoesToggles.txt.

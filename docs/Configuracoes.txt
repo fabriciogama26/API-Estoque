@@ -15,7 +15,7 @@ Componentes e funcoes
 - ConfiguracoesPage: monta header + PermissionsSection + AdminResetPasswordSection.
 - PermissionsSection:
   - Busca titulares/dependentes apenas em `app_users` (parent_user_id null = titular; nao usa mais app_users_dependentes). Master enxerga todos; admin so ve ele e seus dependentes.
-  - Permite definir role (master/admin/operador/estagiario/visitante), toggles de grupos de permissao e status ativo/inativo.
+  - Permite definir role (master/admin/operador/estagiario/visitante), toggles por pagina e status ativo/inativo.
   - Salva em `user_roles`, `user_permission_overrides` e `app_users.ativo`; chama RPC `sync_user_ban_with_status` para alinhar ban no Auth.
   - Historico: insere em `app_users_credential_history` com `before_pages` (baseline carregado) e `after_pages` (estado atual), `changed_by(_username)` e `user_username` (alvo). Modal lista antes/depois, quem alterou e alvo.
 - AdminResetPasswordSection:
@@ -59,7 +59,7 @@ Notas de UX
 - Status toggles usam texto Ativo/Inativo e feedback textual.
 
 
-- Toggles de permissao usam PERMISSION_GROUPS. Como algumas keys sao compartilhadas, alguns switches ligam/desligam juntos. Ver detalhes em docs/PermissoesToggles.txt.
+- Toggles de permissao usam PERMISSION_GROUPS com chaves por pagina (ex.: estoque.atual, estoque.relatorio), evitando vinculos entre switches. Ver detalhes em docs/PermissoesToggles.txt.
 
 - Ajuda contextual: HelpButton top-right, conteudo em src/help/helpConfiguracoes.json; assets em public/help/configuracoes/.
 
