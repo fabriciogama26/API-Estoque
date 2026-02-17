@@ -249,7 +249,7 @@ export function AuthProvider({ children }) {
   const login = useCallback(
     async ({ loginName, username, password }) => {
       const rawLogin = (loginName ?? username ?? '').toString()
-      if (!rawLogin || !password) {
+      if (!rawLogin || password === undefined || password === null || password === '') {
         throw new Error('Informe login e senha')
       }
 

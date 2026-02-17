@@ -2946,6 +2946,25 @@ begin
 end;
 $$;
 
+CREATE FUNCTION public.normalize_login_name() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.login_name is null or btrim(new.login_name) = '' then
+    new.login_name := lower(btrim(coalesce(new.username, '')));
+  else
+    new.login_name := lower(btrim(new.login_name));
+  end if;
+
+  if new.login_name is null or new.login_name = '' then
+    raise exception 'login_name nao pode ser vazio';
+  end if;
+
+  return new;
+end;
+$$;
+
 CREATE FUNCTION public.sync_app_users_from_dependentes() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
@@ -2955,6 +2974,7 @@ begin
     insert into public.app_users as u (
       id,
       username,
+      login_name,
       display_name,
       email,
       credential,
@@ -2968,6 +2988,7 @@ begin
     values (
       new.auth_user_id,
       coalesce(nullif(new.username, ''), 'dep_' || left(new.auth_user_id::text, 8)),
+      lower(btrim(coalesce(nullif(new.username, ''), 'dep_' || left(new.auth_user_id::text, 8)))),
       coalesce(nullif(new.display_name, ''), nullif(new.username, ''), 'Dependente'),
       new.email,
       new.credential,
@@ -2980,6 +3001,7 @@ begin
     )
     on conflict (id) do update
       set username = excluded.username,
+          login_name = excluded.login_name,
           display_name = excluded.display_name,
           email = excluded.email,
           credential = excluded.credential,
@@ -2991,6 +3013,7 @@ begin
   elsif tg_op = 'UPDATE' then
     update public.app_users
       set username = coalesce(nullif(new.username, ''), username),
+          login_name = lower(btrim(coalesce(nullif(new.username, ''), username, login_name))),
           display_name = coalesce(nullif(new.display_name, ''), display_name),
           email = new.email,
           credential = new.credential,
