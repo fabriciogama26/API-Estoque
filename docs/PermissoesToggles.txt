@@ -1,36 +1,24 @@
-Problema: toggles na tela Configuracoes nao sao independentes
+Status: corrigido (2026-02)
 
-Sintoma:
-- Ao marcar Entradas, outros modulos (Estoque, Saidas, Materiais, Termo EPI) tambem mudam.
-- Ao marcar Dashboard Acidentes, Cadastro de Acidentes muda junto.
+Sintoma anterior:
+- Toggles na tela de Configuracoes ligavam/desligavam juntos por causa de chaves compartilhadas.
+- Exemplo: Dashboard Estoque ligava estoque.read; isso liberava Entradas, Saidas, Materiais e Termo no menu.
 
-Causa (front):
-- PERMISSION_GROUPS compartilha keys entre grupos (ex.: estoque.read / estoque.write e acidentes.read).
-- O toggle liga/desliga todas as keys do grupo.
-- Como as keys sao reutilizadas por outros grupos, eles aparecem como ligados/desligados juntos.
+Causa:
+- PERMISSION_GROUPS usava chaves de dominio (estoque.read/write) em varios grupos.
+- PAGE_REQUIRED_PERMISSION mapeava varias paginas para estoque.read/acidentes.read.
+
+Correcao aplicada:
+- Cada pagina tem chave propria em PAGE_REQUIRED_PERMISSION.
+- PERMISSION_GROUPS passou a usar chaves por pagina (sem estoque.read/write compartilhado).
+- Novas chaves: estoque.atual e estoque.relatorio.
+- Migration adiciona chaves e mapeia roles existentes.
+
+Impacto:
+- Menu/rotas refletem exatamente os toggles selecionados.
+- Chaves de dominio (estoque.read/write, acidentes.read/write) continuam existindo para RLS.
 
 Arquivos:
-- src/config/permissions.js (PERMISSION_GROUPS, PAGE_REQUIRED_PERMISSION)
-- src/pages/Configuracoes.jsx (logica de toggle usando group.keys)
-
-Plano de correção (recomendado):
-1) Separar keys por modulo:
-   - entradas -> estoque.entradas
-   - saidas -> estoque.saidas
-   - materiais -> estoque.materiais
-   - termo -> estoque.termo
-   - dashboard acidentes -> acidentes.dashboard
-   - cadastro acidentes -> acidentes.cadastro (exemplo)
-2) Atualizar PAGE_REQUIRED_PERMISSION para usar as keys novas.
-3) Atualizar RLS/RPC (has_permission) para checar keys especificas do modulo.
-4) Migrar role_permissions para incluir as novas keys.
-
-Observacao:
-- Se mantiver keys compartilhadas, a UI nao consegue ter toggles 100% independentes.
-
-Pendencias confirmadas (para estudo/execucao)
----------------------------------------------
-- Separar keys por modulo em permissions.js (sem estoque.read/write compartilhado).
-- Atualizar PAGE_REQUIRED_PERMISSION para as novas keys.
-- Ajustar RLS/RPC (checks de has_permission) para as novas keys.
-- Migrar permissions/role_permissions no banco para incluir as novas keys.
+- src/config/permissions.js
+- supabase/migrations/20260217_page_permission_keys.sql
+- supabase/migrations_rebuild/0010_seed_core.sql
