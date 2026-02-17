@@ -19,6 +19,7 @@ import {
   healthCheck,
 } from './_shared/operations.js'
 import { touchSession, markSessionReauth, revokeSession } from './_shared/sessionActivity.js'
+import { loginWithLoginName, recoverWithLoginName } from './_shared/authPublic.js'
 
 const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 
@@ -54,6 +55,16 @@ export default withAuth(async (req, res, user) => {
   const query = parseQuery(req)
 
   try {
+    if (path === '/api/auth/login' && method === 'POST') {
+      const body = await readJson(req)
+      return sendJson(res, 200, await loginWithLoginName(body))
+    }
+
+    if (path === '/api/auth/recover' && method === 'POST') {
+      const body = await readJson(req)
+      return sendJson(res, 200, await recoverWithLoginName(body))
+    }
+
     // Pessoas
     if (path === '/api/pessoas') {
       if (method === 'GET') return sendJson(res, 200, await PessoasOperations.list(query))

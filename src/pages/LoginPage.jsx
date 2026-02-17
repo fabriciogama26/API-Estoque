@@ -25,11 +25,15 @@ const LockIcon = () => (
 export function LoginPage() {
   const {
     form,
+    recoveryLogin,
+    isRecoveryOpen,
     isSubmitting,
     error,
     status,
     isRecovering,
     handleChange,
+    handleRecoveryChange,
+    handleToggleRecovery,
     handleSubmit,
     handlePasswordRecovery,
   } = useLoginForm()
@@ -42,19 +46,19 @@ export function LoginPage() {
         </div>
 
         <header className="login-auth-card__titles">
-          <p className="login-auth-card__subtitle">Bem-vindo de volta.</p>
+          <h1>Bem-vindo de volta.</h1>
         </header>
 
         <label className="field login-field--panel">
-          <span>Email</span>
+          <span>Login</span>
           <div className="login-field__panel">
             <BadgeIcon />
             <input
               type="text"
-              name="username"
-              value={form.username}
+              name="loginName"
+              value={form.loginName}
               onChange={handleChange}
-              placeholder="Digite seu email"
+              placeholder="Digite seu login"
               autoComplete="username"
               required
             />
@@ -84,12 +88,40 @@ export function LoginPage() {
           <button
             type="button"
             className="link-button"
-            onClick={handlePasswordRecovery}
-            disabled={isRecovering}
+            onClick={handleToggleRecovery}
           >
-            {isRecovering ? 'Enviando...' : 'Esqueceu a senha?'}
+            {isRecoveryOpen ? 'Cancelar recuperação' : 'Esqueceu a senha?'}
           </button>
         </div>
+
+        {isRecoveryOpen ? (
+          <div className="login-auth-card__recovery">
+            <label className="field login-field--panel">
+              <span>Login para recuperação</span>
+              <div className="login-field__panel">
+                <BadgeIcon />
+                <input
+                  type="text"
+                  name="recoveryLogin"
+                  value={recoveryLogin}
+                  onChange={handleRecoveryChange}
+                  placeholder="Digite seu login"
+                  autoComplete="username"
+                />
+              </div>
+            </label>
+            <div className="login-recovery__actions">
+              <button
+                type="button"
+                className="button button--ghost login-recovery__button"
+                onClick={handlePasswordRecovery}
+                disabled={isRecovering}
+              >
+                {isRecovering ? 'Enviando...' : 'Enviar link de recuperação'}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <button type="submit" className="button login-button--neon" disabled={isSubmitting}>
           {isSubmitting ? 'Entrando...' : 'Entrar'}

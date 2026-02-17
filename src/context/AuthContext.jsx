@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
-import { sendPasswordRecovery } from '../services/authService.js'
+import { loginWithLoginName, requestPasswordRecoveryByLoginName } from '../services/authService.js'
 import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../services/effectiveUserService.js'
 import {
   markSessionReauth,
@@ -247,18 +247,21 @@ export function AuthProvider({ children }) {
   }, [buildResolvedUser, hasSupabase, reportError])
 
   const login = useCallback(
-    async ({ username, password }) => {
-      if (!username || !password) {
-        throw new Error('Informe usuario e senha')
+    async ({ loginName, username, password }) => {
+      const rawLogin = (loginName ?? username ?? '').toString()
+      if (!rawLogin || !password) {
+        throw new Error('Informe login e senha')
       }
 
       if (isLocalMode) {
         if (!LOCAL_AUTH) {
           throw new Error('Modo local indisponivel fora do ambiente de desenvolvimento.')
         }
-        const identifier = username.trim()
-        if (identifier !== LOCAL_AUTH.username || password !== LOCAL_AUTH.password) {
-          throw new Error('Usuario ou senha invalidos')
+        const identifier = rawLogin.trim()
+        const normalized = identifier.toLowerCase()
+        const localLogin = (LOCAL_AUTH.username || '').trim().toLowerCase()
+        if (normalized !== localLogin || password !== LOCAL_AUTH.password) {
+          throw new Error('Login ou senha invalidos')
         }
         const localUser = buildLocalUser(identifier)
         setUser(localUser)
@@ -273,17 +276,17 @@ export function AuthProvider({ children }) {
         )
       }
 
-      const identifier = username.trim()
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: identifier,
-        password,
+      const identifier = rawLogin.trim()
+      const session = await loginWithLoginName(identifier, password)
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
       })
-
-      if (error) {
-        throw new Error(error.message)
+      if (sessionError) {
+        throw new Error(sessionError.message)
       }
 
-      const supabaseUser = data?.user
+      const supabaseUser = sessionData?.user
 
       const { user: resolvedUser, effective } = await buildResolvedUser(supabaseUser)
 
@@ -313,11 +316,11 @@ export function AuthProvider({ children }) {
   )
 
   const recoverPassword = useCallback(
-    async (email) => {
-      const identifier = (email || '').trim()
+    async (loginName) => {
+      const identifier = (loginName || '').trim()
 
       if (!identifier) {
-        throw new Error('Informe o email utilizado no login para recuperar a senha.')
+        throw new Error('Informe o login utilizado no acesso para recuperar a senha.')
       }
 
       if (isLocalMode) {
@@ -330,11 +333,7 @@ export function AuthProvider({ children }) {
         )
       }
 
-      const rawRedirect = import.meta?.env?.VITE_SUPABASE_PASSWORD_REDIRECT ?? ''
-      const redirectTo =
-        typeof rawRedirect === 'string' && rawRedirect.trim().length > 0 ? rawRedirect.trim() : undefined
-
-      await sendPasswordRecovery(identifier, redirectTo)
+      await requestPasswordRecoveryByLoginName(identifier)
       return true
     },
     [hasSupabase]

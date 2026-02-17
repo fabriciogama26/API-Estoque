@@ -1,11 +1,56 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
 import { validatePasswordOrThrow } from './passwordPolicyService.js'
+import { request as httpRequest } from './httpClient.js'
 
 function assertSupabase() {
   if (!isSupabaseConfigured() || !supabase) {
     throw new Error('Supabase nao configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
   }
+}
+
+const resolveApiBase = () => {
+  const envBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+  if (envBase) {
+    return envBase
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+  return ''
+}
+
+export async function loginWithLoginName(loginName, password) {
+  const base = resolveApiBase()
+  if (!base) {
+    throw new Error('Base da API nao encontrada.')
+  }
+
+  const payload = {
+    loginName,
+    password,
+  }
+
+  const response = await httpRequest('POST', `${base}/api/auth/login`, { body: payload })
+  const session = response?.session || null
+  if (!session?.access_token || !session?.refresh_token) {
+    throw new Error('Falha ao autenticar.')
+  }
+  return session
+}
+
+export async function requestPasswordRecoveryByLoginName(loginName) {
+  const base = resolveApiBase()
+  if (!base) {
+    throw new Error('Base da API nao encontrada.')
+  }
+
+  const payload = {
+    loginName,
+  }
+
+  await httpRequest('POST', `${base}/api/auth/recover`, { body: payload })
+  return true
 }
 
 export async function sendPasswordRecovery(email, redirectTo) {
@@ -102,6 +147,8 @@ export async function restoreResetSession() {
 // Compat para require() em ambientes CJS
 if (typeof module !== 'undefined') {
   module.exports = {
+    loginWithLoginName,
+    requestPasswordRecoveryByLoginName,
     sendPasswordRecovery,
     updatePassword,
     restoreResetSession,

@@ -44,3 +44,4 @@ SupabaseBackup/
 
 # Agent files
 AGENTS.md
+.vercel
