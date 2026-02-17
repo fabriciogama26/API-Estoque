@@ -231,14 +231,17 @@
     "service",
     "method",
     "path",
-    "status",
+    "status_code",
     "code",
     "user_id",
     "message",
     "stack",
     "context",
     "severity",
-    "fingerprint"
+    "fingerprint",
+    "status",
+    "resolved_at",
+    "resolved_by"
   ],
   "app_credentials_catalog": [
     "id",

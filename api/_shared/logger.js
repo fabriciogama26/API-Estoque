@@ -24,7 +24,7 @@ export async function logApiError(payload = {}) {
     service: payload.service || SERVICE_NAME,
     method: payload.method || null,
     path: payload.path || null,
-    status: payload.status || null,
+    status_code: payload.status || null,
     code: payload.code || null,
     user_id: payload.userId || null,
     message: payload.message || 'Erro desconhecido',
