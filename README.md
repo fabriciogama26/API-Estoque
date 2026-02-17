@@ -133,6 +133,7 @@ README.md  # documentacao do projeto
 api/
   _shared/
     auth.js  # helper compartilhado da API serverless
+    authPublic.js  # auth publico (login e recuperacao)
     errorCore.js  # núcleo de padronização de erros da API serverless
     environment.js  # helper compartilhado da API serverless
     http.js  # helper compartilhado da API serverless
@@ -566,6 +567,10 @@ supabase/
   Scheme.sql  # snapshot de schema (referencia)
   config.toml  # configuracao do Supabase CLI
   functions/
+    auth-login/
+      index.ts  # edge function (Supabase)
+    auth-recover/
+      index.ts  # edge function (Supabase)
     acidente-import/
       index.ts  # edge function (Supabase)
     acidente-template/
