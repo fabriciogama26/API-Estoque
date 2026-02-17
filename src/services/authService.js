@@ -9,21 +9,34 @@ function assertSupabase() {
   }
 }
 
-const resolveApiBase = () => {
-  const envBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+const resolveFunctionsBase = () => {
+  const envBase = (import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || '').trim().replace(/\/+$/, '')
   if (envBase) {
     return envBase
   }
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '')
+  if (supabaseUrl) {
+    return `${supabaseUrl}/functions/v1`
   }
   return ''
 }
 
+const buildFunctionsHeaders = () => {
+  const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim()
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+  if (anonKey) {
+    headers.apikey = anonKey
+    headers.Authorization = `Bearer ${anonKey}`
+  }
+  return headers
+}
+
 export async function loginWithLoginName(loginName, password) {
-  const base = resolveApiBase()
+  const base = resolveFunctionsBase()
   if (!base) {
-    throw new Error('Base da API nao encontrada.')
+    throw new Error('Base das edge functions nao encontrada.')
   }
 
   const payload = {
@@ -31,7 +44,11 @@ export async function loginWithLoginName(loginName, password) {
     password,
   }
 
-  const response = await httpRequest('POST', `${base}/api/auth/login`, { body: payload })
+  const response = await httpRequest('POST', `${base}/auth-login`, {
+    body: payload,
+    headers: buildFunctionsHeaders(),
+    skipSessionGuard: true,
+  })
   const session = response?.session || null
   if (!session?.access_token || !session?.refresh_token) {
     throw new Error('Falha ao autenticar.')
@@ -40,16 +57,20 @@ export async function loginWithLoginName(loginName, password) {
 }
 
 export async function requestPasswordRecoveryByLoginName(loginName) {
-  const base = resolveApiBase()
+  const base = resolveFunctionsBase()
   if (!base) {
-    throw new Error('Base da API nao encontrada.')
+    throw new Error('Base das edge functions nao encontrada.')
   }
 
   const payload = {
     loginName,
   }
 
-  await httpRequest('POST', `${base}/api/auth/recover`, { body: payload })
+  await httpRequest('POST', `${base}/auth-recover`, {
+    body: payload,
+    headers: buildFunctionsHeaders(),
+    skipSessionGuard: true,
+  })
   return true
 }
 

@@ -13,9 +13,9 @@ Arquitetura (modular)
 Fluxos
 
 - Login: login_name + senha; em modo local compara com VITE_LOCAL_USERNAME/PASSWORD (case-insensitive).
-- Login remoto: front chama /api/auth/login, backend resolve login_name -> email e retorna tokens; front aplica supabase.auth.setSession.
+- Login remoto: front chama edge function auth-login, resolve login_name -> email e retorna tokens; front aplica supabase.auth.setSession.
 - Login: ao concluir, dispara um /api/session/touch para registrar atividade inicial.
-- Recuperacao: usa o login do formulario; backend dispara reset sem expor email. Se nao houver email cadastrado, retorna erro especifico.
+- Recuperacao: usa o login do formulario; edge function auth-recover dispara reset sem expor email. Se nao houver email cadastrado, retorna erro especifico.
 - ResetPasswordPage: valida sessao via getSession/getSessionFromUrl/exchangeCodeForSession/setSession; exige senha >=8 e confirmacao; redireciona ao login apos sucesso.
 - ResetPasswordPage: quando nao for expiracao obrigatoria, botao "Voltar ao login" limpa a sessao de recuperacao antes de sair.
 - Inatividade: monitora atividade (mouse, teclado, scroll, touch, foco) e envia /api/session/touch; expiracao vem do servidor e o front redireciona ao receber SESSION_EXPIRED.
@@ -96,8 +96,8 @@ Atualizacao 2026-02 (UI Login)
 Atualizacao 2026-02 (Login por login_name)
 
 - Login passa a usar login_name (case-insensitive) com resolucao para email no backend.
-- Novo endpoint /api/auth/login retorna tokens sem expor email ao cliente.
-- Recuperacao de senha usa /api/auth/recover com mensagem generica.
+- Edge function auth-login retorna tokens sem expor email ao cliente.
+- Recuperacao de senha usa edge function auth-recover com mensagem generica.
 - Nova coluna login_name em app_users com unique por lower(login_name) e backfill a partir de username.
 - Rebuild schema: trigger normalize_login_name garante login_name antes de inserir/atualizar app_users.
 - Senha nao e normalizada (sem trim) no backend para evitar regressao.
@@ -112,6 +112,8 @@ Atualizacao 2026-02 (Login por login_name)
 - `supabase/migrations_rebuild/0005_functions.sql`
 - `supabase/migrations_rebuild/0006_triggers.sql`
 - `supabase/Scheme.sql`
+- `supabase/functions/auth-login/index.ts`
+- `supabase/functions/auth-recover/index.ts`
 - `src/context/AuthContext.jsx`
 - `src/hooks/useLoginForm.js`
 - `src/pages/LoginPage.jsx`
