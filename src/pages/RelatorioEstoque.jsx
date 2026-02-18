@@ -138,7 +138,7 @@ export function RelatorioEstoquePage() {
             />
           </div>
         ) : (
-          <p className="feedback">Clique em "Gerar PDF" para visualizar o relatorio.</p>
+          <p className="feedback">Selecione o mes e clique em "Buscar" para visualizar o relatorio.</p>
         )}
       </section>
     </div>

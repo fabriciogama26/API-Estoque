@@ -4,15 +4,16 @@
 Visao geral
 -----------
 - Permite consultar o historico de relatorios mensais gravados em inventory_report.
-- Gera o HTML do relatorio a partir dos dados persistidos e dispara o PDF.
+- Gera o HTML do relatorio a partir dos dados persistidos para pre-visualizacao.
+- O PDF e gerado separadamente, sem consumir o limite na pre-visualizacao.
 - Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email HTML somente para o ultimo mes gerado.
 - Respeita limite de 1 PDF por mes por relatorio.
 
 Arquitetura
 -----------
 - Pagina `RelatorioEstoquePage` consome hook `useRelatorioEstoque`.
-- Hook chama `relatorioEstoqueApi` para listar relatorios e gerar HTML/PDF.
-- Backend exposto em `EstoqueOperations.reportHistory` e `EstoqueOperations.reportPdf`.
+- Hook chama `relatorioEstoqueApi` para listar relatorios, carregar HTML e gerar PDF.
+- Backend exposto em `EstoqueOperations.reportHistory`, `EstoqueOperations.reportHtml` e `EstoqueOperations.reportPdf`.
 - Edge Function `relatorio-estoque-mensal` gera os dados e grava em `inventory_report`.
 - Edge Function `relatorio-estoque-mensal-email` gera HTML a partir do historico e envia email HTML.
 - Core da geracao automatica fica em `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`.
@@ -22,6 +23,7 @@ Filtros, auto-complete e listagem
 ---------------------------------
 - Mensal: filtra por mes (YYYY-MM).
 - Listagem mostra: periodo, data de geracao e data do ultimo PDF.
+- Buscar carrega a pre-visualizacao do mes informado.
 - Botao "Gerar PDF" fica desabilitado quando o limite mensal foi atingido.
 
 Boas praticas
@@ -37,21 +39,27 @@ Atualizacao 2026-02
 - Edge Function mensal gera dados e grava em inventory_report.
 - Edge Function de email mensal envia HTML via Brevo usando dados persistidos.
 - Endpoints mantidos para listar relatorios e gerar HTML/PDF a partir do historico.
+- Pre-visualizacao passou a ser carregada pelo endpoint HTML, sem consumir o limite de PDF.
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
 - Campos de controle de email adicionados em inventory_report (status, tentativas e erro).
 - PDF passou a ser renderizado pela Edge Function dedicada `relatorio-estoque-pdf`.
 - Arquivos alterados:
 - `src/pages/RelatorioEstoque.jsx`
 - `src/hooks/useRelatorioEstoque.js`
+- `src/services/relatorioEstoqueApi.js`
+- `src/services/api.js`
+- `src/services/localApi.js`
 - `src/utils/RelatorioEstoquePdfUtils.js`
 - `src/help/helpRelatorioEstoque.json`
 - `api/_shared/operations.js`
+- `api/index.js`
 - `shared/documents/relatorioEstoqueTemplate.js`
 - `supabase/functions/relatorio-estoque-mensal/index.ts`
 - `supabase/functions/relatorio-estoque-mensal-email/index.ts`
 - `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`
 - `supabase/functions/relatorio-estoque-mensal-email/_shared/relatorioEstoqueEmailCore.ts`
 - `supabase/migrations/20260218_add_inventory_report_email_fields.sql`
+- `supabase/functions/relatorio-estoque-pdf/index.ts`
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -67,10 +75,10 @@ Funcoes principais
   - Tipo: hook
   - Caminho: src/hooks/useRelatorioEstoque.js
   - Responsavel por: carregar historico, acionar geracao de PDF e tratar limites.
-- EstoqueOperations.reportHistory / reportPdf
+- EstoqueOperations.reportHistory / reportHtml / reportPdf
   - Tipo: operacoes backend
   - Caminho: api/_shared/operations.js
-  - Responsavel por: listar relatorios e registrar geracao de PDF.
+  - Responsavel por: listar relatorios, gerar HTML e registrar geracao de PDF.
 - relatorio-estoque-mensal / relatorio-estoque-mensal-email
   - Tipo: edge functions
   - Caminho: supabase/functions/relatorio-estoque-mensal/index.ts

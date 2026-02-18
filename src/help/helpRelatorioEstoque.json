@@ -5,7 +5,7 @@
     "steps": [
       {
         "title": "Filtrar periodo",
-        "description": "Selecione o mes desejado e clique em Buscar.",
+        "description": "Selecione o mes desejado e clique em Buscar para carregar o preview.",
         "mediaHint": "Formulario de filtros com seletor de mes."
       },
       {
@@ -15,12 +15,13 @@
       },
       {
         "title": "Pre-visualizar",
-        "description": "A pre-visualizacao mostra o HTML que sera convertido em PDF.",
+        "description": "A pre-visualizacao aparece apos o Buscar e mostra o HTML do relatorio.",
         "mediaHint": "Iframe de pre-visualizacao do relatorio."
       }
     ],
     "notes": [
       "Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email em HTML apenas do ultimo mes gerado.",
+      "A pre-visualizacao nao consome o limite mensal de PDF.",
       "Cron recomendado para gerar dados a cada 28 dias: 0 3 */28 * *.",
       "Cron recomendado para enviar email a cada 30 dias: 0 4 */30 * *.",
       "Se nao houver dados no periodo, o relatorio nao e criado.",

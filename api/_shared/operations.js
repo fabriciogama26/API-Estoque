@@ -3050,6 +3050,48 @@ export const EstoqueOperations = {
 
     return { items: items ?? [] }
   },
+  async reportHtml(params = {}, user) {
+    if (!user?.id) {
+      throw createHttpError(401, 'Usuario nao autenticado para visualizar relatorio.')
+    }
+    const ownerId = await resolveOwnerId(user.id)
+    const mesRange = resolveMonthRangeFromString(params.mes)
+    if (!mesRange) {
+      throw createHttpError(400, 'Mes obrigatorio (formato YYYY-MM).')
+    }
+
+    const registro = await executeMaybeSingle(
+      supabaseAdmin
+        .from('inventory_report')
+        .select('id, periodo_inicio, periodo_fim, metadados')
+        .eq('account_owner_id', ownerId)
+        .eq('metadados->>tipo', REPORT_TYPE_MENSAL)
+        .eq('periodo_inicio', toDateOnly(mesRange.start))
+        .eq('periodo_fim', toDateOnly(mesRange.end))
+        .order('created_at', { ascending: false })
+        .limit(1),
+      'Falha ao consultar relatorio de estoque.'
+    )
+
+    if (!registro) {
+      throw createHttpError(404, 'Relatorio nao encontrado para o mes informado.')
+    }
+
+    const contexto = registro?.metadados?.contexto
+    if (!contexto) {
+      throw createHttpError(400, 'Contexto do relatorio nao encontrado para gerar HTML.')
+    }
+
+    return {
+      report: {
+        id: registro.id,
+        periodo_inicio: registro.periodo_inicio,
+        periodo_fim: registro.periodo_fim,
+        tipo: REPORT_TYPE_MENSAL,
+      },
+      html: renderReportHtml(contexto),
+    }
+  },
   async reportPdf(params = {}, user) {
     if (!user?.id) {
       throw createHttpError(401, 'Usuario nao autenticado para gerar PDF.')

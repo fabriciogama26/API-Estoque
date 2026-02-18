@@ -2873,6 +2873,21 @@ const localApi = {
     async reportHistory() {
       return { items: [] }
     },
+    async reportHtml(params = {}) {
+      const mes = String(params.mes || '').trim()
+      if (!mes) {
+        throw createError(400, 'Mes obrigatorio (YYYY-MM).')
+      }
+      return {
+        report: {
+          id: 'local-preview',
+          periodo_inicio: `${mes}-01`,
+          periodo_fim: `${mes}-01`,
+          tipo: 'mensal',
+        },
+        html: '<!DOCTYPE html><html><body><p>Preview indisponivel no modo local.</p></body></html>',
+      }
+    },
     async reportPdf(params = {}) {
       const reportId = String(params.reportId || params.id || '').trim()
       if (!reportId) {
