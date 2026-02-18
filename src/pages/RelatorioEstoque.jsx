@@ -20,6 +20,17 @@ const formatMonthLabel = (value) => {
   return `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`
 }
 
+const formatCreator = (value) => {
+  if (!value) return 'Sistema'
+  if (typeof value === 'string') return value
+  return value.display_name || value.username || value.email || value.id || 'Sistema'
+}
+
+const formatEmailStatus = (value) => {
+  const status = String(value || '').trim()
+  return status || '-'
+}
+
 export function RelatorioEstoquePage() {
   const {
     filters,
@@ -81,21 +92,24 @@ export function RelatorioEstoquePage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Periodo</th>
-                  <th>Gerado em</th>
-                  <th>PDF gerado em</th>
+                  <th>Criado por</th>
+                  <th>Criado em</th>
+                  <th>Periodo inicio</th>
+                  <th>Periodo fim</th>
+                  <th>Status email</th>
                   <th>Acoes</th>
                 </tr>
               </thead>
               <tbody>
                 {reports.map((report) => {
-                  const periodoLabel = formatMonthLabel(report.periodo_inicio)
                   const pdfBlocked = !canGeneratePdf(report)
                   return (
                     <tr key={report.id}>
-                      <td>{periodoLabel}</td>
+                      <td>{formatCreator(report.created_by)}</td>
                       <td>{formatDate(report.created_at)}</td>
-                      <td>{formatDate(report.pdf_gerado_em)}</td>
+                      <td>{formatDate(report.periodo_inicio)}</td>
+                      <td>{formatDate(report.periodo_fim)}</td>
+                      <td>{formatEmailStatus(report.email_status)}</td>
                       <td>
                         <div className="table-actions">
                           <button

@@ -22,7 +22,7 @@ Arquitetura
 Filtros, auto-complete e listagem
 ---------------------------------
 - Mensal: filtra por mes (YYYY-MM).
-- Listagem mostra: periodo, data de geracao e data do ultimo PDF.
+- Listagem mostra: criado por, criado em, periodo inicio, periodo fim e status de email.
 - Buscar carrega a pre-visualizacao do mes informado.
 - Botao "Gerar PDF" fica desabilitado quando o limite mensal foi atingido.
 
