@@ -34,12 +34,28 @@ function splitLines(value: unknown) {
     .filter(Boolean)
 }
 
+const UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+
+function sanitizeListLine(line: string) {
+  let cleaned = normalizeText(line)
+  if (!cleaned) return ''
+  cleaned = cleaned.replace(UUID_REGEX, '').replace(/\s{2,}/g, ' ').trim()
+  if (cleaned.includes('|')) {
+    cleaned = cleaned
+      .split('|')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(' | ')
+  }
+  return cleaned
+}
+
 function renderList(value: unknown) {
   const linhas = splitLines(value)
   if (!linhas.length) {
     return '<p class="relatorio-muted">Sem dados.</p>'
   }
-  const items = linhas.map((linha) => `<li>${escapeHtml(linha)}</li>`).join('')
+  const items = linhas.map((linha) => `<li>${escapeHtml(sanitizeListLine(linha))}</li>`).join('')
   return `<ul class="relatorio-list">${items}</ul>`
 }
 
@@ -191,7 +207,7 @@ export function buildRelatorioEstoqueHtml({
     <title>${escapeHtml(titulo)}</title>
     <style>
       * { box-sizing: border-box; }
-      body { margin: 0; padding: 24px; font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; }
+      body { margin: 0; padding: 24px; font-family: Arial, Helvetica, sans-serif; color: #0f172a; }
       .relatorio-document { max-width: 960px; margin: 0 auto; }
       .empresa { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 16px; }
       .empresa__logo { max-width: 180px; }
@@ -200,16 +216,16 @@ export function buildRelatorioEstoqueHtml({
       .empresa__identidade { max-width: 60%; }
       .empresa__nome { font-size: 16px; font-weight: 600; }
       .empresa__documento, .empresa__endereco, .empresa__contato { font-size: 11px; }
-      .titulo-principal { text-align: center; font-size: 16px; font-weight: 700; margin: 8px 0 20px; padding: 10px; background: #dbeafe; border: 1px solid #1d4ed8; }
-      .relatorio-section { margin-bottom: 18px; }
-      .relatorio-section h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: #1e293b; }
+      .titulo-principal { text-align: center; font-size: 15px; font-weight: 700; margin: 8px 0 14px; }
+      .relatorio-section { margin-bottom: 16px; }
+      .relatorio-section h2 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #1e293b; }
       .relatorio-grid { width: 100%; border-collapse: collapse; }
       .relatorio-grid th, .relatorio-grid td { border: 1px solid #e2e8f0; padding: 6px 8px; font-size: 12px; text-align: left; }
-      .relatorio-grid th { width: 45%; background: #f1f5f9; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; color: #334155; }
-      .relatorio-list { margin: 8px 0 0 18px; padding: 0; font-size: 12px; }
+      .relatorio-grid th { width: 45%; background: #f8fafc; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; color: #334155; }
+      .relatorio-list { margin: 6px 0 0 18px; padding: 0; font-size: 12px; }
       .relatorio-list li { margin-bottom: 4px; }
       .relatorio-muted { font-size: 12px; color: #64748b; margin: 6px 0 0; }
-      .relatorio-highlight { padding: 10px; border: 1px solid #1d4ed8; background: #eff6ff; font-weight: 600; }
+      .relatorio-highlight { padding: 8px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600; }
     </style>
   </head>
   <body>
