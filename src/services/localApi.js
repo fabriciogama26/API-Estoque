@@ -2885,7 +2885,7 @@ const localApi = {
           periodo_fim: `${mes}-01`,
           tipo: 'mensal',
         },
-        html: '<!DOCTYPE html><html><body><p>Preview indisponivel no modo local.</p></body></html>',
+        contexto: {},
       }
     },
     async reportPdf(params = {}) {

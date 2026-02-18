@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   fetchRelatoriosEstoque,
-  fetchRelatorioEstoqueHtml,
+  fetchRelatorioEstoqueContext,
   generateRelatorioEstoquePdf,
 } from '../services/relatorioEstoqueApi.js'
+import { buildRelatorioEstoqueHtml } from '../../shared/documents/relatorioEstoqueTemplate.js'
 import { downloadRelatorioEstoquePdf } from '../utils/RelatorioEstoquePdfUtils.js'
 import { PDF_REPORT_LIMIT_PER_MONTH } from '../config/RelatorioEstoqueConfig.js'
 import { useErrorLogger } from './useErrorLogger.js'
@@ -18,6 +19,21 @@ const isSameMonth = (value, reference) => {
   const dateB = new Date(reference)
   if (Number.isNaN(dateA.getTime()) || Number.isNaN(dateB.getTime())) return false
   return dateA.getUTCFullYear() === dateB.getUTCFullYear() && dateA.getUTCMonth() === dateB.getUTCMonth()
+}
+
+const trim = (value) => (value ? String(value).trim() : '')
+
+const resolveEmpresaInfo = () => {
+  const logoPrincipal = trim(import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_URL) || '/logo_FAA.png'
+  const logoSecundario = trim(import.meta.env.VITE_TERMO_EPI_EMPRESA_LOGO_SECUNDARIO_URL)
+  return {
+    nome: import.meta.env.VITE_TERMO_EPI_EMPRESA_NOME ?? '',
+    documento: import.meta.env.VITE_TERMO_EPI_EMPRESA_DOCUMENTO ?? '',
+    endereco: import.meta.env.VITE_TERMO_EPI_EMPRESA_ENDERECO ?? '',
+    contato: import.meta.env.VITE_TERMO_EPI_EMPRESA_CONTATO ?? '',
+    logoUrl: logoPrincipal,
+    logoSecundarioUrl: logoSecundario ?? '',
+  }
 }
 
 export function useRelatorioEstoque() {
@@ -54,9 +70,13 @@ export function useRelatorioEstoque() {
 
         if (nextFilters?.mes && items.length) {
           try {
-            const previewResponse = await fetchRelatorioEstoqueHtml({ mes: nextFilters.mes })
+            const previewResponse = await fetchRelatorioEstoqueContext({ mes: nextFilters.mes })
+            const contexto = previewResponse?.contexto || null
+            const html = contexto
+              ? buildRelatorioEstoqueHtml({ contexto, empresa: resolveEmpresaInfo() })
+              : ''
             setPreview({
-              html: previewResponse?.html || '',
+              html,
               report: previewResponse?.report || null,
             })
           } catch (previewErr) {
