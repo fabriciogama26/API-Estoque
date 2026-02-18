@@ -662,7 +662,7 @@ function validateMaterialPayload(payload) {
   if (!payload.grupoMaterial && !payload.grupoMaterialNome) {
     throw createHttpError(400, 'Grupo de material obrigatorio.')
   }
-  if (!payload.fabricante && !payload.fabricante)
+  if (!payload.fabricante && !payload.fabricanteNome) {
     throw createHttpError(400, 'Fabricante obrigatorio.')
   }
   if (Number.isNaN(Number(payload.validadeDias)) || Number(payload.validadeDias) <= 0) {
