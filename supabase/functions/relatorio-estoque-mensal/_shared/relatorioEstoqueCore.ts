@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
 
-const DEFAULT_MATERIAIS_VIEW = "vw_materiais_vinculos"
+const DEFAULT_MATERIAIS_VIEW = "materiais_view"
 const REPORT_TYPE_MENSAL = "mensal"
 const CENTRO_ESTOQUE_TABLE = "centros_estoque"
 
