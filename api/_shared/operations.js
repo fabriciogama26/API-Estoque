@@ -3028,7 +3028,7 @@ export const EstoqueOperations = {
     let query = supabaseAdmin
       .from('inventory_report')
       .select(
-        'id, created_at, periodo_inicio, periodo_fim, termo, metadados, pdf_gerado_em, pdf_gerado_por, email_status, created_by (id, display_name, username, email)'
+        'id, created_at, created_by, periodo_inicio, periodo_fim, termo, metadados, pdf_gerado_em, pdf_gerado_por, email_status'
       )
       .eq('account_owner_id', ownerId)
 
@@ -3048,7 +3048,31 @@ export const EstoqueOperations = {
       'Falha ao listar relatorios de estoque.'
     )
 
-    return { items: items ?? [] }
+    const createdByIds = Array.from(
+      new Set((items ?? []).map((item) => item?.created_by).filter(Boolean))
+    )
+    const createdByMap = new Map()
+    if (createdByIds.length) {
+      const users = await execute(
+        supabaseAdmin
+          .from('app_users')
+          .select('id, display_name, username, email')
+          .in('id', createdByIds),
+        'Falha ao consultar usuarios do relatorio.'
+      )
+      ;(users ?? []).forEach((user) => {
+        if (user?.id) {
+          createdByMap.set(user.id, user)
+        }
+      })
+    }
+
+    const mapped = (items ?? []).map((item) => ({
+      ...item,
+      created_by: item?.created_by ? createdByMap.get(item.created_by) || item.created_by : null,
+    }))
+
+    return { items: mapped }
   },
   async reportHtml(params = {}, user) {
     if (!user?.id) {
@@ -3089,7 +3113,7 @@ export const EstoqueOperations = {
         periodo_fim: registro.periodo_fim,
         tipo: REPORT_TYPE_MENSAL,
       },
-      html: renderReportHtml(contexto),
+      contexto,
     }
   },
   async reportPdf(params = {}, user) {

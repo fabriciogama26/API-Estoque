@@ -7,7 +7,7 @@ export const fetchRelatoriosEstoque = (params = {}) => {
   return api.estoque.reportHistory(params)
 }
 
-export const fetchRelatorioEstoqueHtml = (params = {}) => {
+export const fetchRelatorioEstoqueContext = (params = {}) => {
   if (!api?.estoque?.reportHtml) {
     throw new Error('Recurso de preview do relatorio indisponivel.')
   }
