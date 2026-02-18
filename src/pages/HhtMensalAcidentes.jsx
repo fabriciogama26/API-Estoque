@@ -138,6 +138,9 @@ export function HhtMensalAcidentesPage() {
   }, [centrosMap, editing?.centroServicoId, editing?.id, editing?.mesRef, form.centroServicoId, form.mesRefMonth, qtdPessoasManual, reportError])
 
   const startEdit = (registro) => {
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
     setFormError(null)
     setQtdPessoasManual(false)
     setEditing(registro)

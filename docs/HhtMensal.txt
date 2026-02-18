@@ -66,6 +66,7 @@ Atualizacao 2026-02
 -------------------
 - Select de centro de servico deduplica nomes para evitar opcoes repetidas no HHT mensal.
 - Botao "Atualizar" da lista padronizado com icone de refresh.
+- Ao clicar em Editar na tabela, a pagina rola para o topo e mostra o formulario em modo edicao.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -77,6 +78,7 @@ Funcoes principais
   - Tipo: componente de pagina React
   - Caminho: src/pages/HhtMensalAcidentes.jsx
   - Responsavel por: estado de filtros/form, carregamento de centros, CRUD de HHT mensal, historico e modais.
+  - Antes/Depois: antes nao fazia scroll ao editar; agora rola para o topo ao iniciar edicao.
 - HhtMensalForm
   - Tipo: componente de UI
   - Caminho: src/components/Acidentes/HhtMensal/Form/HhtMensalForm.jsx
