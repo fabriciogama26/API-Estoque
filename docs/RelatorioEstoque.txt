@@ -8,6 +8,9 @@ Visao geral
 - O PDF e gerado separadamente, sem consumir o limite na pre-visualizacao.
 - Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email HTML somente para o ultimo mes gerado.
 - Respeita limite de 1 PDF por mes por relatorio.
+- Ranking de consumo por centro/setor considera quantidade e valor, com top 10 e percentuais.
+- Desvios por centro/setor sao marcados por concentracao >= 30% ou outlier (media + 2 desvios).
+- Cobertura por trabalhador usa consumo medio mensal por centro/setor e status por faixas (CRITICO < 0,5; ATENCAO 0,5 a 1,0; OK >= 1,0; SEM BASE sem pessoas ou consumo).
 
 Arquitetura
 -----------
@@ -32,6 +35,7 @@ Boas praticas
 - Executar o cron de email a cada 30 dias (ex.: `0 4 */30 * *`) para enviar somente o ultimo relatorio gerado.
 - Usar apenas dados salvos em inventory_report para gerar HTML/PDF.
 - Manter PDF_REPORT_LIMIT_PER_MONTH em `src/config/RelatorioEstoqueConfig.js`.
+- Revisar centros com desvio e ajustar estoque minimo quando houver concentracao.
 
 Atualizacao 2026-02
 -------------------
@@ -43,6 +47,9 @@ Atualizacao 2026-02
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
 - Campos de controle de email adicionados em inventory_report (status, tentativas e erro).
 - PDF passou a ser renderizado pela Edge Function dedicada `relatorio-estoque-pdf`.
+- Ranking de consumo por centro/setor passou a usar quantidade e valor (top 10 com percentuais).
+- Desvio por centro/setor aplica regra de concentracao (>= 30%) e outlier (media + 2 desvios).
+- Cobertura por trabalhador agora considera consumo medio mensal por centro/setor e classifica status (OK/ATENCAO/CRITICO/SEM BASE).
 - Arquivos alterados:
 - `src/pages/RelatorioEstoque.jsx`
 - `src/hooks/useRelatorioEstoque.js`
@@ -50,6 +57,7 @@ Atualizacao 2026-02
 - `src/services/api.js`
 - `src/services/localApi.js`
 - `src/utils/RelatorioEstoquePdfUtils.js`
+- `src/utils/inventoryReportUtils.js`
 - `src/help/helpRelatorioEstoque.json`
 - `api/_shared/operations.js`
 - `api/index.js`
@@ -88,6 +96,7 @@ Funcoes principais
   - Tipo: utilitario de edge function
   - Caminho: supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts
   - Responsavel por: montar dados e persistir em inventory_report.
+  - Calcula ranking de consumo, desvios e cobertura por centro/setor.
 
 Constantes e configuracoes
 --------------------------

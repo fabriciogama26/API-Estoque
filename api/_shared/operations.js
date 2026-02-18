@@ -12,7 +12,11 @@ import {
   montarDashboard,
   calcularSaldoMaterial,
 } from '../../src/lib/estoque.js'
-import { normalizarTermo, filtrarPorTermo } from '../../src/utils/dashboardEstoqueUtils.js'
+import {
+  normalizarTermo,
+  filtrarPorTermo,
+  resolveCentroServicoDisplay,
+} from '../../src/utils/dashboardEstoqueUtils.js'
 import {
   buildParetoList,
   buildRiscoOperacional,
@@ -2578,6 +2582,23 @@ function interpretarVariacao(variacao, positivo, negativo) {
   return 'Estavel'
 }
 
+function safeNumber(value) {
+  const num = Number(value ?? 0)
+  return Number.isNaN(num) ? 0 : num
+}
+
+function mean(values) {
+  if (!values.length) return 0
+  return values.reduce((acc, item) => acc + item, 0) / values.length
+}
+
+function stddevPop(values) {
+  if (!values.length) return 0
+  const avg = mean(values)
+  const variance = values.reduce((acc, item) => acc + (item - avg) ** 2, 0) / values.length
+  return Math.sqrt(variance)
+}
+
 function buildParetoResumo(pareto) {
   const totalMateriais = pareto.lista.length
   const itensA = pareto.lista.filter((item) => item.classe === 'A')
@@ -2609,6 +2630,219 @@ function buildListaConsumo(setores = [], centros = []) {
   centros.slice(0, 5).forEach((item) => {
     linhas.push(`Centro: ${item.nome || 'Nao informado'} - ${formatNumber(item.quantidade)}`)
   })
+  return linhas.length ? linhas.join('\\n') : 'Sem dados'
+}
+
+function buildRankingConsumoPorCentro(centros = [], totalQuantidade, totalValor, limit = 10) {
+  if (!Array.isArray(centros) || !centros.length) {
+    return 'Sem dados'
+  }
+  const linhas = centros
+    .map((item) => {
+      const quantidade = safeNumber(item.quantidade)
+      const valorTotal = safeNumber(item.valorTotal)
+      return {
+        nome: item.nome || 'Nao informado',
+        quantidade,
+        valorTotal,
+        pctQtd: totalQuantidade > 0 ? (quantidade / totalQuantidade) * 100 : 0,
+        pctValor: totalValor > 0 ? (valorTotal / totalValor) * 100 : 0,
+      }
+    })
+    .sort((a, b) => b.quantidade - a.quantidade)
+    .slice(0, limit)
+    .map(
+      (item) =>
+        `${item.nome} | ${formatNumber(item.quantidade)} | ${formatPercent(item.pctQtd)} | ${formatCurrency(item.valorTotal)} | ${formatPercent(item.pctValor)}`
+    )
+
+  return linhas.length ? linhas.join('\\n') : 'Sem dados'
+}
+
+function buildCentrosDesvioRecomendacao(centros = [], totalQuantidade, totalValor) {
+  if (!Array.isArray(centros) || !centros.length) {
+    return 'Sem dados'
+  }
+
+  const qtdValores = centros.map((item) => safeNumber(item.quantidade))
+  const valorValores = centros.map((item) => safeNumber(item.valorTotal))
+  const mediaQtd = mean(qtdValores)
+  const mediaValor = mean(valorValores)
+  const desvioQtd = stddevPop(qtdValores)
+  const desvioValor = stddevPop(valorValores)
+
+  const linhas = centros
+    .map((item) => {
+      const quantidade = safeNumber(item.quantidade)
+      const valorTotal = safeNumber(item.valorTotal)
+      const pctQtd = totalQuantidade > 0 ? (quantidade / totalQuantidade) * 100 : 0
+      const pctValor = totalValor > 0 ? (valorTotal / totalValor) * 100 : 0
+
+      const motivos = []
+      if (pctQtd >= 30) {
+        motivos.push('concentracao_qtd')
+      }
+      if (pctValor >= 30) {
+        motivos.push('concentracao_valor')
+      }
+      if (desvioQtd > 0 && quantidade > mediaQtd + 2 * desvioQtd) {
+        motivos.push('outlier_qtd')
+      }
+      if (desvioValor > 0 && valorTotal > mediaValor + 2 * desvioValor) {
+        motivos.push('outlier_valor')
+      }
+
+      if (!motivos.length) {
+        return null
+      }
+
+      const diagnosticos = []
+      const recomendacoes = []
+
+      if (motivos.includes('concentracao_qtd')) {
+        diagnosticos.push('Consumo concentrado (giro alto).')
+        recomendacoes.push(
+          'Validar se o centro esta com mais equipes/producao; ajustar estoque minimo e janela de reposicao; conferir registro de consumo (evitar baixa indevida).'
+        )
+      }
+      if (motivos.includes('concentracao_valor')) {
+        diagnosticos.push('Consumo concentrado em itens caros.')
+        recomendacoes.push(
+          'Revisar itens do Pareto financeiro, negociar preco/contrato, checar padronizacao e aprovacoes; auditar requisicoes.'
+        )
+      }
+      if (motivos.includes('outlier_qtd') || motivos.includes('outlier_valor')) {
+        diagnosticos.push('Pico fora do padrao historico do periodo.')
+        recomendacoes.push(
+          'Investigar motivo do pico (obra especifica, urgencia, retrabalho/perda); se recorrente, recalibrar planejamento e estoque minimo.'
+        )
+      }
+
+      return `${item.nome || 'Nao informado'} | ${diagnosticos.join(' ')} | ${recomendacoes.join(' ')}`
+    })
+    .filter(Boolean)
+
+  return linhas.length ? linhas.join('\\n') : 'Sem dados'
+}
+
+function buildCoberturaPorCentro(saidas = [], estoqueAtual = [], pessoas = [], diasPeriodo) {
+  if (!Array.isArray(saidas) || !Array.isArray(estoqueAtual)) {
+    return []
+  }
+
+  const dias = Math.max(1, Number(diasPeriodo ?? 0))
+  const mesesNoPeriodo = Math.max(dias / 30, 1)
+
+  const pessoasAtivas = (Array.isArray(pessoas) ? pessoas : []).filter((pessoa) => pessoa?.ativo !== false)
+
+  const pessoasPorCentro = new Map()
+  pessoasAtivas.forEach((pessoa) => {
+    const centro = resolveCentroServicoDisplay({ pessoa })
+    if (!centro) {
+      return
+    }
+    const set = pessoasPorCentro.get(centro) ?? new Set()
+    set.add(pessoa.id)
+    pessoasPorCentro.set(centro, set)
+  })
+
+  const pessoasMovimentadas = new Map()
+  saidas.forEach((saida) => {
+    const pessoaId = saida.pessoaId
+    if (!pessoaId) return
+    const centro = resolveCentroServicoDisplay(saida)
+    if (!centro) return
+    const set = pessoasMovimentadas.get(centro) ?? new Set()
+    set.add(pessoaId)
+    pessoasMovimentadas.set(centro, set)
+  })
+
+  const consumoPorCentro = new Map()
+  saidas.forEach((saida) => {
+    const centro = resolveCentroServicoDisplay(saida)
+    const quantidade = safeNumber(saida.quantidade)
+    consumoPorCentro.set(centro, (consumoPorCentro.get(centro) ?? 0) + quantidade)
+  })
+
+  const estoquePorCentro = new Map()
+  estoqueAtual.forEach((item) => {
+    const centros = Array.isArray(item?.centrosCusto) ? item.centrosCusto : []
+    const estoque = safeNumber(item?.estoqueAtual ?? item?.quantidade)
+    if (!centros.length) {
+      return
+    }
+    const share = estoque / Math.max(centros.length, 1)
+    centros
+      .map((centro) => (typeof centro === 'string' ? centro.trim() : ''))
+      .filter(Boolean)
+      .forEach((centro) => {
+        estoquePorCentro.set(centro, (estoquePorCentro.get(centro) ?? 0) + share)
+      })
+  })
+
+  const centros = new Set()
+  consumoPorCentro.forEach((_value, key) => centros.add(key))
+  estoquePorCentro.forEach((_value, key) => centros.add(key))
+  pessoasPorCentro.forEach((_value, key) => centros.add(key))
+  pessoasMovimentadas.forEach((_value, key) => centros.add(key))
+
+  return Array.from(centros).map((centro) => {
+    const consumoTotal = safeNumber(consumoPorCentro.get(centro) ?? 0)
+    const consumoMedioMensal = consumoTotal / mesesNoPeriodo
+    const estoqueAtualCentro = safeNumber(estoquePorCentro.get(centro) ?? 0)
+    const pessoasAtivasCentro = pessoasPorCentro.get(centro) ?? new Set()
+    const pessoasMovCentro = pessoasMovimentadas.get(centro) ?? new Set()
+    const trabalhadoresAtivos = new Set([...pessoasAtivasCentro, ...pessoasMovCentro]).size
+
+    if (trabalhadoresAtivos === 0 || consumoMedioMensal === 0) {
+      return {
+        centro,
+        trabalhadores: trabalhadoresAtivos,
+        cobertura: null,
+        status: 'SEM BASE',
+        recomendacao: 'Sem base',
+      }
+    }
+
+    const cobertura = (estoqueAtualCentro * trabalhadoresAtivos) / consumoMedioMensal
+    let status = 'OK'
+    let recomendacao = 'Manter rotina'
+    if (cobertura < 0.5) {
+      status = 'CRITICO'
+      recomendacao = 'Repor imediato / risco de ruptura'
+    } else if (cobertura < 1) {
+      status = 'ATENCAO'
+      recomendacao = 'Programar reposicao / monitorar semanal'
+    }
+
+    return {
+      centro,
+      trabalhadores: trabalhadoresAtivos,
+      cobertura,
+      status,
+      recomendacao,
+    }
+  })
+}
+
+function buildRankingCoberturaPorCentro(cobertura = [], limit = 10) {
+  if (!Array.isArray(cobertura) || !cobertura.length) {
+    return 'Sem dados'
+  }
+  const linhas = cobertura
+    .slice()
+    .sort((a, b) => {
+      if (a.cobertura === null && b.cobertura !== null) return 1
+      if (a.cobertura !== null && b.cobertura === null) return -1
+      if (a.cobertura === null && b.cobertura === null) return 0
+      return (a.cobertura ?? 0) - (b.cobertura ?? 0)
+    })
+    .slice(0, limit)
+    .map((item) => {
+      const coberturaText = item.cobertura === null ? 'Sem base' : formatNumber(item.cobertura, 2)
+      return `${item.centro || 'Nao informado'} | ${formatNumber(item.trabalhadores)} | ${coberturaText} | ${item.status} | ${item.recomendacao}`
+    })
+
   return linhas.length ? linhas.join('\\n') : 'Sem dados'
 }
 
@@ -2724,6 +2958,12 @@ function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo, esto
   const consumoPorTrabalhador =
     pessoasAtivas.length > 0 ? totalSaidasQuantidade / pessoasAtivas.length : null
   const coberturaResumo = buildCoberturaResumo(consumoPorTrabalhador)
+  const coberturaPorCentro = buildCoberturaPorCentro(
+    saidasDetalhadas,
+    estoqueBase?.itens ?? [],
+    pessoas,
+    diasPeriodo
+  )
 
   const baseGiro = criticosLista.length ? criticosLista : riscoLista
   const giroMedioCriticos = baseGiro.length
@@ -2760,6 +3000,7 @@ function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo, esto
     qtdAbaixoMinimo,
     consumoPorTrabalhador,
     coberturaResumo,
+    coberturaPorCentro,
     giroMedioCriticos,
     valorTotalMovimentado: totalEntradasValor + totalSaidasValor,
     alertasAtivos: estoqueBase?.alertas?.length ?? dashboard?.estoqueAtual?.alertas?.length ?? 0,
@@ -2776,6 +3017,17 @@ function buildMonthlyContext({ resumo, periodoRange }) {
   const listaParetoValor = buildListaFinanceiro(resumo.paretoFinanceiro.lista, resumo.categorias)
   const listaCriticos = buildListaCriticos(resumo.criticosLista)
   const listaConsumoSetor = buildListaConsumo(resumo.setores, resumo.centros)
+  const rankingConsumoCentro = buildRankingConsumoPorCentro(
+    resumo.centros,
+    resumo.totalSaidasQuantidade,
+    resumo.totalSaidasValor
+  )
+  const listaDesvioCentro = buildCentrosDesvioRecomendacao(
+    resumo.centros,
+    resumo.totalSaidasQuantidade,
+    resumo.totalSaidasValor
+  )
+  const rankingCoberturaCentro = buildRankingCoberturaPorCentro(resumo.coberturaPorCentro)
 
   return {
     mes_referencia: formatMonthRef(periodoRange?.start),
@@ -2798,11 +3050,14 @@ function buildMonthlyContext({ resumo, periodoRange }) {
     lista_materiais_criticos: listaCriticos,
     lista_pareto_valor: listaParetoValor,
     lista_consumo_setor: listaConsumoSetor,
+    ranking_consumo_por_centro: rankingConsumoCentro,
+    lista_centros_desvio_recomendacao: listaDesvioCentro,
     qtd_vencidos: formatNumber(resumo.qtdVencidos),
     qtd_vencendo: formatNumber(resumo.qtdVencendo),
     qtd_excesso: formatNumber(resumo.qtdExcesso),
     status_cobertura: resumo.coberturaResumo.status,
     interpretacao_cobertura: resumo.coberturaResumo.interpretacao,
+    ranking_cobertura_por_centro: rankingCoberturaCentro,
     qtd_abaixo_minimo: formatNumber(resumo.qtdAbaixoMinimo),
     qtd_riscos_imediatos: formatNumber(resumo.qtdRiscosImediatos),
     status_final: nivelRisco,

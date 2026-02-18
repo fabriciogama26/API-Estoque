@@ -318,8 +318,12 @@ export function buildResumoPorCentroServico(saidas = []) {
       id: chave,
       nome,
       quantidade: 0,
+      valorTotal: 0,
     }
-    atual.quantidade += toNumber(saida.quantidade)
+    const quantidade = toNumber(saida.quantidade)
+    const valorUnitario = toNumber(saida?.material?.valorUnitario ?? saida?.material?.valor_unitario)
+    atual.quantidade += quantidade
+    atual.valorTotal = Number((atual.valorTotal + quantidade * valorUnitario).toFixed(2))
     mapa.set(chave, atual)
   })
 
@@ -337,8 +341,12 @@ export function buildResumoPorSetor(saidas = []) {
       id: chave,
       nome,
       quantidade: 0,
+      valorTotal: 0,
     }
-    atual.quantidade += toNumber(saida.quantidade)
+    const quantidade = toNumber(saida.quantidade)
+    const valorUnitario = toNumber(saida?.material?.valorUnitario ?? saida?.material?.valor_unitario)
+    atual.quantidade += quantidade
+    atual.valorTotal = Number((atual.valorTotal + quantidade * valorUnitario).toFixed(2))
     mapa.set(chave, atual)
   })
 
@@ -394,8 +402,12 @@ export function buildResumoPorCentroCusto(saidas = []) {
       id: chave,
       nome,
       quantidade: 0,
+      valorTotal: 0,
     }
-    atual.quantidade += toNumber(saida.quantidade)
+    const quantidade = toNumber(saida.quantidade)
+    const valorUnitario = toNumber(saida?.material?.valorUnitario ?? saida?.material?.valor_unitario)
+    atual.quantidade += quantidade
+    atual.valorTotal = Number((atual.valorTotal + quantidade * valorUnitario).toFixed(2))
     mapa.set(chave, atual)
   })
 
