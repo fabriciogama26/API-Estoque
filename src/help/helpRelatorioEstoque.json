@@ -5,8 +5,8 @@
     "steps": [
       {
         "title": "Filtrar periodo",
-        "description": "Selecione mensal (mes) ou trimestral (trimestre + ano) e clique em Buscar.",
-        "mediaHint": "Formulario de filtros com seletor de tipo e periodo."
+        "description": "Selecione o mes desejado e clique em Buscar.",
+        "mediaHint": "Formulario de filtros com seletor de mes."
       },
       {
         "title": "Gerar PDF",
@@ -20,9 +20,12 @@
       }
     ],
     "notes": [
-      "Relatorios sao gerados automaticamente pelo cron no ultimo dia do mes.",
+      "Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email em HTML apenas do ultimo mes gerado.",
+      "Cron recomendado para gerar dados a cada 28 dias: 0 3 */28 * *.",
+      "Cron recomendado para enviar email a cada 30 dias: 0 4 */30 * *.",
       "Se nao houver dados no periodo, o relatorio nao e criado.",
-      "PDF pode ser gerado apenas uma vez por mes para cada relatorio."
+      "PDF pode ser gerado apenas uma vez por mes para cada relatorio.",
+      "Email enviado em HTML usando Brevo."
     ]
   }
 }

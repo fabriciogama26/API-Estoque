@@ -2866,8 +2866,7 @@ const localApi = {
       const diffMeses = (fimAno - inicioAno) * 12 + (fimMes - inicioMes) + 1
       let tipo = ''
       if (diffMeses === 1) tipo = 'mensal'
-      else if (diffMeses === 3) tipo = 'trimestral'
-      else throw createError(400, 'Periodo precisa ser mensal ou trimestral.')
+      else throw createError(400, 'Periodo precisa ser mensal.')
 
       return { tipo, origem: 'local' }
     },

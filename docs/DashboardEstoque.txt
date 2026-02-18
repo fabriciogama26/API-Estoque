@@ -6,7 +6,7 @@ Visao geral
 - Consolida indicadores de movimentacao de estoque (entradas, saidas, saldo e valor movimentado) no periodo filtrado.
 - Exibe series historicas e rankings de movimentacao.
 - Paretos e interpretacoes foram movidos para a pagina "Analise de Estoque".
-- Relatorios mensais e trimestrais sao gerados automaticamente e enviados por email para administradores.
+- Relatorios mensais sao gerados automaticamente e enviados por email somente para o ultimo mes gerado.
 - Fonte principal: `api.estoque.dashboard` e `api.estoque.report` via `dashboardEstoqueApi`.
 
 Arquitetura
@@ -20,9 +20,9 @@ Arquitetura
 - Componentes de grafico:
   - `ChartExpandModal` para visualizar graficos em tela cheia.
 - Backend:
-  - `EstoqueOperations.report` gera o relatorio, grava em `inventory_report` e envia email via Brevo.
-  - `EstoqueOperations.reportAuto` gera relatorios mensais/trimestrais via cron.
-  - Templates em `shared/documents` alimentam os textos enviados por email.
+  - `EstoqueOperations.report` gera o relatorio e grava em `inventory_report` (sem envio de email).
+  - `EstoqueOperations.reportAuto` gera relatorios mensais via cron (sem envio de email).
+  - Edge Functions `relatorio-estoque-mensal` e `relatorio-estoque-mensal-email` fazem geracao e envio.
 - Erros:
   - `useErrorLogger('dashboard_estoque')` registra falhas de carga e geracao de relatorio.
 
@@ -46,10 +46,10 @@ Boas praticas
 Atualizacao 2026-02
 -------------------
 - Paretos movidos para a pagina "Analise de Estoque".
-- Relatorios mensais e trimestrais com envio por email e persistencia em `inventory_report`.
-- Templates TXT criados em `shared/documents` para relatorios mensais e trimestrais.
-- Rotina automatica gera mensal no ultimo dia do mes (mes corrente fechado) e trimestral em fim de trimestre.
-- Backfill automatico gera meses/trimestres antigos sem relatorio quando houver dados.
+- Relatorios mensais com envio por email e persistencia em `inventory_report`.
+- Templates TXT criados em `shared/documents` para relatorios mensais.
+- Rotina automatica gera mensal a cada 28 dias (mes fechado) e envia email a cada 30 dias apenas do ultimo relatorio.
+- Backfill automatico gera meses antigos sem relatorio quando houver dados.
 - Labels de materiais agora incluem numero/tamanho e CA para evitar duplicidade visual.
 - IDs de tamanho/numero nao sao exibidos; usa nome legivel quando disponivel.
 - Tooltip dos graficos de materiais mostra descricao completa, ID e quantidade.
@@ -78,7 +78,8 @@ Atualizacao 2026-02
   - `api/index.js`
   - `api/_shared/withAuth.js`
   - `shared/documents/RELATÓRIO MENSAL DE ESTOQUE.txt`
-  - `shared/documents/RELATÓRIO TRIMESTRAL DE ESTOQUE (COMPARATIVO).txt`
+  - `supabase/functions/relatorio-estoque-mensal-email/index.ts`
+  - `supabase/migrations/20260218_add_inventory_report_email_fields.sql`
   - `supabase/migrations/20260201_create_inventory_report.sql`
 
 ===========================================
@@ -98,7 +99,7 @@ Funcoes principais
 - EstoqueOperations.report/reportAuto
   - Tipo: operacao backend
   - Caminho: api/_shared/operations.js
-  - Responsavel por: gerar relatorio, gravar no banco e enviar email.
+  - Responsavel por: gerar relatorio e gravar no banco.
 
 Constantes e configuracoes
 --------------------------
@@ -130,7 +131,7 @@ Servicos e integracoes externas
   - Responsavel por: buscar dashboard e gerar relatorio.
 - Brevo (email)
   - Tipo: integracao externa
-  - Caminho: api/_shared/operations.js
+  - Caminho: supabase/functions/relatorio-estoque-mensal-email/_shared/relatorioEstoqueEmailCore.ts
   - Responsavel por: envio de relatorios via `BREVO_API_KEY`.
 
 Ajuda contextual

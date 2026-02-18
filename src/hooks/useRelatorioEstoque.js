@@ -4,13 +4,8 @@ import { downloadRelatorioEstoquePdf } from '../utils/RelatorioEstoquePdfUtils.j
 import { PDF_REPORT_LIMIT_PER_MONTH } from '../config/RelatorioEstoqueConfig.js'
 import { useErrorLogger } from './useErrorLogger.js'
 
-const CURRENT_YEAR = new Date().getFullYear()
-
 const initialFilters = {
-  tipo: 'mensal',
   mes: '',
-  trimestre: '1',
-  ano: `${CURRENT_YEAR}`,
 }
 
 const isSameMonth = (value, reference) => {
@@ -36,20 +31,13 @@ export function useRelatorioEstoque() {
     return !isSameMonth(report.pdf_gerado_em, new Date())
   }, [])
 
-  const buildParams = useCallback(
-    (nextFilters) => {
-      const params = { tipo: nextFilters.tipo }
-      if (nextFilters.tipo === 'mensal' && nextFilters.mes) {
-        params.mes = nextFilters.mes
-      }
-      if (nextFilters.tipo === 'trimestral') {
-        params.trimestre = nextFilters.trimestre
-        params.ano = nextFilters.ano
-      }
-      return params
-    },
-    []
-  )
+  const buildParams = useCallback((nextFilters) => {
+    const params = {}
+    if (nextFilters.mes) {
+      params.mes = nextFilters.mes
+    }
+    return params
+  }, [])
 
   const loadReports = useCallback(
     async (nextFilters) => {

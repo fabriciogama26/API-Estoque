@@ -3,8 +3,9 @@
 
 Visao geral
 -----------
-- Permite consultar o historico de relatorios mensais e trimestrais gravados em inventory_report.
+- Permite consultar o historico de relatorios mensais gravados em inventory_report.
 - Gera o HTML do relatorio a partir dos dados persistidos e dispara o PDF.
+- Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email HTML somente para o ultimo mes gerado.
 - Respeita limite de 1 PDF por mes por relatorio.
 
 Arquitetura
@@ -12,37 +13,44 @@ Arquitetura
 - Pagina `RelatorioEstoquePage` consome hook `useRelatorioEstoque`.
 - Hook chama `relatorioEstoqueApi` para listar relatorios e gerar HTML/PDF.
 - Backend exposto em `EstoqueOperations.reportHistory` e `EstoqueOperations.reportPdf`.
-- Persistencia feita na tabela `inventory_report` (campos pdf_gerado_em/pdf_gerado_por).
+- Edge Function `relatorio-estoque-mensal` gera os dados e grava em `inventory_report`.
+- Edge Function `relatorio-estoque-mensal-email` gera HTML a partir do historico e envia email HTML.
+- Core da geracao automatica fica em `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`.
+- Persistencia feita na tabela `inventory_report` (campos pdf_gerado_em/pdf_gerado_por/email_status/email_enviado_em/email_erro/email_tentativas).
 
 Filtros, auto-complete e listagem
 ---------------------------------
-- Tipo:
-  - Mensal: filtra por mes (YYYY-MM).
-  - Trimestral: filtra por trimestre (T1..T4) e ano.
-- Listagem mostra: periodo, tipo, data de geracao e data do ultimo PDF.
+- Mensal: filtra por mes (YYYY-MM).
+- Listagem mostra: periodo, data de geracao e data do ultimo PDF.
 - Botao "Gerar PDF" fica desabilitado quando o limite mensal foi atingido.
 
 Boas praticas
 -------------
-- Executar o cron no ultimo dia do mes para manter o historico atualizado.
+- Executar o cron de geracao a cada 28 dias (ex.: `0 3 */28 * *`) para gerar o ultimo mes fechado.
+- Executar o cron de email a cada 30 dias (ex.: `0 4 */30 * *`) para enviar somente o ultimo relatorio gerado.
 - Usar apenas dados salvos em inventory_report para gerar HTML/PDF.
 - Manter PDF_REPORT_LIMIT_PER_MONTH em `src/config/RelatorioEstoqueConfig.js`.
 
 Atualizacao 2026-02
 -------------------
-- Criada pagina de historico de relatorios de estoque.
-- Endpoints para listar relatorios e gerar HTML/PDF a partir do historico.
+- Relatorios trimestrais removidos; fluxo passa a ser apenas mensal.
+- Edge Function mensal gera dados e grava em inventory_report.
+- Edge Function de email mensal envia HTML via Brevo usando dados persistidos.
+- Endpoints mantidos para listar relatorios e gerar HTML/PDF a partir do historico.
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
-- Chamadas de historico/PDF agora incluem `X-Session-Id` para manter o guard de sessao consistente.
-- Download do PDF agora usa httpClient com envelope padronizado e request_id das Functions.
+- Campos de controle de email adicionados em inventory_report (status, tentativas e erro).
 - Arquivos alterados:
-- `src/services/api.js`
+- `src/pages/RelatorioEstoque.jsx`
+- `src/hooks/useRelatorioEstoque.js`
 - `src/utils/RelatorioEstoquePdfUtils.js`
-- Antes/Depois:
-- Antes: requisicoes de historico/PDF nao enviavam `X-Session-Id`.
-- Depois: requisicoes enviam `X-Session-Id` para manter a sessao consistente no backend.
-- Antes: download do PDF usava fetch direto e tratava erro manualmente.
-- Depois: download usa httpClient com responseType blob e envelope padronizado.
+- `src/help/helpRelatorioEstoque.json`
+- `api/_shared/operations.js`
+- `shared/documents/relatorioEstoqueTemplate.js`
+- `supabase/functions/relatorio-estoque-mensal/index.ts`
+- `supabase/functions/relatorio-estoque-mensal-email/index.ts`
+- `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`
+- `supabase/functions/relatorio-estoque-mensal-email/_shared/relatorioEstoqueEmailCore.ts`
+- `supabase/migrations/20260218_add_inventory_report_email_fields.sql`
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -62,6 +70,15 @@ Funcoes principais
   - Tipo: operacoes backend
   - Caminho: api/_shared/operations.js
   - Responsavel por: listar relatorios e registrar geracao de PDF.
+- relatorio-estoque-mensal / relatorio-estoque-mensal-email
+  - Tipo: edge functions
+  - Caminho: supabase/functions/relatorio-estoque-mensal/index.ts
+  - Caminho: supabase/functions/relatorio-estoque-mensal-email/index.ts
+  - Responsavel por: gerar dados mensais e enviar email HTML.
+- relatorioEstoqueCore
+  - Tipo: utilitario de edge function
+  - Caminho: supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts
+  - Responsavel por: montar dados e persistir em inventory_report.
 
 Constantes e configuracoes
 --------------------------
@@ -87,6 +104,10 @@ Servicos e integracoes externas
   - Tipo: integracao externa
   - Caminho: supabase/functions/termo-epi
   - Responsavel por: converter HTML em PDF.
+- Brevo (email HTML)
+  - Tipo: integracao externa
+  - Caminho: supabase/functions/relatorio-estoque-mensal-email/_shared/relatorioEstoqueEmailCore.ts
+  - Responsavel por: envio de relatorios mensais.
 
 Ajuda contextual
 ----------------

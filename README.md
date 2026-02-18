@@ -13,6 +13,7 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 - React
 - Vite
 - Supabase (Auth, Database, Storage)
+- Supabase Edge Functions (cron)
 - Node.js
 - Vercel Serverless Functions (pasta `api/`)
 
@@ -214,9 +215,9 @@ security_front_review.txt  # documento de suporte
 shared/
   documents/
     RELATÓRIO MENSAL DE ESTOQUE.txt  # template de documento
-    RELATÓRIO TRIMESTRAL DE ESTOQUE (COMPARATIVO).txt  # template de documento
     epiTermTemplate.js  # template de documento compartilhado
     index.js  # template de documento compartilhado
+    relatorioEstoqueTemplate.js  # template de documento compartilhado
 src/
   App.jsx  # entrada da aplicacao
   app.js  # entrada da aplicacao
@@ -596,6 +597,16 @@ supabase/
       index.ts  # edge function (Supabase)
     forecast-gasto-mensal/
       index.ts  # edge function (Supabase)
+    relatorio-estoque-mensal/
+      _shared/
+        relatorioEstoqueCore.ts  # core de relatorios (edge function)
+        relatorioEstoqueTemplate.ts  # template HTML de relatorio (edge function)
+      index.ts  # edge function (Supabase)
+    relatorio-estoque-mensal-email/
+      _shared/
+        relatorioEstoqueEmailCore.ts  # envio de email mensal (edge function)
+        relatorioEstoqueTemplate.ts  # template HTML de relatorio (edge function)
+      index.ts  # edge function (Supabase)
     import_map.json  # import map das edge functions
     request-password-reset/
       index.ts  # edge function (Supabase)
@@ -759,6 +770,7 @@ supabase/
     20260201_create_inventory_report.sql  # migration SQL
     20260202_add_inventory_report_pdf_fields.sql  # migration SQL
     20260202_create_inventory_report_full.sql  # migration SQL
+    20260218_add_inventory_report_email_fields.sql  # migration SQL
     20260203_create_inventory_forecast.sql  # migration SQL
     20260204_add_rpc_previsao_gasto_periodo.sql  # migration SQL
     20260204_add_updated_at_forecast.sql  # migration SQL
@@ -831,7 +843,7 @@ vite.config.js  # configuracao do Vite
 - Erro de auth/URL: validar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
 - Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.
 - Relatorio nao enviado: validar `BREVO_API_KEY` e destinatarios admin/master.
-- Relatorio automatico nao executa: validar `CRON_SECRET` e a rota `/api/estoque/relatorio/auto`.
+- Relatorio automatico nao executa: validar `CRON_SECRET` e as Edge Functions `relatorio-estoque-mensal`/`relatorio-estoque-mensal-email`.
 - Nenhuma movimentacao encontrada: revisar filtros e periodo do relatorio.
 
 
