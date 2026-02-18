@@ -3028,7 +3028,7 @@ export const EstoqueOperations = {
     let query = supabaseAdmin
       .from('inventory_report')
       .select(
-        'id, created_at, created_by, periodo_inicio, periodo_fim, termo, metadados, pdf_gerado_em, pdf_gerado_por'
+        'id, created_at, periodo_inicio, periodo_fim, termo, metadados, pdf_gerado_em, pdf_gerado_por, email_status, created_by (id, display_name, username, email)'
       )
       .eq('account_owner_id', ownerId)
 
