@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon, InfoIcon } from '../components/icons.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
@@ -21,14 +20,6 @@ const formatMonthLabel = (value) => {
   return `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`
 }
 
-const formatQuarterLabel = (value) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  const quarter = Math.floor(date.getUTCMonth() / 3) + 1
-  return `T${quarter}/${date.getUTCFullYear()}`
-}
-
 export function RelatorioEstoquePage() {
   const {
     filters,
@@ -44,16 +35,6 @@ export function RelatorioEstoquePage() {
     handleReset,
     handleGeneratePdf,
   } = useRelatorioEstoque()
-
-  const quarterOptions = useMemo(
-    () => [
-      { value: '1', label: 'T1' },
-      { value: '2', label: 'T2' },
-      { value: '3', label: 'T3' },
-      { value: '4', label: 'T4' },
-    ],
-    []
-  )
 
   return (
     <div className="stack">
@@ -71,35 +52,9 @@ export function RelatorioEstoquePage() {
         <form className="form" onSubmit={handleSubmit}>
           <div className="form__grid">
             <label className="field">
-              <span>Tipo</span>
-              <select name="tipo" value={filters.tipo} onChange={handleChange}>
-                <option value="mensal">Mensal</option>
-                <option value="trimestral">Trimestral</option>
-              </select>
+              <span>Mes</span>
+              <input type="month" name="mes" value={filters.mes} onChange={handleChange} />
             </label>
-            {filters.tipo === 'mensal' ? (
-              <label className="field">
-                <span>Mes</span>
-                <input type="month" name="mes" value={filters.mes} onChange={handleChange} />
-              </label>
-            ) : (
-              <>
-                <label className="field">
-                  <span>Trimestre</span>
-                  <select name="trimestre" value={filters.trimestre} onChange={handleChange}>
-                    {quarterOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Ano</span>
-                  <input type="number" name="ano" value={filters.ano} onChange={handleChange} min="2000" />
-                </label>
-              </>
-            )}
           </div>
           <div className="form__actions">
             <button type="submit" className="button button--primary" disabled={loading}>
@@ -127,7 +82,6 @@ export function RelatorioEstoquePage() {
               <thead>
                 <tr>
                   <th>Periodo</th>
-                  <th>Tipo</th>
                   <th>Gerado em</th>
                   <th>PDF gerado em</th>
                   <th>Acoes</th>
@@ -135,16 +89,11 @@ export function RelatorioEstoquePage() {
               </thead>
               <tbody>
                 {reports.map((report) => {
-                  const tipo = report?.metadados?.tipo || 'mensal'
-                  const periodoLabel =
-                    tipo === 'trimestral'
-                      ? formatQuarterLabel(report.periodo_inicio)
-                      : formatMonthLabel(report.periodo_inicio)
+                  const periodoLabel = formatMonthLabel(report.periodo_inicio)
                   const pdfBlocked = !canGeneratePdf(report)
                   return (
                     <tr key={report.id}>
                       <td>{periodoLabel}</td>
-                      <td>{tipo === 'trimestral' ? 'Trimestral' : 'Mensal'}</td>
                       <td>{formatDate(report.created_at)}</td>
                       <td>{formatDate(report.pdf_gerado_em)}</td>
                       <td>

@@ -25,20 +25,10 @@ function formatMonthLabel(dateValue) {
   return `${String(date.getUTCMonth() + 1).padStart(2, '0')}-${date.getUTCFullYear()}`
 }
 
-function formatQuarterLabel(dateValue) {
-  if (!dateValue) return ''
-  const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return ''
-  const quarter = Math.floor(date.getUTCMonth() / 3) + 1
-  return `T${quarter}-${date.getUTCFullYear()}`
-}
-
 function buildFileName(report = {}) {
-  const metadados = report && typeof report === 'object' ? report.metadados : null
-  const tipo = (metadados && metadados.tipo) || report.tipo || 'mensal'
   const periodo = report.periodo_inicio || report.periodoInicio
-  const label = tipo === 'trimestral' ? formatQuarterLabel(periodo) : formatMonthLabel(periodo)
-  const slug = [tipo, label].filter(Boolean).join('_').toLowerCase()
+  const label = formatMonthLabel(periodo)
+  const slug = ['mensal', label].filter(Boolean).join('_').toLowerCase()
   return slug ? `${slug}.pdf` : DEFAULT_FILENAME
 }
 
