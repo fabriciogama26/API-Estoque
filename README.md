@@ -831,7 +831,7 @@ vite.config.js  # configuracao do Vite
 - Registrar entradas para compor saldo.
 - Registrar saidas e acompanhar historico.
 - Exportar lista de materiais em CSV quando necessario.
-- Consultar dashboards e gerar relatorios mensais/trimestrais quando necessario.
+- Consultar dashboards e gerar relatorios mensais quando necessario.
 - Gerar termo de EPI quando aplicavel.
 
 

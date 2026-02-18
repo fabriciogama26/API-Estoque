@@ -5828,6 +5828,23 @@ export const api = {
       const endpoint = `${base}/api/estoque/relatorios${query.toString() ? `?${query.toString()}` : ''}`
       return httpRequest('GET', endpoint, { headers })
     },
+    async reportHtml(params = {}) {
+      ensureSupabase()
+      const headers = await buildAuthHeaders()
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const query = new URLSearchParams()
+      Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && String(value).trim() !== '') {
+          query.append(key, String(value))
+        }
+      })
+      const endpoint = `${base}/api/estoque/relatorio/html${query.toString() ? `?${query.toString()}` : ''}`
+      return httpRequest('GET', endpoint, { headers })
+    },
     async reportPdf(params = {}) {
       ensureSupabase()
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })

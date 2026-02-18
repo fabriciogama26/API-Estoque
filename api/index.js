@@ -198,6 +198,9 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/estoque/relatorios' && method === 'GET') {
       return sendJson(res, 200, await EstoqueOperations.reportHistory(query, user))
     }
+    if (path === '/api/estoque/relatorio/html' && method === 'GET') {
+      return sendJson(res, 200, await EstoqueOperations.reportHtml(query, user))
+    }
     if (path === '/api/estoque/relatorio/pdf' && method === 'POST') {
       const body = await readJson(req)
       return sendJson(res, 200, await EstoqueOperations.reportPdf(body, user))

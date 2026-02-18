@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
-import { fetchRelatoriosEstoque, generateRelatorioEstoquePdf } from '../services/relatorioEstoqueApi.js'
+import {
+  fetchRelatoriosEstoque,
+  fetchRelatorioEstoqueHtml,
+  generateRelatorioEstoquePdf,
+} from '../services/relatorioEstoqueApi.js'
 import { downloadRelatorioEstoquePdf } from '../utils/RelatorioEstoquePdfUtils.js'
 import { PDF_REPORT_LIMIT_PER_MONTH } from '../config/RelatorioEstoqueConfig.js'
 import { useErrorLogger } from './useErrorLogger.js'
@@ -45,7 +49,24 @@ export function useRelatorioEstoque() {
       setError(null)
       try {
         const response = await fetchRelatoriosEstoque(buildParams(nextFilters))
-        setReports(response?.items ?? [])
+        const items = response?.items ?? []
+        setReports(items)
+
+        if (nextFilters?.mes && items.length) {
+          try {
+            const previewResponse = await fetchRelatorioEstoqueHtml({ mes: nextFilters.mes })
+            setPreview({
+              html: previewResponse?.html || '',
+              report: previewResponse?.report || null,
+            })
+          } catch (previewErr) {
+            setPreview({ html: '', report: null })
+            setError(previewErr?.message || 'Falha ao carregar pre-visualizacao.')
+            reportError(previewErr, { area: 'preview_relatorio', mes: nextFilters.mes })
+          }
+        } else {
+          setPreview({ html: '', report: null })
+        }
       } catch (err) {
         setError(err?.message || 'Falha ao carregar relatorios.')
         reportError(err, { area: 'listar_relatorios' })
@@ -63,6 +84,11 @@ export function useRelatorioEstoque() {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    if (!filters.mes) {
+      setError('Informe o mes para buscar o relatorio.')
+      setPreview({ html: '', report: null })
+      return
+    }
     loadReports(filters)
   }
 
