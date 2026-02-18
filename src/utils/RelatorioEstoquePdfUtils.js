@@ -38,7 +38,7 @@ export async function downloadRelatorioEstoquePdf({ html, report } = {}) {
   }
 
   const normalizedHtml = normalizeHtmlForRemote(html)
-  const endpoint = `${buildFunctionsUrl()}/termo-epi`
+  const endpoint = `${buildFunctionsUrl()}/relatorio-estoque-pdf`
   const anonKey = resolveAnonKey()
 
   const blob = await httpRequest('POST', endpoint, {

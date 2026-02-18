@@ -36,7 +36,7 @@ import { createHttpError } from './http.js'
 
 const GENERIC_SUPABASE_ERROR = 'Falha ao comunicar com o Supabase.'
 
-const DEFAULT_MATERIAIS_VIEW = 'vw_materiais_vinculos'
+const DEFAULT_MATERIAIS_VIEW = 'materiais_view'
 const MATERIAIS_VIEW = process.env.MATERIAIS_VIEW || DEFAULT_MATERIAIS_VIEW
 const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'

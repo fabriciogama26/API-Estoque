@@ -607,6 +607,8 @@ supabase/
         relatorioEstoqueEmailCore.ts  # envio de email mensal (edge function)
         relatorioEstoqueTemplate.ts  # template HTML de relatorio (edge function)
       index.ts  # edge function (Supabase)
+    relatorio-estoque-pdf/
+      index.ts  # edge function (Supabase)
     import_map.json  # import map das edge functions
     request-password-reset/
       index.ts  # edge function (Supabase)

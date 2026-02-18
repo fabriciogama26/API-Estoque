@@ -39,6 +39,7 @@ Atualizacao 2026-02
 - Endpoints mantidos para listar relatorios e gerar HTML/PDF a partir do historico.
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
 - Campos de controle de email adicionados em inventory_report (status, tentativas e erro).
+- PDF passou a ser renderizado pela Edge Function dedicada `relatorio-estoque-pdf`.
 - Arquivos alterados:
 - `src/pages/RelatorioEstoque.jsx`
 - `src/hooks/useRelatorioEstoque.js`
@@ -102,7 +103,7 @@ Servicos e integracoes externas
   - Responsavel por: listar relatorios e solicitar HTML/PDF.
 - Supabase Functions (renderizacao PDF)
   - Tipo: integracao externa
-  - Caminho: supabase/functions/termo-epi
+  - Caminho: supabase/functions/relatorio-estoque-pdf
   - Responsavel por: converter HTML em PDF.
 - Brevo (email HTML)
   - Tipo: integracao externa
@@ -113,3 +114,4 @@ Ajuda contextual
 ----------------
 - Botao 'Ajuda' no cabecalho abre modal com passos e notas desta pagina.
 - Conteudo vem de src/help/helpRelatorioEstoque.json.
+- `supabase/functions/relatorio-estoque-pdf/index.ts`
