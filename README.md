@@ -600,7 +600,6 @@ supabase/
     relatorio-estoque-mensal/
       _shared/
         relatorioEstoqueCore.ts  # core de relatorios (edge function)
-        relatorioEstoqueTemplate.ts  # template HTML de relatorio (edge function)
       index.ts  # edge function (Supabase)
     relatorio-estoque-mensal-email/
       _shared/

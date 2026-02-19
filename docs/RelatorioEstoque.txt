@@ -13,6 +13,7 @@ Visao geral
 - Cobertura por trabalhador usa consumo medio mensal por centro/setor e status por faixas (CRITICO < 0,5; ATENCAO 0,5 a 1,0; OK >= 1,0; SEM BASE sem pessoas ou consumo).
 - Pessoas sao carregadas da tabela `pessoas` e enriquecidas com centro/setor/centro de custo via joins nas tabelas de apoio.
 - Colaboradores inativos com movimentacao no periodo entram no calculo.
+- Identificacao do nivel (CRITICO/ATENCAO/OK) aparece no resumo executivo do HTML/PDF.
 
 Arquitetura
 -----------

@@ -131,7 +131,11 @@ export function buildRelatorioEstoqueHtml({ contexto = {}, empresa = {} } = {}) 
     ['Status geral do estoque', contexto.status_estoque],
   ])
 
-  const resumoExecutivo = `${resumoExecutivoTexto}${resumoExecutivoGrid}`
+  const resumoExecutivoLegenda = renderParagraph(
+    'Classificações do nível: CRÍTICO (há materiais críticos ou ruptura iminente), ATENÇÃO (há riscos moderados que exigem acompanhamento), OK (sem riscos relevantes no período).',
+  )
+
+  const resumoExecutivo = `${resumoExecutivoTexto}${resumoExecutivoGrid}${resumoExecutivoLegenda}`
 
   // 3) Pareto 80/20 – Saída por quantidade (ação operacional)
   const sec3 = renderSection(
