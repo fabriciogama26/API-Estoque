@@ -11,6 +11,7 @@ Visao geral
 - Ranking de consumo por centro/setor considera quantidade e valor, com top 10 e percentuais.
 - Desvios por centro/setor sao marcados por concentracao >= 30% ou outlier (media + 2 desvios).
 - Cobertura por trabalhador usa consumo medio mensal por centro/setor e status por faixas (CRITICO < 0,5; ATENCAO 0,5 a 1,0; OK >= 1,0; SEM BASE sem pessoas ou consumo).
+- Pessoas sao carregadas da view `pessoas_view` e colaboradores inativos com movimentacao no periodo entram no calculo.
 
 Arquitetura
 -----------
@@ -58,6 +59,7 @@ Atualizacao 2026-02
 - `src/services/localApi.js`
 - `src/utils/RelatorioEstoquePdfUtils.js`
 - `src/utils/inventoryReportUtils.js`
+- `src/lib/estoque.js`
 - `src/help/helpRelatorioEstoque.json`
 - `api/_shared/operations.js`
 - `api/index.js`

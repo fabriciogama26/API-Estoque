@@ -483,24 +483,33 @@ function formatMaterialResumo(material) {
     .join(' | ')
 }
 
-export function montarDashboard({ materiais = [], entradas = [], saidas = [], pessoas = [] }, periodo = null) {
+export function montarDashboard(
+  { materiais = [], entradas = [], saidas = [], pessoas = [] },
+  periodo = null,
+  options = {}
+) {
+  const includeInactivePessoas = Boolean(options?.includeInactivePessoas)
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
   const materiaisMap = new Map(materiaisNormalizados.map((material) => [material.id, material]))
-  const pessoasAtivas = (Array.isArray(pessoas) ? pessoas : []).filter((pessoa) => pessoa?.ativo !== false)
+  const pessoasLista = Array.isArray(pessoas) ? pessoas : []
+  const pessoasAtivas = includeInactivePessoas
+    ? pessoasLista
+    : pessoasLista.filter((pessoa) => pessoa?.ativo !== false)
   const pessoasMap = new Map(pessoasAtivas.map((pessoa) => [pessoa.id, pessoa]))
 
   const filtrar = (lista, campoData) => lista.filter((item) => filtrarPorPeriodo(item, campoData, periodo))
 
   const entradasFiltradas = filtrar(entradas, 'dataEntrada').filter((entrada) => !isRegistroCancelado(entrada))
-  const pessoaAtivaIds = new Set(pessoasAtivas.map((pessoa) => pessoa?.id).filter(Boolean))
-  const saidasFiltradas = filtrar(saidas, 'dataEntrega')
-    .filter((saida) => !isRegistroCancelado(saida))
-    .filter((saida) => {
+  let saidasFiltradas = filtrar(saidas, 'dataEntrega').filter((saida) => !isRegistroCancelado(saida))
+  if (!includeInactivePessoas) {
+    const pessoaAtivaIds = new Set(pessoasAtivas.map((pessoa) => pessoa?.id).filter(Boolean))
+    saidasFiltradas = saidasFiltradas.filter((saida) => {
       if (!saida?.pessoaId) {
         return true
       }
       return pessoaAtivaIds.has(saida.pessoaId)
     })
+  }
 
   const entradasDetalhadas = entradasFiltradas.map((entrada) => ({
     ...entrada,
