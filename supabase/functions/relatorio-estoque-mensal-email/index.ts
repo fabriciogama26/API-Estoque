@@ -52,6 +52,49 @@ const saveRunToDb = async (row: Record<string, unknown>) => {
 const getSbRequestId = (req: Request) =>
   req.headers.get("x-sb-request-id") || req.headers.get("sb-request-id") || null
 
+const trim = (value: unknown) => {
+  if (value === undefined || value === null) {
+    return ""
+  }
+  return String(value).trim()
+}
+
+const parseRequestBody = async (req: Request) => {
+  const contentType = req.headers.get("content-type") || ""
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return {}
+  }
+  try {
+    return await req.json()
+  } catch {
+    return {}
+  }
+}
+
+const parseTestParams = async (req: Request) => {
+  const url = new URL(req.url)
+  const body = await parseRequestBody(req)
+  const bodyAny = body as any
+  const testEmail =
+    trim(bodyAny?.test_email) ||
+    trim(bodyAny?.testEmail) ||
+    trim(url.searchParams.get("test_email")) ||
+    trim(url.searchParams.get("testEmail")) ||
+    trim(req.headers.get("x-test-email"))
+  const testOwnerId =
+    trim(bodyAny?.test_owner_id) ||
+    trim(bodyAny?.owner_id) ||
+    trim(bodyAny?.testOwnerId) ||
+    trim(bodyAny?.ownerId) ||
+    trim(url.searchParams.get("test_owner_id")) ||
+    trim(url.searchParams.get("owner_id")) ||
+    trim(url.searchParams.get("testOwnerId")) ||
+    trim(url.searchParams.get("ownerId")) ||
+    trim(req.headers.get("x-test-owner-id"))
+
+  return { testEmail, testOwnerId }
+}
+
 Deno.serve(async (req) => {
   const t0 = Date.now()
   let httpStatus = 200
@@ -100,10 +143,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const { testEmail, testOwnerId } = await parseTestParams(req)
     assertRelatorioEmailEnv()
-    const result = await runRelatorioEstoqueMensalEmail()
+    const result = await runRelatorioEstoqueMensalEmail({ testEmail, testOwnerId })
     const detalhes = {
-      cron: true,
+      cron: !testEmail,
+      test: Boolean(testEmail),
+      test_owner_id: testOwnerId || null,
       ok: (result as any)?.ok ?? true,
       status: (result as any)?.status ?? null,
       total: (result as any)?.total ?? null,

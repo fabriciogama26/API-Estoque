@@ -48,6 +48,16 @@ const resolveEmpresaInfo = () => {
   }
 }
 
+const resolveSenderInfo = () => {
+  const empresa = resolveEmpresaInfo()
+  const email = trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM") || "")
+  const name =
+    trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM_NAME") || "") ||
+    trim(empresa.nome || "") ||
+    "Sistema"
+  return { email, name }
+}
+
 const execute = async (builder: any, fallbackMessage: string) => {
   const { data, error } = await builder
   if (error) {
@@ -207,15 +217,39 @@ export const assertRelatorioEmailEnv = () => {
   if (!trim(Deno.env.get("BREVO_API_KEY"))) {
     throw new Error("Missing BREVO_API_KEY")
   }
+  if (!trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM"))) {
+    throw new Error("Missing RELATORIO_ESTOQUE_EMAIL_FROM")
+  }
 }
 
-export const runRelatorioEstoqueMensalEmail = async () => {
+export const runRelatorioEstoqueMensalEmail = async ({
+  testEmail,
+  testOwnerId,
+}: {
+  testEmail?: string
+  testOwnerId?: string
+} = {}) => {
   assertRelatorioEmailEnv()
+  const normalizedTestEmail = trim(testEmail).toLowerCase()
+  const normalizedTestOwnerId = trim(testOwnerId)
+  if (normalizedTestEmail && !normalizedTestEmail.includes("@")) {
+    throw new Error("test_email invalido.")
+  }
+  const isTestMode = Boolean(normalizedTestEmail)
   const credenciaisAdminIds = await carregarCredenciaisAdminIds()
-  const owners = await fetchOwners()
+  let owners = await fetchOwners()
+  if (normalizedTestOwnerId) {
+    owners = owners.filter((row: any) => String(row?.id ?? "") === normalizedTestOwnerId)
+  }
   const resultados: Array<Record<string, unknown>> = []
+  let testSent = false
+  const senderInfo = resolveSenderInfo()
+  if (!senderInfo.email) {
+    throw new Error("Remetente de email nao configurado.")
+  }
 
   for (const owner of owners ?? []) {
+    if (isTestMode && testSent) break
     const ownerId = (owner as any).id as string
     if (!ownerId) continue
 
@@ -224,30 +258,34 @@ export const runRelatorioEstoqueMensalEmail = async () => {
       continue
     }
 
-    const rawStatus = trim((latestReport as any).email_status ?? "")
-    const normalizedStatus = rawStatus || EMAIL_STATUS_PENDENTE
-    if (![EMAIL_STATUS_PENDENTE, EMAIL_STATUS_ERRO].includes(normalizedStatus)) {
-      resultados.push({
-        ownerId,
-        reportId: latestReport.id,
-        status: normalizedStatus,
-        skipped: true,
-        reason: "ultimo_relatorio_ja_enviado",
-      })
-      continue
+    if (!isTestMode) {
+      const rawStatus = trim((latestReport as any).email_status ?? "")
+      const normalizedStatus = rawStatus || EMAIL_STATUS_PENDENTE
+      if (![EMAIL_STATUS_PENDENTE, EMAIL_STATUS_ERRO].includes(normalizedStatus)) {
+        resultados.push({
+          ownerId,
+          reportId: latestReport.id,
+          status: normalizedStatus,
+          skipped: true,
+          reason: "ultimo_relatorio_ja_enviado",
+        })
+        continue
+      }
     }
 
     const admins = await listarAdminsOwner(ownerId, credenciaisAdminIds)
-    const senderEmail = trim((owner as any).email ?? "") || admins[0]?.email || ""
-    const senderName = trim((owner as any).display_name ?? (owner as any).username ?? (owner as any).email ?? "Sistema")
+    const senderEmail = senderInfo.email
+    const senderName = senderInfo.name
 
-    if (!senderEmail || !admins.length) {
-      const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
-      await updateEmailStatus(ownerId, latestReport.id, {
-        email_status: EMAIL_STATUS_ERRO,
-        email_erro: "Sem destinatarios para envio.",
-        email_tentativas: tentativas,
-      })
+    if (!senderEmail || (!admins.length && !isTestMode)) {
+      if (!isTestMode) {
+        const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
+        await updateEmailStatus(ownerId, latestReport.id, {
+          email_status: EMAIL_STATUS_ERRO,
+          email_erro: "Sem destinatarios para envio.",
+          email_tentativas: tentativas,
+        })
+      }
       resultados.push({
         ownerId,
         reportId: latestReport.id,
@@ -260,11 +298,13 @@ export const runRelatorioEstoqueMensalEmail = async () => {
     const contexto = (latestReport as any).metadados?.contexto ?? null
     const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
     if (!contexto) {
-      await updateEmailStatus(ownerId, latestReport.id, {
-        email_status: EMAIL_STATUS_ERRO,
-        email_erro: "Contexto do relatorio nao encontrado.",
-        email_tentativas: tentativas,
-      })
+      if (!isTestMode) {
+        await updateEmailStatus(ownerId, latestReport.id, {
+          email_status: EMAIL_STATUS_ERRO,
+          email_erro: "Contexto do relatorio nao encontrado.",
+          email_tentativas: tentativas,
+        })
+      }
       resultados.push({
         ownerId,
         reportId: latestReport.id,
@@ -276,20 +316,25 @@ export const runRelatorioEstoqueMensalEmail = async () => {
 
     const html = buildRelatorioEstoqueHtml({ contexto, empresa: resolveEmpresaInfo() })
     const subject = `Relatorio mensal de estoque - ${formatMonthRef((latestReport as any).periodo_inicio)}`
+    const destinatarios = isTestMode
+      ? [{ name: normalizedTestEmail, email: normalizedTestEmail }]
+      : admins.map((admin) => ({ name: admin.nome || admin.email, email: admin.email }))
     const emailStatus = await sendBrevoEmail({
       sender: { name: senderName, email: senderEmail },
-      to: admins.map((admin) => ({ name: admin.nome || admin.email, email: admin.email })),
+      to: destinatarios,
       subject,
       text: buildReportText(contexto),
       html,
     })
 
-    await updateEmailStatus(ownerId, latestReport.id, {
-      email_status: emailStatus.ok ? EMAIL_STATUS_ENVIADO : EMAIL_STATUS_ERRO,
-      email_enviado_em: emailStatus.ok ? nowIso() : (latestReport as any).email_enviado_em ?? null,
-      email_erro: emailStatus.ok ? null : (emailStatus as any).error,
-      email_tentativas: tentativas,
-    })
+    if (!isTestMode) {
+      await updateEmailStatus(ownerId, latestReport.id, {
+        email_status: emailStatus.ok ? EMAIL_STATUS_ENVIADO : EMAIL_STATUS_ERRO,
+        email_enviado_em: emailStatus.ok ? nowIso() : (latestReport as any).email_enviado_em ?? null,
+        email_erro: emailStatus.ok ? null : (emailStatus as any).error,
+        email_tentativas: tentativas,
+      })
+    }
 
     resultados.push({
       ownerId,
@@ -297,7 +342,21 @@ export const runRelatorioEstoqueMensalEmail = async () => {
       status: emailStatus.ok ? EMAIL_STATUS_ENVIADO : EMAIL_STATUS_ERRO,
       error: emailStatus.ok ? null : (emailStatus as any).error,
     })
+    if (isTestMode) {
+      testSent = true
+    }
   }
 
-  return { ok: true, total: resultados.length, resultados }
+  const warnings: string[] = []
+  if (isTestMode && !normalizedTestOwnerId) {
+    warnings.push("test_email usado sem test_owner_id; envio limitado a 1 owner.")
+  }
+
+  return {
+    ok: true,
+    total: resultados.length,
+    resultados,
+    test: isTestMode,
+    warnings: warnings.length ? warnings : undefined,
+  }
 }
