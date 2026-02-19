@@ -1650,6 +1650,92 @@ async function preencherNomesSaidas(registros = []) {
   }))
 }
 
+async function preencherNomesPessoas(registros = [], ownerId) {
+  const centroServicoIds = Array.from(
+    new Set(
+      registros
+        .map((pessoa) => pessoa?.centro_servico_id || pessoa?.centroServicoId || pessoa?.centroServico_id)
+        .filter((valor) => Boolean(valor) && UUID_REGEX.test(String(valor)))
+    )
+  )
+  const centroCustoIds = Array.from(
+    new Set(
+      registros
+        .map((pessoa) => pessoa?.centro_custo_id || pessoa?.centroCustoId || pessoa?.centroCusto_id)
+        .filter((valor) => Boolean(valor) && UUID_REGEX.test(String(valor)))
+    )
+  )
+  const setorIds = Array.from(
+    new Set(
+      registros
+        .map((pessoa) => pessoa?.setor_id || pessoa?.setorId)
+        .filter((valor) => Boolean(valor) && UUID_REGEX.test(String(valor)))
+    )
+  )
+
+  const [centrosServico, centrosCusto, setores] = await Promise.all([
+    centroServicoIds.length
+      ? execute(
+          supabaseAdmin
+            .from('centros_servico')
+            .select('id, nome')
+            .in('id', centroServicoIds)
+            .eq('account_owner_id', ownerId),
+          'Falha ao consultar centros de servico.'
+        )
+      : [],
+    centroCustoIds.length
+      ? execute(
+          supabaseAdmin
+            .from('centros_custo')
+            .select('id, nome')
+            .in('id', centroCustoIds)
+            .eq('account_owner_id', ownerId),
+          'Falha ao consultar centros de custo.'
+        )
+      : [],
+    setorIds.length
+      ? execute(
+          supabaseAdmin
+            .from('setores')
+            .select('id, nome')
+            .in('id', setorIds)
+            .eq('account_owner_id', ownerId),
+          'Falha ao consultar setores.'
+        )
+      : [],
+  ])
+
+  const centroServicoMap = new Map(
+    (centrosServico ?? []).map((item) => [item.id, trim(item.nome ?? '')]).filter(([, nome]) => Boolean(nome))
+  )
+  const centroCustoMap = new Map(
+    (centrosCusto ?? []).map((item) => [item.id, trim(item.nome ?? '')]).filter(([, nome]) => Boolean(nome))
+  )
+  const setorMap = new Map(
+    (setores ?? []).map((item) => [item.id, trim(item.nome ?? '')]).filter(([, nome]) => Boolean(nome))
+  )
+
+  return (registros ?? []).map((pessoa) => {
+    const centroServicoNome =
+      centroServicoMap.get(pessoa?.centro_servico_id || pessoa?.centroServicoId || pessoa?.centroServico_id) ||
+      trim(pessoa?.centroServico ?? pessoa?.centro_servico ?? '')
+    const centroCustoNome =
+      centroCustoMap.get(pessoa?.centro_custo_id || pessoa?.centroCustoId || pessoa?.centroCusto_id) ||
+      trim(pessoa?.centroCusto ?? pessoa?.centro_custo ?? '')
+    const setorNome = setorMap.get(pessoa?.setor_id || pessoa?.setorId) || trim(pessoa?.setor ?? '')
+    const localNome = centroServicoNome || centroCustoNome || trim(pessoa?.local ?? '')
+
+    return {
+      ...pessoa,
+      centroServico: centroServicoNome,
+      centroCusto: centroCustoNome,
+      setor: setorNome,
+      local: localNome,
+    }
+  })
+}
+
 async function carregarMovimentacoesPorOwner({ ownerId, periodoRange }) {
   if (!ownerId) {
     return { materiais: [], entradas: [], saidas: [], pessoas: [], periodo: null }
@@ -1671,23 +1757,16 @@ async function carregarMovimentacoesPorOwner({ ownerId, periodoRange }) {
     saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
   }
 
-  const [materiais, entradas, saidas, pessoasIds] = await Promise.all([
+  const [materiais, entradas, saidas, pessoasBase] = await Promise.all([
     carregarMateriaisPorOwner(ownerId),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
     execute(saidasFiltered, 'Falha ao listar saidas.'),
-    execute(supabaseAdmin.from('pessoas').select('id').eq('account_owner_id', ownerId), 'Falha ao listar pessoas.'),
+    execute(supabaseAdmin.from('pessoas').select('*').eq('account_owner_id', ownerId), 'Falha ao listar pessoas.'),
   ])
-
-  const pessoaIds = (pessoasIds ?? []).map((item) => item.id).filter(Boolean)
-  const pessoas = pessoaIds.length
-    ? await execute(
-        supabaseAdmin.from('pessoas_view').select('*').in('id', pessoaIds),
-        'Falha ao listar pessoas.'
-      )
-    : []
 
   const entradasNormalizadas = await preencherCentrosEstoque((entradas ?? []).map(mapEntradaRecord))
   const saidasNormalizadas = await preencherNomesSaidas((saidas ?? []).map(mapSaidaRecord))
+  const pessoas = await preencherNomesPessoas(pessoasBase ?? [], ownerId)
 
   return {
     materiais,
