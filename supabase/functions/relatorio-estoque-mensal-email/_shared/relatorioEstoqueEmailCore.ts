@@ -76,10 +76,11 @@ const executeSingle = async (builder: any, fallbackMessage: string) => {
 
 const carregarCredenciaisAdminIds = async () => {
   const registros = await execute(
-    supabaseAdmin.from("app_credentials_catalog").select("id_text"),
+    supabaseAdmin.from("app_credentials_catalog").select("id, id_text"),
     "Falha ao listar credenciais.",
   )
-  const credenciais = Array.from(
+
+  const adminTextIds = Array.from(
     new Set(
       (registros ?? [])
         .map((item: any) => String(item.id_text ?? "").trim().toLowerCase())
@@ -87,21 +88,54 @@ const carregarCredenciaisAdminIds = async () => {
     ),
   )
 
-  return credenciais.length ? credenciais : ["admin", "master"]
+  const adminUuidIds = Array.from(
+    new Set(
+      (registros ?? [])
+        .filter((item: any) => {
+          const idText = String(item.id_text ?? "").trim().toLowerCase()
+          return idText === "admin" || idText === "master"
+        })
+        .map((item: any) => String(item.id ?? "").trim())
+        .filter(Boolean),
+    ),
+  )
+
+  return {
+    adminTextIds: adminTextIds.length ? adminTextIds : ["admin", "master"],
+    adminUuidIds,
+  }
 }
 
-const listarAdminsOwner = async (ownerId: string, credenciaisAdminIds: string[]) => {
+const listarAdminsOwner = async (
+  ownerId: string,
+  credenciais: { adminTextIds: string[]; adminUuidIds: string[] },
+) => {
   if (!ownerId) return []
-  const credIds = credenciaisAdminIds ?? []
-  if (!credIds.length) return []
+  const credTextIds = credenciais?.adminTextIds ?? []
+  const credUuidIds = credenciais?.adminUuidIds ?? []
+  if (!credTextIds.length && !credUuidIds.length) return []
 
-  const { data } = await supabaseAdmin
+  const { data: dataText } = await supabaseAdmin
     .from("app_users")
     .select("id, username, display_name, email, parent_user_id, credential")
-    .in("credential", credIds)
+    .in("credential", credTextIds)
     .or(`id.eq.${ownerId},parent_user_id.eq.${ownerId}`)
 
-  return (data ?? [])
+  const { data: dataUuid } = credUuidIds.length
+    ? await supabaseAdmin
+        .from("app_users")
+        .select("id, username, display_name, email, parent_user_id, credential")
+        .in("credential", credUuidIds)
+        .or(`id.eq.${ownerId},parent_user_id.eq.${ownerId}`)
+    : { data: [] }
+
+  const combined = [...(dataText ?? []), ...(dataUuid ?? [])]
+  const uniqueById = new Map<string, any>()
+  for (const row of combined) {
+    if (row?.id) uniqueById.set(String(row.id), row)
+  }
+
+  return Array.from(uniqueById.values())
     .filter((item) => item?.email)
     .map((item) => ({
       id: item.id,

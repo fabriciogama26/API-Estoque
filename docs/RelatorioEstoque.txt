@@ -43,8 +43,9 @@ Boas praticas
 - Revisar centros com desvio e ajustar estoque minimo quando houver concentracao.
 - Para teste manual de email, enviar `test_email` (body/query/header) e opcionalmente `test_owner_id`. Em modo teste nao atualiza status do email.
 - Remetente do email mensal vem de `RELATORIO_ESTOQUE_EMAIL_FROM` (verificado na Brevo).
-- Template do email mensal exibe logo principal (termo EPI) a esquerda, logo secundaria (login) a direita e aviso de email automatico.
+- Template do email mensal exibe logo principal (termo EPI) a esquerda com tamanho maior e logo secundaria (login) a direita com tamanho menor, alem do aviso de email automatico.
 - Pre-visualizacao usa apenas a logo principal do termo EPI.
+- Busca de administradores para envio considera `credential` como texto (admin/master) ou UUID referenciando `app_credentials_catalog`.
 
 Atualizacao 2026-02
 -------------------
