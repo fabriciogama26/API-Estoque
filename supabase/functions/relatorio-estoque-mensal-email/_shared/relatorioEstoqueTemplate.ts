@@ -70,18 +70,20 @@ function renderGrid(rows: Array<[string, unknown]>) {
 
 function renderEmpresaHeader(empresa: EmpresaInfo = {}) {
   const logoPrincipal = empresa.logoUrl
-    ? `<img src="${escapeHtml(empresa.logoUrl)}" alt="Logo principal" />`
+    ? `<img src="${escapeHtml(empresa.logoUrl)}" alt="Logo principal" style="display:block;width:240px;max-width:240px;height:auto;max-height:120px;object-fit:contain;" />`
     : ''
   const logoSecundario = empresa.logoSecundarioUrl
-    ? `<img src="${escapeHtml(empresa.logoSecundarioUrl)}" alt="Logo secundario" />`
+    ? `<img src="${escapeHtml(empresa.logoSecundarioUrl)}" alt="Logo secundario" style="display:block;width:160px;max-width:160px;height:auto;max-height:120px;object-fit:contain;" />`
     : ''
 
   return `
-    <div class="email-header">
-      <div class="email-header__logo email-header__logo--left">${logoPrincipal}</div>
-      <div class="email-header__spacer"></div>
-      <div class="email-header__logo email-header__logo--right">${logoSecundario}</div>
-    </div>
+    <table class="email-header" role="presentation" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="email-header__cell email-header__cell--left">${logoPrincipal}</td>
+        <td class="email-header__cell email-header__cell--spacer"></td>
+        <td class="email-header__cell email-header__cell--right">${logoSecundario}</td>
+      </tr>
+    </table>
   `
 }
 
@@ -217,11 +219,11 @@ export function buildRelatorioEstoqueHtml({
       * { box-sizing: border-box; }
       body { margin: 0; padding: 24px; font-family: Arial, Helvetica, sans-serif; color: #0f172a; }
       .relatorio-document { max-width: 960px; margin: 0 auto; }
-      .email-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-      .email-header__logo { max-width: 180px; min-height: 64px; display: flex; align-items: center; }
-      .email-header__logo img { max-width: 180px; max-height: 120px; display: block; }
-      .email-header__logo--right { justify-content: flex-end; }
-      .email-header__spacer { flex: 1; }
+      .email-header { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
+      .email-header__cell { vertical-align: middle; }
+      .email-header__cell--left { width: 240px; }
+      .email-header__cell--right { width: 160px; text-align: right; }
+      .email-header__cell--spacer { width: auto; }
       .email-notice { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; color: #1e293b; line-height: 1.4; }
       .email-notice strong { display: inline-block; margin-bottom: 4px; }
       .titulo-principal { text-align: center; font-size: 15px; font-weight: 700; margin: 6px 0 12px; }
