@@ -1391,21 +1391,13 @@ const somaQuantidade = (lista: any[]) => {
 const montarDashboard = ({ materiais = [], entradas = [], saidas = [], pessoas = [] }: any, periodo: any = null) => {
   const materiaisNormalizados = materiais.map((material: any) => normalizarMaterial(material)).filter(Boolean)
   const materiaisMap = new Map(materiaisNormalizados.map((material: any) => [material.id, material]))
-  const pessoasAtivas = (Array.isArray(pessoas) ? pessoas : []).filter((pessoa) => pessoa?.ativo !== false)
-  const pessoasMap = new Map(pessoasAtivas.map((pessoa: any) => [pessoa.id, pessoa]))
+  const pessoasLista = Array.isArray(pessoas) ? pessoas : []
+  const pessoasMap = new Map(pessoasLista.map((pessoa: any) => [pessoa.id, pessoa]))
 
   const filtrar = (lista: any[], campoData: string) => lista.filter((item) => filtrarPorPeriodo(item, campoData, periodo))
 
   const entradasFiltradas = filtrar(entradas, "dataEntrada").filter((entrada) => !isRegistroCancelado(entrada))
-  const pessoaAtivaIds = new Set(pessoasAtivas.map((pessoa: any) => pessoa?.id).filter(Boolean))
-  const saidasFiltradas = filtrar(saidas, "dataEntrega")
-    .filter((saida) => !isRegistroCancelado(saida))
-    .filter((saida) => {
-      if (!saida?.pessoaId) {
-        return true
-      }
-      return pessoaAtivaIds.has(saida.pessoaId)
-    })
+  const saidasFiltradas = filtrar(saidas, "dataEntrega").filter((saida) => !isRegistroCancelado(saida))
 
   const entradasDetalhadas = entradasFiltradas.map((entrada) => ({
     ...entrada,
@@ -1629,10 +1621,15 @@ const buildCoberturaPorCentro = (saidas: any[] = [], estoqueAtual: any[] = [], p
   const dias = Math.max(1, Number(diasPeriodo ?? 0))
   const mesesNoPeriodo = Math.max(dias / 30, 1)
 
-  const pessoasAtivas = (Array.isArray(pessoas) ? pessoas : []).filter((pessoa) => pessoa?.ativo !== false)
+  const pessoasIdsComMov = new Set(
+    (saidas ?? []).map((saida: any) => saida?.pessoaId).filter((id: any) => Boolean(id)),
+  )
+  const pessoasConsideradas = (Array.isArray(pessoas) ? pessoas : []).filter(
+    (pessoa) => pessoa?.id && (pessoa?.ativo !== false || pessoasIdsComMov.has(pessoa.id)),
+  )
 
   const pessoasPorCentro = new Map<string, Set<string>>()
-  pessoasAtivas.forEach((pessoa) => {
+  pessoasConsideradas.forEach((pessoa) => {
     const centro = resolveCentroServicoDisplay({ pessoa })
     if (!centro) {
       return
@@ -1853,11 +1850,22 @@ const buildReportSummary = ({ dashboard, pessoas = [], periodoRange, termo, esto
   const qtdRiscosImediatos = riscoLista.filter((item: any) => item.flags?.rupturaPressao).length
   const qtdAbaixoMinimo = riscoLista.filter((item: any) => item.flags?.estoqueBaixo).length
 
-  const pessoasAtivas = (pessoas ?? []).filter((pessoa: any) => pessoa?.ativo !== false)
-  const consumoPorTrabalhador = pessoasAtivas.length > 0 ? totalSaidasQuantidade / pessoasAtivas.length : null
+  const pessoasIdsComMov = new Set(
+    (saidasDetalhadas ?? []).map((saida: any) => saida?.pessoaId).filter((id: any) => Boolean(id)),
+  )
+  const pessoasConsideradas = (pessoas ?? []).filter(
+    (pessoa: any) => pessoa?.id && (pessoa?.ativo !== false || pessoasIdsComMov.has(pessoa.id)),
+  )
+  const consumoPorTrabalhador =
+    pessoasConsideradas.length > 0 ? totalSaidasQuantidade / pessoasConsideradas.length : null
   const coberturaResumo = buildCoberturaResumo(consumoPorTrabalhador)
 
-  const coberturaPorCentro = buildCoberturaPorCentro(saidasDetalhadas, estoqueBase?.itens ?? [], pessoas, diasPeriodo)
+  const coberturaPorCentro = buildCoberturaPorCentro(
+    saidasDetalhadas,
+    estoqueBase?.itens ?? [],
+    pessoasConsideradas,
+    diasPeriodo,
+  )
 
   const baseGiro = criticosLista.length ? criticosLista : riscoLista
   const giroMedioCriticos = baseGiro.length
@@ -2175,12 +2183,20 @@ const carregarMovimentacoesPorOwner = async ({ ownerId, periodoRange }: { ownerI
     saidasFiltered = saidasFiltered.lte("dataEntrega", fimIso)
   }
 
-  const [materiais, entradas, saidas, pessoas] = await Promise.all([
+  const [materiais, entradas, saidas, pessoasIds] = await Promise.all([
     carregarMateriaisPorOwner(ownerId),
     execute(entradasFiltered, "Falha ao listar entradas."),
     execute(saidasFiltered, "Falha ao listar saidas."),
-    execute(supabaseAdmin.from("pessoas").select("*").eq("account_owner_id", ownerId), "Falha ao listar pessoas."),
+    execute(supabaseAdmin.from("pessoas").select("id").eq("account_owner_id", ownerId), "Falha ao listar pessoas."),
   ])
+
+  const pessoaIds = (pessoasIds ?? []).map((item: any) => item.id).filter(Boolean)
+  const pessoas = pessoaIds.length
+    ? await execute(
+        supabaseAdmin.from("pessoas_view").select("*").in("id", pessoaIds),
+        "Falha ao listar pessoas.",
+      )
+    : []
 
   const entradasNormalizadas = await preencherCentrosEstoque((entradas ?? []).map(mapEntradaRecord), ownerId)
   const saidasNormalizadas = await preencherNomesSaidas((saidas ?? []).map(mapSaidaRecord), ownerId)

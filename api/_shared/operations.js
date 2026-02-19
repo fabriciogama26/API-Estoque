@@ -1671,12 +1671,20 @@ async function carregarMovimentacoesPorOwner({ ownerId, periodoRange }) {
     saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
   }
 
-  const [materiais, entradas, saidas, pessoas] = await Promise.all([
+  const [materiais, entradas, saidas, pessoasIds] = await Promise.all([
     carregarMateriaisPorOwner(ownerId),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
     execute(saidasFiltered, 'Falha ao listar saidas.'),
-    execute(supabaseAdmin.from('pessoas').select('*').eq('account_owner_id', ownerId), 'Falha ao listar pessoas.'),
+    execute(supabaseAdmin.from('pessoas').select('id').eq('account_owner_id', ownerId), 'Falha ao listar pessoas.'),
   ])
+
+  const pessoaIds = (pessoasIds ?? []).map((item) => item.id).filter(Boolean)
+  const pessoas = pessoaIds.length
+    ? await execute(
+        supabaseAdmin.from('pessoas_view').select('*').in('id', pessoaIds),
+        'Falha ao listar pessoas.'
+      )
+    : []
 
   const entradasNormalizadas = await preencherCentrosEstoque((entradas ?? []).map(mapEntradaRecord))
   const saidasNormalizadas = await preencherNomesSaidas((saidas ?? []).map(mapSaidaRecord))
@@ -2733,10 +2741,13 @@ function buildCoberturaPorCentro(saidas = [], estoqueAtual = [], pessoas = [], d
   const dias = Math.max(1, Number(diasPeriodo ?? 0))
   const mesesNoPeriodo = Math.max(dias / 30, 1)
 
-  const pessoasAtivas = (Array.isArray(pessoas) ? pessoas : []).filter((pessoa) => pessoa?.ativo !== false)
+  const pessoasIdsComMov = new Set((saidas ?? []).map((saida) => saida?.pessoaId).filter(Boolean))
+  const pessoasConsideradas = (Array.isArray(pessoas) ? pessoas : []).filter(
+    (pessoa) => pessoa?.id && (pessoa?.ativo !== false || pessoasIdsComMov.has(pessoa.id))
+  )
 
   const pessoasPorCentro = new Map()
-  pessoasAtivas.forEach((pessoa) => {
+  pessoasConsideradas.forEach((pessoa) => {
     const centro = resolveCentroServicoDisplay({ pessoa })
     if (!centro) {
       return
@@ -2954,14 +2965,19 @@ function buildReportSummary({ dashboard, pessoas = [], periodoRange, termo, esto
   const qtdRiscosImediatos = riscoLista.filter((item) => item.flags?.rupturaPressao).length
   const qtdAbaixoMinimo = riscoLista.filter((item) => item.flags?.estoqueBaixo).length
 
-  const pessoasAtivas = (pessoas ?? []).filter((pessoa) => pessoa?.ativo !== false)
+  const pessoasIdsComMov = new Set(
+    (saidasDetalhadas ?? []).map((saida) => saida?.pessoaId).filter(Boolean)
+  )
+  const pessoasConsideradas = (pessoas ?? []).filter(
+    (pessoa) => pessoa?.id && (pessoa?.ativo !== false || pessoasIdsComMov.has(pessoa.id))
+  )
   const consumoPorTrabalhador =
-    pessoasAtivas.length > 0 ? totalSaidasQuantidade / pessoasAtivas.length : null
+    pessoasConsideradas.length > 0 ? totalSaidasQuantidade / pessoasConsideradas.length : null
   const coberturaResumo = buildCoberturaResumo(consumoPorTrabalhador)
   const coberturaPorCentro = buildCoberturaPorCentro(
     saidasDetalhadas,
     estoqueBase?.itens ?? [],
-    pessoas,
+    pessoasConsideradas,
     diasPeriodo
   )
 
@@ -3240,7 +3256,8 @@ export const EstoqueOperations = {
         saidas: dadosAtual.saidas,
         pessoas: dadosAtual.pessoas,
       },
-      periodo
+      periodo,
+      { includeInactivePessoas: true }
     )
 
     const resumoAtual = buildReportSummary({
@@ -3624,7 +3641,8 @@ export const EstoqueOperations = {
           parsePeriodo({
             periodoInicio: `${periodoRange.start.getUTCFullYear()}-${String(periodoRange.start.getUTCMonth() + 1).padStart(2, '0')}`,
             periodoFim: `${periodoRange.end.getUTCFullYear()}-${String(periodoRange.end.getUTCMonth() + 1).padStart(2, '0')}`,
-          })
+          }),
+          { includeInactivePessoas: true }
         )
         const resumoAtual = buildReportSummary({
           dashboard: dashboardAtual,
