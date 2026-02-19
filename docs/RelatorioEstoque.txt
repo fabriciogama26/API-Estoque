@@ -41,6 +41,10 @@ Boas praticas
 - Usar apenas dados salvos em inventory_report para gerar HTML/PDF.
 - Manter PDF_REPORT_LIMIT_PER_MONTH em `src/config/RelatorioEstoqueConfig.js`.
 - Revisar centros com desvio e ajustar estoque minimo quando houver concentracao.
+- Para teste manual de email, enviar `test_email` (body/query/header) e opcionalmente `test_owner_id`. Em modo teste nao atualiza status do email.
+- Remetente do email mensal vem de `RELATORIO_ESTOQUE_EMAIL_FROM` (verificado na Brevo).
+- Template do email mensal exibe logo principal (termo EPI) a esquerda, logo secundaria (login) a direita e aviso de email automatico.
+- Pre-visualizacao usa apenas a logo principal do termo EPI.
 
 Atualizacao 2026-02
 -------------------
@@ -53,6 +57,9 @@ Atualizacao 2026-02
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
 - Campos de controle de email adicionados em inventory_report (status, tentativas e erro).
 - PDF passou a ser renderizado pela Edge Function dedicada `relatorio-estoque-pdf`.
+- Edge Function de email mensal aceita `test_email` para envio de teste sem atualizar status.
+- Remetente do email mensal passou a usar `RELATORIO_ESTOQUE_EMAIL_FROM`.
+- Header do email mensal passou a incluir duas logos e aviso de email automatico.
 - Ranking de consumo por centro/setor passou a usar quantidade e valor (top 10 com percentuais).
 - Desvio por centro/setor aplica regra de concentracao (>= 30%) e outlier (media + 2 desvios).
 - Cobertura por trabalhador agora considera consumo medio mensal por centro/setor e classifica status (OK/ATENCAO/CRITICO/SEM BASE).

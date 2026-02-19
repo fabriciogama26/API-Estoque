@@ -63,6 +63,7 @@ Obrigatorias (API serverless e relatorios):
 - `PUPPETEER_BROWSERLESS_IO_KEY`
 - `HCAPTCHA_SECRET`
 - `HCAPTCHA_SITEKEY`
+- `RELATORIO_ESTOQUE_EMAIL_FROM`
 
 Obrigatorias (backup Supabase via `supabasebackup/backup_supabase.ps1`):
 - `PROJECT_REF`
@@ -78,6 +79,7 @@ Opcionais / por feature:
 - `VITE_DATA_MODE`
 - `VITE_LOCAL_USERNAME`
 - `VITE_LOCAL_PASSWORD`
+- `RELATORIO_ESTOQUE_EMAIL_FROM_NAME`
 - `VITE_LOCAL_DISPLAY_NAME`
 - `VITE_API_URL`
 - `VITE_PUBLIC_ASSETS_ORIGIN`

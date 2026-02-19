@@ -68,26 +68,29 @@ function renderGrid(rows: Array<[string, unknown]>) {
   return `<table class="relatorio-grid">${linhas}</table>`
 }
 
-function renderEmpresa(empresa: EmpresaInfo = {}) {
+function renderEmpresaHeader(empresa: EmpresaInfo = {}) {
   const logoPrincipal = empresa.logoUrl
-    ? `<div class="empresa__logo"><img src="${escapeHtml(empresa.logoUrl)}" alt="Logo principal" /></div>`
+    ? `<img src="${escapeHtml(empresa.logoUrl)}" alt="Logo principal" />`
     : ''
   const logoSecundario = empresa.logoSecundarioUrl
-    ? `<div class="empresa__logo empresa__logo--secundaria"><img src="${escapeHtml(
-        empresa.logoSecundarioUrl,
-      )}" alt="Logo secundario" /></div>`
+    ? `<img src="${escapeHtml(empresa.logoSecundarioUrl)}" alt="Logo secundario" />`
     : ''
 
   return `
-    <div class="empresa">
-      ${logoPrincipal}
-      <div class="empresa__identidade">
-        <div class="empresa__nome">${escapeHtml(empresa.nome || '')}</div>
-        <div class="empresa__documento">${escapeHtml(empresa.documento || '')}</div>
-        <div class="empresa__endereco">${escapeHtml(empresa.endereco || '')}</div>
-        <div class="empresa__contato">${escapeHtml(empresa.contato || '')}</div>
-      </div>
-      ${logoSecundario}
+    <div class="email-header">
+      <div class="email-header__logo email-header__logo--left">${logoPrincipal}</div>
+      <div class="email-header__spacer"></div>
+      <div class="email-header__logo email-header__logo--right">${logoSecundario}</div>
+    </div>
+  `
+}
+
+function renderAvisoEmail() {
+  return `
+    <div class="email-notice">
+      <strong>E-mail automatico.</strong> Nao responda esta mensagem.
+      <div>Relatorio gerado automaticamente com base nas movimentacoes registradas.</div>
+      <div>Em caso de divergencias, revise os lancamentos no sistema.</div>
     </div>
   `
 }
@@ -214,14 +217,14 @@ export function buildRelatorioEstoqueHtml({
       * { box-sizing: border-box; }
       body { margin: 0; padding: 24px; font-family: Arial, Helvetica, sans-serif; color: #0f172a; }
       .relatorio-document { max-width: 960px; margin: 0 auto; }
-      .empresa { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 16px; }
-      .empresa__logo { max-width: 180px; }
-      .empresa__logo img { max-width: 180px; max-height: 120px; display: block; }
-      .empresa__logo.empresa__logo--secundaria { text-align: right; }
-      .empresa__identidade { max-width: 60%; }
-      .empresa__nome { font-size: 16px; font-weight: 600; }
-      .empresa__documento, .empresa__endereco, .empresa__contato { font-size: 11px; }
-      .titulo-principal { text-align: center; font-size: 15px; font-weight: 700; margin: 8px 0 14px; }
+      .email-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+      .email-header__logo { max-width: 180px; min-height: 64px; display: flex; align-items: center; }
+      .email-header__logo img { max-width: 180px; max-height: 120px; display: block; }
+      .email-header__logo--right { justify-content: flex-end; }
+      .email-header__spacer { flex: 1; }
+      .email-notice { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; color: #1e293b; line-height: 1.4; }
+      .email-notice strong { display: inline-block; margin-bottom: 4px; }
+      .titulo-principal { text-align: center; font-size: 15px; font-weight: 700; margin: 6px 0 12px; }
       .relatorio-section { margin-bottom: 16px; }
       .relatorio-section h2 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #1e293b; }
       .relatorio-grid { width: 100%; border-collapse: collapse; }
@@ -235,8 +238,9 @@ export function buildRelatorioEstoqueHtml({
   </head>
   <body>
     <div class="relatorio-document">
-      ${renderEmpresa(empresa)}
+      ${renderEmpresaHeader(empresa)}
       <div class="titulo-principal">${escapeHtml(titulo)}</div>
+      ${renderAvisoEmail()}
       ${renderSection('Identificacao', identificacao)}
       ${renderSection('Resumo executivo', resumoExecutivo)}
       ${paretoQuantidade}

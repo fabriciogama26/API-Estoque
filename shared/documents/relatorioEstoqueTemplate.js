@@ -64,11 +64,6 @@ function renderEmpresa(empresa = {}) {
   const logoPrincipal = empresa.logoUrl
     ? `<div class="empresa__logo"><img src="${escapeHtml(empresa.logoUrl)}" alt="Logo principal" /></div>`
     : ''
-  const logoSecundario = empresa.logoSecundarioUrl
-    ? `<div class="empresa__logo empresa__logo--secundaria"><img src="${escapeHtml(
-        empresa.logoSecundarioUrl,
-      )}" alt="Logo secundario" /></div>`
-    : ''
 
   return `
     <div class="empresa">
@@ -79,7 +74,6 @@ function renderEmpresa(empresa = {}) {
         <div class="empresa__endereco">${escapeHtml(empresa.endereco || '')}</div>
         <div class="empresa__contato">${escapeHtml(empresa.contato || '')}</div>
       </div>
-      ${logoSecundario}
     </div>
   `
 }
@@ -298,7 +292,6 @@ export function buildRelatorioEstoqueHtml({ contexto = {}, empresa = {} } = {}) 
       .empresa { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 16px; }
       .empresa__logo { max-width: 180px; }
       .empresa__logo img { max-width: 180px; max-height: 120px; display: block; }
-      .empresa__logo.empresa__logo--secundaria { text-align: right; }
       .empresa__identidade { max-width: 60%; }
       .empresa__nome { font-size: 16px; font-weight: 700; }
       .empresa__documento, .empresa__endereco, .empresa__contato { font-size: 11px; }
