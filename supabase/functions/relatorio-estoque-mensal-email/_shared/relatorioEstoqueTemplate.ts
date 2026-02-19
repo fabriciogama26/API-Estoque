@@ -116,16 +116,21 @@ export function buildRelatorioEstoqueHtml({
     ['Data de emissao', contexto.data_emissao],
   ])
 
-  const resumoExecutivo = renderGrid([
-    ['Total de movimentacoes', contexto.total_movimentacoes],
-    ['Total de entradas', contexto.total_entradas],
-    ['Total de saidas', contexto.total_saidas],
-    ['Valor total movimentado', contexto.valor_total_movimentado],
-    ['Alertas ativos', contexto.alertas_ativos],
-    ['Nivel de risco geral', contexto.nivel_risco_geral],
-    ['Materiais criticos', contexto.qtd_criticos],
-    ['Status geral do estoque', contexto.status_estoque],
-  ])
+  const resumoExecutivo = `
+    ${renderGrid([
+      ['Total de movimentacoes', contexto.total_movimentacoes],
+      ['Total de entradas', contexto.total_entradas],
+      ['Total de saidas', contexto.total_saidas],
+      ['Valor total movimentado', contexto.valor_total_movimentado],
+      ['Alertas ativos', contexto.alertas_ativos],
+      ['Nivel de risco geral', contexto.nivel_risco_geral],
+      ['Materiais criticos', contexto.qtd_criticos],
+      ['Status geral do estoque', contexto.status_estoque],
+    ])}
+    <p class="relatorio-paragraph">
+      Classificacoes do nivel: CRITICO (ha materiais criticos ou ruptura iminente), ATENCAO (ha riscos moderados que exigem acompanhamento), OK (sem riscos relevantes no periodo).
+    </p>
+  `
 
   const paretoQuantidade = renderSection(
     'Pareto 80/20 - Saida por quantidade',

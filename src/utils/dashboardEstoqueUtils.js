@@ -91,6 +91,7 @@ export function resolveCentroServicoDisplay(saida = {}) {
     saida.setorNome,
     saida.setor,
     saida.local,
+    saida.centroCusto,
     saida.pessoa?.centroServico,
     saida.pessoa?.setor,
     saida.pessoa?.local,

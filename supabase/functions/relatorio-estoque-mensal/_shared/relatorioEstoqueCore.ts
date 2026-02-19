@@ -460,6 +460,7 @@ const resolveCentroServicoDisplay = (saida: Record<string, unknown> = {}) => {
     (saida as any).setorNome,
     (saida as any).setor,
     (saida as any).local,
+    (saida as any).centroCusto,
     (saida as any).pessoa?.centroServico,
     (saida as any).pessoa?.setor,
     (saida as any).pessoa?.local,
