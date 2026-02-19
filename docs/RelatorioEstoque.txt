@@ -11,7 +11,8 @@ Visao geral
 - Ranking de consumo por centro/setor considera quantidade e valor, com top 10 e percentuais.
 - Desvios por centro/setor sao marcados por concentracao >= 30% ou outlier (media + 2 desvios).
 - Cobertura por trabalhador usa consumo medio mensal por centro/setor e status por faixas (CRITICO < 0,5; ATENCAO 0,5 a 1,0; OK >= 1,0; SEM BASE sem pessoas ou consumo).
-- Pessoas sao carregadas da view `pessoas_view` e colaboradores inativos com movimentacao no periodo entram no calculo.
+- Pessoas sao carregadas da tabela `pessoas` e enriquecidas com centro/setor/centro de custo via joins nas tabelas de apoio.
+- Colaboradores inativos com movimentacao no periodo entram no calculo.
 
 Arquitetura
 -----------
@@ -20,6 +21,7 @@ Arquitetura
 - Backend exposto em `EstoqueOperations.reportHistory`, `EstoqueOperations.reportHtml` (contexto) e `EstoqueOperations.reportPdf`.
 - Edge Function `relatorio-estoque-mensal` gera os dados e grava em `inventory_report`.
 - Edge Function `relatorio-estoque-mensal-email` gera HTML a partir do historico e envia email HTML.
+- Edge Function `relatorio-estoque-mensal` grava logs de execucao em `edge_functions_error_report` (bucket `cron`).
 - Core da geracao automatica fica em `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`.
 - Persistencia feita na tabela `inventory_report` (campos pdf_gerado_em/pdf_gerado_por/email_status/email_enviado_em/email_erro/email_tentativas).
 
@@ -44,6 +46,7 @@ Atualizacao 2026-02
 - Relatorios trimestrais removidos; fluxo passa a ser apenas mensal.
 - Edge Function mensal gera dados e grava em inventory_report.
 - Edge Function de email mensal envia HTML via Brevo usando dados persistidos.
+- Execucoes dos crons `relatorio-estoque-mensal` e `relatorio-estoque-mensal-email` agora registram resumo em `edge_functions_error_report`.
 - Endpoints mantidos para listar relatorios e fornecer contexto/PDF a partir do historico.
 - Pre-visualizacao passou a ser carregada com contexto do backend e template no frontend, sem consumir o limite de PDF.
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
@@ -71,6 +74,9 @@ Atualizacao 2026-02
 - `supabase/functions/relatorio-estoque-mensal-email/_shared/relatorioEstoqueEmailCore.ts`
 - `supabase/migrations/20260218_add_inventory_report_email_fields.sql`
 - `supabase/functions/relatorio-estoque-pdf/index.ts`
+- Antes/Depois:
+- Antes: os crons de relatorio nao registravam execucao em `edge_functions_error_report`.
+- Depois: os crons de relatorio registram resumo da execucao em `edge_functions_error_report`.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -94,7 +100,7 @@ Funcoes principais
   - Tipo: edge functions
   - Caminho: supabase/functions/relatorio-estoque-mensal/index.ts
   - Caminho: supabase/functions/relatorio-estoque-mensal-email/index.ts
-  - Responsavel por: gerar dados mensais e enviar email HTML.
+  - Responsavel por: gerar dados mensais, enviar email HTML e registrar execucoes em edge_functions_error_report.
 - relatorioEstoqueCore
   - Tipo: utilitario de edge function
   - Caminho: supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts

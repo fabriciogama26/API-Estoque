@@ -92,14 +92,18 @@ Atualizacao 2026-02
 - Tabelas `agg_gasto_mensal` e `f_previsao_gasto_mensal` adicionadas para historico e previsao mensal.
 - Endpoint `/api/estoque/previsao` retorna dados apenas das tabelas agregadas.
 - Edge Function `forecast-gasto-mensal` dispara a previsao mensal para todos os tenants.
+- Execucoes do cron `forecast-gasto-mensal` agora registram resumo em `edge_functions_error_report`.
 - rpc_refresh_gasto_mensal agora ignora saidas canceladas via status_saida (evita erro de UUID e garante agregados corretos).
 - Ajuda contextual criada para a pagina.
 - Requisicao de previsao (`/api/estoque/previsao`) agora inclui `X-Session-Id` para manter o guard de sessao consistente.
 - Arquivos alterados:
 - `src/services/api.js`
+- `supabase/functions/forecast-gasto-mensal/index.ts`
 - Antes/Depois:
 - Antes: a previsao era solicitada sem `X-Session-Id`.
 - Depois: a previsao inclui `X-Session-Id` para manter a sessao consistente no backend.
+- Antes: o cron `forecast-gasto-mensal` nao registrava execucao em `edge_functions_error_report`.
+- Depois: o cron `forecast-gasto-mensal` registra resumo da execucao em `edge_functions_error_report`.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -152,6 +156,10 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260204_create_gasto_forecast_tables.sql
   - Responsavel por: gerar agregados mensais e previsoes por tenant.
+- Edge Function forecast-gasto-mensal
+  - Tipo: Supabase Edge Function
+  - Caminho: supabase/functions/forecast-gasto-mensal/index.ts
+  - Responsavel por: gerar previsao mensal via cron e registrar execucoes em edge_functions_error_report.
 
 Ajuda contextual
 ----------------
