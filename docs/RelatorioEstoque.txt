@@ -34,6 +34,7 @@ Boas praticas
 -------------
 - Executar o cron de geracao a cada 28 dias (ex.: `0 3 */28 * *`) para gerar o ultimo mes fechado.
 - Executar o cron de email a cada 30 dias (ex.: `0 4 */30 * *`) para enviar somente o ultimo relatorio gerado.
+- Cron configurado no pg_cron em 2026-02-19 (jobs relatorio-estoque-mensal e relatorio-estoque-mensal-email).
 - Usar apenas dados salvos em inventory_report para gerar HTML/PDF.
 - Manter PDF_REPORT_LIMIT_PER_MONTH em `src/config/RelatorioEstoqueConfig.js`.
 - Revisar centros com desvio e ajustar estoque minimo quando houver concentracao.

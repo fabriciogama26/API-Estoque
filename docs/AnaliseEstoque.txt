@@ -51,6 +51,7 @@ Boas praticas
 - O botao Diagnostico executa `diagnosticar_estatisticas_mensais` e exibe percentis mensais.
 - O modal de validacao mostra as formulas de fator_tendencia, sazonalidade e previsao mensal.
 - Cron oficial roda via Edge Function `forecast-gasto-mensal` (schedule 0 3 28-31 * *), com checagem de ultimo dia do mes e suporte a force no body.
+- Cron configurado no pg_cron em 2026-02-19 (jobname forecast-gasto-mensal).
 - Para testes por periodo, usar `rpc_previsao_gasto_mensal_calcular_periodo(p_owner_id, p_periodo_inicio, p_periodo_fim, p_fator_tendencia)` (grava forecast e inventory_forecast).
 - A RPC por periodo nao bloqueia por falta de movimento; registra `monthsSpan`, `monthsWithMovement` e ajusta `nivel_confianca`.
 - A RPC por periodo usa a maior sequencia continua de meses com movimento (6..12). Se a melhor sequencia for < 6, retorna `insufficient`.

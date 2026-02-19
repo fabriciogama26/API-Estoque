@@ -111,6 +111,7 @@ chamando a function com `x-cron-secret`.
 Exemplo (todos os dias 00:00 horario de Brasilia):
 - Cron (UTC): 0 3 * * *
 - URL: https://<project-ref>.supabase.co/functions/v1/cleanup-import-errors
+- Cron configurado no pg_cron em 2026-02-19 (jobname cleanup-import-errors-weekly).
 
 Payload de chamada:
 { "dryRun": false }
