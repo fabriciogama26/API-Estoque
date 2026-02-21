@@ -69,6 +69,7 @@ Fluxos principais
 3) Historico
    - Botao de relogio na tabela abre `AcidentesHistoryModal`.
    - O modal busca `acidentesService.getAcidenteHistory(id)` e exibe registros com data, usuario e campos alterados.
+   - Quando nao ha alteracoes, o item exibe "Registro criado".
    - O resultado pode ser cacheado por `acidente.id` para evitar chamadas repetidas.
 
 4) Filtros

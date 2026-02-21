@@ -6,6 +6,7 @@ Visao geral
 - Registra e mantem HHT (homem-hora trabalhada) por mes e centro de servico.
 - Calcula HHT final no Supabase conforme modo (manual, simples, completo).
 - Mantem historico com motivo e bloqueia cancelamento quando ha acidente no mesmo centro/mes.
+- Historico sem alteracoes exibe "Registro criado".
 - Usa status (status_hht) para ativo/cancelado; cancelado continua visivel na lista.
 
 Arquitetura

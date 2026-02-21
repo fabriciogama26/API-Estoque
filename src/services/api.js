@@ -234,7 +234,6 @@ const PESSOAS_VIEW_SELECT = `
   matricula,
   "dataAdmissao",
   "dataDemissao",
-  observacao,
   "usuarioCadastro",
   "usuarioCadastroNome",
   "usuarioEdicao",
@@ -4371,30 +4370,20 @@ export const api = {
         throw new Error('ID obrigatorio.')
       }
 
-      const atualRaw = await executeSingle(
-        supabase
-          .from('pessoas')
-          .select(`
-            id,
-            nome,
-            matricula,
-            observacao,
-            "dataAdmissao",
-            "dataDemissao",
-            "usuarioCadastro",
-            "usuarioEdicao",
-            "criadoEm",
-            "atualizadoEm",
-            ativo,
-            centro_servico_id,
-            setor_id,
-            cargo_id,
-            centro_custo_id,
-            tipo_execucao_id
-          `)
-          .eq('id', id),
-        'Falha ao obter pessoa.'
-      )
+      const [atualView, atualObs] = await Promise.all([
+        executeSingle(
+          supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).eq('id', id),
+          'Falha ao obter pessoa.'
+        ),
+        executeSingle(
+          supabase.from('pessoas').select('observacao').eq('id', id),
+          'Falha ao obter observacao da pessoa.'
+        ),
+      ])
+      const atualRaw = {
+        ...atualView,
+        observacao: atualObs?.observacao ?? atualView?.observacao ?? '',
+      }
       if (!atualRaw) {
         throw new Error('Pessoa nao encontrada.')
       }

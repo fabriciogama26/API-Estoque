@@ -188,7 +188,11 @@ export function usePessoasController() {
     const { name, value, type, checked } = event.target
     if (name === 'ativo') {
       const proximoValor = type === 'checkbox' ? Boolean(checked) : value !== 'false'
-      setForm((prev) => ({ ...prev, ativo: proximoValor }))
+      setForm((prev) => ({
+        ...prev,
+        ativo: proximoValor,
+        dataDemissao: proximoValor ? '' : prev.dataDemissao,
+      }))
       return
     }
     if (name === 'centroServico') {

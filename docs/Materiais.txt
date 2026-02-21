@@ -21,6 +21,7 @@ Fluxos principais
 - Filtros: termo livre, grupo, tamanho/nÃºmero, fabricante, caracterÃ­sticas, cores, status e intervalo de valor unitÃ¡rio (mÃ­n/mÃ¡x); ajuste os campos e clique em Aplicar para recalcular (sem refiltro automÃ¡tico); limpar restaura defaults.
 - Detalhes: modal em cartÃµes (padrÃ£o acidentes) com todos os campos, buscando o material completo por id.
 - HistÃ³rico: modal no padrÃ£o â€œHistÃ³rico do acidenteâ€, exibindo ediÃ§Ãµes campo a campo (usuÃ¡rio/data).
+- Historico: quando nao ha mudancas, exibe "Registro criado".
 
 Boas prÃ¡ticas
 

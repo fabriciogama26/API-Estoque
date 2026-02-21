@@ -67,6 +67,7 @@ Filtros, auto-complete e listagem
 - Historico:
   - Modal paginado com `useHistoryPagination` (5 registros por pagina via `HISTORY_PAGE_SIZE`).
   - Mantem comparacao com o snapshot anterior mesmo mudando de pagina.
+  - Quando nao ha alteracoes, o item exibe "Registro criado".
   - Cada linha exibe:
     - Material, quantidade, centro de estoque/custo.
     - Valor unitario e valor total (quando disponivel).
