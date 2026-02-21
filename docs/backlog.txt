@@ -6,3 +6,31 @@ Backlog - Melhorias Pendentes
   planos_users, role_permissions, roles, user_permission_overrides, user_roles.
 - Definir payload minimo e mascaramento de dados sensiveis para exibir em tela de auditoria.
 - Mapear consumo atual (frontend/API) para evitar regressao ao endurecer policies.
+
+- Opcional: criar tabela materializada de estoque atual (reduzir custo de leitura na tela/export).
+  - Tabela sugerida: estoque_atual (por tenant/owner).
+  - Colunas base:
+    - id (uuid, pk)
+    - account_owner_id (uuid, RLS)
+    - material_id (uuid)
+    - estoque_atual (numeric)
+    - total_entradas (numeric)
+    - total_saidas (numeric)
+    - estoque_minimo (numeric)
+    - deficit_quantidade (numeric)
+    - valor_unitario (numeric)
+    - valor_total (numeric)
+    - valor_reposicao (numeric)
+    - centros_estoque_ids (uuid[] ou text[])
+    - ultima_atualizacao (timestamptz)
+    - ultima_saida_em (timestamptz)
+    - created_at, updated_at
+  - Indices: unique (account_owner_id, material_id) e (account_owner_id, updated_at desc).
+  - View opcional: vw_estoque_atual com joins para textos (materiais_view, centros_estoque).
+  - Atualizacao:
+    - Trigger em entradas/saidas/materiais (tempo real, mais custo de escrita) OU
+    - Cron de refresh (mais simples, pode ficar levemente defasado).
+  - Impactos:
+    - Migracao + RLS + backfill inicial.
+    - Ajustar API de estoque atual para ler da tabela/view.
+    - Ajustar modo local se existir simulacao de estoque atual.

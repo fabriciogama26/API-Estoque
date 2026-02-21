@@ -7,6 +7,8 @@ Visao geral
 - Gera o HTML do relatorio no frontend a partir dos dados persistidos para pre-visualizacao.
 - O PDF e gerado separadamente, sem consumir o limite na pre-visualizacao.
 - Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email HTML somente para o ultimo mes gerado.
+- Relatorios semanais sao gerados com CSVs (estoque atual, entradas, saidas, acidentes e HHT) e enviados por email com anexos.
+- Periodo semanal considera os ultimos 7 dias a partir do horario de execucao.
 - Respeita limite de 1 PDF por mes por relatorio.
 - Ranking de consumo por centro/setor considera quantidade e valor, com top 10 e percentuais.
 - Desvios por centro/setor sao marcados por concentracao >= 30% ou outlier (media + 2 desvios).
@@ -22,6 +24,7 @@ Arquitetura
 - Backend exposto em `EstoqueOperations.reportHistory`, `EstoqueOperations.reportHtml` (contexto) e `EstoqueOperations.reportPdf`.
 - Edge Function `relatorio-estoque-mensal` gera os dados e grava em `inventory_report`.
 - Edge Function `relatorio-estoque-mensal-email` gera HTML a partir do historico e envia email HTML.
+- Edge Functions `relatorio-estoque-semanal` e `relatorio-estoque-semanal-email` geram CSVs semanais e enviam email com anexos.
 - Edge Function `relatorio-estoque-mensal` grava logs de execucao em `edge_functions_error_report` (bucket `cron`).
 - Core da geracao automatica fica em `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`.
 - Persistencia feita na tabela `inventory_report` (campos pdf_gerado_em/pdf_gerado_por/email_status/email_enviado_em/email_erro/email_tentativas).
@@ -37,7 +40,9 @@ Boas praticas
 -------------
 - Executar o cron de geracao a cada 28 dias (ex.: `0 3 */28 * *`) para gerar o ultimo mes fechado.
 - Executar o cron de email a cada 30 dias (ex.: `0 4 */30 * *`) para enviar somente o ultimo relatorio gerado.
+- Executar o cron semanal em sexta-feira as 18:10 (America/Sao_Paulo). No pg_cron (UTC), usar 21:10.
 - Cron configurado no pg_cron em 2026-02-19 (jobs relatorio-estoque-mensal e relatorio-estoque-mensal-email).
+- CSVs semanais ficam no bucket `imports` em `relatorios-semanais/<owner>/<periodo>/` e sao limpos pelo cron de cleanup.
 - Usar apenas dados salvos em inventory_report para gerar HTML/PDF.
 - Manter PDF_REPORT_LIMIT_PER_MONTH em `src/config/RelatorioEstoqueConfig.js`.
 - Revisar centros com desvio e ajustar estoque minimo quando houver concentracao.
@@ -87,6 +92,23 @@ Atualizacao 2026-02
 - Antes: os crons de relatorio nao registravam execucao em `edge_functions_error_report`.
 - Depois: os crons de relatorio registram resumo da execucao em `edge_functions_error_report`.
 
+Atualizacao 2026-02 (semanal)
+-----------------------------
+- Relatorio semanal com CSVs anexados por email (estoque atual, entradas, saidas, acidentes e HHT).
+- Geracao semanal grava metadados no `inventory_report` com `tipo=semanal` e status de email.
+- Coluna `arquivos_total` em `inventory_report` guarda a quantidade de CSVs gerados (semanal).
+- Arquivos salvos no bucket `imports` em `relatorios-semanais/<owner>/<periodo>/`.
+- Envio semanal usa Brevo com anexos (limite total 20MB).
+- Envio semanal respeita limite de 99 destinatarios quando ha anexos.
+- CSV de estoque atual usa saldo acumulado (todas as entradas/saidas) para refletir estoque real, mas total de entradas/saidas considera apenas a semana.
+- Apenas materiais com movimentacao na semana entram no CSV de estoque atual.
+- Arquivos alterados:
+- `supabase/functions/relatorio-estoque-semanal/index.ts`
+- `supabase/functions/relatorio-estoque-semanal/_shared/relatorioEstoqueSemanalCore.ts`
+- `supabase/functions/relatorio-estoque-semanal-email/index.ts`
+- `supabase/functions/relatorio-estoque-semanal-email/_shared/relatorioEstoqueSemanalEmailCore.ts`
+- `supabase/functions/cleanup-import-errors/index.ts`
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -110,6 +132,11 @@ Funcoes principais
   - Caminho: supabase/functions/relatorio-estoque-mensal/index.ts
   - Caminho: supabase/functions/relatorio-estoque-mensal-email/index.ts
   - Responsavel por: gerar dados mensais, enviar email HTML e registrar execucoes em edge_functions_error_report.
+- relatorio-estoque-semanal / relatorio-estoque-semanal-email
+  - Tipo: edge functions
+  - Caminho: supabase/functions/relatorio-estoque-semanal/index.ts
+  - Caminho: supabase/functions/relatorio-estoque-semanal-email/index.ts
+  - Responsavel por: gerar CSVs semanais, enviar email com anexos e registrar execucoes em edge_functions_error_report.
 - relatorioEstoqueCore
   - Tipo: utilitario de edge function
   - Caminho: supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts

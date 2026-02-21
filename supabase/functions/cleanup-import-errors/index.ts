@@ -59,7 +59,14 @@ const isAuthorized = (req: Request) => {
   return headerToken === cronSecret || bearerToken === cronSecret
 }
 
-const importPrefixes = ["desligamento/", "cadastro/", "entradas/", "acidentes/", "cadastro-base/"]
+const importPrefixes = [
+  "desligamento/",
+  "cadastro/",
+  "entradas/",
+  "acidentes/",
+  "cadastro-base/",
+  "relatorios-semanais/",
+]
 
 function isErrorCsv(path: string) {
   const s = path.toLowerCase()
@@ -69,6 +76,11 @@ function isErrorCsv(path: string) {
 function isImportSource(path: string) {
   const s = path.toLowerCase()
   return importPrefixes.some((prefix) => s.startsWith(prefix)) && s.endsWith(".xlsx")
+}
+
+function isWeeklyReportCsv(path: string) {
+  const s = path.toLowerCase()
+  return s.startsWith("relatorios-semanais/") && s.endsWith(".csv")
 }
 
 function extractTs(obj: any): number | null {
@@ -136,6 +148,32 @@ async function listImportEntries() {
           if (!childName) return
           entries.push({ path: `${nestedPrefix}${childName}`, ts: extractTs(child) })
         })
+      }
+    }
+
+    if (prefix === "relatorios-semanais/") {
+      for (const item of topLevel) {
+        const ownerName = String(item?.name ?? "")
+        if (!ownerName) continue
+        const ownerPrefix = `${prefix}${ownerName}/`
+        const periods = await listAll(ownerPrefix)
+        periods.forEach((periodItem) => {
+          const periodName = String(periodItem?.name ?? "")
+          if (!periodName) return
+          entries.push({ path: `${ownerPrefix}${periodName}`, ts: extractTs(periodItem) })
+        })
+
+        for (const period of periods) {
+          const periodName = String(period?.name ?? "")
+          if (!periodName) continue
+          const periodPrefix = `${ownerPrefix}${periodName}/`
+          const periodFiles = await listAll(periodPrefix)
+          periodFiles.forEach((fileItem) => {
+            const fileName = String(fileItem?.name ?? "")
+            if (!fileName) return
+            entries.push({ path: `${periodPrefix}${fileName}`, ts: extractTs(fileItem) })
+          })
+        }
       }
     }
   }
@@ -295,7 +333,7 @@ Deno.serve(async (req) => {
     const candidatesAll = allPaths.filter((p) => {
       const ts = tsMap.get(p)
       if (ts == null) return false
-      if (!(isErrorCsv(p) || isImportSource(p))) return false
+      if (!(isErrorCsv(p) || isImportSource(p) || isWeeklyReportCsv(p))) return false
       return ts <= cutoffMs
     })
 
