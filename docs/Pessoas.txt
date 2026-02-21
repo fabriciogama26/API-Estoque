@@ -3,6 +3,7 @@ Tela: Cadastro de Pessoas
 - Campos com * sao obrigatorios no formulario.
 - Data de admissao (dataAdmissao) e obrigatoria.
 - Data de demissao (dataDemissao) e opcional; se preenchida, o backend forÃ§a `ativo=false`. Se nula/vazia, o backend forÃ§a `ativo=true` (trigger em `supabase/migrations/20250114_force_inativo_on_demissao.sql`).
+- Reativacao: ao marcar "Ativar", a dataDemissao e limpa antes de salvar; historico registra dataDemissao/ativo quando alterados.
 
 Visao geral
 -----------
@@ -20,6 +21,8 @@ Campos e fluxos
 ---------------
 - Campos principais: matricula, nome, centro_servico_id/centro_custo_id, setor_id, cargo_id, tipo_execucao_id, dataAdmissao, dataDemissao, ativo.
 - Historico: timeline com alteracoes (usuario, data, campos modificados).
+- Historico: diff usa pessoas_view para comparar nomes resolvidos e busca observacao direto em pessoas.
+- Historico: quando nao ha alteracoes, o item exibe "Registro criado".
 - Filtros: termo livre, centro de servico, setor, cargo, ativo, cadastrado de/ate; aplicados apenas no frontend (backend jÃ¡ filtra por `account_owner_id`).
 - Buscas (search/listByIds) retornam apenas pessoas ativas por padrao; use includeInactive para listar todas.
 - Listagem/busca de pessoas aplica escopo por `centro_servico_id` do owner quando a credencial nao e master.
@@ -79,6 +82,7 @@ Funcoes principais
   - Tipo: hook/controller
   - Caminho: src/hooks/usePessoasController.js
   - Responsavel por: estado de formulario/filtros, listagem, historico, submit/editar e carregamento de catalogos auxiliares.
+  - Detalhes: ao marcar "Ativar", limpa dataDemissao no formulario para reativacao correta.
 
 Servicos e integracoes
 ----------------------
@@ -104,3 +108,4 @@ Atualizacao 2026-01 (UI)
 
 Atualizacao 2026-02 (UI)
 - Botao "Atualizar" da lista padronizado com icone de refresh.
+- Reativacao limpa dataDemissao e normaliza ativo para manter historico consistente.

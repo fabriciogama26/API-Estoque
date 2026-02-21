@@ -78,7 +78,7 @@ export function AcidentesHistoryTimeline({ registros }) {
               </div>
               <div className="entradas-history__item-body">
                 {changes.length === 0 ? (
-                  <p className="feedback">Sem alteracoes registradas.</p>
+                  <p className="feedback">Registro criado.</p>
                 ) : (
                     changes.map((change) => (
                       <p key={`${registro.id}-${change.campo}`}>

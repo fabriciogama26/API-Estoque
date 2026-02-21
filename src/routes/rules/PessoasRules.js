@@ -38,6 +38,10 @@ export function createPessoaPayload(form, usuario) {
 export function updatePessoaPayload(form, usuario) {
   const centroServico = sanitizeCampo(form.centroServico ?? form.local)
   const setor = sanitizeCampo(form.setor ?? centroServico)
+  const dataDemissaoRaw = sanitizeDate(form.dataDemissao)
+  const ativoForm = form.ativo !== false
+  const ativo = dataDemissaoRaw ? false : ativoForm
+  const dataDemissao = ativo ? null : dataDemissaoRaw
   return {
     nome: sanitizeCampo(form.nome),
     matricula: sanitizeCampo(form.matricula),
@@ -46,10 +50,10 @@ export function updatePessoaPayload(form, usuario) {
     setor,
     cargo: sanitizeCampo(form.cargo),
     dataAdmissao: sanitizeDate(form.dataAdmissao),
-    dataDemissao: sanitizeDate(form.dataDemissao),
+    dataDemissao,
     tipoExecucao: sanitizeCampo(form.tipoExecucao),
     usuarioResponsavel: usuario,
-    ativo: form.ativo !== false,
+    ativo,
     observacao: sanitizeCampo(form.observacao),
   }
 }

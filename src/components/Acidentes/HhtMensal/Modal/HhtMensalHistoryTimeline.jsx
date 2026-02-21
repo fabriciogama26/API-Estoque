@@ -123,6 +123,7 @@ export function HhtMensalHistoryTimeline({ registros }) {
                   <strong>Usuario:</strong> {usuario || 'sistema'}
                 </p>
                 {acao === 'DELETE' ? <p>Registro excluido.</p> : null}
+                {acao === 'INSERT' ? <p>Registro criado.</p> : null}
                 {acao === 'UPDATE' ? (
                   changes.length ? (
                     <>

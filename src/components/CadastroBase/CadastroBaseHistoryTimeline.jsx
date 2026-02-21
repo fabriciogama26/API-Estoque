@@ -76,8 +76,17 @@ export function CadastroBaseHistoryTimeline({ registros = [], centrosCustoMap, c
   const maps = { centrosCustoMap, centrosServicoMap }
   return (
     <div className="cadastro-base__history-list">
-      {registros.map((registro) => (
-        <div key={registro.id} className="cadastro-base__history-item">
+      {registros.map((registro) => {
+        const changes = buildChanges(registro, maps)
+        const action = (registro.action || '').toString().toUpperCase()
+        const emptyLabel =
+          action === 'INSERT'
+            ? 'Registro criado.'
+            : action === 'DELETE'
+              ? 'Registro removido.'
+              : 'Sem alteracoes registradas.'
+        return (
+          <div key={registro.id} className="cadastro-base__history-item">
           <div className="cadastro-base__history-header">
             <strong>{registro.action}</strong>
             <span>{formatDisplayDateTime(registro.created_at)}</span>
@@ -86,8 +95,8 @@ export function CadastroBaseHistoryTimeline({ registros = [], centrosCustoMap, c
             {registro.changedByUserName || registro.changed_by_user_name || registro.changed_by_user_id || 'Nao informado'}
           </p>
           <div className="cadastro-base__history-fields">
-            {buildChanges(registro, maps).length ? (
-              buildChanges(registro, maps).map((change) => (
+            {changes.length ? (
+              changes.map((change) => (
                 <div key={`${registro.id}-${change.field}`} className="cadastro-base__history-change">
                   <span className="cadastro-base__history-field">{resolveFieldLabel(registro.table_name, change.field)}</span>
                   <span className="cadastro-base__history-values">
@@ -96,11 +105,12 @@ export function CadastroBaseHistoryTimeline({ registros = [], centrosCustoMap, c
                 </div>
               ))
             ) : (
-              <span className="cadastro-base__history-empty">-</span>
+              <span className="cadastro-base__history-empty">{emptyLabel}</span>
             )}
           </div>
-        </div>
-      ))}
+          </div>
+        )
+      })}
     </div>
   )
 }

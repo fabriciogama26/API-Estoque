@@ -65,6 +65,7 @@ Filtros, auto-complete e listagem
   - Centro de estoque exporta o nome resolvido quando disponivel.
 - Detalhes e historico:
   - Modais dedicados no padrao de acidentes.
+  - Quando nao ha alteracoes, o item exibe "Registro criado".
 
 Boas praticas
 -------------

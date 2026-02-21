@@ -51,6 +51,7 @@ Filtros, auto-complete e listagem
 - Historico:
   - Modal mostra acao, data, campos alterados e usuario (ID).
   - Insercoes nao sao exibidas no modal; apenas UPDATE/DELETE.
+  - Quando nao ha campos alterados, exibe "Registro criado".
   - Gravacao no historico via trigger (SECURITY DEFINER) ignora RLS da tabela de historico.
 
 Boas praticas
