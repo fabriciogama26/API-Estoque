@@ -16,6 +16,13 @@ Serverless (Vercel/Supabase)
 - Funcoes Vercel ficam em `api/` e usam helpers em `api/_shared`.
 - Edge Functions ficam em `supabase/functions`.
 
+Cron (pg_cron / Scheduler)
+- Toda chamada via cron precisa enviar headers minimos:
+  - content-type: application/json
+  - x-cron-secret: <CRON_SECRET>
+  - apikey: <SUPABASE_ANON_KEY ou SERVICE_ROLE_KEY>
+  - authorization: Bearer <mesma chave do apikey>
+
 Nota de lint
 - O ESLint atual assume ambiente browser/ESM.
 - Arquivos CommonJS em `src/services/server` podem acusar "`require` is not defined".

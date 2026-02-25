@@ -1,11 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
-import { buildRelatorioEstoqueHtml } from "./relatorioEstoqueTemplate.ts"
 
-const REPORT_TYPE_MENSAL = "mensal"
+const REPORT_TYPE_TROCA = "troca-epi-alertas"
 const EMAIL_STATUS_PENDENTE = "pendente"
 const EMAIL_STATUS_ENVIADO = "enviado"
 const EMAIL_STATUS_ERRO = "erro"
+const REPORT_TIMEZONE = Deno.env.get("RELATORIO_TROCA_EPI_TIMEZONE") || "America/Sao_Paulo"
+const MAX_RECIPIENTS = 99
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
@@ -29,12 +30,42 @@ const trim = (value: unknown) => {
 
 const nowIso = () => new Date().toISOString()
 
-const formatMonthRef = (date: Date | string | null | undefined) => {
-  if (!date) return ""
-  const d = new Date(date)
-  const mes = String(d.getUTCMonth() + 1).padStart(2, "0")
-  const ano = d.getUTCFullYear()
-  return `${mes}/${ano}`
+const escapeHtml = (value: unknown) => {
+  const text = String(value ?? "")
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+const formatDateKey = (value: string) => {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return value || ""
+  const [, year, month, day] = match
+  return `${day}/${month}/${year}`
+}
+
+const formatLocalDate = (value: unknown, timeZone = REPORT_TIMEZONE) => {
+  if (!value) return ""
+  const date = new Date(value as any)
+  if (Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    dateStyle: "short",
+  }).format(date)
+}
+
+const formatLocalDateTime = (value: unknown, timeZone = REPORT_TIMEZONE) => {
+  if (!value) return ""
+  const date = new Date(value as any)
+  if (Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date)
 }
 
 const resolveEmpresaInfo = () => {
@@ -51,10 +82,7 @@ const resolveEmpresaInfo = () => {
 const resolveSenderInfo = () => {
   const empresa = resolveEmpresaInfo()
   const email = trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM") || "")
-  const name =
-    trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM_NAME") || "") ||
-    trim(empresa.nome || "") ||
-    "Sistema"
+  const name = trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM_NAME") || "") || trim(empresa.nome || "") || "Sistema"
   const replyTo = trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_REPLY_TO") || "")
   return { email, name, replyTo }
 }
@@ -85,7 +113,7 @@ const carregarCredenciaisAdminIds = async () => {
     new Set(
       (registros ?? [])
         .map((item: any) => String(item.id_text ?? "").trim().toLowerCase())
-        .filter((id) => id && ["admin", "master"].includes(id)),
+        .filter((id) => id && id === "admin"),
     ),
   )
 
@@ -94,7 +122,7 @@ const carregarCredenciaisAdminIds = async () => {
       (registros ?? [])
         .filter((item: any) => {
           const idText = String(item.id_text ?? "").trim().toLowerCase()
-          return idText === "admin" || idText === "master"
+          return idText === "admin"
         })
         .map((item: any) => String(item.id ?? "").trim())
         .filter(Boolean),
@@ -102,7 +130,7 @@ const carregarCredenciaisAdminIds = async () => {
   )
 
   return {
-    adminTextIds: adminTextIds.length ? adminTextIds : ["admin", "master"],
+    adminTextIds: adminTextIds.length ? adminTextIds : ["admin"],
     adminUuidIds,
   }
 }
@@ -201,12 +229,111 @@ const sendBrevoEmail = async ({
   return { ok: true }
 }
 
-const buildReportText = (contexto: Record<string, unknown>) => {
-  const periodoInicio = (contexto as any).periodo_inicio ?? ""
-  const periodoFim = (contexto as any).periodo_fim ?? ""
-  const periodo =
-    periodoInicio && periodoFim ? `${periodoInicio} a ${periodoFim}` : "Periodo nao informado"
-  return `Relatorio mensal de estoque\nPeriodo: ${periodo}`
+const renderTable = (titulo: string, itens: any[], timeZone: string) => {
+  if (!itens.length) {
+    return `<p style="margin:0 0 12px 0;font-size:13px;color:#475569;">Nenhum registro neste grupo.</p>`
+  }
+
+  const rows = itens
+    .map((item: any) => {
+      const centro = escapeHtml(item?.centro_label || "")
+      return `<tr>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(item?.pessoa_nome || "")}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(item?.pessoa_matricula || "")}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(item?.material_resumo || "")}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${escapeHtml(item?.quantidade ?? "")}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${centro}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(formatLocalDateTime(item?.data_entrega, timeZone))}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(formatLocalDate(item?.data_troca, timeZone))}</td>
+      </tr>`
+    })
+    .join("")
+
+  return `<div style="margin:16px 0 20px 0;">
+    <div style="font-weight:700;font-size:14px;margin-bottom:8px;">${escapeHtml(titulo)}</div>
+    <div style="overflow:auto;border:1px solid #e2e8f0;border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#f8fafc;text-align:left;">
+            <th style="padding:8px;border-bottom:1px solid #e2e8f0;">Pessoa</th>
+            <th style="padding:8px;border-bottom:1px solid #e2e8f0;">Matricula</th>
+            <th style="padding:8px;border-bottom:1px solid #e2e8f0;">Material</th>
+            <th style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">Qtd</th>
+            <th style="padding:8px;border-bottom:1px solid #e2e8f0;">Centro</th>
+            <th style="padding:8px;border-bottom:1px solid #e2e8f0;">Entrega</th>
+            <th style="padding:8px;border-bottom:1px solid #e2e8f0;">Troca</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`
+}
+
+const buildReportText = (periodo: string, total: number, limite: number, alerta: number) => {
+  return `Relatorio de troca de EPI\nPeriodo: ${periodo}\nTotal: ${total}\nData limite: ${limite}\n7 dias para troca: ${alerta}`
+}
+
+const buildEmailHtml = ({
+  empresa,
+  periodo,
+  total,
+  limite,
+  alerta,
+  timeZone,
+}: {
+  empresa: Record<string, string>
+  periodo: string
+  total: number
+  limite: any[]
+  alerta: any[]
+  timeZone: string
+}) => {
+  const logoPrincipal = empresa?.logoUrl
+    ? `<img src="${empresa.logoUrl}" alt="logo" style="height:56px;max-width:260px;object-fit:contain;display:block;" />`
+    : ""
+  const logoSecundario = empresa?.logoSecundarioUrl
+    ? `<img src="${empresa.logoSecundarioUrl}" alt="logo" style="height:44px;max-width:180px;object-fit:contain;display:block;" />`
+    : ""
+
+  return `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Relatorio de troca de EPI</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <div style="max-width:760px;margin:0 auto;padding:24px;">
+      <div style="background:#ffffff;border-radius:12px;padding:24px;box-shadow:0 6px 24px rgba(15,23,42,0.08);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:20px;width:100%;">
+          <div style="flex:1;display:flex;align-items:center;">
+            ${logoPrincipal}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;">
+            ${logoSecundario}
+          </div>
+        </div>
+        <h1 style="margin:0 0 12px 0;font-size:20px;">Relatorio de troca de EPI</h1>
+        <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;">
+          Segue o relatorio diario das saidas com prazo de troca.
+        </p>
+        <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;">
+          <strong>Periodo:</strong> ${escapeHtml(periodo)}
+        </p>
+        <div style="margin:16px 0;padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Resumo</div>
+          <div style="font-size:13px;">Total: ${total} | Data limite: ${limite.length} | 7 dias: ${alerta.length}</div>
+        </div>
+        ${renderTable("Data limite", limite, timeZone)}
+        ${renderTable("7 dias para o limite da troca", alerta, timeZone)}
+        <p style="margin:16px 0 0 0;font-size:12px;color:#64748b;">
+          Este e um email automatico. Nao responda.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>`
 }
 
 const fetchOwners = async () => {
@@ -226,8 +353,9 @@ const loadLatestReport = async (ownerId: string) => {
       .from("inventory_report")
       .select("id, periodo_inicio, periodo_fim, metadados, email_tentativas, email_enviado_em, email_status")
       .eq("account_owner_id", ownerId)
-      .eq("metadados->>tipo", REPORT_TYPE_MENSAL)
+      .eq("metadados->>tipo", REPORT_TYPE_TROCA)
       .order("periodo_inicio", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(1),
     "Falha ao consultar relatorios.",
   )
@@ -250,7 +378,7 @@ const updateEmailStatus = async (
   )
 }
 
-export const assertRelatorioEmailEnv = () => {
+export const assertRelatorioTrocaEmailEnv = () => {
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
   }
@@ -262,14 +390,14 @@ export const assertRelatorioEmailEnv = () => {
   }
 }
 
-export const runRelatorioEstoqueMensalEmail = async ({
+export const runRelatorioTrocaEpiEmail = async ({
   testEmail,
   testOwnerId,
 }: {
   testEmail?: string
   testOwnerId?: string
 } = {}) => {
-  assertRelatorioEmailEnv()
+  assertRelatorioTrocaEmailEnv()
   const normalizedTestEmail = trim(testEmail).toLowerCase()
   const normalizedTestOwnerId = trim(testOwnerId)
   if (normalizedTestEmail && !normalizedTestEmail.includes("@")) {
@@ -335,13 +463,16 @@ export const runRelatorioEstoqueMensalEmail = async ({
       continue
     }
 
-    const contexto = (latestReport as any).metadados?.contexto ?? null
-    const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
-    if (!contexto) {
+    const metadados = (latestReport as any).metadados ?? null
+    const limite = Array.isArray(metadados?.limite) ? metadados.limite : []
+    const alerta = Array.isArray(metadados?.alerta) ? metadados.alerta : []
+    const total = Number(metadados?.total ?? limite.length + alerta.length)
+    if (!total) {
       if (!isTestMode) {
+        const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
         await updateEmailStatus(ownerId, latestReport.id, {
           email_status: EMAIL_STATUS_ERRO,
-          email_erro: "Contexto do relatorio nao encontrado.",
+          email_erro: "Relatorio sem dados para envio.",
           email_tentativas: tentativas,
         })
       }
@@ -349,27 +480,54 @@ export const runRelatorioEstoqueMensalEmail = async ({
         ownerId,
         reportId: latestReport.id,
         status: EMAIL_STATUS_ERRO,
-        error: "Contexto do relatorio nao encontrado.",
+        error: "Relatorio sem dados para envio.",
       })
       continue
     }
 
-    const html = buildRelatorioEstoqueHtml({ contexto, empresa: resolveEmpresaInfo() })
-    const subject = `Relatorio mensal de estoque - ${formatMonthRef((latestReport as any).periodo_inicio)}`
+    const periodoRef = trim(metadados?.periodo_ref || (latestReport as any).periodo_inicio || "")
+    const periodoLabel = formatDateKey(periodoRef) || periodoRef || "Periodo nao informado"
+    const timeZone = trim(metadados?.timezone || REPORT_TIMEZONE) || REPORT_TIMEZONE
     const destinatarios = isTestMode
       ? [{ name: normalizedTestEmail, email: normalizedTestEmail }]
       : admins.map((admin) => ({ name: admin.nome || admin.email, email: admin.email }))
+
+    if (!isTestMode && destinatarios.length > MAX_RECIPIENTS) {
+      const errorMessage = `Destinatarios excedem limite (${destinatarios.length}/${MAX_RECIPIENTS}).`
+      const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
+      await updateEmailStatus(ownerId, latestReport.id, {
+        email_status: EMAIL_STATUS_ERRO,
+        email_erro: errorMessage,
+        email_tentativas: tentativas,
+      })
+      resultados.push({
+        ownerId,
+        reportId: latestReport.id,
+        status: EMAIL_STATUS_ERRO,
+        error: errorMessage,
+      })
+      continue
+    }
+
     const replyTo = senderInfo.replyTo ? { name: senderName, email: senderInfo.replyTo } : undefined
     const emailStatus = await sendBrevoEmail({
       sender: { name: senderName, email: senderEmail },
       replyTo,
       to: destinatarios,
-      subject,
-      text: buildReportText(contexto),
-      html,
+      subject: `Relatorio troca de EPI - ${periodoLabel}`,
+      text: buildReportText(periodoLabel, total, limite.length, alerta.length),
+      html: buildEmailHtml({
+        empresa: resolveEmpresaInfo(),
+        periodo: periodoLabel,
+        total,
+        limite,
+        alerta,
+        timeZone,
+      }),
     })
 
     if (!isTestMode) {
+      const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
       await updateEmailStatus(ownerId, latestReport.id, {
         email_status: emailStatus.ok ? EMAIL_STATUS_ENVIADO : EMAIL_STATUS_ERRO,
         email_enviado_em: emailStatus.ok ? nowIso() : (latestReport as any).email_enviado_em ?? null,

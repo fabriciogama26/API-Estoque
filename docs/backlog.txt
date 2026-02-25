@@ -6,6 +6,9 @@ Backlog - Melhorias Pendentes
   planos_users, role_permissions, roles, user_permission_overrides, user_roles.
 - Definir payload minimo e mascaramento de dados sensiveis para exibir em tela de auditoria.
 - Mapear consumo atual (frontend/API) para evitar regressao ao endurecer policies.
+- Migration pendente: `supabase/migrations/20260307_add_fk_indexes_advisor_large_tables.sql`
+  - Criar indices cobrindo FKs em tabelas grandes (saidas, entradas, historicos, grupos de acidentes).
+  - Necessario aplicar no banco para efetivar a melhoria de performance.
 
 - Opcional: criar tabela materializada de estoque atual (reduzir custo de leitura na tela/export).
   - Tabela sugerida: estoque_atual (por tenant/owner).
