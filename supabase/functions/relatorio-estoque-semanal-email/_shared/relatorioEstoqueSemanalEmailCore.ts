@@ -66,7 +66,8 @@ const resolveSenderInfo = () => {
   const empresa = resolveEmpresaInfo()
   const email = trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM") || "")
   const name = trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_FROM_NAME") || "") || trim(empresa.nome || "") || "Sistema"
-  return { email, name }
+  const replyTo = trim(Deno.env.get("RELATORIO_ESTOQUE_EMAIL_REPLY_TO") || "")
+  return { email, name, replyTo }
 }
 
 const execute = async (builder: any, fallbackMessage: string) => {
@@ -168,6 +169,7 @@ const toBase64 = (buffer: ArrayBuffer) => {
 
 const sendBrevoEmail = async ({
   sender,
+  replyTo,
   to,
   subject,
   text,
@@ -175,6 +177,7 @@ const sendBrevoEmail = async ({
   attachments,
 }: {
   sender: { name: string; email: string }
+  replyTo?: { name?: string; email: string }
   to: Array<{ name: string; email: string }>
   subject: string
   text?: string
@@ -193,6 +196,9 @@ const sendBrevoEmail = async ({
     sender,
     to,
     subject,
+  }
+  if (replyTo?.email) {
+    payload.replyTo = replyTo
   }
   if (text) {
     payload.textContent = text
@@ -511,8 +517,10 @@ export const runRelatorioEstoqueSemanalEmail = async ({
       continue
     }
 
+    const replyTo = senderInfo.replyTo ? { name: senderName, email: senderInfo.replyTo } : undefined
     const emailStatus = await sendBrevoEmail({
       sender: { name: senderName, email: senderEmail },
+      replyTo,
       to: destinatarios,
       subject: `Relatorio semanal de movimentacao - ${periodoLabel}`,
       text: buildReportText(periodoLabel),

@@ -102,6 +102,25 @@ Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 
+Atualizacao 2026-02 (relatorio troca EPI)
+-----------------------------------------
+- Criado relatorio diario de trocas de EPI (data limite e 7 dias).
+- Edge Functions geram snapshot e enviam email apenas quando houver dados.
+- Destinatarios: somente usuarios com credencial admin (com suporte a test_email).
+- Relatorio nao e gerado quando o conteudo for igual ao ultimo snapshot (evita envio duplicado).
+- Arquivos alterados:
+  - supabase/functions/relatorio-troca-epi/index.ts
+  - supabase/functions/relatorio-troca-epi/_shared/relatorioTrocaEpiCore.ts
+  - supabase/functions/relatorio-troca-epi-email/index.ts
+  - supabase/functions/relatorio-troca-epi-email/_shared/relatorioTrocaEpiEmailCore.ts
+  - docs/Saidas.txt
+- Funcoes tocadas:
+  - runRelatorioTrocaEpi (gera relatorio diario e grava em inventory_report).
+  - runRelatorioTrocaEpiEmail (envia email para admins e atualiza status).
+- Comportamento antes/depois:
+  - Antes: nao existia envio diario de alertas de troca.
+  - Depois: alertas diarios com data limite e 7 dias sao enviados quando houver dados.
+
 Atualizacao 2026-01 (estoque)
 -----------------------------
 - Arquivos alterados:
@@ -181,6 +200,10 @@ Servicos e integracoes externas
   - Tipo: servico local
   - Caminho: src/services/localApi.js
   - Responsavel por: filtrar saidas no modo local (termo/registrado por).
+- Edge Functions de relatorio de troca
+  - Tipo: Edge Functions
+  - Caminho: supabase/functions/relatorio-troca-epi/* e supabase/functions/relatorio-troca-epi-email/*
+  - Responsavel por: gerar e enviar email diario com saidas em data limite e 7 dias para troca.
 
 Ajuda contextual
 ----------------
