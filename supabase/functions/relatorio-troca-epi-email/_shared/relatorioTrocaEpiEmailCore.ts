@@ -243,7 +243,7 @@ const renderTable = (titulo: string, itens: any[], timeZone: string) => {
         <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(item?.material_resumo || "")}</td>
         <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">${escapeHtml(item?.quantidade ?? "")}</td>
         <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${centro}</td>
-        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(formatLocalDateTime(item?.data_entrega, timeZone))}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(formatLocalDate(item?.data_entrega, timeZone))}</td>
         <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(formatLocalDate(item?.data_troca, timeZone))}</td>
       </tr>`
     })
@@ -270,23 +270,21 @@ const renderTable = (titulo: string, itens: any[], timeZone: string) => {
   </div>`
 }
 
-const buildReportText = (periodo: string, total: number, limite: number, alerta: number) => {
-  return `Relatorio de troca de EPI\nPeriodo: ${periodo}\nTotal: ${total}\nData limite: ${limite}\n7 dias para troca: ${alerta}`
+const buildReportText = (periodo: string, total: number) => {
+  return `Relatorio de troca de EPI\nPeriodo: ${periodo}\nTotal: ${total}`
 }
 
 const buildEmailHtml = ({
   empresa,
   periodo,
   total,
-  limite,
-  alerta,
+  itens,
   timeZone,
 }: {
   empresa: Record<string, string>
   periodo: string
   total: number
-  limite: any[]
-  alerta: any[]
+  itens: any[]
   timeZone: string
 }) => {
   const logoPrincipal = empresa?.logoUrl
@@ -316,17 +314,16 @@ const buildEmailHtml = ({
         </div>
         <h1 style="margin:0 0 12px 0;font-size:20px;">Relatorio de troca de EPI</h1>
         <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;">
-          Segue o relatorio diario das saidas com prazo de troca.
+          Segue o relatorio semanal das saidas com prazo de troca.
         </p>
         <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;">
           <strong>Periodo:</strong> ${escapeHtml(periodo)}
         </p>
         <div style="margin:16px 0;padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
           <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Resumo</div>
-          <div style="font-size:13px;">Total: ${total} | Data limite: ${limite.length} | 7 dias: ${alerta.length}</div>
+          <div style="font-size:13px;">Total: ${total}</div>
         </div>
-        ${renderTable("Data limite", limite, timeZone)}
-        ${renderTable("7 dias para o limite da troca", alerta, timeZone)}
+        ${renderTable("Saidas no periodo", itens, timeZone)}
         <p style="margin:16px 0 0 0;font-size:12px;color:#64748b;">
           Este e um email automatico. Nao responda.
         </p>
@@ -464,9 +461,8 @@ export const runRelatorioTrocaEpiEmail = async ({
     }
 
     const metadados = (latestReport as any).metadados ?? null
-    const limite = Array.isArray(metadados?.limite) ? metadados.limite : []
-    const alerta = Array.isArray(metadados?.alerta) ? metadados.alerta : []
-    const total = Number(metadados?.total ?? limite.length + alerta.length)
+    const itens = Array.isArray(metadados?.itens) ? metadados.itens : []
+    const total = Number(metadados?.total ?? itens.length)
     if (!total) {
       if (!isTestMode) {
         const tentativas = Number((latestReport as any).email_tentativas ?? 0) + 1
@@ -485,8 +481,11 @@ export const runRelatorioTrocaEpiEmail = async ({
       continue
     }
 
-    const periodoRef = trim(metadados?.periodo_ref || (latestReport as any).periodo_inicio || "")
-    const periodoLabel = formatDateKey(periodoRef) || periodoRef || "Periodo nao informado"
+    const periodoInicio = trim(metadados?.periodo_inicio || (latestReport as any).periodo_inicio || "")
+    const periodoFim = trim(metadados?.periodo_fim || (latestReport as any).periodo_fim || "")
+    const periodoLabel = periodoInicio && periodoFim
+      ? `${formatDateKey(periodoInicio)} a ${formatDateKey(periodoFim)}`
+      : formatDateKey(periodoInicio || periodoFim) || "Periodo nao informado"
     const timeZone = trim(metadados?.timezone || REPORT_TIMEZONE) || REPORT_TIMEZONE
     const destinatarios = isTestMode
       ? [{ name: normalizedTestEmail, email: normalizedTestEmail }]
@@ -515,13 +514,12 @@ export const runRelatorioTrocaEpiEmail = async ({
       replyTo,
       to: destinatarios,
       subject: `Relatorio troca de EPI - ${periodoLabel}`,
-      text: buildReportText(periodoLabel, total, limite.length, alerta.length),
+      text: buildReportText(periodoLabel, total),
       html: buildEmailHtml({
         empresa: resolveEmpresaInfo(),
         periodo: periodoLabel,
         total,
-        limite,
-        alerta,
+        itens,
         timeZone,
       }),
     })

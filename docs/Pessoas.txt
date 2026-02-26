@@ -38,6 +38,9 @@ Desligamento em massa (novo)
 - A planilha exige matricula e data_demissao (dd/MM/yyyy); ativo sempre fica false.
 - Se a pessoa ja estiver inativa, ela aparece na lista de "ja inativos" no retorno.
 - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+- Upload vai para o Storage em `imports/<owner_id>/desligamento/<uuid>-<arquivo>.xlsx`.
+- Edge Function valida JWT e confere prefixo do owner antes de processar.
+- CSV de erros fica em `imports/<owner_id>/erros/desligamento_erros_<uuid>.csv`.
 - O fluxo completo (frontend + Supabase + Edge Functions + Storage) esta documentado em:
   - docs/DesligamentoEmMassa.txt
 - Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.
@@ -50,6 +53,9 @@ Cadastro em massa (novo)
 - O modal tem o botao "Importar planilha" para inserir novos registros.
 - Importar bloqueia matriculas ja existentes.
 - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+- Upload vai para o Storage em `imports/<owner_id>/cadastro/<uuid>-<arquivo>.xlsx`.
+- Edge Function valida JWT e confere prefixo do owner antes de processar.
+- CSV de erros fica em `imports/<owner_id>/erros/cadastro_erros_<uuid>.csv`.
 - O fluxo completo esta documentado em:
   - docs/CadastroEmMassa.txt
 - Relatorio de erros (CSV) agora inclui matricula por linha: linha,matricula,coluna,motivo.
@@ -94,7 +100,12 @@ Servicos e integracoes
 - api.pessoas.importDesligamentoPlanilha
   - Tipo: integracao Supabase (Storage + Edge Function)
   - Caminho: src/services/api.js
-  - Responsavel por: (1) upload do XLSX para o bucket imports, (2) invoke da Edge Function desligamento-import com { path }.
+  - Responsavel por: (1) upload do XLSX para `imports/<owner_id>/desligamento/`, (2) invoke da Edge Function desligamento-import com { path }.
+
+- api.pessoas.importCadastroPlanilha
+  - Tipo: integracao Supabase (Storage + Edge Function)
+  - Caminho: src/services/api.js
+  - Responsavel por: (1) upload do XLSX para `imports/<owner_id>/cadastro/`, (2) invoke da Edge Function cadastro-import com { path }.
 
 Ajuda contextual
 ----------------
@@ -109,3 +120,4 @@ Atualizacao 2026-01 (UI)
 Atualizacao 2026-02 (UI)
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 - Reativacao limpa dataDemissao e normaliza ativo para manter historico consistente.
+- Importacoes em massa agora usam prefixo `imports/<owner_id>/` e validacao de JWT no backend.

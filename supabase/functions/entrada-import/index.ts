@@ -243,10 +243,15 @@ Deno.serve(async (req) => {
       await logError(400, "Apenas XLSX", {}, importUserId)
       return new Response("Apenas XLSX", { status: 400, headers: corsHeaders })
     }
-    sourcePath = path
+    const normalizedPath = path.replace(/^\/+/, "")
+    if (!normalizedPath.startsWith(`${owner}/`)) {
+      await logError(403, "Path fora do owner", { path: normalizedPath }, importUserId)
+      return new Response("Path fora do owner", { status: 403, headers: corsHeaders })
+    }
+    sourcePath = normalizedPath
 
     stage = "storage_download"
-    const download = await supabaseAdmin.storage.from(errorsBucket).download(path)
+    const download = await supabaseAdmin.storage.from(errorsBucket).download(sourcePath)
     if (download.error || !download.data) {
       const msg = download.error?.message || "Falha ao baixar arquivo"
       await logError(400, msg, { error: download.error?.message || null }, importUserId)
@@ -410,7 +415,7 @@ Deno.serve(async (req) => {
       stage = "storage_upload_erros"
       errorSamples.push(...errorLines.slice(1, Math.min(errorLines.length, 6)))
       const csv = errorLines.join("\n")
-      const key = `entrada_erros_${crypto.randomUUID()}.csv`
+      const key = `${owner}/erros/entrada_erros_${crypto.randomUUID()}.csv`
       await supabaseAdmin.storage.from(errorsBucket).upload(key, new TextEncoder().encode(csv), {
         contentType: "text/csv",
       })

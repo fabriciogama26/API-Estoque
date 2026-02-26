@@ -52,14 +52,14 @@ Modelo de dados (Supabase)
 
 - Seeds de permissions: `estoque.read|write`, `pessoas.read|write`, `acidentes.read|write`, `hht.read|write`,
   `estoque.dashboard`, `dashboard_analise_estoque`, `acidentes.dashboard`, `estoque.atual`, `estoque.entradas`,
-  `estoque.saidas`, `estoque.materiais`, `estoque.termo`, `estoque.relatorio`, `rbac.manage`, `users.manage`,
-  `credentials.manage`.
+  `estoque.saidas`, `estoque.materiais`, `estoque.termo`, `estoque.relatorio`, `estoque.reprocessar`,
+  `rbac.manage`, `users.manage`, `credentials.manage`.
 
 - Mapeamentos principais:
 
   - master: todas as permissions (somente via role master).
 
-  - admin/owner: todas as permissions seed (inclui rbac/users/credentials.manage).
+  - admin/owner: todas as permissions seed (inclui rbac/users/credentials.manage e estoque.reprocessar).
 
   - supervisor/viewer: leituras (hht.read, estoque.read, pessoas.read, acidentes.read).
 
@@ -189,8 +189,8 @@ Diagnóstico rápido de “Sem permissão”
 -------------------------------------
 
 - Checar `/v_me`: roles contém master? permissions contém key da rota (PAGE_REQUIRED_PERMISSION)?
-
-- Dependente? `parent_user_id` correto?
+  - Para reprocessamento/forecast manual: conferir `estoque.reprocessar`.
+  - Dependente? `parent_user_id` correto?
 
 - RLS escrita negada? Conferir `account_owner_id` vs `my_owner_id()`.
 
@@ -238,3 +238,11 @@ Resolvido (2026-02)
 - PAGE_REQUIRED_PERMISSION atualizado para chaves por pagina.
 - Migration adiciona permissoes e mapeia roles para manter comportamento.
 - Ver detalhes em docs/PermissoesToggles.txt.
+
+Atualizacao 2026-02 (permissoes)
+--------------------------------
+- Adicionada a permissao `estoque.reprocessar` para reprocessar previsao mensal por tenant.
+- Roles master/admin/owner incluem a nova permissao.
+- Arquivos alterados:
+- `src/config/permissions.js`
+- `supabase/migrations/20260226_add_permission_estoque_reprocessar.sql`

@@ -2184,6 +2184,15 @@ async function resolveUsuarioIdOrThrow() {
   return usuarioId
 }
 
+async function resolveImportsOwnerId() {
+  const ownerId = await resolveUsuarioIdOrThrow()
+  const normalized = normalizeUuid(ownerId)
+  if (!normalized) {
+    throw new Error('Owner invalido para importacao.')
+  }
+  return normalized
+}
+
 async function buildAuthHeaders(extra = {}) {
   ensureSupabase()
   const { data } = await supabase.auth.getSession()
@@ -4599,7 +4608,8 @@ export const api = {
         assertFileSizeWithinLimit(file)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
-        const path = `desligamento/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+        const ownerId = await resolveImportsOwnerId()
+        const path = `${ownerId}/desligamento/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
 
         // 1) Upload para o Storage
         const upload = await supabase.storage.from(importsBucket).upload(path, file, {
@@ -4703,7 +4713,8 @@ export const api = {
         const mode = modeRaw === 'update' ? 'update' : 'insert'
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
-        const path = `cadastro/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+        const ownerId = await resolveImportsOwnerId()
+        const path = `${ownerId}/cadastro/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
 
         const upload = await supabase.storage.from(importsBucket).upload(path, file, {
           contentType:
@@ -5289,7 +5300,8 @@ export const api = {
         assertFileSizeWithinLimit(file)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
-        const path = `entradas/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+        const ownerId = await resolveImportsOwnerId()
+        const path = `${ownerId}/entradas/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
 
         const upload = await supabase.storage.from(importsBucket).upload(path, file, {
           contentType:
@@ -6093,7 +6105,8 @@ export const api = {
         assertFileSizeWithinLimit(file)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
-        const path = `acidentes/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+        const ownerId = await resolveImportsOwnerId()
+        const path = `${ownerId}/acidentes/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
 
         const upload = await supabase.storage.from(importsBucket).upload(path, file, {
           contentType:
@@ -7236,7 +7249,8 @@ export const api = {
         const { key } = resolveBasicRegistrationConfig(table)
 
         const importsBucket = import.meta.env.VITE_IMPORTS_BUCKET || 'imports'
-        const path = `cadastro-base/${key}/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
+        const ownerId = await resolveImportsOwnerId()
+        const path = `${ownerId}/cadastro-base/${key}/${(crypto?.randomUUID?.() ?? Date.now())}-${file.name}`
 
         const upload = await supabase.storage.from(importsBucket).upload(path, file, {
           contentType:

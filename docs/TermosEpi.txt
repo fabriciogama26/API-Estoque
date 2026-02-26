@@ -2,7 +2,7 @@ Tela: Termo de EPI
 
 Visao geral
 
-Gerar e baixar o termo de responsabilidade de EPI para colaboradores, com pre-visualizacao HTML e PDF renderizado no cliente.
+Gerar e baixar o termo de responsabilidade de EPI para colaboradores, com pre-visualizacao HTML e PDF renderizado via Edge Function com JWT.
 
 Arquitetura (modular)
 
@@ -30,8 +30,10 @@ Atualizacao 2025-12
 Atualizacao 2026-02
 
 - Download do PDF agora usa httpClient para aplicar envelope de erro e request_id das Functions.
+- A Edge Function `termo-epi` passou a exigir Authorization Bearer JWT; o frontend envia o token de sessao.
 - Arquivos alterados:
 - `src/utils/TermoEpiUtils.js`
+- `supabase/functions/termo-epi/index.ts`
 - Antes/Depois:
 - Antes: download usava fetch direto e tratava erro manualmente.
 - Depois: download usa httpClient com responseType blob e envelope padronizado.
@@ -75,6 +77,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/termoEpiService.js
   - Responsavel por: buscar contexto do termo (via dataClient/Supabase ou local) a partir de matricula/nome e periodo.
+- Supabase Functions (renderizacao PDF)
+  - Tipo: integracao externa
+  - Caminho: supabase/functions/termo-epi
+  - Responsavel por: renderizar PDF; exige Authorization Bearer JWT.
 
 Ajuda contextual
 ----------------

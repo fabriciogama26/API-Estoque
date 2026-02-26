@@ -1,5 +1,6 @@
 ﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
+import { createUserClient, getBearerToken } from "./_shared/auth.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,37 +10,35 @@ const corsHeaders = {
 
 const SERVICE_NAME = "forecast-gasto-mensal"
 const LOG_BUCKET = "cron"
+const MANUAL_RATE_LIMIT_SECONDS = 300
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-const cronSecret = Deno.env.get("CRON_SECRET") || ""
+const anonKey = (Deno.env.get("SUPABASE_ANON_KEY") || "").trim()
+const cronSecret = (Deno.env.get("CRON_SECRET") || "").trim()
 const canLog = Boolean(supabaseUrl && serviceRoleKey)
 
-const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { persistSession: false },
-  global: {
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
-    },
-  },
-})
-
-const getBearerToken = (req: Request) => {
-  const authHeader = req.headers.get("authorization") || ""
-  const match = authHeader.match(/Bearer\s+(.+)/i)
-  return match?.[1]?.trim() || ""
-}
+const supabaseAdmin = canLog
+  ? createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
+      },
+    })
+  : null
 
 const isCronAuthorized = (req: Request) => {
-  if (!cronSecret) return true
+  if (!cronSecret) return false
   const headerToken = (req.headers.get("x-cron-secret") || "").trim()
   const bearerToken = getBearerToken(req)
   return headerToken === cronSecret || bearerToken === cronSecret
 }
 
 const saveRunToDb = async (row: Record<string, unknown>) => {
-  if (!canLog) return
+  if (!canLog || !supabaseAdmin) return
   try {
     const { error } = await supabaseAdmin.from("edge_functions_error_report").insert(row)
     if (error) console.log("WARN insert edge_functions_error_report:", error.message)
@@ -64,6 +63,33 @@ function isLastDayOfMonthUtc(date: Date) {
   return nextDay.getUTCMonth() !== month
 }
 
+async function checkManualRateLimit(userId: string) {
+  if (!supabaseAdmin) return { ok: true, retryAfter: 0 }
+  const { data, error } = await supabaseAdmin
+    .from("edge_functions_error_report")
+    .select("created_at")
+    .eq("function_name", SERVICE_NAME)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+
+  if (error || !Array.isArray(data) || !data.length) {
+    return { ok: true, retryAfter: 0 }
+  }
+
+  const lastCreated = data[0]?.created_at
+  if (!lastCreated) return { ok: true, retryAfter: 0 }
+  const lastMs = Date.parse(String(lastCreated))
+  if (Number.isNaN(lastMs)) return { ok: true, retryAfter: 0 }
+
+  const elapsed = (Date.now() - lastMs) / 1000
+  if (elapsed >= MANUAL_RATE_LIMIT_SECONDS) {
+    return { ok: true, retryAfter: 0 }
+  }
+  const retryAfter = Math.max(1, Math.ceil(MANUAL_RATE_LIMIT_SECONDS - elapsed))
+  return { ok: false, retryAfter }
+}
+
 async function fetchOwners() {
   const { data, error } = await supabaseAdmin
     .from("app_users")
@@ -73,24 +99,6 @@ async function fetchOwners() {
     throw new Error(`Falha ao listar owners: ${error.message}`)
   }
   return (data || []).filter((row) => row?.ativo !== false && row?.id)
-}
-
-async function resolveOwnerId(userId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("app_users")
-    .select("id, parent_user_id, ativo")
-    .eq("id", userId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(`Falha ao resolver owner: ${error.message}`)
-  }
-
-  if (data?.ativo === false) {
-    throw new Error("Usuario inativo.")
-  }
-
-  return data?.parent_user_id || data?.id || userId
 }
 
 Deno.serve(async (req) => {
@@ -133,19 +141,25 @@ Deno.serve(async (req) => {
   let details: Record<string, unknown> | null = null
 
   try {
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl || !serviceRoleKey || !anonKey || !supabaseAdmin) {
       httpStatus = 500
-      return new Response(JSON.stringify({ ok: false, error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      })
+      return new Response(
+        JSON.stringify({ ok: false, error: "Missing SUPABASE_URL, SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      )
     }
 
     const isCronCall = isCronAuthorized(req)
-    shouldLog = isCronCall
     let userId: string | null = null
+    let ownerId: string | null = null
+    let supabaseUser: ReturnType<typeof createUserClient> | null = null
 
-    if (!isCronCall) {
+    if (isCronCall) {
+      shouldLog = true
+    } else {
       const bearerToken = getBearerToken(req)
       if (!bearerToken) {
         httpStatus = 401
@@ -154,19 +168,73 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         })
       }
-      const { data, error } = await supabaseAdmin.auth.getUser(bearerToken)
-      if (error || !data?.user?.id) {
+
+      supabaseUser = createUserClient(bearerToken)
+      const { data: userData, error: userError } = await supabaseUser.auth.getUser(bearerToken)
+      if (userError || !userData?.user?.id) {
         httpStatus = 401
         return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         })
       }
-      userId = data.user.id
+
+      userId = userData.user.id
       baseRow.user_id = userId
+      shouldLog = canLog
+
+      const { data: permissionOk, error: permissionError } = await supabaseUser.rpc("has_permission", {
+        p_key: "estoque.reprocessar",
+      })
+      if (permissionError || permissionOk !== true) {
+        httpStatus = 403
+        return new Response(JSON.stringify({ ok: false, error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+
+      const { data: ownerData, error: ownerError } = await supabaseUser.rpc("current_account_owner_id")
+      const resolvedOwner =
+        typeof ownerData === "string"
+          ? ownerData
+          : (ownerData as { account_owner_id?: string } | null)?.account_owner_id
+      if (ownerError || !resolvedOwner) {
+        httpStatus = 403
+        return new Response(JSON.stringify({ ok: false, error: "Owner nao encontrado" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+      ownerId = resolvedOwner
+
+      const rateLimit = await checkManualRateLimit(userId)
+      if (!rateLimit.ok) {
+        httpStatus = 429
+        const headers = {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": String(rateLimit.retryAfter || MANUAL_RATE_LIMIT_SECONDS),
+        }
+        if (shouldLog) {
+          await finalizeLog({
+            errors_count: 1,
+            error_message: "rate_limit",
+            details: {
+              mode: "manual",
+              owner_id: ownerId,
+              retry_after: rateLimit.retryAfter,
+            },
+          })
+        }
+        return new Response(JSON.stringify({ ok: false, error: "Rate limit" }), {
+          status: 429,
+          headers,
+        })
+      }
     }
 
-    const body = await req.json().catch(() => ({}))
+    const body = isCronCall ? await req.json().catch(() => ({})) : {}
     const forceRun = Boolean((body as any)?.force ?? (body as any)?.forceRun ?? false)
 
     const now = new Date()
@@ -191,18 +259,44 @@ Deno.serve(async (req) => {
     }
 
     if (!isCronCall) {
-      const ownerId = await resolveOwnerId(userId as string)
-      const { data, error } = await supabaseAdmin.rpc("rpc_previsao_gasto_mensal_calcular", {
+      if (!supabaseUser || !ownerId || !userId) {
+        httpStatus = 401
+        return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+
+      const { data, error } = await supabaseUser.rpc("rpc_previsao_gasto_mensal_calcular", {
         p_owner_id: ownerId,
         p_fator_tendencia: null,
       })
       if (error) {
         httpStatus = 500
+        if (shouldLog) {
+          await finalizeLog({
+            errors_count: 1,
+            error_message: error.message,
+            details: {
+              mode: "manual",
+              owner_id: ownerId,
+            },
+          })
+        }
         return new Response(JSON.stringify({ ok: false, error: error.message }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         })
       }
+
+      details = { mode: "manual", owner_id: ownerId }
+      if (shouldLog) {
+        await finalizeLog({
+          errors_count: 0,
+          details,
+        })
+      }
+
       return new Response(JSON.stringify({ ok: true, ownerId, data }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

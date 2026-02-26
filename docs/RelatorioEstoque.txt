@@ -6,6 +6,7 @@ Visao geral
 - Permite consultar o historico de relatorios mensais gravados em inventory_report.
 - Gera o HTML do relatorio no frontend a partir dos dados persistidos para pre-visualizacao.
 - O PDF e gerado separadamente, sem consumir o limite na pre-visualizacao.
+- A renderizacao de PDF via Edge Function `relatorio-estoque-pdf` exige Authorization Bearer JWT.
 - Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email HTML somente para o ultimo mes gerado.
 - Relatorios semanais sao gerados com CSVs (estoque atual, entradas, saidas, acidentes e HHT) e enviados por email com anexos.
 - Periodo semanal considera os ultimos 7 dias a partir do horario de execucao.
@@ -42,7 +43,7 @@ Boas praticas
 - Executar o cron de email a cada 30 dias (ex.: `0 4 */30 * *`) para enviar somente o ultimo relatorio gerado.
 - Executar o cron semanal em sexta-feira as 18:10 (America/Sao_Paulo). No pg_cron (UTC), usar 21:10.
 - Cron configurado no pg_cron em 2026-02-19 (jobs relatorio-estoque-mensal e relatorio-estoque-mensal-email).
-- CSVs semanais ficam no bucket `imports` em `relatorios-semanais/<owner>/<periodo>/` e sao limpos pelo cron de cleanup.
+- CSVs semanais ficam no bucket `imports` em `<owner_id>/relatorios-semanais/<periodo>/` e sao limpos pelo cron de cleanup.
 - Usar apenas dados salvos em inventory_report para gerar HTML/PDF.
 - Manter PDF_REPORT_LIMIT_PER_MONTH em `src/config/RelatorioEstoqueConfig.js`.
 - Revisar centros com desvio e ajustar estoque minimo quando houver concentracao.
@@ -63,6 +64,7 @@ Atualizacao 2026-02
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
 - Campos de controle de email adicionados em inventory_report (status, tentativas e erro).
 - PDF passou a ser renderizado pela Edge Function dedicada `relatorio-estoque-pdf`.
+- `relatorio-estoque-pdf` passou a exigir Authorization Bearer JWT; o frontend envia o token de sessao.
 - Edge Function de email mensal aceita `test_email` para envio de teste sem atualizar status.
 - Remetente do email mensal passou a usar `RELATORIO_ESTOQUE_EMAIL_FROM`.
 - Header do email mensal passou a incluir duas logos e aviso de email automatico.
@@ -97,7 +99,7 @@ Atualizacao 2026-02 (semanal)
 - Relatorio semanal com CSVs anexados por email (estoque atual, entradas, saidas, acidentes e HHT).
 - Geracao semanal grava metadados no `inventory_report` com `tipo=semanal` e status de email.
 - Coluna `arquivos_total` em `inventory_report` guarda a quantidade de CSVs gerados (semanal).
-- Arquivos salvos no bucket `imports` em `relatorios-semanais/<owner>/<periodo>/`.
+- Arquivos salvos no bucket `imports` em `<owner_id>/relatorios-semanais/<periodo>/`.
 - Envio semanal usa Brevo com anexos (limite total 20MB).
 - Envio semanal respeita limite de 99 destinatarios quando ha anexos.
 - CSV de estoque atual usa saldo acumulado (todas as entradas/saidas) para refletir estoque real, mas total de entradas/saidas considera apenas a semana.

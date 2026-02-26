@@ -13,7 +13,7 @@ const LOG_BUCKET = "cron"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-const cronSecret = Deno.env.get("CRON_SECRET") || ""
+const cronSecret = (Deno.env.get("CRON_SECRET") || "").trim()
 const canLog = Boolean(supabaseUrl && serviceRoleKey)
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
@@ -33,7 +33,7 @@ const getBearerToken = (req: Request) => {
 }
 
 const isCronAuthorized = (req: Request) => {
-  if (!cronSecret) return true
+  if (!cronSecret) return false
   const headerToken = (req.headers.get("x-cron-secret") || "").trim()
   const bearerToken = getBearerToken(req)
   return headerToken === cronSecret || bearerToken === cronSecret
@@ -129,6 +129,14 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     httpStatus = 405
     return new Response("Method not allowed", { status: 405, headers: corsHeaders })
+  }
+
+  if (!cronSecret) {
+    httpStatus = 500
+    return new Response(JSON.stringify({ ok: false, error: "Missing CRON_SECRET" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
   }
 
   const isCronCall = isCronAuthorized(req)
