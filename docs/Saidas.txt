@@ -104,10 +104,13 @@ Atualizacao 2026-02
 
 Atualizacao 2026-02 (relatorio troca EPI)
 -----------------------------------------
-- Criado relatorio diario de trocas de EPI (data limite e 7 dias).
-- Edge Functions geram snapshot e enviam email apenas quando houver dados.
+- Criado relatorio semanal de trocas de EPI (periodo de 7 dias).
+- Edge Functions geram snapshot semanal e enviam email apenas quando houver dados.
+- Cron sugerido:
+  - Geracao: domingo 18:00 (America/Sao_Paulo).
+  - Envio: segunda 06:00 (America/Sao_Paulo).
 - Destinatarios: somente usuarios com credencial admin (com suporte a test_email).
-- Relatorio nao e gerado quando o conteudo for igual ao ultimo snapshot (evita envio duplicado).
+- Email exibe data de entrega sem horario.
 - Arquivos alterados:
   - supabase/functions/relatorio-troca-epi/index.ts
   - supabase/functions/relatorio-troca-epi/_shared/relatorioTrocaEpiCore.ts
@@ -115,11 +118,11 @@ Atualizacao 2026-02 (relatorio troca EPI)
   - supabase/functions/relatorio-troca-epi-email/_shared/relatorioTrocaEpiEmailCore.ts
   - docs/Saidas.txt
 - Funcoes tocadas:
-  - runRelatorioTrocaEpi (gera relatorio diario e grava em inventory_report).
+  - runRelatorioTrocaEpi (gera relatorio semanal e grava em inventory_report).
   - runRelatorioTrocaEpiEmail (envia email para admins e atualiza status).
 - Comportamento antes/depois:
-  - Antes: nao existia envio diario de alertas de troca.
-  - Depois: alertas diarios com data limite e 7 dias sao enviados quando houver dados.
+  - Antes: nao existia envio semanal de alertas de troca.
+  - Depois: alertas semanais com periodo de 7 dias sao enviados quando houver dados.
 
 Atualizacao 2026-01 (estoque)
 -----------------------------

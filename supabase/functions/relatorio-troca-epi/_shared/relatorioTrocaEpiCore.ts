@@ -49,46 +49,52 @@ const getDatePartsInTimezone = (value: Date, timeZone: string) => {
 const buildDateKey = (parts: { year: number; month: number; day: number }) =>
   `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`
 
-const toUtcDateValue = (parts: { year: number; month: number; day: number }) =>
-  Date.UTC(parts.year, parts.month - 1, parts.day)
-
-const resolveTodayContext = () => {
-  const todayParts = getDatePartsInTimezone(new Date(), REPORT_TIMEZONE)
-  if (!todayParts) {
-    throw new Error("Falha ao resolver data base do relatorio.")
+const addDaysToParts = (parts: { year: number; month: number; day: number }, days: number) => {
+  const baseUtc = Date.UTC(parts.year, parts.month - 1, parts.day)
+  const next = new Date(baseUtc + days * DAY_MS)
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
   }
-  const todayUtcMs = toUtcDateValue(todayParts)
-  const periodo = buildDateKey(todayParts)
-  const rangeStartIso = new Date(todayUtcMs - DAY_MS).toISOString()
-  const rangeEndIso = new Date(todayUtcMs + 8 * DAY_MS).toISOString()
-  return { todayUtcMs, periodo, rangeStartIso, rangeEndIso }
 }
 
-const classifyTrocaPrazo = (dataTroca: unknown, todayUtcMs: number) => {
-  if (!dataTroca) return null
-  let parts: { year: number; month: number; day: number } | null = null
-  if (typeof dataTroca === "string") {
-    const match = dataTroca.match(/^(\d{4})-(\d{2})-(\d{2})/)
+const resolveWeeklyContext = () => {
+  const startParts = getDatePartsInTimezone(new Date(), REPORT_TIMEZONE)
+  if (!startParts) {
+    throw new Error("Falha ao resolver data base do relatorio.")
+  }
+  const endParts = addDaysToParts(startParts, 7)
+  const startKey = buildDateKey(startParts)
+  const endKey = buildDateKey(endParts)
+
+  const startUtcMs = Date.UTC(startParts.year, startParts.month - 1, startParts.day)
+  const endUtcMs = Date.UTC(endParts.year, endParts.month - 1, endParts.day)
+  const rangeStartIso = new Date(startUtcMs - DAY_MS).toISOString()
+  const rangeEndIso = new Date(endUtcMs + DAY_MS).toISOString()
+
+  return {
+    startKey,
+    endKey,
+    rangeStartIso,
+    rangeEndIso,
+  }
+}
+
+const extractDateKey = (value: unknown) => {
+  if (!value) return null
+  if (typeof value === "string") {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
     if (match) {
       const [, year, month, day] = match
-      parts = {
-        year: Number(year),
-        month: Number(month),
-        day: Number(day),
-      }
+      return `${year}-${month}-${day}`
     }
   }
-  if (!parts) {
-    const date = new Date(dataTroca as any)
-    if (Number.isNaN(date.getTime())) return null
-    parts = getDatePartsInTimezone(date, REPORT_TIMEZONE)
-  }
+  const date = new Date(value as any)
+  if (Number.isNaN(date.getTime())) return null
+  const parts = getDatePartsInTimezone(date, REPORT_TIMEZONE)
   if (!parts) return null
-  const dataUtc = toUtcDateValue(parts)
-  const diffDays = Math.floor((dataUtc - todayUtcMs) / DAY_MS)
-  if (diffDays === 0) return "limite"
-  if (diffDays >= 1 && diffDays <= 7) return "alerta"
-  return null
+  return buildDateKey(parts)
 }
 
 const normalizeSearchValue = (value: unknown) => {
@@ -298,21 +304,6 @@ const mapSaidaRecord = (saida: any, maps: any, statusMap: Map<string, string>) =
   }
 }
 
-const buildSignature = async (limite: any[], alerta: any[]) => {
-  const sorter = (a: any, b: any) => {
-    const aKey = `${a?.data_troca || ""}|${a?.saida_id || ""}|${a?.material_resumo || ""}`
-    const bKey = `${b?.data_troca || ""}|${b?.saida_id || ""}|${b?.material_resumo || ""}`
-    return aKey.localeCompare(bKey, "pt-BR")
-  }
-  const payload = JSON.stringify({
-    limite: [...(limite ?? [])].sort(sorter),
-    alerta: [...(alerta ?? [])].sort(sorter),
-  })
-  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload))
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
-}
-
 export const assertRelatorioTrocaEnv = () => {
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
@@ -321,7 +312,7 @@ export const assertRelatorioTrocaEnv = () => {
 
 export const runRelatorioTrocaEpi = async () => {
   assertRelatorioTrocaEnv()
-  const { todayUtcMs, periodo, rangeStartIso, rangeEndIso } = resolveTodayContext()
+  const { startKey, endKey, rangeStartIso, rangeEndIso } = resolveWeeklyContext()
   const owners = await fetchOwners()
   const statusMap = await loadStatusSaidaMap()
 
@@ -331,7 +322,7 @@ export const runRelatorioTrocaEpi = async () => {
     if (!ownerId) continue
 
     const ultimo = await loadLatestReport(ownerId)
-    if (ultimo?.periodo_inicio === periodo && ultimo?.periodo_fim === periodo) {
+    if (ultimo?.periodo_inicio === startKey && ultimo?.periodo_fim === endKey) {
       resultados.push({ ownerId, skipped: true, reason: "periodo_ja_registrado" })
       continue
     }
@@ -342,40 +333,44 @@ export const runRelatorioTrocaEpi = async () => {
       continue
     }
 
-    const saidasComPrazo = (saidasRaw ?? [])
+    const saidasPeriodo = (saidasRaw ?? [])
       .map((saida: any) => {
         const statusNome = statusMap.get(saida?.status) || ""
-        const prazo = classifyTrocaPrazo(saida?.dataTroca, todayUtcMs)
+        const dataKey = extractDateKey(saida?.dataTroca)
         return {
           ...saida,
           statusNome,
-          prazo,
+          dataKey,
         }
       })
-      .filter((saida: any) => saida?.prazo && !isSaidaCancelada(saida?.statusNome || ""))
+      .filter((saida: any) => {
+        if (!saida?.dataKey) return false
+        if (isSaidaCancelada(saida?.statusNome || "")) return false
+        return saida.dataKey >= startKey && saida.dataKey <= endKey
+      })
 
-    if (!saidasComPrazo.length) {
+    if (!saidasPeriodo.length) {
       resultados.push({ ownerId, skipped: true, reason: "sem_alertas" })
       continue
     }
 
     const pessoasIds = Array.from(
-      new Set(saidasComPrazo.map((item: any) => item?.pessoaId).filter(Boolean)),
+      new Set(saidasPeriodo.map((item: any) => item?.pessoaId).filter(Boolean)),
     )
     const materiaisIds = Array.from(
-      new Set(saidasComPrazo.map((item: any) => item?.materialId).filter(Boolean)),
+      new Set(saidasPeriodo.map((item: any) => item?.materialId).filter(Boolean)),
     )
     const usuariosIds = Array.from(
-      new Set(saidasComPrazo.map((item: any) => item?.usuarioResponsavel).filter(Boolean)),
+      new Set(saidasPeriodo.map((item: any) => item?.usuarioResponsavel).filter(Boolean)),
     )
     const centrosEstoqueIds = Array.from(
-      new Set(saidasComPrazo.map((item: any) => item?.centro_estoque).filter(Boolean)),
+      new Set(saidasPeriodo.map((item: any) => item?.centro_estoque).filter(Boolean)),
     )
     const centrosCustoIds = Array.from(
-      new Set(saidasComPrazo.map((item: any) => item?.centro_custo).filter(Boolean)),
+      new Set(saidasPeriodo.map((item: any) => item?.centro_custo).filter(Boolean)),
     )
     const centrosServicoIds = Array.from(
-      new Set(saidasComPrazo.map((item: any) => item?.centro_servico).filter(Boolean)),
+      new Set(saidasPeriodo.map((item: any) => item?.centro_servico).filter(Boolean)),
     )
 
     const [pessoas, materiais, usuarios, centrosEstoque, centrosCusto, centrosServico] = await Promise.all([
@@ -396,27 +391,15 @@ export const runRelatorioTrocaEpi = async () => {
       centrosServico,
     }
 
-    const limite: any[] = []
-    const alerta: any[] = []
-    for (const saida of saidasComPrazo ?? []) {
+    const itens: any[] = []
+    for (const saida of saidasPeriodo ?? []) {
       const record = mapSaidaRecord(saida, maps, statusMap)
-      if (saida?.prazo === "limite") {
-        limite.push(record)
-      } else if (saida?.prazo === "alerta") {
-        alerta.push(record)
-      }
+      itens.push(record)
     }
 
-    const total = limite.length + alerta.length
+    const total = itens.length
     if (!total) {
       resultados.push({ ownerId, skipped: true, reason: "sem_alertas" })
-      continue
-    }
-
-    const signature = await buildSignature(limite, alerta)
-    const assinaturaAnterior = trim(ultimo?.metadados?.signature ?? "")
-    if (assinaturaAnterior && assinaturaAnterior === signature) {
-      resultados.push({ ownerId, skipped: true, reason: "sem_alteracoes" })
       continue
     }
 
@@ -424,14 +407,11 @@ export const runRelatorioTrocaEpi = async () => {
       tipo: REPORT_TYPE_TROCA,
       origem: "auto",
       timezone: REPORT_TIMEZONE,
-      periodo_ref: periodo,
-      limite_total: limite.length,
-      alerta_total: alerta.length,
+      periodo_inicio: startKey,
+      periodo_fim: endKey,
       total,
-      signature,
       gerado_em: new Date().toISOString(),
-      limite,
-      alerta,
+      itens,
     }
 
     const registro = await executeSingle(
@@ -440,8 +420,8 @@ export const runRelatorioTrocaEpi = async () => {
         .insert({
           account_owner_id: ownerId,
           created_by: ownerId,
-          periodo_inicio: periodo,
-          periodo_fim: periodo,
+          periodo_inicio: startKey,
+          periodo_fim: endKey,
           termo: "",
           pareto_saida: {},
           pareto_risco: {},
@@ -460,9 +440,8 @@ export const runRelatorioTrocaEpi = async () => {
     resultados.push({
       ownerId,
       reportId: registro?.id ?? null,
-      periodo,
-      limite: limite.length,
-      alerta: alerta.length,
+      periodo_inicio: startKey,
+      periodo_fim: endKey,
       total,
       email_status: EMAIL_STATUS_PENDENTE,
     })
