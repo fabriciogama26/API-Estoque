@@ -11,7 +11,7 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
 const bucket = Deno.env.get("ERRORS_BUCKET") || "imports"
-const cronSecret = Deno.env.get("CRON_SECRET") || ""
+const cronSecret = (Deno.env.get("CRON_SECRET") || "").trim()
 
 const clampInt = (value: string | undefined, fallback: number) => {
   const parsed = Number(value)
@@ -51,7 +51,7 @@ const resolveActorUserId = async (req: Request) => {
 }
 
 const isAuthorized = (req: Request) => {
-  if (!cronSecret) return true
+  if (!cronSecret) return false
   const headerToken = (req.headers.get("x-cron-secret") || "").trim()
   const authHeader = req.headers.get("authorization") || ""
   const match = authHeader.match(/Bearer\s+(.+)/i)
@@ -68,18 +68,29 @@ const importPrefixes = [
   "relatorios-semanais/",
 ]
 
+const OWNER_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const splitOwnerPrefix = (path: string) => {
+  const normalized = path.replace(/^\/+/, "")
+  const parts = normalized.split("/")
+  if (parts.length > 1 && OWNER_UUID_REGEX.test(parts[0])) {
+    return { owner: parts[0], relative: parts.slice(1).join("/") }
+  }
+  return { owner: null, relative: normalized }
+}
+
 function isErrorCsv(path: string) {
-  const s = path.toLowerCase()
+  const s = splitOwnerPrefix(path).relative.toLowerCase()
   return s.includes("_erros_") && s.endsWith(".csv")
 }
 
 function isImportSource(path: string) {
-  const s = path.toLowerCase()
+  const s = splitOwnerPrefix(path).relative.toLowerCase()
   return importPrefixes.some((prefix) => s.startsWith(prefix)) && s.endsWith(".xlsx")
 }
 
 function isWeeklyReportCsv(path: string) {
-  const s = path.toLowerCase()
+  const s = splitOwnerPrefix(path).relative.toLowerCase()
   return s.startsWith("relatorios-semanais/") && s.endsWith(".csv")
 }
 
@@ -123,12 +134,17 @@ async function listImportEntries() {
   const entries: { path: string; ts: number | null }[] = []
 
   const rootList = await listAll("")
+  const ownerPrefixes = new Set<string>()
   rootList.forEach((item) => {
     const name = String(item?.name ?? "")
     if (!name) return
     entries.push({ path: name, ts: extractTs(item) })
+    if (OWNER_UUID_REGEX.test(name)) {
+      ownerPrefixes.add(name)
+    }
   })
 
+  // Legacy paths (sem prefixo do owner)
   for (const prefix of importPrefixes) {
     const topLevel = await listAll(prefix)
     topLevel.forEach((item) => {
@@ -167,6 +183,47 @@ async function listImportEntries() {
           const periodName = String(period?.name ?? "")
           if (!periodName) continue
           const periodPrefix = `${ownerPrefix}${periodName}/`
+          const periodFiles = await listAll(periodPrefix)
+          periodFiles.forEach((fileItem) => {
+            const fileName = String(fileItem?.name ?? "")
+            if (!fileName) return
+            entries.push({ path: `${periodPrefix}${fileName}`, ts: extractTs(fileItem) })
+          })
+        }
+      }
+    }
+  }
+
+  // Paths com prefixo do owner
+  for (const ownerPrefix of ownerPrefixes) {
+    for (const prefix of importPrefixes) {
+      const scopedPrefix = `${ownerPrefix}/${prefix}`
+      const topLevel = await listAll(scopedPrefix)
+      topLevel.forEach((item) => {
+        const name = String(item?.name ?? "")
+        if (!name) return
+        entries.push({ path: `${scopedPrefix}${name}`, ts: extractTs(item) })
+      })
+
+      if (prefix === "cadastro-base/") {
+        for (const item of topLevel) {
+          const name = String(item?.name ?? "")
+          if (!name) continue
+          const nestedPrefix = `${scopedPrefix}${name}/`
+          const nested = await listAll(nestedPrefix)
+          nested.forEach((child) => {
+            const childName = String(child?.name ?? "")
+            if (!childName) return
+            entries.push({ path: `${nestedPrefix}${childName}`, ts: extractTs(child) })
+          })
+        }
+      }
+
+      if (prefix === "relatorios-semanais/") {
+        for (const item of topLevel) {
+          const periodName = String(item?.name ?? "")
+          if (!periodName) continue
+          const periodPrefix = `${scopedPrefix}${periodName}/`
           const periodFiles = await listAll(periodPrefix)
           periodFiles.forEach((fileItem) => {
             const fileName = String(fileItem?.name ?? "")
@@ -240,10 +297,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
-    baseRow.user_id = await resolveActorUserId(req)
-    if (req.method !== "POST") {
-      httpStatus = 405
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
+  baseRow.user_id = await resolveActorUserId(req)
+  if (req.method !== "POST") {
+    httpStatus = 405
       baseRow.http_status = httpStatus
       baseRow.error_message = "Method not allowed"
       baseRow.duration_ms = Date.now() - t0
@@ -255,6 +312,18 @@ Deno.serve(async (req) => {
       httpStatus = 500
       baseRow.http_status = httpStatus
       baseRow.error_message = "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+      baseRow.duration_ms = Date.now() - t0
+      await saveRunToDb(baseRow)
+      return new Response(JSON.stringify({ ok: false, message: baseRow.error_message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    if (!cronSecret) {
+      httpStatus = 500
+      baseRow.http_status = httpStatus
+      baseRow.error_message = "Missing CRON_SECRET"
       baseRow.duration_ms = Date.now() - t0
       await saveRunToDb(baseRow)
       return new Response(JSON.stringify({ ok: false, message: baseRow.error_message }), {

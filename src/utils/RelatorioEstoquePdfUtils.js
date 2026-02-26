@@ -1,4 +1,5 @@
 import { request as httpRequest } from '../services/httpClient.js'
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 
 const DEFAULT_FILENAME = 'relatorio-estoque.pdf'
 
@@ -16,6 +17,18 @@ function resolveAnonKey() {
     throw new Error('VITE_SUPABASE_ANON_KEY nao configurada.')
   }
   return key
+}
+
+async function resolveAccessToken() {
+  if (!isSupabaseConfigured() || !supabase) {
+    throw new Error('Supabase nao configurado.')
+  }
+  const { data } = await supabase.auth.getSession()
+  const token = data?.session?.access_token
+  if (!token) {
+    throw new Error('Sessao expirada. Faca login novamente.')
+  }
+  return token
 }
 
 function formatMonthLabel(dateValue) {
@@ -40,12 +53,13 @@ export async function downloadRelatorioEstoquePdf({ html, report } = {}) {
   const normalizedHtml = normalizeHtmlForRemote(html)
   const endpoint = `${buildFunctionsUrl()}/relatorio-estoque-pdf`
   const anonKey = resolveAnonKey()
+  const token = await resolveAccessToken()
 
   const blob = await httpRequest('POST', endpoint, {
     body: { html: normalizedHtml },
     headers: {
       apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
+      Authorization: `Bearer ${token}`,
     },
     responseType: 'blob',
     skipSessionGuard: true,

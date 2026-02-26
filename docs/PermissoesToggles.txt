@@ -18,6 +18,9 @@ Impacto:
 - Menu/rotas refletem exatamente os toggles selecionados.
 - Chaves de dominio (estoque.read/write, acidentes.read/write) continuam existindo para RLS.
 
+Atualizacao 2026-02 (reprocessar)
+- Adicionado grupo `estoque-reprocessar` para ligar a permissao `estoque.reprocessar`.
+
 Arquivos:
 - src/config/permissions.js
 - supabase/migrations/20260217_page_permission_keys.sql

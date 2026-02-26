@@ -47,6 +47,9 @@ Cadastro
   - Colunas obrigatorias: centro_estoque, material_id, quantidade, data_entrada.
   - Hora da entrada e definida automaticamente no momento do import.
   - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+  - Upload vai para o Storage em `imports/<owner_id>/entradas/<uuid>-<arquivo>.xlsx`.
+  - Edge Function valida JWT e confere prefixo do owner antes de processar.
+  - CSV de erros fica em `imports/<owner_id>/erros/entrada_erros_<uuid>.csv`.
   - Centro de estoque e material precisam existir no catalogo do owner.
 
 Filtros, auto-complete e listagem
@@ -114,6 +117,7 @@ Atualizacao 2026-01
 Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
+- Importacao em massa agora usa prefixo `imports/<owner_id>/entradas/` e valida JWT + owner no backend.
 
 Atualizacao 2026-01 (schema)
 -----------------------------

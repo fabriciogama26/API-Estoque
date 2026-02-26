@@ -1,4 +1,4 @@
-# API-Estoque
+﻿# API-Estoque
 
 Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 
@@ -9,6 +9,8 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 - Contexto de uso: times de seguranca e almoxarifado em ambiente multi-tenant.
 
 
+---
+
 ## Tecnologias
 - React
 - Vite
@@ -18,6 +20,8 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 - Vercel Serverless Functions (pasta `api/`)
 
 
+---
+
 ## Requisitos
 - Node.js 20+
 - npm 10+
@@ -25,6 +29,8 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 - Supabase CLI disponivel via `npx` para backup de functions publicadas/configs
 - PostgreSQL client (pg_dump) para backup do banco
 
+
+---
 
 ## Como rodar o projeto
 
@@ -41,6 +47,8 @@ npm run build
 npm run preview
 ```
 
+
+---
 
 ## Variaveis de ambiente
 Obrigatorias (frontend remoto):
@@ -114,7 +122,9 @@ Opcionais / por feature:
 - `NEXT_PUBLIC_SUPABASE_URL`
 
 
-## Estrutura de pastas simplificada
+---
+
+## Estrutura de pastas
 - `api/`: funcoes serverless (Vercel).
 - `docs/`: documentacao por tela e guias.
 - `public/`: assets estaticos.
@@ -123,6 +133,8 @@ Opcionais / por feature:
 - `supabase/`: migrations, functions e configuracoes.
 - `supabasebackup/`: scripts e artefatos de backup.
 
+
+---
 
 ## Estrutura completa de pastas
 - Excecao explicita: pastas grandes nao listadas nesta secao: `.git/`, `node_modules/`, `dist/`, `supabasebackup/`.
@@ -571,6 +583,8 @@ supabase/
   Scheme.sql  # snapshot de schema (referencia)
   config.toml  # configuracao do Supabase CLI
   functions/
+    _shared/
+      auth.ts  # helper compartilhado (auth/jwt) das edge functions
     auth-login/
       index.ts  # edge function (Supabase)
     auth-recover/
@@ -578,14 +592,20 @@ supabase/
     acidente-import/
       index.ts  # edge function (Supabase)
     acidente-template/
+      _shared/
+        auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
     cadastro-base-import/
       index.ts  # edge function (Supabase)
     cadastro-base-template/
+      _shared/
+        auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
     cadastro-import/
       index.ts  # edge function (Supabase)
     cadastro-template/
+      _shared/
+        auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
     cleanup-import-errors/
       index.ts  # edge function (Supabase)
@@ -593,6 +613,8 @@ supabase/
     desligamento-import/
       index.ts  # edge function (Supabase)
     desligamento-template/
+      _shared/
+        auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
     entrada-import/
       index.ts  # edge function (Supabase)
@@ -610,11 +632,15 @@ supabase/
         relatorioEstoqueTemplate.ts  # template HTML de relatorio (edge function)
       index.ts  # edge function (Supabase)
     relatorio-estoque-pdf/
+      _shared/
+        auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
     import_map.json  # import map das edge functions
     request-password-reset/
       index.ts  # edge function (Supabase)
     termo-epi/
+      _shared/
+        auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
     verify-captcha/
       index.ts  # edge function (Supabase)
@@ -803,6 +829,8 @@ supabase/
     20260225_update_rpc_acidentes_mult_agents.sql  # migration SQL
     20260225_update_vw_acidentes_mult_agents.sql  # migration SQL
     20260226_fix_trigger_set_owner_accident_relacionado_safe.sql  # migration SQL
+    20260226_add_permission_estoque_reprocessar.sql  # migration SQL
+    20260226_imports_bucket_owner_prefix.sql  # migration SQL
     20260227_accidents_unique_cat_cid.sql  # migration SQL
     20260228_register_missing_tables.sql  # migration SQL
     20260301_fix_rpc_acidentes_import_hash.sql  # migration SQL
@@ -826,7 +854,12 @@ vite.config.js  # configuracao do Vite
 ```
 
 
-## Fluxo principal (happy path)
+---
+
+## Verificacao de dados em (caso exista):
+D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
+
+## Fluxo principal
 - Autenticar no Supabase e carregar contexto do usuario.
 - Cadastrar catalogos base (grupos, fabricantes, cores, caracteristicas, medidas).
 - Cadastrar materiais e pessoas.
@@ -837,23 +870,36 @@ vite.config.js  # configuracao do Vite
 - Gerar termo de EPI quando aplicavel.
 
 
+---
+
 ## Testes
 - Nao existem testes automatizados.
 
+
+---
 
 ## Troubleshooting
 - Erro de API: validar `error.request_id` e correlacionar com `api_errors`.
 - Erro de RLS (42501): conferir `account_owner_id`, roles/permissions e policies do schema.
 - Erro de auth/URL: validar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
 - Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.
+- Erro 401/403 em templates/PDF/imports: validar Authorization Bearer JWT e sessao ativa.
+- Erro de importacao: path do bucket `imports` deve iniciar com `<account_owner_id>/`.
 - Relatorio nao enviado: validar `BREVO_API_KEY` e destinatarios admin/master.
 - Relatorio automatico nao executa: validar `CRON_SECRET` e as Edge Functions `relatorio-estoque-mensal`/`relatorio-estoque-mensal-email`.
+- Erro 500 em cron: `CRON_SECRET` ausente ou header `x-cron-secret` divergente.
 - Nenhuma movimentacao encontrada: revisar filtros e periodo do relatorio.
 
 
-## Status do projeto
-🟡 Em desenvolvimento
+---
 
+## Status do projeto
+🟢 Em produção  
+🟡 Em desenvolvimento (atual)  
+🔴 Descontinuado
+
+
+---
 
 ## Licenca
 - Nao definida no repositorio.

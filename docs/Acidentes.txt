@@ -91,6 +91,9 @@ Cadastro em massa (novo)
   - Campos opcionais: cat, cid, observacao.
   - Agentes/tipos/lesoes/partes usam ";" como separador.
   - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+  - Upload vai para o Storage em `imports/<owner_id>/acidentes/<uuid>-<arquivo>.xlsx`.
+  - Edge Function valida JWT e confere prefixo do owner antes de processar.
+  - CSV de erros fica em `imports/<owner_id>/erros/acidente_erros_<uuid>.csv`.
   - Importacao calcula hash do registro; linhas ja importadas retornam "registro ja importado".
   - Se ja existir acidente para a mesma matricula e data, a linha e bloqueada.
   - O fluxo completo esta documentado em:
@@ -151,6 +154,7 @@ Atualizacao 2026-02
 - Botao "Exportar Excel (CSV)" adicionado na lista de acidentes.
 - CID deixou de ser unico (CAT segue unico); RPCs e validacao do formulario ajustadas.
 - Modal de confirmacao para duplicidade por matricula+data no cadastro manual.
+- Importacao em massa agora usa prefixo `imports/<owner_id>/acidentes/` e valida JWT + owner no backend.
 
 Atualizacao 2026-03
 -------------------

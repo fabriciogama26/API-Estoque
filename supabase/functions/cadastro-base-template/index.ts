@@ -1,6 +1,7 @@
 ﻿// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import * as XLSX from "npm:xlsx"
+import { requireAuthUser } from "./_shared/auth.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,8 +52,9 @@ Deno.serve((req) => {
     return new Response("Method not allowed", { status: 405, headers: corsHeaders })
   }
 
-  if (!req.headers.get("authorization")) {
-    return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+  const auth = await requireAuthUser(req, corsHeaders)
+  if ("response" in auth) {
+    return auth.response
   }
 
   const url = new URL(req.url)

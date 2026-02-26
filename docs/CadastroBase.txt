@@ -37,6 +37,9 @@ Cadastro
   - Modelo XLSX varia por tabela (nome + relacoes).
   - Todos os campos sao texto; ativo e opcional (true/false).
   - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+  - Upload vai para o Storage em `imports/<owner_id>/cadastro-base/<tabela>/<uuid>-<arquivo>.xlsx`.
+  - Edge Function valida JWT e confere prefixo do owner antes de processar.
+  - CSV de erros fica em `imports/<owner_id>/erros/cadastro_base_erros_<uuid>.csv`.
   - Itens duplicados na planilha ou ja existentes sao bloqueados.
 
 Filtros, auto-complete e listagem
@@ -69,6 +72,7 @@ Atualizacao 2026-01
 Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
+- Importacao em massa agora usa prefixo `imports/<owner_id>/cadastro-base/` e validacao de JWT + owner no backend.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

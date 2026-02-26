@@ -886,7 +886,7 @@ const uploadCsv = async ({
   name: string
   content: string
 }) => {
-  const path = `relatorios-semanais/${ownerId}/${periodKey}/${name}`
+  const path = `${ownerId}/relatorios-semanais/${periodKey}/${name}`
   const encoder = new TextEncoder()
   const payload = encoder.encode(content)
   const { error } = await supabaseAdmin.storage.from(STORAGE_BUCKET).upload(path, payload, {

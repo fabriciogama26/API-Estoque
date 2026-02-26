@@ -44,6 +44,8 @@ Boas praticas
 - Base de previsao considera o ultimo mes com dados e preenche meses sem movimento com zero.
 - Se existir previsao aberta (qtd_meses_base < 12), o RPC reutiliza o mesmo periodo_base_inicio e atualiza ate completar 12.
 - Previsao mensal e agregados sao gerados por cron via Edge Function.
+- Execucao manual de previsao (`forecast-gasto-mensal`) exige Authorization Bearer JWT, valida tenant, requer permissao `estoque.reprocessar` e aplica rate limit (5 min).
+- Execucao interna por cron requer `CRON_SECRET` e usa service role (nao deve aceitar chamada manual sem permissao).
 - A previsao mensal usa metodo sazonal: media movel 3m e fator sazonal por mes, multiplicado pelo fator_tendencia.
 - Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m).
 - O periodo exibido pode ser trocado pelo select com historicos gravados em `inventory_forecast`.
@@ -93,12 +95,15 @@ Atualizacao 2026-02
 - Endpoint `/api/estoque/previsao` retorna dados apenas das tabelas agregadas.
 - Edge Function `forecast-gasto-mensal` dispara a previsao mensal para todos os tenants.
 - Execucoes do cron `forecast-gasto-mensal` agora registram resumo em `edge_functions_error_report`.
+- Execucao manual de `forecast-gasto-mensal` passou a exigir JWT, permissao `estoque.reprocessar` e rate limit por tenant.
 - rpc_refresh_gasto_mensal agora ignora saidas canceladas via status_saida (evita erro de UUID e garante agregados corretos).
 - Ajuda contextual criada para a pagina.
 - Requisicao de previsao (`/api/estoque/previsao`) agora inclui `X-Session-Id` para manter o guard de sessao consistente.
 - Arquivos alterados:
 - `src/services/api.js`
+- `src/config/permissions.js`
 - `supabase/functions/forecast-gasto-mensal/index.ts`
+- `supabase/migrations/20260226_add_permission_estoque_reprocessar.sql`
 - Antes/Depois:
 - Antes: a previsao era solicitada sem `X-Session-Id`.
 - Depois: a previsao inclui `X-Session-Id` para manter a sessao consistente no backend.
