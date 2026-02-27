@@ -10,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Expose-Headers": "x-deno-execution-id, x-sb-request-id",
 }
 
-Deno.serve((req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
