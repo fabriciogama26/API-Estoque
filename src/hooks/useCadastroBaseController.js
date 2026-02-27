@@ -8,6 +8,8 @@ import {
   listBasicRegistrationHistory,
 } from '../services/basicRegistrationService.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { resolveEffectiveAppUser } from '../services/effectiveUserService.js'
+import { isLocalMode } from '../config/runtime.js'
 
 const TABLES = [
   { key: 'fabricantes', label: 'Fabricantes', nameLabel: 'Fabricante', hasOrder: false },
@@ -212,6 +214,32 @@ export function useCadastroBaseController() {
     setForm(buildDefaultForm())
   }
 
+  const resolveActor = useCallback(async () => {
+    const baseName = user?.metadata?.username || user?.name || user?.email || null
+    if (isLocalMode) {
+      return { actorId: user?.id || null, actorName: baseName }
+    }
+    if (user?.metadata?.app_user_id) {
+      return { actorId: user.metadata.app_user_id, actorName: baseName }
+    }
+    if (!user?.id) {
+      return { actorId: null, actorName: baseName }
+    }
+    try {
+      const effective = await resolveEffectiveAppUser(user.id, { forceRefresh: true })
+      const profile = effective?.profile || null
+      const actorName =
+        profile?.username ||
+        profile?.display_name ||
+        profile?.email ||
+        baseName
+      return { actorId: effective?.appUserId || null, actorName }
+    } catch (err) {
+      reportError(err, { stage: 'resolve_actor' })
+      return { actorId: null, actorName: baseName }
+    }
+  }, [reportError, user])
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (!dependencyStatus.canSave) {
@@ -225,16 +253,21 @@ export function useCadastroBaseController() {
       setError(`Selecione ${tableConfig.relationLabel?.toLowerCase?.() || 'um registro relacionado'}.`)
       return
     }
-    setIsSaving(true)
     setError(null)
+    setIsSaving(true)
     try {
+      const { actorId, actorName } = await resolveActor()
+      if (!actorId) {
+        setError('Aguardando sincronizacao do usuario. Tente novamente em alguns segundos.')
+        return
+      }
       const payload = {
         nome: form.nome,
         ativo: form.ativo,
         centroCustoId: form.centroCustoId || null,
         centroServicoId: form.centroServicoId || null,
-        usuarioId: user?.metadata?.app_user_id || user?.id || null,
-        usuarioNome: user?.metadata?.username || user?.name || user?.email || null,
+        usuarioId: actorId,
+        usuarioNome: actorName,
       }
       if (editingItem?.id) {
         await updateBasicRegistration(tableKey, editingItem.id, payload)

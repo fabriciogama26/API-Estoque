@@ -73,6 +73,7 @@ Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 - Importacao em massa agora usa prefixo `imports/<owner_id>/cadastro-base/` e validacao de JWT + owner no backend.
+- Submit do cadastro base aguarda sincronizacao do usuario efetivo (app_user_id) antes de salvar.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

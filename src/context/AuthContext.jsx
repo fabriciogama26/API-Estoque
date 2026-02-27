@@ -40,12 +40,19 @@ function buildStoredUser(value) {
     typeof value.metadata?.username === 'string' && value.metadata.username.trim()
       ? value.metadata.username.trim()
       : null
+  const appUserId =
+    typeof value.metadata?.app_user_id === 'string' && value.metadata.app_user_id.trim()
+      ? value.metadata.app_user_id.trim()
+      : null
 
   return {
     id,
     email,
     name,
-    metadata: username ? { username } : {},
+    metadata: {
+      ...(username ? { username } : {}),
+      ...(appUserId ? { app_user_id: appUserId } : {}),
+    },
   }
 }
 
