@@ -39,6 +39,8 @@ export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
     return DOMPurify.sanitize(srcDoc, {
       USE_PROFILES: { html: true },
       FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
+      ADD_TAGS: ['style'],
+      ADD_ATTR: ['style', 'class', 'id'],
     })
   }, [srcDoc])
 

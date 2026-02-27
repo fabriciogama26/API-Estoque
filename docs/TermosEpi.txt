@@ -32,6 +32,7 @@ Atualizacao 2026-02
 - Download do PDF agora usa httpClient para aplicar envelope de erro e request_id das Functions.
 - A Edge Function `termo-epi` passou a exigir Authorization Bearer JWT; o frontend envia o token de sessao.
 - Preview HTML passou a ser sanitizado e exibido em iframe sandbox (sem allow-same-origin/allow-scripts).
+- Sanitizacao passou a preservar estilos (style/class/id) para manter o layout da pre-visualizacao.
 - Arquivos alterados:
 - `src/utils/TermoEpiUtils.js`
 - `supabase/functions/termo-epi/index.ts`
