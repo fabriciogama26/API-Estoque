@@ -26,6 +26,6 @@ export function isSupabaseConfigured() {
 }
 
 // Exponibiliza o client no navegador para facilitar debug de sessao (ex.: supabase.auth.getSession())
-if (typeof window !== 'undefined' && supabase) {
+if (typeof window !== 'undefined' && supabase && import.meta.env.DEV) {
   window.supabase = supabase
 }

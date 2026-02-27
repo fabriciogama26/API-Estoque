@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import DOMPurify from 'dompurify'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 
 const DEFAULT_MIN_HEIGHT = 400
 
@@ -27,6 +28,15 @@ export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
   forwardedRef,
 ) {
   const innerRef = useRef(null)
+  const sanitizedSrcDoc = useMemo(() => {
+    if (typeof srcDoc !== 'string' || !srcDoc.trim()) {
+      return ''
+    }
+    return DOMPurify.sanitize(srcDoc, {
+      USE_PROFILES: { html: true },
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
+    })
+  }, [srcDoc])
 
   useImperativeHandle(forwardedRef, () => innerRef.current)
 
@@ -93,14 +103,15 @@ export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
         resizeObserver = undefined
       }
     }
-  }, [srcDoc, minHeight, onLoad])
+  }, [sanitizedSrcDoc, minHeight, onLoad])
 
   return (
     <iframe
       {...rest}
       ref={innerRef}
-      srcDoc={srcDoc}
-      scrolling="no"
+      sandbox=""
+      srcDoc={sanitizedSrcDoc}
+      scrolling="auto"
     />
   )
 })

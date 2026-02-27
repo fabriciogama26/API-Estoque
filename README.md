@@ -3,6 +3,8 @@
 Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 
 
+---
+
 ## Visao geral
 - Problema resolvido: centralizar cadastros, movimentacoes de estoque e historicos.
 - Solucao proposta: frontend React com Supabase Auth/Database/Storage e migrations versionadas.
@@ -859,6 +861,8 @@ vite.config.js  # configuracao do Vite
 ## Verificacao de dados em (caso exista):
 D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 
+---
+
 ## Fluxo principal
 - Autenticar no Supabase e carregar contexto do usuario.
 - Cadastrar catalogos base (grupos, fabricantes, cores, caracteristicas, medidas).
@@ -882,7 +886,8 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Erro de API: validar `error.request_id` e correlacionar com `api_errors`.
 - Erro de RLS (42501): conferir `account_owner_id`, roles/permissions e policies do schema.
 - Erro de auth/URL: validar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-- Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.
+  - Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.
+  - Violacao de CSP (Report-Only): revisar `vercel.json` e ajustar origens permitidas.
 - Erro 401/403 em templates/PDF/imports: validar Authorization Bearer JWT e sessao ativa.
 - Erro de importacao: path do bucket `imports` deve iniciar com `<account_owner_id>/`.
 - Relatorio nao enviado: validar `BREVO_API_KEY` e destinatarios admin/master.

@@ -26,6 +26,29 @@ const LOCAL_AUTH = import.meta.env.DEV
 
 export const AuthContext = createContext(null)
 
+function buildStoredUser(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  const id = typeof value.id === 'string' ? value.id : null
+  if (!id) {
+    return null
+  }
+  const email = typeof value.email === 'string' ? value.email : null
+  const name = typeof value.name === 'string' ? value.name : null
+  const username =
+    typeof value.metadata?.username === 'string' && value.metadata.username.trim()
+      ? value.metadata.username.trim()
+      : null
+
+  return {
+    id,
+    email,
+    name,
+    metadata: username ? { username } : {},
+  }
+}
+
 function buildLocalUser(identifier) {
   const username = identifier || LOCAL_AUTH?.username || 'admin'
   const name = LOCAL_AUTH?.name || username
@@ -135,7 +158,7 @@ export function AuthProvider({ children }) {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
       if (raw) {
-        return JSON.parse(raw)
+        return buildStoredUser(JSON.parse(raw))
       }
     } catch (error) {
       reportError(error, { stage: 'parse_storage' })
@@ -192,7 +215,12 @@ export function AuthProvider({ children }) {
         }
         setUser(resolvedUser)
         if (resolvedUser) {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
+          const storedUser = buildStoredUser(resolvedUser)
+          if (storedUser) {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedUser))
+          } else {
+            window.localStorage.removeItem(STORAGE_KEY)
+          }
         } else {
           window.localStorage.removeItem(STORAGE_KEY)
         }
@@ -224,12 +252,17 @@ export function AuthProvider({ children }) {
             setReauthState({ open: false, error: null, isSubmitting: false })
             return
           }
-          setUser(resolvedUser)
-          if (resolvedUser) {
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
-          } else {
-            window.localStorage.removeItem(STORAGE_KEY)
-          }
+            setUser(resolvedUser)
+            if (resolvedUser) {
+              const storedUser = buildStoredUser(resolvedUser)
+              if (storedUser) {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedUser))
+              } else {
+                window.localStorage.removeItem(STORAGE_KEY)
+              }
+            } else {
+              window.localStorage.removeItem(STORAGE_KEY)
+            }
         } catch (error) {
           reportError(error, { stage: 'auth_state_change' })
           setUser(null)
@@ -265,7 +298,12 @@ export function AuthProvider({ children }) {
         }
         const localUser = buildLocalUser(identifier)
         setUser(localUser)
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(localUser))
+        const storedUser = buildStoredUser(localUser)
+        if (storedUser) {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedUser))
+        } else {
+          window.localStorage.removeItem(STORAGE_KEY)
+        }
         setReauthState({ open: false, error: null, isSubmitting: false })
         return localUser
       }
@@ -297,12 +335,17 @@ export function AuthProvider({ children }) {
         throw new Error('Usuario inativo. Procure um administrador.')
       }
 
-      setUser(resolvedUser)
-      if (resolvedUser) {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resolvedUser))
-      } else {
-        window.localStorage.removeItem(STORAGE_KEY)
-      }
+        setUser(resolvedUser)
+        if (resolvedUser) {
+          const storedUser = buildStoredUser(resolvedUser)
+          if (storedUser) {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedUser))
+          } else {
+            window.localStorage.removeItem(STORAGE_KEY)
+          }
+        } else {
+          window.localStorage.removeItem(STORAGE_KEY)
+        }
       if (!isLocalMode && hasSupabase && supabase) {
         rotateSessionId()
         touchSession().catch((error) => {

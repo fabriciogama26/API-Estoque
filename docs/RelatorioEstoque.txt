@@ -68,6 +68,7 @@ Atualizacao 2026-02
 - Edge Function de email mensal aceita `test_email` para envio de teste sem atualizar status.
 - Remetente do email mensal passou a usar `RELATORIO_ESTOQUE_EMAIL_FROM`.
 - Header do email mensal passou a incluir duas logos e aviso de email automatico.
+- Pre-visualizacao HTML passou a ser sanitizada e exibida em iframe sandbox (sem allow-same-origin/allow-scripts).
 - Ranking de consumo por centro/setor passou a usar quantidade e valor (top 10 com percentuais).
 - Desvio por centro/setor aplica regra de concentracao (>= 30%) e outlier (media + 2 desvios).
 - Cobertura por trabalhador agora considera consumo medio mensal por centro/setor e classifica status (OK/ATENCAO/CRITICO/SEM BASE).
@@ -79,6 +80,7 @@ Atualizacao 2026-02
 - `src/services/localApi.js`
 - `src/utils/RelatorioEstoquePdfUtils.js`
 - `src/utils/inventoryReportUtils.js`
+- `src/components/AutoResizeIframe.jsx`
 - `src/lib/estoque.js`
 - `src/help/helpRelatorioEstoque.json`
 - `api/_shared/operations.js`
