@@ -31,12 +31,19 @@ Atualizacao 2026-02
 
 - Download do PDF agora usa httpClient para aplicar envelope de erro e request_id das Functions.
 - A Edge Function `termo-epi` passou a exigir Authorization Bearer JWT; o frontend envia o token de sessao.
-- Preview HTML passou a ser sanitizado e exibido em iframe sandbox (sem allow-same-origin/allow-scripts).
-- Sanitizacao passou a preservar estilos (style/class/id) para manter o layout da pre-visualizacao.
+- Preview HTML passou a ser sanitizado e exibido em iframe sandbox.
+- Modo trusted (templates internos) usa allow-same-origin para auto-resize; modo untrusted usa sandbox vazio com scroll.
+- Sanitizacao preserva documento completo e estilos (head/style/class/id) para manter o layout da pre-visualizacao.
+- Sanitizacao registra eventos de seguranca (script, event_handler, javascript_url, iframe) em app_errors com tenant_hint quando ha remocao.
+- Edge Function termo-epi registra eventos de seguranca (api_errors) quando HTML suspeito e enviado.
+- Preview envia contexto (page/tenant_hint/user_id) para log de seguranca.
 - Arquivos alterados:
 - `src/utils/TermoEpiUtils.js`
 - `supabase/functions/termo-epi/index.ts`
 - `src/components/AutoResizeIframe.jsx`
+- `src/pages/TermosEpiPage.jsx`
+- `src/components/Documents/TermoEpiPreviewModal.jsx`
+- `src/services/errorLogService.js`
 - Antes/Depois:
 - Antes: download usava fetch direto e tratava erro manualmente.
 - Depois: download usa httpClient com responseType blob e envelope padronizado.

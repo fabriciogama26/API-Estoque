@@ -1,9 +1,11 @@
+import { useMemo } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon } from '../components/icons.jsx'
 import { AutoResizeIframe } from '../components/AutoResizeIframe.jsx'
 import { useTermoEpi } from '../hooks/useTermoEpi.js'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import '../styles/DocumentPreviewModal.css'
+import { usePermissions } from '../context/PermissionsContext.jsx'
 
 export function TermosEpiPage() {
   const {
@@ -16,6 +18,17 @@ export function TermosEpiPage() {
     handleReset,
     handleDownload,
   } = useTermoEpi()
+  const { ownerId, userId } = usePermissions()
+  const tenantHint = useMemo(() => (typeof ownerId === 'string' ? ownerId.slice(0, 8) : null), [ownerId])
+  const securityContext = useMemo(
+    () => ({
+      page: 'termo-epi',
+      tenantHint,
+      userId,
+      source: 'front',
+    }),
+    [tenantHint, userId],
+  )
 
   const { context, ultimaEntregaLabel, origemLabel } = resumo
 
@@ -116,6 +129,8 @@ export function TermosEpiPage() {
               title="Pre-visualizacao do termo de EPI"
               className="document-preview__frame"
               srcDoc={preview.html}
+              trusted
+              securityContext={securityContext}
             />
           </div>
         ) : (
