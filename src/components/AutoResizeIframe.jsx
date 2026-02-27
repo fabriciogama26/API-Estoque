@@ -4,7 +4,11 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 const DEFAULT_MIN_HEIGHT = 400
 
 function getDocumentFromIframe(iframe) {
-  return iframe?.contentDocument || iframe?.contentWindow?.document || null
+  try {
+    return iframe?.contentDocument || iframe?.contentWindow?.document || null
+  } catch (_) {
+    return null
+  }
 }
 
 function computeDocumentHeight(doc) {
@@ -109,9 +113,9 @@ export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
     <iframe
       {...rest}
       ref={innerRef}
-      sandbox=""
+      sandbox="allow-same-origin"
       srcDoc={sanitizedSrcDoc}
-      scrolling="auto"
+      scrolling="no"
     />
   )
 })

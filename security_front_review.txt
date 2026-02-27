@@ -1,4 +1,15 @@
 Revisao de seguranca do front-end (API-Estoque)
+Resultado geral (2026-02)
+- Service role no front: OK
+- RLS ativado: OK
+- Policy por tenant: OK
+- Functions com validacao: OK
+- Storage isolado: OK
+- Exportacoes protegidas: OK
+- Logs seguros: revisar
+- Rate limit: implementar
+- Views/RPC auditadas: revisar
+
 
 1) Permissoes e autorizacao
 - Modo local: so habilita em desenvolvimento (runtime.js) e build de producao falha se VITE_DATA_MODE != remote (vite.config.js). Guard do front apenas redireciona; chamadas diretas a Supabase/API continuam sendo o vetor de risco.
@@ -17,6 +28,10 @@ Revisao de seguranca do front-end (API-Estoque)
 4) Logs, dados sensiveis e sessao
 - useErrorLogger/errorLogService: sanitizacao de message/stack/context (whitelist, remove email/token, truncamento). Evitar PII em mensagens.
 - app_errors/api_errors: RLS master-only para leitura; coluna account_owner_id removida. Sessao Supabase fica no localStorage (risco XSS); aplicar CSP e escape de dados de usuario.
+- Preview HTML: iframe com sandbox e HTML sanitizado (DOMPurify) para reduzir risco de XSS.
+- window.supabase exposto apenas em DEV.
+- localStorage do AuthContext agora guarda somente campos minimos (id/email/name/username).
+
 
 5) Integridade / logica de negocio
 - Validacoes criticas ainda sao client-side; mutacoes diretas podem ser abusadas. Necessario reforco no backend (RLS/constraints/triggers/RPC) para estoque/acidentes e correlatos.
@@ -30,3 +45,7 @@ Pendencias backend
 - Deploy da Edge Function request-password-reset com SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (opcional SUPABASE_PASSWORD_REDIRECT whitelisted).
 - Validar que todas as migrations estao aplicadas (20250101/02/03/04 corrigida; 05 so se precisou reverter catalogos; 06 backfill; 07 FKs/catalogos globais) e que RLS de account_owner_id permanece ativa nas tabelas de negocio.
 - Testar RLS/RPC: admin de um owner só opera no proprio owner; master atravessa; usuario comum nao chama RPCs admin.
+- Revisar logs para remover PII/tokens e garantir escopo por tenant quando aplicavel.
+- Implementar rate limit por tenant/rota sensivel.
+- Auditar views/RPCs (security definer/invoker e account_owner_id).
+
