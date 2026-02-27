@@ -1,7 +1,14 @@
 import { AutoResizeIframe } from '../AutoResizeIframe.jsx'
 import '../../styles/DocumentPreviewModal.css'
 
-export function TermoEpiPreviewModal({ state, onClose, onDownload, onRetry, downloadLabel = 'Baixar PDF' }) {
+export function TermoEpiPreviewModal({
+  state,
+  onClose,
+  onDownload,
+  onRetry,
+  downloadLabel = 'Baixar PDF',
+  securityContext = null,
+}) {
   if (!state?.open) {
     return null
   }
@@ -60,6 +67,8 @@ export function TermoEpiPreviewModal({ state, onClose, onDownload, onRetry, down
               className="document-preview__frame"
               loading="lazy"
               srcDoc={html}
+              trusted
+              securityContext={securityContext}
             />
           ) : (
             <p className="feedback">Nenhum conteudo disponivel para exibir.</p>

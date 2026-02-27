@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { ChecklistIcon, InfoIcon } from '../components/icons.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
@@ -5,6 +6,7 @@ import { AutoResizeIframe } from '../components/AutoResizeIframe.jsx'
 import { useRelatorioEstoque } from '../hooks/useRelatorioEstoque.js'
 import { PDF_REPORT_LIMIT_PER_MONTH } from '../config/RelatorioEstoqueConfig.js'
 import '../styles/DocumentPreviewModal.css'
+import { usePermissions } from '../context/PermissionsContext.jsx'
 
 const formatDate = (value) => {
   if (!value) return '-'
@@ -46,6 +48,17 @@ export function RelatorioEstoquePage() {
     handleReset,
     handleGeneratePdf,
   } = useRelatorioEstoque()
+  const { ownerId, userId } = usePermissions()
+  const tenantHint = useMemo(() => (typeof ownerId === 'string' ? ownerId.slice(0, 8) : null), [ownerId])
+  const securityContext = useMemo(
+    () => ({
+      page: 'relatorio-estoque',
+      tenantHint,
+      userId,
+      source: 'front',
+    }),
+    [tenantHint, userId],
+  )
 
   return (
     <div className="stack">
@@ -149,6 +162,8 @@ export function RelatorioEstoquePage() {
               title="Pre-visualizacao do relatorio de estoque"
               className="document-preview__frame"
               srcDoc={preview.html}
+              trusted
+              securityContext={securityContext}
             />
           </div>
         ) : (

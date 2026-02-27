@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { requireAuthUser } from "./_shared/auth.ts";
+import { createUserClient, requireAuthUser } from "./_shared/auth.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +9,9 @@ const corsHeaders: Record<string, string> = {
 };
 
 const PDF_FILENAME = "relatorio-estoque.pdf";
+const SECURITY_EVENT_CODE = "SANITIZE_HTML";
+const SECURITY_EVENT_MESSAGE = "HTML sanitize: conteudo suspeito detectado";
+const SECURITY_SERVICE = "edge-security";
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -22,6 +25,16 @@ serve(async (req: Request): Promise<Response> => {
 
   try {
     const input = await resolveInput(req);
+    if (input.securityTypes?.length) {
+      const tenantHint = await resolveTenantHint(auth.token);
+      await logSecurityEvent({
+        types: input.securityTypes,
+        userId: auth.user?.id || null,
+        tenantHint,
+        method: req.method.toUpperCase(),
+        path: new URL(req.url).pathname,
+      });
+    }
     const pdfBytes = await renderPdf(input);
 
     const headers = new Headers({
@@ -73,6 +86,7 @@ serve(async (req: Request): Promise<Response> => {
 type RenderInput = {
   html?: string;
   url?: string;
+  securityTypes?: string[];
 };
 
 async function renderPdf({ html, url }: RenderInput): Promise<Uint8Array> {
@@ -144,6 +158,8 @@ async function resolveInput(req: Request): Promise<RenderInput> {
     const rawHtml = data.html ?? data.content ?? data.body ?? data.markup;
     const rawUrl = data.url ?? data.href ?? data.link;
 
+    const securityTypes =
+      typeof rawHtml === "string" ? detectSuspiciousHtml(rawHtml) : [];
     const html = rawHtml === undefined ? undefined : normalizeHtmlDocument(rawHtml);
     const url = rawUrl === undefined ? undefined : normalizeUrl(rawUrl);
 
@@ -151,7 +167,7 @@ async function resolveInput(req: Request): Promise<RenderInput> {
       throw new HttpError(400, "Informe o HTML ou uma URL para gerar o PDF.");
     }
 
-    return { html, url };
+    return { html, url, securityTypes };
   }
 
   throw new HttpError(405, "Metodo nao suportado.", {
@@ -195,6 +211,97 @@ function normalizeHtmlDocument(raw: unknown): string {
   }
 
   return html;
+}
+
+function detectSuspiciousHtml(html: string): string[] {
+  const types = new Set<string>();
+  if (/<\s*script\b/i.test(html)) {
+    types.add("script");
+  }
+  if (/<\s*iframe\b/i.test(html)) {
+    types.add("iframe");
+  }
+  if (/\son[a-z]+\s*=/i.test(html)) {
+    types.add("event_handler");
+  }
+  if (/(href|src)\s*=\s*['"]?\s*javascript:/i.test(html)) {
+    types.add("javascript_url");
+  }
+  return Array.from(types);
+}
+
+async function resolveTenantHint(token: string): Promise<string | null> {
+  try {
+    const supabaseUser = createUserClient(token);
+    const { data, error } = await supabaseUser.rpc("current_account_owner_id");
+    if (error) {
+      return null;
+    }
+    const ownerId =
+      typeof data === "string"
+        ? data
+        : (data as { account_owner_id?: string } | null)?.account_owner_id;
+    return typeof ownerId === "string" ? ownerId.slice(0, 8) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function logSecurityEvent({
+  types,
+  userId,
+  tenantHint,
+  method,
+  path,
+}: {
+  types: string[];
+  userId: string | null;
+  tenantHint: string | null;
+  method: string;
+  path: string;
+}): Promise<void> {
+  if (!types.length) {
+    return;
+  }
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    return;
+  }
+
+  const fingerprint = `sanitize_html|${path}|${types.sort().join(",")}`;
+  const payload = {
+    environment: "api",
+    service: SECURITY_SERVICE,
+    method,
+    path,
+    status: 200,
+    code: SECURITY_EVENT_CODE,
+    user_id: userId,
+    message: SECURITY_EVENT_MESSAGE,
+    context: {
+      source: "edge",
+      eventTypes: types,
+      tenantHint,
+    },
+    severity: "warn",
+    fingerprint,
+  };
+
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/api_errors`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    console.warn("Falha ao registrar evento de seguranca", error);
+  }
 }
 
 function ensureMetaCharset(html: string): string {

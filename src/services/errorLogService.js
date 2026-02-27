@@ -14,6 +14,8 @@ const ALLOWED_CONTEXT_KEYS = new Set([
   'path',
   'response',
   'requestId',
+  'tenantHint',
+  'eventTypes',
 ])
 const MAX_FIELD_LENGTH = 500
 

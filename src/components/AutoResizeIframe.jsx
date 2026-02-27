@@ -1,7 +1,71 @@
 import DOMPurify from 'dompurify'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
+import { logError } from '../services/errorLogService.js'
 
 const DEFAULT_MIN_HEIGHT = 400
+const SANITIZE_EVENT_MESSAGE = 'HTML sanitize: conteudo removido'
+const SANITIZE_EVENT_ACTION = 'sanitize_html'
+
+let sanitizeHookReady = false
+let activeSanitizeCollector = null
+
+function ensureSanitizeHooks() {
+  if (sanitizeHookReady || typeof DOMPurify.addHook !== 'function') {
+    return
+  }
+
+  DOMPurify.addHook('uponSanitizeElement', (_node, data) => {
+    if (!activeSanitizeCollector || !data?.tagName) {
+      return
+    }
+    const tagName = String(data.tagName).toLowerCase()
+    if (tagName === 'script') {
+      activeSanitizeCollector.add('script')
+    }
+    if (tagName === 'iframe') {
+      activeSanitizeCollector.add('iframe')
+    }
+  })
+
+  DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
+    if (!activeSanitizeCollector || !data?.attrName) {
+      return
+    }
+    const attrName = String(data.attrName).toLowerCase()
+    if (attrName.startsWith('on') && data.keepAttr === false) {
+      activeSanitizeCollector.add('event_handler')
+      return
+    }
+    if (
+      (attrName === 'href' || attrName === 'src' || attrName === 'xlink:href') &&
+      typeof data.attrValue === 'string' &&
+      /^\s*javascript:/i.test(data.attrValue)
+    ) {
+      activeSanitizeCollector.add('javascript_url')
+    }
+  })
+
+  sanitizeHookReady = true
+}
+
+function logSanitizeEvent(eventTypes, securityContext) {
+  if (!securityContext?.page || !eventTypes.length) {
+    return
+  }
+
+  logError({
+    page: securityContext.page,
+    message: SANITIZE_EVENT_MESSAGE,
+    severity: 'warn',
+    userId: securityContext.userId || undefined,
+    context: {
+      action: SANITIZE_EVENT_ACTION,
+      eventTypes: eventTypes.join(','),
+      tenantHint: securityContext.tenantHint || null,
+      source: securityContext.source || 'front',
+    },
+  })
+}
 
 function getDocumentFromIframe(iframe) {
   try {
@@ -28,21 +92,55 @@ function computeDocumentHeight(doc) {
 }
 
 export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
-  { srcDoc, minHeight = DEFAULT_MIN_HEIGHT, onLoad, ...rest },
+  {
+    srcDoc,
+    minHeight = DEFAULT_MIN_HEIGHT,
+    onLoad,
+    trusted = false,
+    securityContext = null,
+    ...rest
+  },
   forwardedRef,
 ) {
   const innerRef = useRef(null)
+  const lastSanitizeEventsRef = useRef(null)
+  const allowSameOrigin = Boolean(trusted)
   const sanitizedSrcDoc = useMemo(() => {
     if (typeof srcDoc !== 'string' || !srcDoc.trim()) {
       return ''
     }
-    return DOMPurify.sanitize(srcDoc, {
-      USE_PROFILES: { html: true },
-      FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
-      ADD_TAGS: ['style'],
-      ADD_ATTR: ['style', 'class', 'id'],
-    })
-  }, [srcDoc])
+    const canCollect = Boolean(securityContext?.page)
+    const eventTypes = canCollect ? new Set() : null
+    ensureSanitizeHooks()
+    if (eventTypes && sanitizeHookReady) {
+      activeSanitizeCollector = eventTypes
+    }
+    let sanitized
+    try {
+      sanitized = DOMPurify.sanitize(srcDoc, {
+        WHOLE_DOCUMENT: true,
+        USE_PROFILES: { html: true },
+        FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
+        ADD_TAGS: ['style'],
+        ADD_ATTR: ['style', 'class', 'id'],
+      })
+    } finally {
+      activeSanitizeCollector = null
+    }
+    if (eventTypes && eventTypes.size) {
+      lastSanitizeEventsRef.current = { types: Array.from(eventTypes) }
+    } else {
+      lastSanitizeEventsRef.current = null
+    }
+    return typeof sanitized === 'string' ? sanitized : String(sanitized || '')
+  }, [securityContext, srcDoc])
+
+  useEffect(() => {
+    const last = lastSanitizeEventsRef.current
+    if (last?.types?.length) {
+      logSanitizeEvent(last.types, securityContext)
+    }
+  }, [sanitizedSrcDoc, securityContext])
 
   useImperativeHandle(forwardedRef, () => innerRef.current)
 
@@ -53,6 +151,27 @@ export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
     }
 
     let resizeObserver
+    const sandboxed = !allowSameOrigin
+
+    const handleLoad = (event) => {
+      if (sandboxed) {
+        iframe.style.height = `${minHeight}px`
+        iframe.style.overflow = 'auto'
+        if (typeof onLoad === 'function') {
+          onLoad(event)
+        }
+        return
+      }
+
+      iframe.style.height = 'auto'
+      iframe.style.overflow = 'hidden'
+      scheduleHeightAdjustments()
+      setupResizeObserver()
+
+      if (typeof onLoad === 'function') {
+        onLoad(event)
+      }
+    }
 
     const applyHeight = () => {
       const doc = getDocumentFromIframe(iframe)
@@ -89,17 +208,6 @@ export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
       setTimeout(() => applyHeight(), 50)
     }
 
-    const handleLoad = (event) => {
-      iframe.style.height = 'auto'
-      iframe.style.overflow = 'hidden'
-      scheduleHeightAdjustments()
-      setupResizeObserver()
-
-      if (typeof onLoad === 'function') {
-        onLoad(event)
-      }
-    }
-
     iframe.addEventListener('load', handleLoad)
 
     return () => {
@@ -109,15 +217,15 @@ export const AutoResizeIframe = forwardRef(function AutoResizeIframe(
         resizeObserver = undefined
       }
     }
-  }, [sanitizedSrcDoc, minHeight, onLoad])
+  }, [sanitizedSrcDoc, minHeight, onLoad, allowSameOrigin])
 
   return (
     <iframe
       {...rest}
       ref={innerRef}
-      sandbox="allow-same-origin"
+      sandbox={allowSameOrigin ? 'allow-same-origin' : ''}
       srcDoc={sanitizedSrcDoc}
-      scrolling="no"
+      scrolling={allowSameOrigin ? 'no' : 'auto'}
     />
   )
 })
