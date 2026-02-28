@@ -1,7 +1,8 @@
-﻿// Setup type definitions for built-in Supabase Runtime APIs
+// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import * as XLSX from "npm:xlsx"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
+import { resolveImportSizeLimit, resolveStorageObjectSize } from "../_shared/importLimits.ts"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,12 @@ const errorsBucket = Deno.env.get("ERRORS_BUCKET") || "imports"
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
 const supabaseAuth = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } })
 const SERVICE_NAME = "cadastro-base-import"
+const RATE_LIMIT_WINDOW_SECONDS = 60
+const DAILY_LIMIT_CATEGORY = "import"
+const RATE_LIMIT_WINDOW_CODE = "RATE_LIMIT_WINDOW"
+const RATE_LIMIT_WINDOW_MESSAGE = "Limite de 1 requisicao a cada 60 segundos."
+const DAILY_LIMIT_CODE = "DAILY_LIMIT_BLOCK"
+const DAILY_LIMIT_MESSAGE = "Limite diario do plano bloqueado."
 
 const limitText = (value: unknown, max = 500) => {
   if (value === null || value === undefined) return ""
@@ -176,7 +183,7 @@ const parseBoolean = (value?: unknown) => {
   const raw = String(value).trim().toLowerCase()
   if (!raw) return null
   if (["true", "1", "sim", "yes", "ativo"].includes(raw)) return true
-  if (["false", "0", "nao", "nÃ£o", "no", "inativo"].includes(raw)) return false
+  if (["false", "0", "nao", "não", "no", "inativo"].includes(raw)) return false
   return null
 }
 
@@ -192,10 +199,11 @@ const buildMapByName = (rows: { id: string; nome?: string | null; almox?: string
 }
 
 Deno.serve(async (req) => {
+  let owner: string | null = null
+  let importUserId: string | null = null
+  let dailyLimitChecked = false
+  let dailyResultRegistered = false
   try {
-    if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
-    if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: corsHeaders })
-
     const requestPath = new URL(req.url).pathname
     const requestMethod = req.method
     const logError = async (
@@ -227,22 +235,82 @@ Deno.serve(async (req) => {
       })
     }
 
+    const registerDailyResult = async (success: boolean) => {
+      if (!owner) return
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/edge_rate_limit_daily_register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify({ p_owner_id: owner, p_category: DAILY_LIMIT_CATEGORY, p_success: success }),
+        })
+        if (!response.ok) {
+          const errorText = await response.text()
+          await logError(
+            500,
+            "Falha ao registrar consumo diario.",
+            { status: response.status, error: errorText },
+            importUserId,
+            "DAILY_LIMIT_REGISTER_ERROR",
+          )
+          return
+        }
+        const data = await response.json()
+        const result = Array.isArray(data) ? data[0] : data
+        if (!success && result?.error_count === 3 && result?.locked_until) {
+          await logError(
+            429,
+            "Limite diario bloqueado ate meia-noite (America/Sao_Paulo).",
+            { lockedUntil: result.locked_until },
+            importUserId,
+            DAILY_LIMIT_CODE,
+            null,
+            "warn",
+          )
+        }
+      } catch (error) {
+        await logError(
+          500,
+          "Falha ao registrar consumo diario.",
+          { error: error instanceof Error ? error.message : String(error) },
+          importUserId,
+          "DAILY_LIMIT_REGISTER_ERROR",
+        )
+      }
+    }
+
+    const respond = async (body: BodyInit | null, init?: ResponseInit) => {
+      const response = new Response(body, init)
+      if (dailyLimitChecked && !dailyResultRegistered && owner) {
+        await registerDailyResult(response.ok)
+        dailyResultRegistered = true
+      }
+      return response
+    }
+
+    if (req.method === "OPTIONS") return respond("ok", { headers: corsHeaders })
+    if (req.method !== "POST") return respond("Method not allowed", { status: 405, headers: corsHeaders })
+
     stage = "auth_header"
     const authHeader = req.headers.get("authorization") || ""
     const tokenMatch = authHeader.match(/Bearer\s+(.+)/i)
     const accessToken = tokenMatch?.[1]?.trim()
     if (!accessToken) {
       await logError(401, "Unauthorized")
-      return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+      return respond("Unauthorized", { status: 401, headers: corsHeaders })
     }
 
     stage = "auth_getUser"
     const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(accessToken)
     if (userErr || !userData?.user?.id) {
       await logError(401, "Unauthorized", { error: userErr?.message || null })
-      return new Response("Unauthorized", { status: 401, headers: corsHeaders })
+      return respond("Unauthorized", { status: 401, headers: corsHeaders })
     }
-    const importUserId = userData.user.id
+    importUserId = userData.user.id
     const userMeta = userData.user.user_metadata || {}
     const userName =
       (userMeta.username || userMeta.full_name || userMeta.name || userData.user.email || "").toString().trim() || null
@@ -253,12 +321,161 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     })
     const { data: ownerId, error: ownerErr } = await supabaseUser.rpc("current_account_owner_id")
-    const owner =
-      typeof ownerId === "string" ? ownerId : (ownerId as { account_owner_id?: string } | null)?.account_owner_id
+    owner = typeof ownerId === "string" ? ownerId : (ownerId as { account_owner_id?: string } | null)?.account_owner_id
     if (ownerErr || !owner) {
       await logError(403, "Owner nao encontrado", { error: ownerErr?.message || null }, importUserId)
-      return new Response("Owner nao encontrado", { status: 403, headers: corsHeaders })
+      return respond("Owner nao encontrado", { status: 403, headers: corsHeaders })
     }
+
+    const enforceRateLimit = async () => {
+      const now = new Date()
+      const windowStartSeconds =
+        Math.floor(now.getTime() / 1000 / RATE_LIMIT_WINDOW_SECONDS) * RATE_LIMIT_WINDOW_SECONDS
+      const windowStart = new Date(windowStartSeconds * 1000).toISOString()
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/edge_rate_limits`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          account_owner_id: owner,
+          function_name: SERVICE_NAME,
+          window_start: windowStart,
+        }),
+      })
+
+      if (response.ok) return null
+
+      const text = await response.text()
+      if (response.status === 409 || text.includes("23505")) {
+        await logError(
+          429,
+          RATE_LIMIT_WINDOW_MESSAGE,
+          { windowStart, functionName: SERVICE_NAME },
+          importUserId,
+          RATE_LIMIT_WINDOW_CODE,
+          null,
+          "warn",
+        )
+        return respond(RATE_LIMIT_WINDOW_MESSAGE, {
+          status: 429,
+          headers: { ...corsHeaders, "Retry-After": String(RATE_LIMIT_WINDOW_SECONDS) },
+        })
+      }
+
+      await logError(
+        500,
+        "Falha ao validar limite de requisicoes.",
+        { status: response.status, error: text },
+        importUserId,
+        RATE_LIMIT_WINDOW_CODE,
+      )
+      return respond("Falha ao validar limite de requisicoes.", { status: 500, headers: corsHeaders })
+    }
+
+    const enforceDailyLimit = async () => {
+      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/edge_rate_limit_daily_check`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({ p_owner_id: owner, p_category: DAILY_LIMIT_CATEGORY }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        await logError(
+          500,
+          "Falha ao validar limite diario do plano.",
+          { status: response.status, error: errorText },
+          importUserId,
+          "DAILY_LIMIT_CHECK_ERROR",
+        )
+        return respond("Falha ao validar limite diario do plano.", { status: 500, headers: corsHeaders })
+      }
+
+      const data = await response.json()
+      const result = Array.isArray(data) ? data[0] : data
+      if (!result) {
+        await logError(500, "Falha ao validar limite diario do plano.", {}, importUserId, "DAILY_LIMIT_CHECK_ERROR")
+        return respond("Falha ao validar limite diario do plano.", { status: 500, headers: corsHeaders })
+      }
+      if (result.allowed === true) return null
+
+      const reason = String(result.reason || "")
+      if (reason === "limit_not_configured") {
+        await logError(
+          403,
+          "Limite diario do plano nao configurado.",
+          { category: DAILY_LIMIT_CATEGORY, dayDate: result.day_date },
+          importUserId,
+          DAILY_LIMIT_CODE,
+        )
+        return respond("Limite diario do plano nao configurado.", { status: 403, headers: corsHeaders })
+      }
+      if (reason === "plan_not_found") {
+        await logError(403, "Plano nao encontrado.", { category: DAILY_LIMIT_CATEGORY }, importUserId, DAILY_LIMIT_CODE)
+        return respond("Plano nao encontrado.", { status: 403, headers: corsHeaders })
+      }
+      if (reason === "locked") {
+        await logError(
+          429,
+          DAILY_LIMIT_MESSAGE,
+          { category: DAILY_LIMIT_CATEGORY, dayDate: result.day_date, lockedUntil: result.locked_until },
+          importUserId,
+          DAILY_LIMIT_CODE,
+          null,
+          "warn",
+        )
+        return respond("Limite diario bloqueado ate meia-noite (America/Sao_Paulo).", {
+          status: 429,
+          headers: { ...corsHeaders, "Retry-After": "3600" },
+        })
+      }
+      if (reason === "limit_reached") {
+        await logError(
+          429,
+          DAILY_LIMIT_MESSAGE,
+          { category: DAILY_LIMIT_CATEGORY, dayDate: result.day_date },
+          importUserId,
+          DAILY_LIMIT_CODE,
+          null,
+          "warn",
+        )
+        return respond("Limite diario do plano atingido.", {
+          status: 429,
+          headers: { ...corsHeaders, "Retry-After": "3600" },
+        })
+      }
+
+      await logError(
+        429,
+        DAILY_LIMIT_MESSAGE,
+        { category: DAILY_LIMIT_CATEGORY, reason },
+        importUserId,
+        DAILY_LIMIT_CODE,
+        null,
+        "warn",
+      )
+      return respond("Limite diario do plano nao permitido.", {
+        status: 429,
+        headers: { ...corsHeaders, "Retry-After": "3600" },
+      })
+    }
+
+    const rateLimitResponse = await enforceRateLimit()
+    if (rateLimitResponse) return rateLimitResponse
+
+    const dailyLimitResponse = await enforceDailyLimit()
+    if (dailyLimitResponse) return dailyLimitResponse
+    dailyLimitChecked = true
 
     stage = "read_body"
     let body: any = {}
@@ -266,7 +483,7 @@ Deno.serve(async (req) => {
       body = await req.json()
     } catch {
       await logError(400, "Body precisa ser JSON: { path: string, table: string }", {}, importUserId)
-      return new Response(
+      return respond(
         JSON.stringify({ ok: false, stage, message: "Body precisa ser JSON: { path: string, table: string }" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       )
@@ -275,30 +492,93 @@ Deno.serve(async (req) => {
     const tableKey = (body?.table || "").toString().trim().toLowerCase()
     if (!path || typeof path !== "string") {
       await logError(400, "path obrigatorio", {}, importUserId)
-      return new Response("path obrigatorio", { status: 400, headers: corsHeaders })
+      return respond("path obrigatorio", { status: 400, headers: corsHeaders })
     }
     if (!path.toLowerCase().endsWith(".xlsx")) {
       await logError(400, "Apenas XLSX", {}, importUserId)
-      return new Response("Apenas XLSX", { status: 400, headers: corsHeaders })
+      return respond("Apenas XLSX", { status: 400, headers: corsHeaders })
     }
     const config = TABLES[tableKey]
     if (!config) {
       await logError(400, "Tabela invalida", { table: tableKey }, importUserId)
-      return new Response("Tabela invalida", { status: 400, headers: corsHeaders })
+      return respond("Tabela invalida", { status: 400, headers: corsHeaders })
     }
     const normalizedPath = path.replace(/^\/+/, "")
     if (!normalizedPath.startsWith(`${owner}/`)) {
       await logError(403, "Path fora do owner", { path: normalizedPath }, importUserId)
-      return new Response("Path fora do owner", { status: 403, headers: corsHeaders })
+      return respond("Path fora do owner", { status: 403, headers: corsHeaders })
     }
     sourcePath = normalizedPath
+
+    stage = "import_plan_limit"
+    const limitInfo = await resolveImportSizeLimit(supabaseAdmin, owner)
+    if (limitInfo.error) {
+      await logError(
+        500,
+        "Falha ao validar limite de tamanho do plano.",
+        { error: limitInfo.error, planId: limitInfo.planId },
+        importUserId,
+        "IMPORT_SIZE_PLAN_ERROR",
+      )
+      return respond("Falha ao validar limite de tamanho do plano.", {
+        status: 500,
+        headers: corsHeaders,
+      })
+    }
+    if (!limitInfo.limitBytes || !limitInfo.limitMb) {
+      await logError(
+        403,
+        "Limite de tamanho do plano nao configurado.",
+        { planId: limitInfo.planId },
+        importUserId,
+        "IMPORT_SIZE_PLAN_NOT_CONFIGURED",
+      )
+      return respond("Limite de tamanho do plano nao configurado.", {
+        status: 403,
+        headers: corsHeaders,
+      })
+    }
+
+    stage = "import_size_check"
+    const sizeInfo = await resolveStorageObjectSize(supabaseUrl, serviceRoleKey, errorsBucket, normalizedPath)
+    if (sizeInfo.sizeBytes === null || sizeInfo.error) {
+      await logError(
+        500,
+        "Falha ao validar tamanho do arquivo.",
+        { error: sizeInfo.error, status: sizeInfo.status, path: normalizedPath },
+        importUserId,
+        "IMPORT_SIZE_CHECK_FAILED",
+      )
+      return respond("Falha ao validar tamanho do arquivo.", {
+        status: 500,
+        headers: corsHeaders,
+      })
+    }
+    if (sizeInfo.sizeBytes > limitInfo.limitBytes) {
+      await logError(
+        413,
+        "Arquivo excede limite de tamanho.",
+        {
+          sizeBytes: sizeInfo.sizeBytes,
+          limitBytes: limitInfo.limitBytes,
+          limitMb: limitInfo.limitMb,
+          path: normalizedPath,
+        },
+        importUserId,
+        "IMPORT_SIZE_LIMIT",
+      )
+      return respond(`Arquivo excede o limite de ${limitInfo.limitMb}MB.`, {
+        status: 413,
+        headers: corsHeaders,
+      })
+    }
 
     stage = "storage_download"
     const download = await supabaseAdmin.storage.from(errorsBucket).download(sourcePath)
     if (download.error || !download.data) {
       const msg = download.error?.message || "Falha ao baixar arquivo"
       await logError(400, msg, { error: download.error?.message || null }, importUserId)
-      return new Response(msg, { status: 400, headers: corsHeaders })
+      return respond(msg, { status: 400, headers: corsHeaders })
     }
 
     stage = "xlsx_read"
@@ -315,7 +595,7 @@ Deno.serve(async (req) => {
       .eq("account_owner_id", owner)
     if (existingErr) {
       await logError(500, existingErr.message, { error: existingErr.message }, importUserId, existingErr.code)
-      return new Response(existingErr.message, { status: 500, headers: corsHeaders })
+      return respond(existingErr.message, { status: 500, headers: corsHeaders })
     }
     const existingMap = new Map<string, string>()
     ;(existingRaw || []).forEach((row) => {
@@ -333,7 +613,7 @@ Deno.serve(async (req) => {
         .eq("account_owner_id", owner)
       if (relationErr) {
         await logError(500, relationErr.message, { error: relationErr.message }, importUserId, relationErr.code)
-        return new Response(relationErr.message, { status: 500, headers: corsHeaders })
+        return respond(relationErr.message, { status: 500, headers: corsHeaders })
       }
       relationMap = buildMapByName(relationRows as { id: string; nome?: string | null; almox?: string | null }[])
     }
@@ -461,7 +741,7 @@ Deno.serve(async (req) => {
         "warn",
       )
 
-      return new Response(
+      return respond(
         JSON.stringify({
           processed,
           success,
@@ -480,7 +760,7 @@ Deno.serve(async (req) => {
 
     stage = "response_success"
     await deleteSource()
-    return new Response(
+    return respond(
       JSON.stringify({
         processed,
         success,
@@ -522,7 +802,7 @@ Deno.serve(async (req) => {
         path: sourcePath,
       },
     })
-    return new Response(
+    return respond(
       JSON.stringify({
         ok: false,
         stage,

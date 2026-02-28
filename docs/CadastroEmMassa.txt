@@ -42,6 +42,9 @@ Como usar (passo a passo)
 
 Regras de importacao
 --------------------
+- Backend bloqueia arquivos acima do limite do plano (limit_import_mb, padrao 2 MB).
+- Rate limit: 1 importacao a cada 60 segundos por tenant.
+- Rate limit diario: plano define limit_import_daily; 3 falhas no dia bloqueiam ate meia-noite (America/Sao_Paulo).
 - matricula obrigatoria:
   - Se estiver vazia: erro na coluna matricula.
   - Se tiver letras/simbolos: erro "deve ser numerica".

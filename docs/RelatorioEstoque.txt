@@ -74,6 +74,15 @@ Atualizacao 2026-02
 - Sanitizacao registra eventos de seguranca (script, event_handler, javascript_url, iframe) em app_errors com tenant_hint quando ha remocao.
 - Edge Function relatorio-estoque-pdf registra eventos de seguranca (api_errors) quando HTML suspeito e enviado.
 - Preview envia contexto (page/tenant_hint/user_id) para log de seguranca.
+- Rate limit: edge function `relatorio-estoque-pdf` limita 1 requisicao por tenant a cada 60 segundos (tabela edge_rate_limits).
+- Rate limit diario: plano define limite de PDF (limit_pdf_daily). Conta apenas sucesso; 3 falhas no dia bloqueiam ate meia-noite (America/Sao_Paulo).
+- Observabilidade: falhas nos RPCs diarios (`edge_rate_limit_daily_check` / `edge_rate_limit_daily_register`) geram log em `api_errors` com code DAILY_LIMIT_*.
+- Reset manual (teste): limpar consumo diario do tenant atual:
+```
+delete from public.edge_rate_limits_daily
+where account_owner_id = '<OWNER_ID>'
+  and day_date = (now() at time zone 'America/Sao_Paulo')::date;
+```
 - Ranking de consumo por centro/setor passou a usar quantidade e valor (top 10 com percentuais).
 - Desvio por centro/setor aplica regra de concentracao (>= 30%) e outlier (media + 2 desvios).
 - Cobertura por trabalhador agora considera consumo medio mensal por centro/setor e classifica status (OK/ATENCAO/CRITICO/SEM BASE).

@@ -155,6 +155,8 @@ Atualizacao 2026-02
 - CID deixou de ser unico (CAT segue unico); RPCs e validacao do formulario ajustadas.
 - Modal de confirmacao para duplicidade por matricula+data no cadastro manual.
 - Importacao em massa agora usa prefixo `imports/<owner_id>/acidentes/` e valida JWT + owner no backend.
+- Importacao em massa valida tamanho do arquivo pelo plano (limit_import_mb, padrao 2 MB) e bloqueia acima do limite.
+- Importacao em massa aplica rate limit (1 requisicao a cada 60s) e limite diario por plano (limit_import_daily).
 
 Atualizacao 2026-03
 -------------------

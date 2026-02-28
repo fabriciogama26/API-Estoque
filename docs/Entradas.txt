@@ -118,6 +118,8 @@ Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 - Importacao em massa agora usa prefixo `imports/<owner_id>/entradas/` e valida JWT + owner no backend.
+- Importacao em massa valida tamanho do arquivo pelo plano (limit_import_mb, padrao 2 MB) e bloqueia acima do limite.
+- Importacao em massa aplica rate limit (1 requisicao a cada 60s) e limite diario por plano (limit_import_daily).
 
 Atualizacao 2026-01 (schema)
 -----------------------------
