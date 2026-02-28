@@ -97,6 +97,11 @@ Servicos e integracoes
   - Caminho: src/services/pessoasService.js
   - Responsavel por: expor metodos da API (inclui importacao de desligamento).
 
+- rpc_pessoas_completa
+  - Tipo: RPC Supabase
+  - Caminho: supabase/migrations/20260228_fix_rpc_pessoas_completa_tenant.sql
+  - Responsavel por: listar pessoas com escopo de tenant via current_account_owner_id().
+
 - api.pessoas.create
   - Tipo: integracao API (Vercel)
   - Caminho: src/services/api.js
@@ -133,3 +138,7 @@ Atualizacao 2026-02 (API)
 - Cadastro passou a chamar `/api/pessoas` (Vercel) em vez de RPC direta.
 - Pipeline aplica rate limit e idempotencia no create.
 - Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
+
+Atualizacao 2026-02 (Seguranca)
+- rpc_pessoas_completa passou a filtrar pelo tenant (account_owner_id/current_account_owner_id).
+- Consultas da tela usam RPC para respeitar o escopo de owner (evita vazamento cross-tenant).

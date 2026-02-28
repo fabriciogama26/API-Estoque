@@ -1462,10 +1462,7 @@ async function fetchPessoaSnapshot(pessoaId) {
   }
   try {
     const registro = await executeMaybeSingle(
-      supabase
-        .from('pessoas_view')
-        .select('id, nome, matricula, cargo, centro_servico, centro_custo')
-        .eq('id', pessoaId),
+      buildPessoasViewQuery().eq('id', pessoaId),
       'Falha ao obter pessoa.'
     )
     if (!registro) {
@@ -4201,8 +4198,7 @@ export const api = {
         let registros = (data ?? []).map(mapPessoaRecord)
         if ((!registros || registros.length === 0) && !termo) {
           const fallbackDados = await executePaged(
-            () =>
-              supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).order('nome', { ascending: true }),
+            () => buildPessoasViewQuery().order('nome', { ascending: true }),
             'Falha ao listar pessoas (fallback view).'
           )
           registros = (fallbackDados ?? []).map(mapPessoaRecord)
@@ -4386,7 +4382,7 @@ export const api = {
 
       const [atualView, atualObs] = await Promise.all([
         executeSingle(
-          supabase.from('pessoas_view').select(PESSOAS_VIEW_SELECT).eq('id', id),
+          buildPessoasViewQuery().eq('id', id),
           'Falha ao obter pessoa.'
         ),
         executeSingle(
