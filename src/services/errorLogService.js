@@ -33,6 +33,19 @@ const scrubString = (value) => {
   return sanitized
 }
 
+const resolveStatus = (payload) => {
+  const raw =
+    payload?.status ??
+    payload?.context?.status ??
+    payload?.context?.response?.status ??
+    null
+  if (raw === null || raw === undefined) {
+    return null
+  }
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 const sanitizeContext = (ctx) => {
   if (!ctx || typeof ctx !== 'object') {
     return null
@@ -65,6 +78,10 @@ async function insertError(payload) {
 
   const base = payload || {}
   const userId = base.userId || (await resolveSessionUserId())
+  const status = resolveStatus(base)
+  if (!userId && (status === 401 || status === 429)) {
+    return
+  }
   const context = sanitizeContext({
     source: base.context?.source || 'front',
     ...(base.context || {}),

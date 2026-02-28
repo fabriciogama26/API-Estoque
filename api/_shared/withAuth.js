@@ -1,92 +1,34 @@
-import { requireAuth } from './auth.js'
-import { handleError } from './http.js'
-import { CONSUME_LOCAL_DATA } from './environment.js'
-import { ensureRequestId } from './errorCore.js'
+import { compose } from './middleware/compose.js'
+import { buildContext } from './middleware/ctx.js'
+import { requestId } from './middleware/requestId.js'
+import { cors } from './middleware/cors.js'
+import { auth } from './middleware/auth.js'
+import { tenantResolve } from './middleware/tenant.js'
+import { tenantGuard } from './middleware/tenantGuard.js'
+import { rateLimitAuth, rateLimitApi } from './middleware/rateLimit.js'
+import { idempotency } from './middleware/idempotency.js'
+import { errorHandler } from './middleware/errorHandler.js'
+
+const handlerAdapter = (handler) => async (ctx) => {
+  await handler(ctx.raw.req, ctx.raw.res, ctx.user)
+}
 
 export function withAuth(handler) {
+  const pipeline = compose(
+    requestId,
+    cors,
+    auth,
+    rateLimitAuth,
+    tenantResolve,
+    tenantGuard,
+    rateLimitApi,
+    idempotency,
+    handlerAdapter(handler),
+    errorHandler
+  )
+
   return async (req, res) => {
-    try {
-      ensureRequestId(req, res)
-      if (req.method === 'OPTIONS') {
-        const origin = req.headers?.origin || '*'
-        res.setHeader('Access-Control-Allow-Origin', origin)
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
-        res.setHeader(
-          'Access-Control-Allow-Headers',
-          'Authorization, Content-Type, X-Cron-Secret, X-User-Interaction, X-Session-Id'
-        )
-        res.setHeader('Vary', 'Origin')
-        res.statusCode = 204
-        res.end()
-        return
-      }
-
-      const origin = req.headers?.origin || '*'
-      res.setHeader('Access-Control-Allow-Origin', origin)
-      res.setHeader('Vary', 'Origin')
-
-      const method = (req.method || '').toUpperCase()
-      const path = (req.url || '').split('?')[0]
-      const reauthRequiredMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
-      const reauthExemptPaths = new Set([
-        '/api/session/touch',
-        '/api/session/reauth',
-        '/api/session/revoke',
-        '/api/health',
-      ])
-      const publicPaths = new Set(['/api/auth/login', '/api/auth/recover'])
-      const isPublicPath = publicPaths.has(path)
-      req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path)
-
-      let user = null
-      const cronSecret = process.env.CRON_SECRET || ''
-      const cronHeader =
-        req.headers?.['x-cron-secret'] ||
-        req.headers?.['X-Cron-Secret'] ||
-        req.headers?.get?.('x-cron-secret') ||
-        req.headers?.get?.('X-Cron-Secret')
-      const authHeader =
-        req.headers?.authorization ||
-        req.headers?.Authorization ||
-        req.headers?.get?.('authorization') ||
-        req.headers?.get?.('Authorization')
-      const bearerMatch = typeof authHeader === 'string' ? authHeader.match(/Bearer\s+(.+)/i) : null
-      const bearerToken = bearerMatch?.[1]?.trim() || ''
-      const isCron = cronSecret && ((cronHeader || '').trim() === cronSecret || bearerToken === cronSecret)
-
-      if (isPublicPath) {
-        req.user = null
-        await handler(req, res, null)
-        return
-      }
-
-      if (CONSUME_LOCAL_DATA) {
-        user = {
-          id: 'local-user',
-          user_metadata: {
-            nome: 'Modo Local',
-          },
-        }
-      } else if (isCron) {
-        user = {
-          id: 'cron-job',
-          user_metadata: {
-            nome: 'Cron',
-          },
-          isCron: true,
-        }
-        req.isCron = true
-      } else {
-        user = await requireAuth(req, res)
-        if (!user) {
-          return
-        }
-      }
-
-      req.user = user
-      await handler(req, res, user)
-    } catch (error) {
-      handleError(res, error, 'Erro interno do servidor.', req)
-    }
+    const ctx = buildContext(req, res)
+    return pipeline(ctx)
   }
 }

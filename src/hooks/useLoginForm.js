@@ -33,10 +33,12 @@ export function useLoginForm() {
       navigate(from, { replace: true })
     } catch (err) {
       setError(err.message)
+      const status = err?.status ?? null
       logError({
         page: 'login',
         message: err.message,
-        context: { loginName: form.loginName },
+        status,
+        context: { loginName: form.loginName, status },
         severity: 'error',
       })
     } finally {
@@ -60,10 +62,12 @@ export function useLoginForm() {
       setStatus('Enviamos um link de recuperacao para o seu email.')
     } catch (err) {
       setError(err.message)
+      const status = err?.status ?? null
       logError({
         page: 'login',
         message: err.message,
-        context: { loginName, action: 'recoverPassword' },
+        status,
+        context: { loginName, action: 'recoverPassword', status },
         severity: 'error',
       })
     } finally {

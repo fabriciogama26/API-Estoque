@@ -888,6 +888,8 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Erro de auth/URL: validar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
   - Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.
   - Violacao de CSP (Report-Only): revisar `vercel.json` e ajustar origens permitidas.
+- Erro 429 (rate limit): aguardar `Retry-After`. Em `auth.login`, bloqueio apos 3 tentativas em 60s; em `auth.recover`, segue `rate_limit_config`.
+- Erro 422 (Idempotency-Key): chave reutilizada com payload diferente.
 - Erro 401/403 em templates/PDF/imports: validar Authorization Bearer JWT e sessao ativa.
 - Erro de importacao: path do bucket `imports` deve iniciar com `<account_owner_id>/`.
 - Relatorio nao enviado: validar `BREVO_API_KEY` e destinatarios admin/master.
