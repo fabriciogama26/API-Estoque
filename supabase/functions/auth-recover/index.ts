@@ -12,11 +12,38 @@ const corsHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
 }
 
-const respond = (status: number, payload: Record<string, unknown>) =>
-  new Response(JSON.stringify(payload), { status, headers: corsHeaders })
+const respond = (
+  status: number,
+  payload: Record<string, unknown>,
+  extraHeaders: Record<string, string> = {}
+) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, ...extraHeaders },
+  })
 
 const normalizeLoginName = (value: unknown) =>
   String(value ?? '').trim().toLowerCase()
+const getClientIp = (req: Request) => {
+  const forwarded = req.headers.get('x-forwarded-for')
+  if (forwarded) {
+    const ip = forwarded.split(',')[0]?.trim()
+    if (ip) return ip
+  }
+  return (
+    req.headers.get('cf-connecting-ip') ||
+    req.headers.get('x-real-ip') ||
+    ''
+  )
+}
+
+const sha256Hex = async (value: string) => {
+  const data = new TextEncoder().encode(value)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -49,6 +76,41 @@ serve(async (req) => {
     return respond(400, {
       error: { message: 'Informe seu login para recuperar a senha.', code: 'VALIDATION_ERROR' },
     })
+  }
+
+  const ip = getClientIp(req) || 'unknown'
+  const identityHash = await sha256Hex(`${ip}|${loginName}`)
+  const { data: rateData, error: rateError } = await supabase.rpc(
+    'rate_limit_check_and_hit',
+    {
+      p_scope: 'auth',
+      p_route: 'auth.recover',
+      p_identity_hash: identityHash,
+      p_owner_id: null,
+      p_ip_hash: null,
+    }
+  )
+
+  if (rateError) {
+    return respond(500, {
+      error: { message: 'Falha ao validar limite de requisicoes.', code: 'UPSTREAM_ERROR' },
+    })
+  }
+
+  const rateResult = Array.isArray(rateData) ? rateData[0] : rateData
+  if (rateResult?.allowed === false) {
+    const retryAfterSeconds = Number(rateResult.retry_after) || 60
+    const retryAfter = String(retryAfterSeconds)
+    return respond(
+      429,
+      {
+        error: {
+          message: `Limite de requisicoes excedido. Tente em ${retryAfterSeconds} segundos.`,
+          code: 'RATE_LIMIT',
+        },
+      },
+      { 'Retry-After': retryAfter }
+    )
   }
 
   const { data: userRow, error } = await supabase

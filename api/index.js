@@ -3,7 +3,6 @@ import {
   readJson,
   sendJson,
   methodNotAllowed,
-  handleError,
   parseQuery,
   createHttpError,
 } from './_shared/http.js'
@@ -54,7 +53,6 @@ export default withAuth(async (req, res, user) => {
   const path = url.split('?')[0]
   const query = parseQuery(req)
 
-  try {
     if (path === '/api/auth/login' && method === 'POST') {
       const body = await readJson(req)
       return sendJson(res, 200, await loginWithLoginName(body))
@@ -321,7 +319,4 @@ export default withAuth(async (req, res, user) => {
     }
 
     methodNotAllowed(res, ['GET', 'POST', 'PUT'], req)
-  } catch (error) {
-    handleError(res, error, 'Erro interno do servidor.', req)
-  }
 })

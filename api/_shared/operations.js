@@ -37,6 +37,7 @@ import { buildRelatorioEstoqueHtml } from '../../shared/documents/relatorioEstoq
 import { PDF_REPORT_LIMIT_PER_MONTH } from '../../src/config/RelatorioEstoqueConfig.js'
 import { resolveUsuarioNome } from './auth.js'
 import { createHttpError } from './http.js'
+import { resolveOwnerId } from './tenant.js'
 
 const GENERIC_SUPABASE_ERROR = 'Falha ao comunicar com o Supabase.'
 
@@ -1556,19 +1557,6 @@ async function carregarMovimentacoes(params) {
   }
 }
 
-async function resolveOwnerId(userId) {
-  if (!userId) {
-    throw createHttpError(400, 'Usuario invalido para resolver owner.')
-  }
-  const data = await execute(
-    supabaseAdmin.rpc('my_owner_id_v2', { p_user_id: userId }),
-    'Falha ao resolver owner do usuario.'
-  )
-  if (!data) {
-    throw createHttpError(404, 'Owner nao encontrado para o usuario informado.')
-  }
-  return Array.isArray(data) ? data[0] : data
-}
 
 async function carregarMateriaisPorOwner(ownerId) {
   const registrosIds = await execute(
