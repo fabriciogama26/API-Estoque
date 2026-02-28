@@ -118,6 +118,12 @@ Regras e validacoes
   - Converte texto para numero em campos como dias perdidos e dias debitados.
   - Checa se os grupos obrigatorios (agentes/tipos/lesoes/partes) estao preenchidos quando configurados.
   - CAT nao pode se repetir em outro acidente do mesmo owner (validacao no front + DB).
+
+Atualizacao 2026-02 (API)
+-------------------------
+- Cadastro passou a chamar `/api/acidentes` (Vercel) em vez de RPC direta.
+- Pipeline aplica rate limit e idempotencia no create.
+- Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
 - `createAcidentePayload` e `updateAcidentePayload`:
   - Montam o payload no formato esperado pela API/BD.
   - Mantem consistencia entre listas (`agentes`, `tipos`, `lesoes`, `partesLesionadas`) e campos unicos legados (`agente`, `tipo`, `lesao`, `parteLesionada`).

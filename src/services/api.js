@@ -4353,23 +4353,28 @@ export const api = {
         throw err
       }
 
-      const registro = await executeSingle(
-        supabase.rpc('rpc_pessoas_create_full', {
-          p_nome: dados.nome,
-          p_matricula: dados.matricula,
-          p_observacao: dados.observacao,
-          p_data_admissao: dados.dataAdmissao,
-          p_data_demissao: dados.dataDemissao,
-          p_centro_servico_id: referencias.centroServicoId,
-          p_setor_id: referencias.setorId,
-          p_cargo_id: referencias.cargoId,
-          p_centro_custo_id: referencias.centroCustoId,
-          p_tipo_execucao_id: referencias.tipoExecucaoId,
-          p_ativo: dados.ativo !== false,
-          p_usuario_id: usuarioId,
-        }),
-        'Falha ao criar pessoa.'
-      )
+      const rpcPayload = {
+        p_nome: dados.nome,
+        p_matricula: dados.matricula,
+        p_observacao: dados.observacao,
+        p_data_admissao: dados.dataAdmissao,
+        p_data_demissao: dados.dataDemissao,
+        p_centro_servico_id: referencias.centroServicoId,
+        p_setor_id: referencias.setorId,
+        p_cargo_id: referencias.cargoId,
+        p_centro_custo_id: referencias.centroCustoId,
+        p_tipo_execucao_id: referencias.tipoExecucaoId,
+        p_ativo: dados.ativo !== false,
+        p_usuario_id: usuarioId,
+      }
+
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/pessoas`
+      const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
 
       return mapPessoaRecord(registro)
     },
@@ -4925,25 +4930,19 @@ export const api = {
         },
       )
 
-      const criado = await executeMaybeSingle(
-        supabase.rpc('material_create_full', {
-          p_material: supabasePayload,
-          p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
-          p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
-        }),
-        'Falha ao criar material.'
-      )
-      const materialCriadoId = criado?.id
-      if (!materialCriadoId) {
-        throw new Error('Falha ao criar material.')
+      const rpcPayload = {
+        p_material: supabasePayload,
+        p_cores_ids: toUuidArrayOrEmpty(corRelationIds),
+        p_caracteristicas_ids: toUuidArrayOrEmpty(caracteristicaRelationIds),
       }
-      const registro = await executeSingle(
-        supabase
-          .from('materiais_view')
-          .select(MATERIAL_SELECT_COLUMNS)
-          .eq('id', materialCriadoId),
-        'Falha ao obter material criado.'
-      )
+
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/materiais`
+      const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
       return mapMaterialRecord(registro)
     },
     async update(id, payload) {
@@ -5397,19 +5396,23 @@ export const api = {
     async create(payload) {
       const usuarioId = await resolveUsuarioIdOrThrow()
       const dados = normalizeEntradaInput(payload)
-      const registro = await executeSingle(
-        supabase.rpc('rpc_entradas_create_full', {
-          p_material_id: dados.materialId,
-          p_quantidade: dados.quantidade,
-          p_centro_estoque: dados.centroCusto,
-          p_data_entrada: dados.dataEntrada,
-          p_status: normalizeUuid(payload.statusId ?? payload.status ?? null),
-          p_usuario_id: usuarioId,
-        }),
-        'Falha ao registrar entrada.'
-      )
+      const rpcPayload = {
+        p_material_id: dados.materialId,
+        p_quantidade: dados.quantidade,
+        p_centro_estoque: dados.centroCusto,
+        p_data_entrada: dados.dataEntrada,
+        p_status: normalizeUuid(payload.statusId ?? payload.status ?? null),
+        p_usuario_id: usuarioId,
+      }
+
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/entradas`
+      const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
       const entradaNormalizada = mapEntradaRecord(registro)
-      await registrarEntradaHistoricoSupabase(entradaNormalizada)
       return entradaNormalizada
     },
     async update(id, payload) {
@@ -5576,23 +5579,34 @@ export const api = {
       }
 
       const trocaSequencia = Number(trocaPreflight?.troca_sequencia ?? 0)
-      const registro = await executeSingle(
-        supabase.rpc('rpc_saidas_create_full', {
-          p_pessoa_id: pessoaId,
-          p_material_id: materialId,
-          p_quantidade: quantidade,
-          p_centro_estoque: centroEstoqueIdFinal,
-          p_centro_custo: centroCustoIdFinal,
-          p_centro_servico: centroServicoIdFinal,
-          p_data_entrega: dataEntregaIso,
-          p_status: status,
-          p_usuario_id: usuarioId,
-          p_is_troca: trocaPreflight?.tem_saida && payload.forceTroca ? true : false,
-          p_troca_de_saida: trocaPreflight?.tem_saida && payload.forceTroca ? trocaPreflight?.ultima_saida_id ?? null : null,
-          p_troca_sequencia: trocaPreflight?.tem_saida && payload.forceTroca ? (trocaSequencia > 0 ? trocaSequencia : 1) : null,
-        }),
-        'Falha ao registrar saida.'
-      )
+      const rpcPayload = {
+        p_pessoa_id: pessoaId,
+        p_material_id: materialId,
+        p_quantidade: quantidade,
+        p_centro_estoque: centroEstoqueIdFinal,
+        p_centro_custo: centroCustoIdFinal,
+        p_centro_servico: centroServicoIdFinal,
+        p_data_entrega: dataEntregaIso,
+        p_status: status,
+        p_usuario_id: usuarioId,
+        p_is_troca: trocaPreflight?.tem_saida && payload.forceTroca ? true : false,
+        p_troca_de_saida:
+          trocaPreflight?.tem_saida && payload.forceTroca ? trocaPreflight?.ultima_saida_id ?? null : null,
+        p_troca_sequencia:
+          trocaPreflight?.tem_saida && payload.forceTroca
+            ? trocaSequencia > 0
+              ? trocaSequencia
+              : 1
+            : null,
+      }
+
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/saidas`
+      const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
 
       const saidaNormalizada = mapSaidaRecord(registro)
       await registrarSaidaHistoricoSupabase(saidaNormalizada)
@@ -6274,35 +6288,35 @@ export const api = {
       }
 
       const usuario = await resolveUsuarioResponsavel()
-      const registro = await executeSingle(
-        supabase.rpc('rpc_acidentes_create_full', {
-          p_pessoa_id: pessoaId,
-          p_data: data,
-          p_dias_perdidos: toNumber(payload.diasPerdidos),
-          p_dias_debitados: toNumber(payload.diasDebitados),
-          p_cid: trim(payload.cid),
-          p_centro_servico_id: centroServicoId,
-          p_local_id: localId,
-          p_cat: trim(payload.cat),
-          p_observacao: trim(payload.observacao),
-          p_data_esocial: dataEsocial,
-          p_esocial: esocial,
-          p_sesmt: sesmt,
-          p_data_sesmt: dataSesmt,
-          p_agentes_ids: agentesIds,
-          p_tipos_ids: tiposIds,
-          p_lesoes_ids: lesoesIds,
-          p_partes_ids: partesIds,
-          p_registrado_por: usuario,
-        }),
-        'Falha ao registrar acidente.'
-      )
+      const rpcPayload = {
+        p_pessoa_id: pessoaId,
+        p_data: data,
+        p_dias_perdidos: toNumber(payload.diasPerdidos),
+        p_dias_debitados: toNumber(payload.diasDebitados),
+        p_cid: trim(payload.cid),
+        p_centro_servico_id: centroServicoId,
+        p_local_id: localId,
+        p_cat: trim(payload.cat),
+        p_observacao: trim(payload.observacao),
+        p_data_esocial: dataEsocial,
+        p_esocial: esocial,
+        p_sesmt: sesmt,
+        p_data_sesmt: dataSesmt,
+        p_agentes_ids: agentesIds,
+        p_tipos_ids: tiposIds,
+        p_lesoes_ids: lesoesIds,
+        p_partes_ids: partesIds,
+        p_registrado_por: usuario,
+      }
 
-      const completo = await executeMaybeSingle(
-        supabase.from('vw_acidentes').select('*').eq('id', registro.id).limit(1),
-        'Falha ao obter acidente registrado.'
-      )
-      return mapAcidenteRecord(completo ?? registro)
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/acidentes`
+      const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
+      return mapAcidenteRecord(registro)
     },
     async update(id, payload) {
       if (!id) {

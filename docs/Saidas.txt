@@ -102,6 +102,12 @@ Atualizacao 2026-02
 -------------------
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 
+Atualizacao 2026-02 (API)
+-------------------------
+- Cadastro passou a chamar `/api/saidas` (Vercel) em vez de RPC direta.
+- Pipeline aplica rate limit e idempotencia no create.
+- Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
+
 Atualizacao 2026-02 (relatorio troca EPI)
 -----------------------------------------
 - Criado relatorio semanal de trocas de EPI (periodo de 7 dias).

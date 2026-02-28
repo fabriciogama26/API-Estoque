@@ -1,5 +1,5 @@
 ﻿import { randomUUID } from 'node:crypto'
-import { supabaseAdmin } from './supabaseClient.js'
+import { supabaseAdmin, createUserClient } from './supabaseClient.js'
 import { CONSUME_LOCAL_DATA } from './environment.js'
 const loadLocalTermoContext = async () => {
   const module = await import('./localDocumentContext.js')
@@ -185,6 +185,28 @@ const trim = (value) => {
   }
   return String(value).trim()
 }
+
+const pickParam = (payload, keys, fallback = null) => {
+  if (!payload || typeof payload !== 'object') {
+    return fallback
+  }
+  for (const key of keys) {
+    if (payload[key] !== undefined) {
+      return payload[key]
+    }
+  }
+  return fallback
+}
+
+const requireAuthToken = (token) => {
+  const resolved = typeof token === 'string' ? token.trim() : ''
+  if (!resolved) {
+    throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
+  }
+  return resolved
+}
+
+const buildUserClient = (token) => createUserClient(requireAuthToken(token))
 
 const normalizeSearchTerm = (value) => (value ? String(value).trim().toLowerCase() : '')
 
@@ -1930,29 +1952,25 @@ export const PessoasOperations = {
       (await execute(query, 'Falha ao listar pessoas.')) ?? []
     return pessoas.map(mapPessoaRecord)
   },
-  async create(payload, user) {
-    const dados = sanitizePessoaPayload(payload)
-    validatePessoaPayload(dados)
-    await ensureMatriculaDisponivel(dados.matricula)
+  async create(payload, user, authToken) {
+    const params = {
+      p_nome: pickParam(payload, ['p_nome', 'nome']),
+      p_matricula: pickParam(payload, ['p_matricula', 'matricula']),
+      p_observacao: pickParam(payload, ['p_observacao', 'observacao']),
+      p_data_admissao: pickParam(payload, ['p_data_admissao', 'dataAdmissao', 'data_admissao']),
+      p_data_demissao: pickParam(payload, ['p_data_demissao', 'dataDemissao', 'data_demissao']),
+      p_centro_servico_id: pickParam(payload, ['p_centro_servico_id', 'centroServicoId', 'centro_servico_id']),
+      p_setor_id: pickParam(payload, ['p_setor_id', 'setorId', 'setor_id']),
+      p_cargo_id: pickParam(payload, ['p_cargo_id', 'cargoId', 'cargo_id']),
+      p_centro_custo_id: pickParam(payload, ['p_centro_custo_id', 'centroCustoId', 'centro_custo_id']),
+      p_tipo_execucao_id: pickParam(payload, ['p_tipo_execucao_id', 'tipoExecucaoId', 'tipo_execucao_id']),
+      p_ativo: pickParam(payload, ['p_ativo', 'ativo']),
+      p_usuario_id: pickParam(payload, ['p_usuario_id'], user?.id ?? null),
+    }
 
-    const agora = nowIso()
-    const usuario = resolveUsuarioNome(user)
-
+    const client = buildUserClient(authToken)
     const pessoa = await executeSingle(
-      supabaseAdmin
-        .from('pessoas')
-        .insert({
-          id: randomId(),
-          nome: dados.nome,
-          matricula: dados.matricula,
-          local: dados.centroServico,
-          cargo: dados.cargo,
-          usuarioCadastro: usuario,
-          criadoEm: agora,
-          atualizadoEm: null,
-          usuarioEdicao: null,
-        })
-        .select(),
+      client.rpc('rpc_pessoas_create_full', params),
       'Falha ao criar pessoa.'
     )
 
@@ -2089,43 +2107,32 @@ export const MateriaisOperations = {
     )
     return normalizeCatalogoLista(registros)
   },
-  async create(payload, user) {
-    const dados = await sanitizeMaterialPayload(payload)
-    validateMaterialPayload(dados)
-
-    const agora = nowIso()
-    const usuario = resolveUsuarioNome(user)
-    const materialId = randomId()
-
-    const materialPayload = {
-      id: materialId,
-      nome: dados.nome,
-      fabricante: dados.fabricante,
-      validadeDias: dados.validadeDias,
-      ca: dados.ca,
-      valorUnitario: dados.valorUnitario,
-      estoqueMinimo: dados.estoqueMinimo,
-      ativo: dados.ativo,
-      grupoMaterial: dados.grupoMaterialId || dados.grupoMaterial,
-      numeroCalcado: dados.numeroCalcado,
-      numeroVestimenta: dados.numeroVestimenta,
-      numeroEspecifico: dados.numeroEspecifico,
-      descricao: dados.descricao,
-      usuarioCadastro: usuario,
-      dataCadastro: agora,
+  async create(payload, user, authToken) {
+    const params = {
+      p_material: pickParam(payload, ['p_material', 'material']),
+      p_cores_ids: pickParam(payload, ['p_cores_ids', 'coresIds', 'cores_ids'], []),
+      p_caracteristicas_ids: pickParam(
+        payload,
+        ['p_caracteristicas_ids', 'caracteristicasIds', 'caracteristicas_ids'],
+        []
+      ),
+    }
+    if (!params.p_material) {
+      throw createHttpError(400, 'Payload de material invalido.', { code: 'VALIDATION_ERROR' })
     }
 
-    await executeSingle(
-      supabaseAdmin.from('materiais').insert(materialPayload).select('id'),
-      'Falha ao criar material.',
+    const client = buildUserClient(authToken)
+    const created = await executeSingle(
+      client.rpc('material_create_full', params),
+      'Falha ao criar material.'
     )
-
-    await syncMaterialVinculos(materialId, {
-      corIds: dados.corIds || [],
-      caracteristicaIds: dados.caracteristicaIds || [],
-    })
-
-    await registrarHistoricoPreco(materialId, dados.valorUnitario, usuario)
+    const materialId = created?.id
+    if (!materialId) {
+      throw createHttpError(500, 'Falha ao criar material.')
+    }
+    const usuario = resolveUsuarioNome(user)
+    const valorUnitario = params.p_material?.valorUnitario ?? params.p_material?.valor_unitario ?? 0
+    await registrarHistoricoPreco(materialId, valorUnitario, usuario)
 
     return await obterMaterialPorId(materialId)
   },
@@ -2265,32 +2272,33 @@ export const EntradasOperations = {
 
     return entradas
   },
-  async create(payload, user) {
-    const dados = sanitizeEntradaPayload(payload)
-    validateEntradaPayload(dados)
-
-    const material = await obterMaterialPorId(dados.materialId)
-    if (!material) {
-      throw createHttpError(404, 'Material não encontrado.')
+  async create(payload, user, authToken) {
+    const params = {
+      p_material_id: pickParam(payload, ['p_material_id', 'materialId', 'material_id']),
+      p_quantidade: pickParam(payload, ['p_quantidade', 'quantidade']),
+      p_centro_estoque: pickParam(payload, [
+        'p_centro_estoque',
+        'centroEstoqueId',
+        'centro_estoque',
+        'centroCusto',
+        'centro_custo',
+      ]),
+      p_data_entrada: pickParam(payload, ['p_data_entrada', 'dataEntrada', 'data_entrada']),
+      p_status: pickParam(payload, ['p_status', 'status', 'statusId', 'status_id']),
+      p_usuario_id: pickParam(payload, ['p_usuario_id'], user?.id ?? null),
     }
 
-    const usuario = resolveUsuarioNome(user)
-
+    const client = buildUserClient(authToken)
     const entrada = await executeSingle(
-        supabaseAdmin
-          .from('entradas')
-          .insert({
-            id: randomId(),
-            materialId: dados.materialId,
-            quantidade: dados.quantidade,
-            centro_estoque: dados.centroCusto,
-            dataEntrada: dados.dataEntrada,
-            usuarioResponsavel: usuario,
-          })
-        .select(),
+      client.rpc('rpc_entradas_create_full', params),
       'Falha ao registrar entrada.'
     )
 
+    const material = await obterMaterialPorId(params.p_material_id)
+    if (!material) {
+      throw createHttpError(404, 'Material não encontrado.')
+    }
+    const usuario = resolveUsuarioNome(user)
     const normalizada = (
       await preencherCentrosEstoque(
         await preencherUsuariosResponsaveis([mapEntradaRecord(entrada)])
@@ -2575,53 +2583,35 @@ export const SaidasOperations = {
 
     return saidas
   },
-  async create(payload, user) {
-    const dados = sanitizeSaidaPayload(payload)
-    validateSaidaPayload(dados)
-
-    const [pessoa, material] = await Promise.all([
-      obterPessoaPorId(dados.pessoaId),
-      obterMaterialPorId(dados.materialId),
-    ])
-
-    if (!pessoa) {
-      throw createHttpError(404, 'Pessoa não encontrada.')
+  async create(payload, user, authToken) {
+    const params = {
+      p_pessoa_id: pickParam(payload, ['p_pessoa_id', 'pessoaId', 'pessoa_id']),
+      p_material_id: pickParam(payload, ['p_material_id', 'materialId', 'material_id']),
+      p_quantidade: pickParam(payload, ['p_quantidade', 'quantidade']),
+      p_centro_estoque: pickParam(payload, [
+        'p_centro_estoque',
+        'centroEstoqueId',
+        'centro_estoque',
+        'centroCusto',
+        'centro_custo',
+      ]),
+      p_centro_custo: pickParam(payload, ['p_centro_custo', 'centroCustoId', 'centro_custo_id']),
+      p_centro_servico: pickParam(payload, ['p_centro_servico', 'centroServicoId', 'centro_servico_id']),
+      p_data_entrega: pickParam(payload, ['p_data_entrega', 'dataEntrega', 'data_entrega']),
+      p_status: pickParam(payload, ['p_status', 'status', 'statusId', 'status_id']),
+      p_usuario_id: pickParam(payload, ['p_usuario_id'], user?.id ?? null),
+      p_is_troca: pickParam(payload, ['p_is_troca', 'isTroca']),
+      p_troca_de_saida: pickParam(payload, ['p_troca_de_saida', 'trocaDeSaida', 'troca_de_saida']),
+      p_troca_sequencia: pickParam(payload, ['p_troca_sequencia', 'trocaSequencia', 'troca_sequencia']),
     }
-    if (!material) {
-      throw createHttpError(404, 'Material não encontrado.')
-    }
 
-    const estoqueDisponivel = await calcularSaldoMaterialAtual(material.id)
-    if (Number(dados.quantidade) > estoqueDisponivel) {
-      throw createHttpError(400, 'Quantidade informada maior que estoque disponível.')
-    }
-
-    const centroServico = dados.centroServico || pessoa.centroServico || pessoa.local || ''
-    const dataTroca = calcularDataTroca(dados.dataEntrega, material.validadeDias)
-    const usuario = resolveUsuarioNome(user)
-
+    const client = buildUserClient(authToken)
     const saida = await executeSingle(
-      supabaseAdmin
-        .from('saidas')
-        .insert({
-          id: randomId(),
-          pessoaId: dados.pessoaId,
-          materialId: dados.materialId,
-          quantidade: dados.quantidade,
-                centroServico: dados.centroServico,
-          dataEntrega: dados.dataEntrega,
-          usuarioResponsavel: usuario,
-          status: dados.status,
-          dataTroca,
-        })
-        .select(),
+      client.rpc('rpc_saidas_create_full', params),
       'Falha ao registrar saída.'
     )
 
-    return {
-      ...mapSaidaRecord(saida),
-      estoqueAtual: estoqueDisponivel - Number(dados.quantidade),
-    }
+    return mapSaidaRecord(saida)
   },
 }
 
@@ -3822,42 +3812,66 @@ export const AcidentesOperations = {
       )) ?? []
     return acidentes.map(mapAcidenteRecord)
   },
-  async create(payload, user) {
-    const dados = sanitizeAcidentePayload(payload)
-    validateAcidentePayload(dados)
-
-    let pessoaId = dados.pessoaId
-    if (!pessoaId) {
-      const pessoa = await obterPessoaPorMatricula(dados.matricula)
-      if (!pessoa) {
-        throw createHttpError(404, 'Pessoa nao encontrada para a matricula informada.')
-      }
-      pessoaId = pessoa.id
+  async create(payload, user, authToken) {
+    const params = {
+      p_pessoa_id: pickParam(payload, ['p_pessoa_id', 'pessoaId', 'pessoa_id']),
+      p_data: pickParam(payload, ['p_data', 'data']),
+      p_dias_perdidos: pickParam(payload, ['p_dias_perdidos', 'diasPerdidos', 'dias_perdidos']),
+      p_dias_debitados: pickParam(payload, ['p_dias_debitados', 'diasDebitados', 'dias_debitados']),
+      p_cid: pickParam(payload, ['p_cid', 'cid']),
+      p_centro_servico_id: pickParam(payload, ['p_centro_servico_id', 'centroServicoId', 'centro_servico_id']),
+      p_local_id: pickParam(payload, ['p_local_id', 'localId', 'local_id']),
+      p_cat: pickParam(payload, ['p_cat', 'cat']),
+      p_observacao: pickParam(payload, ['p_observacao', 'observacao']),
+      p_data_esocial: pickParam(payload, ['p_data_esocial', 'dataEsocial', 'data_esocial']),
+      p_esocial: pickParam(payload, ['p_esocial', 'esocial']),
+      p_sesmt: pickParam(payload, ['p_sesmt', 'sesmt']),
+      p_data_sesmt: pickParam(payload, ['p_data_sesmt', 'dataSesmt', 'data_sesmt']),
+      p_agentes_ids: pickParam(payload, ['p_agentes_ids', 'agentesIds', 'agentes_ids']),
+      p_tipos_ids: pickParam(payload, ['p_tipos_ids', 'tiposIds', 'tipos_ids']),
+      p_lesoes_ids: pickParam(payload, ['p_lesoes_ids', 'lesoesIds', 'lesoes_ids']),
+      p_partes_ids: pickParam(payload, ['p_partes_ids', 'partesIds', 'partes_ids']),
+      p_registrado_por: pickParam(payload, ['p_registrado_por', 'registradoPor'], resolveUsuarioNome(user)),
     }
 
-    const usuario = resolveUsuarioNome(user)
+    if (!params.p_pessoa_id) {
+      const dados = sanitizeAcidentePayload(payload)
+      validateAcidentePayload(dados)
+      let pessoaId = dados.pessoaId
+      if (!pessoaId) {
+        const pessoa = await obterPessoaPorMatricula(dados.matricula)
+        if (!pessoa) {
+          throw createHttpError(404, 'Pessoa nao encontrada para a matricula informada.')
+        }
+        pessoaId = pessoa.id
+      }
+      params.p_pessoa_id = pessoaId
+      params.p_data = dados.data
+      params.p_dias_perdidos = dados.diasPerdidos
+      params.p_dias_debitados = dados.diasDebitados
+      params.p_cid = dados.cid
+      params.p_centro_servico_id = dados.centroServicoId
+      params.p_local_id = dados.localId
+      params.p_cat = dados.cat
+      params.p_observacao = dados.observacao
+      params.p_data_esocial = dados.dataEsocial
+      params.p_esocial = dados.esocial
+      params.p_sesmt = dados.sesmt
+      params.p_data_sesmt = dados.dataSesmt
+      if (!params.p_agentes_ids) {
+        params.p_agentes_ids = dados.agenteId ? [dados.agenteId] : null
+      }
+      params.p_tipos_ids = dados.tiposIds
+      params.p_lesoes_ids = dados.lesoesIds
+      params.p_partes_ids = dados.partesIds
+      if (!params.p_registrado_por) {
+        params.p_registrado_por = resolveUsuarioNome(user)
+      }
+    }
 
+    const client = buildUserClient(authToken)
     const acidente = await executeSingle(
-      supabaseAdmin.rpc('rpc_acidentes_create_full', {
-        p_pessoa_id: pessoaId,
-        p_data: dados.data,
-        p_dias_perdidos: dados.diasPerdidos,
-        p_dias_debitados: dados.diasDebitados,
-        p_cid: dados.cid,
-        p_centro_servico_id: dados.centroServicoId,
-        p_local_id: dados.localId,
-        p_cat: dados.cat,
-        p_observacao: dados.observacao,
-        p_data_esocial: dados.dataEsocial,
-        p_esocial: dados.esocial,
-        p_sesmt: dados.sesmt,
-        p_data_sesmt: dados.dataSesmt,
-        p_agente_id: dados.agenteId,
-        p_tipos_ids: dados.tiposIds,
-        p_lesoes_ids: dados.lesoesIds,
-        p_partes_ids: dados.partesIds,
-        p_registrado_por: usuario,
-      }),
+      client.rpc('rpc_acidentes_create_full', params),
       'Falha ao registrar acidente.'
     )
 

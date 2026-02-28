@@ -68,7 +68,7 @@ export default withAuth(async (req, res, user) => {
       if (method === 'GET') return sendJson(res, 200, await PessoasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
-        return sendJson(res, 201, await PessoasOperations.create(body, user))
+        return sendJson(res, 201, await PessoasOperations.create(body, user, req.authToken))
       }
     }
     if (path.startsWith('/api/pessoas/') && method === 'PUT') {
@@ -115,7 +115,7 @@ export default withAuth(async (req, res, user) => {
       if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
       if (method === 'POST') {
         const body = await readJson(req)
-        return sendJson(res, 201, await MateriaisOperations.create(body, user))
+        return sendJson(res, 201, await MateriaisOperations.create(body, user, req.authToken))
       }
     }
     if (path.startsWith('/api/materiais/') && method === 'PUT') {
@@ -141,7 +141,7 @@ export default withAuth(async (req, res, user) => {
       if (method === 'GET') return sendJson(res, 200, await AcidentesOperations.list())
       if (method === 'POST') {
         const body = await readJson(req)
-        return sendJson(res, 201, await AcidentesOperations.create(body, user))
+        return sendJson(res, 201, await AcidentesOperations.create(body, user, req.authToken))
       }
     }
     if (path.startsWith('/api/acidentes/') && method === 'PUT') {
@@ -158,7 +158,7 @@ export default withAuth(async (req, res, user) => {
       if (method === 'GET') return sendJson(res, 200, await EntradasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
-        return sendJson(res, 201, await EntradasOperations.create(body, user))
+        return sendJson(res, 201, await EntradasOperations.create(body, user, req.authToken))
       }
     }
     if (path.startsWith('/api/entradas/') && method === 'PUT') {
@@ -184,7 +184,7 @@ export default withAuth(async (req, res, user) => {
       if (method === 'GET') return sendJson(res, 200, await SaidasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
-        return sendJson(res, 201, await SaidasOperations.create(body, user))
+        return sendJson(res, 201, await SaidasOperations.create(body, user, req.authToken))
       }
     }
 
