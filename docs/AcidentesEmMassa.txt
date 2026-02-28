@@ -28,6 +28,9 @@ Colunas opcionais:
 Observacoes importantes:
 - O arquivo deve ser .xlsx (nao CSV).
 - O upload bloqueia arquivos acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+- O backend bloqueia arquivos acima do limite do plano (limit_import_mb, padrao 2 MB).
+- Rate limit: 1 importacao a cada 60 segundos por tenant.
+- Rate limit diario: plano define limit_import_daily; 3 falhas no dia bloqueiam ate meia-noite (America/Sao_Paulo).
 - Agentes, tipos, lesoes e partes devem usar ";" como separador.
 - A ordem precisa ser coerente:
   Ex.: agentes="A1;A2", tipos="T1;T2", lesoes="L1;L2".

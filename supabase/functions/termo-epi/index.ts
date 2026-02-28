@@ -9,9 +9,18 @@ const corsHeaders: Record<string, string> = {
 };
 
 const PDF_FILENAME = "termo-epi.pdf";
+const FUNCTION_NAME = "termo-epi";
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+const DAILY_LIMIT_CATEGORY = "pdf";
 const SECURITY_EVENT_CODE = "SANITIZE_HTML";
 const SECURITY_EVENT_MESSAGE = "HTML sanitize: conteudo suspeito detectado";
 const SECURITY_SERVICE = "edge-security";
+const DAILY_LOCK_CODE = "DAILY_LIMIT_LOCK";
+const DAILY_LOCK_MESSAGE = "Limite diario bloqueado por erros repetidos.";
+const RATE_LIMIT_WINDOW_CODE = "RATE_LIMIT_WINDOW";
+const RATE_LIMIT_WINDOW_MESSAGE = "Limite de 1 requisicao a cada 60 segundos.";
+const DAILY_LIMIT_CODE = "DAILY_LIMIT_BLOCK";
+const DAILY_LIMIT_MESSAGE = "Limite diario do plano bloqueado.";
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -23,19 +32,56 @@ serve(async (req: Request): Promise<Response> => {
     return auth.response;
   }
 
+  let ownerId: string | null = null;
+  let dailyLimitChecked = false;
   try {
+    ownerId = await resolveOwnerId(auth.token);
+    if (!ownerId) {
+      return jsonError("Owner nao encontrado.", 403);
+    }
+
+    const rateLimitResponse = await enforceRateLimit({
+      ownerId,
+      functionName: FUNCTION_NAME,
+      method: req.method.toUpperCase(),
+      path: new URL(req.url).pathname,
+      userId: auth.user?.id || null,
+    });
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    const dailyLimitResponse = await enforceDailyLimit({
+      ownerId,
+      category: DAILY_LIMIT_CATEGORY,
+      method: req.method.toUpperCase(),
+      path: new URL(req.url).pathname,
+      userId: auth.user?.id || null,
+    });
+    if (dailyLimitResponse) {
+      return dailyLimitResponse;
+    }
+    dailyLimitChecked = true;
+
     const input = await resolveInput(req);
     if (input.securityTypes?.length) {
-      const tenantHint = await resolveTenantHint(auth.token);
       await logSecurityEvent({
         types: input.securityTypes,
         userId: auth.user?.id || null,
-        tenantHint,
+        tenantHint: ownerId.slice(0, 8),
         method: req.method.toUpperCase(),
         path: new URL(req.url).pathname,
       });
     }
     const pdfBytes = await renderPdf(input);
+    await registerDailyResult({
+      ownerId,
+      category: DAILY_LIMIT_CATEGORY,
+      success: true,
+      userId: auth.user?.id || null,
+      method: req.method.toUpperCase(),
+      path: new URL(req.url).pathname,
+    });
 
     const headers = new Headers({
       ...corsHeaders,
@@ -47,6 +93,16 @@ serve(async (req: Request): Promise<Response> => {
 
     return new Response(pdfBytes, { status: 200, headers });
   } catch (error) {
+    if (ownerId && dailyLimitChecked) {
+      await registerDailyResult({
+        ownerId,
+        category: DAILY_LIMIT_CATEGORY,
+        success: false,
+        userId: auth.user?.id || null,
+        method: req.method.toUpperCase(),
+        path: new URL(req.url).pathname,
+      });
+    }
     console.error("Erro ao gerar PDF na funcao termo-epi:", error);
 
     if (error instanceof HttpError) {
@@ -175,6 +231,307 @@ async function resolveInput(req: Request): Promise<RenderInput> {
   });
 }
 
+async function resolveOwnerId(token: string): Promise<string | null> {
+  try {
+    const supabaseUser = createUserClient(token);
+    const { data, error } = await supabaseUser.rpc("current_account_owner_id");
+    if (error) {
+      return null;
+    }
+    const ownerId =
+      typeof data === "string"
+        ? data
+        : (data as { account_owner_id?: string } | null)?.account_owner_id;
+    return typeof ownerId === "string" ? ownerId : null;
+  } catch {
+    return null;
+  }
+}
+
+async function enforceRateLimit({
+  ownerId,
+  functionName,
+  method,
+  path,
+  userId,
+}: {
+  ownerId: string;
+  functionName: string;
+  method: string;
+  path: string;
+  userId: string | null;
+}): Promise<Response | null> {
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonError("SUPABASE_SERVICE_ROLE_KEY nao configurada.", 500);
+  }
+
+  const now = new Date();
+  const windowStartSeconds =
+    Math.floor(now.getTime() / 1000 / RATE_LIMIT_WINDOW_SECONDS) * RATE_LIMIT_WINDOW_SECONDS;
+  const windowStart = new Date(windowStartSeconds * 1000).toISOString();
+
+  const payload = {
+    account_owner_id: ownerId,
+    function_name: functionName,
+    window_start: windowStart,
+  };
+
+  const response = await fetch(`${supabaseUrl}/rest/v1/edge_rate_limits`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.ok) {
+    return null;
+  }
+
+  const text = await response.text();
+  if (response.status === 409 || text.includes("23505")) {
+    await logLimitBlock({
+      code: RATE_LIMIT_WINDOW_CODE,
+      message: RATE_LIMIT_WINDOW_MESSAGE,
+      ownerId,
+      userId,
+      method,
+      path,
+      context: {
+        functionName,
+        windowStart,
+        type: "window",
+      },
+      fingerprint: `rate_limit_window|${functionName}|${ownerId}|${windowStart}`,
+    });
+    return jsonError("Limite de 1 requisicao a cada 60 segundos.", 429, {
+      "Retry-After": String(RATE_LIMIT_WINDOW_SECONDS),
+    });
+  }
+
+  return jsonError("Falha ao validar limite de requisicoes.", 500);
+}
+
+async function enforceDailyLimit({
+  ownerId,
+  category,
+  method,
+  path,
+  userId,
+}: {
+  ownerId: string;
+  category: string;
+  method: string;
+  path: string;
+  userId: string | null;
+}): Promise<Response | null> {
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonError("SUPABASE_SERVICE_ROLE_KEY nao configurada.", 500);
+  }
+
+  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/edge_rate_limit_daily_check`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ p_owner_id: ownerId, p_category: category }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    await logLimitBlock({
+      code: DAILY_LIMIT_CODE,
+      message: "Falha ao validar limite diario do plano.",
+      ownerId,
+      userId,
+      method,
+      path,
+      context: {
+        category,
+        status: response.status,
+        body: errorText,
+      },
+      fingerprint: `daily_limit_check_error|${category}|${ownerId}|${response.status}`,
+    });
+    return jsonError("Falha ao validar limite diario do plano.", 500);
+  }
+
+  const data = await response.json();
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result) {
+    return jsonError("Falha ao validar limite diario do plano.", 500);
+  }
+
+  if (result.allowed === true) {
+    return null;
+  }
+
+  const reason = String(result.reason || "");
+  if (reason === "limit_not_configured") {
+    await logLimitBlock({
+      code: DAILY_LIMIT_CODE,
+      message: DAILY_LIMIT_MESSAGE,
+      ownerId,
+      userId,
+      method,
+      path,
+      context: {
+        category,
+        reason,
+        dayDate: result.day_date,
+        limitValue: result.limit_value,
+        successCount: result.success_count,
+        errorCount: result.error_count,
+        lockedUntil: result.locked_until,
+      },
+      fingerprint: `daily_limit|${category}|${ownerId}|${result.day_date}|${reason}`,
+    });
+    return jsonError("Limite diario do plano nao configurado.", 403);
+  }
+  if (reason === "plan_not_found") {
+    await logLimitBlock({
+      code: DAILY_LIMIT_CODE,
+      message: DAILY_LIMIT_MESSAGE,
+      ownerId,
+      userId,
+      method,
+      path,
+      context: {
+        category,
+        reason,
+        dayDate: result.day_date,
+      },
+      fingerprint: `daily_limit|${category}|${ownerId}|${result.day_date}|${reason}`,
+    });
+    return jsonError("Plano nao encontrado.", 403);
+  }
+  if (reason === "locked") {
+    await logLimitBlock({
+      code: DAILY_LIMIT_CODE,
+      message: DAILY_LIMIT_MESSAGE,
+      ownerId,
+      userId,
+      method,
+      path,
+      context: {
+        category,
+        reason,
+        dayDate: result.day_date,
+        limitValue: result.limit_value,
+        successCount: result.success_count,
+        errorCount: result.error_count,
+        lockedUntil: result.locked_until,
+      },
+      fingerprint: `daily_limit|${category}|${ownerId}|${result.day_date}|${reason}`,
+    });
+    return jsonError("Limite diario bloqueado ate meia-noite (America/Sao_Paulo).", 429, {
+      "Retry-After": "3600",
+    });
+  }
+  if (reason === "limit_reached") {
+    await logLimitBlock({
+      code: DAILY_LIMIT_CODE,
+      message: DAILY_LIMIT_MESSAGE,
+      ownerId,
+      userId,
+      method,
+      path,
+      context: {
+        category,
+        reason,
+        dayDate: result.day_date,
+        limitValue: result.limit_value,
+        successCount: result.success_count,
+        errorCount: result.error_count,
+        lockedUntil: result.locked_until,
+      },
+      fingerprint: `daily_limit|${category}|${ownerId}|${result.day_date}|${reason}`,
+    });
+    return jsonError("Limite diario do plano atingido.", 429, {
+      "Retry-After": "3600",
+    });
+  }
+
+  return jsonError("Limite diario do plano nao permitido.", 429);
+}
+
+async function registerDailyResult({
+  ownerId,
+  category,
+  success,
+  userId,
+  method,
+  path,
+}: {
+  ownerId: string;
+  category: string;
+  success: boolean;
+  userId: string | null;
+  method: string;
+  path: string;
+}): Promise<void> {
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/edge_rate_limit_daily_register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ p_owner_id: ownerId, p_category: category, p_success: success }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      await logLimitBlock({
+        code: "DAILY_LIMIT_REGISTER_ERROR",
+        message: "Falha ao registrar consumo diario.",
+        ownerId,
+        userId,
+        method,
+        path,
+        context: {
+          category,
+          success,
+          status: response.status,
+          body: errorText,
+        },
+        fingerprint: `daily_limit_register_error|${category}|${ownerId}|${response.status}`,
+      });
+      return;
+    }
+    const data = await response.json();
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!success && result?.error_count === 3 && result?.locked_until) {
+      await logDailyLock({
+        ownerId,
+        userId,
+        category,
+        method,
+        path,
+      });
+    }
+  } catch (error) {
+    console.warn("Falha ao registrar consumo diario", error);
+  }
+}
+
 async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
   try {
     const data = await req.json();
@@ -228,23 +585,6 @@ function detectSuspiciousHtml(html: string): string[] {
     types.add("javascript_url");
   }
   return Array.from(types);
-}
-
-async function resolveTenantHint(token: string): Promise<string | null> {
-  try {
-    const supabaseUser = createUserClient(token);
-    const { data, error } = await supabaseUser.rpc("current_account_owner_id");
-    if (error) {
-      return null;
-    }
-    const ownerId =
-      typeof data === "string"
-        ? data
-        : (data as { account_owner_id?: string } | null)?.account_owner_id;
-    return typeof ownerId === "string" ? ownerId.slice(0, 8) : null;
-  } catch {
-    return null;
-  }
 }
 
 async function logSecurityEvent({
@@ -301,6 +641,118 @@ async function logSecurityEvent({
     });
   } catch (error) {
     console.warn("Falha ao registrar evento de seguranca", error);
+  }
+}
+
+async function logDailyLock({
+  ownerId,
+  userId,
+  category,
+  method,
+  path,
+}: {
+  ownerId: string;
+  userId: string | null;
+  category: string;
+  method: string;
+  path: string;
+}): Promise<void> {
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    return;
+  }
+
+  const payload = {
+    environment: "api",
+    service: SECURITY_SERVICE,
+    method,
+    path,
+    status: 429,
+    code: DAILY_LOCK_CODE,
+    user_id: userId,
+    message: DAILY_LOCK_MESSAGE,
+    context: {
+      source: "edge",
+      category,
+      tenantHint: ownerId.slice(0, 8),
+    },
+    severity: "warn",
+    fingerprint: `daily_lock|${path}|${category}`,
+  };
+
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/api_errors`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    console.warn("Falha ao registrar bloqueio diario", error);
+  }
+}
+
+async function logLimitBlock({
+  code,
+  message,
+  ownerId,
+  userId,
+  method,
+  path,
+  context,
+  fingerprint,
+}: {
+  code: string;
+  message: string;
+  ownerId: string;
+  userId: string | null;
+  method: string;
+  path: string;
+  context: Record<string, unknown>;
+  fingerprint: string;
+}): Promise<void> {
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+  if (!supabaseUrl || !serviceRoleKey) {
+    return;
+  }
+
+  const payload = {
+    environment: "api",
+    service: SECURITY_SERVICE,
+    method,
+    path,
+    status: 429,
+    code,
+    user_id: userId,
+    message,
+    context: {
+      source: "edge",
+      tenantHint: ownerId.slice(0, 8),
+      ...context,
+    },
+    severity: "warn",
+    fingerprint,
+  };
+
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/api_errors`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    console.warn("Falha ao registrar bloqueio de limite", error);
   }
 }
 

@@ -31,6 +31,9 @@ Colunas opcionais:
 Regras de importacao
 --------------------
 - Upload bloqueado acima de VITE_IMPORTS_MAX_MB (padrao 50 MB).
+- Backend bloqueia acima do limite do plano (limit_import_mb, padrao 2 MB).
+- Rate limit: 1 importacao a cada 60 segundos por tenant.
+- Rate limit diario: plano define limit_import_daily; 3 falhas no dia bloqueiam ate meia-noite (America/Sao_Paulo).
 - Todos os valores sao texto (UUID nao e aceito).
 - Nomes precisam bater com os catalogos relacionados.
 - Itens duplicados na mesma planilha ou ja existentes geram erro.
