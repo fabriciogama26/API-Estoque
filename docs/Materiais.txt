@@ -63,6 +63,7 @@ FunÃ§Ãµes utilitÃ¡rias relacionadas
 ServiÃ§os e integraÃ§Ãµes externas
 -------------------------------
 - materiaisService â€” serviÃ§o de API (src/services/materiaisService.js); listar/criar/atualizar, detalhes completos (get), histÃ³rico de preÃ§o, catÃ¡logos (grupos, itens, fabricantes, cores, caracterÃ­sticas, calÃ§ados, tamanhos).
+- api.materiais.create â€” integraÃ§Ã£o API (Vercel) em src/services/api.js; envia cadastro via `POST /api/materiais` (rate limit + idempotencia).
 - api (src/services/api.js); resolveGrupoMaterialId, materials.groups e materials.items sem ordenacao por coluna ordem.
 - MateriaisOperations.groups (api/_shared/operations.js); lista grupos apenas por nome.
 
@@ -85,3 +86,8 @@ Atualizacao 2026-02 (catalogos)
 - Arquivos alterados: src/services/api.js, api/_shared/operations.js.
 - Funcoes: resolveGrupoMaterialId, materials.groups, materials.items, MateriaisOperations.groups.
 - Antes/Depois: antes selecionava/ordenava por coluna ordem; agora remove ordem e ordena por nome.
+
+Atualizacao 2026-02 (API)
+- Cadastro passou a chamar `/api/materiais` (Vercel) em vez de RPC direta.
+- Pipeline aplica rate limit e idempotencia no create.
+- Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.

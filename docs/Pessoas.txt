@@ -97,6 +97,11 @@ Servicos e integracoes
   - Caminho: src/services/pessoasService.js
   - Responsavel por: expor metodos da API (inclui importacao de desligamento).
 
+- api.pessoas.create
+  - Tipo: integracao API (Vercel)
+  - Caminho: src/services/api.js
+  - Responsavel por: enviar cadastro via `POST /api/pessoas` (rate limit + idempotencia no pipeline).
+
 - api.pessoas.importDesligamentoPlanilha
   - Tipo: integracao Supabase (Storage + Edge Function)
   - Caminho: src/services/api.js
@@ -123,3 +128,8 @@ Atualizacao 2026-02 (UI)
 - Importacoes em massa agora usam prefixo `imports/<owner_id>/` e validacao de JWT no backend.
 - Importacoes em massa validam tamanho do arquivo pelo plano (limit_import_mb, padrao 2 MB) e bloqueiam acima do limite.
 - Importacoes em massa aplicam rate limit (1 requisicao a cada 60s) e limite diario por plano (limit_import_daily).
+
+Atualizacao 2026-02 (API)
+- Cadastro passou a chamar `/api/pessoas` (Vercel) em vez de RPC direta.
+- Pipeline aplica rate limit e idempotencia no create.
+- Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
