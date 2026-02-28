@@ -1,4 +1,4 @@
--- Evita ambiguidade entre OUT params e colunas (window_start, max_hits, etc)
+-- Corrige uso de record nao inicializado e aplica override por plano com colunas em planos_users
 
 create or replace function public.rate_limit_check_and_hit(
   p_scope text,
@@ -16,13 +16,17 @@ create or replace function public.rate_limit_check_and_hit(
 ) language plpgsql security definer set search_path = public as $$
 #variable_conflict use_column
 declare
-  v_config record;
   v_now timestamp with time zone := now();
   v_window_start timestamp with time zone;
   v_blocked_until timestamp with time zone;
   v_hits integer;
   v_plan_id uuid;
-  v_plan record;
+  v_plan_max_hits integer;
+  v_plan_window_seconds integer;
+  v_plan_block_seconds integer;
+  v_max_hits integer;
+  v_window_seconds integer;
+  v_block_seconds integer;
 begin
   if p_scope = 'api' and p_owner_id is not null then
     select plan_id into v_plan_id
@@ -37,48 +41,50 @@ begin
         when p_route like 'pdf.%' then limit_pdf_burst_hits
         when p_route like 'import.%' then limit_import_burst_hits
         else null
-      end as max_hits,
+      end,
       case
         when p_route like 'create.%' then limit_create_burst_window_seconds
         when p_route like 'pdf.%' then limit_pdf_burst_window_seconds
         when p_route like 'import.%' then limit_import_burst_window_seconds
         else null
-      end as window_seconds,
+      end,
       case
         when p_route like 'create.%' then limit_create_burst_block_seconds
         when p_route like 'pdf.%' then limit_pdf_burst_block_seconds
         when p_route like 'import.%' then limit_import_burst_block_seconds
         else null
-      end as block_seconds
-    into v_plan
+      end
+    into v_plan_max_hits, v_plan_window_seconds, v_plan_block_seconds
     from public.planos_users
     where id = v_plan_id;
   end if;
 
-  if p_scope = 'api' and v_plan is not null
-     and v_plan.max_hits is not null
-     and v_plan.window_seconds is not null
-     and v_plan.block_seconds is not null then
-    v_config := v_plan;
+  if p_scope = 'api'
+     and v_plan_max_hits is not null
+     and v_plan_window_seconds is not null
+     and v_plan_block_seconds is not null then
+    v_max_hits := v_plan_max_hits;
+    v_window_seconds := v_plan_window_seconds;
+    v_block_seconds := v_plan_block_seconds;
   else
-    select r.route, r.scope, r.max_hits, r.window_seconds, r.block_seconds
-      into v_config
+    select r.max_hits, r.window_seconds, r.block_seconds
+      into v_max_hits, v_window_seconds, v_block_seconds
     from public.rate_limit_config r
     where r.route = p_route and r.scope = p_scope;
-  end if;
 
-  if not found then
-    return query select true, null::integer, null::integer, null::integer, null::timestamp with time zone, null::timestamp with time zone;
-    return;
+    if not found then
+      return query select true, null::integer, null::integer, null::integer, null::timestamp with time zone, null::timestamp with time zone;
+      return;
+    end if;
   end if;
 
   if p_scope = 'auth' and (p_identity_hash is null or p_identity_hash = '') then
-    return query select true, null::integer, v_config.max_hits, null::integer, null::timestamp with time zone, null::timestamp with time zone;
+    return query select true, null::integer, v_max_hits, null::integer, null::timestamp with time zone, null::timestamp with time zone;
     return;
   end if;
 
   if p_scope = 'api' and (p_owner_id is null or p_ip_hash is null or p_ip_hash = '') then
-    return query select true, null::integer, v_config.max_hits, null::integer, null::timestamp with time zone, null::timestamp with time zone;
+    return query select true, null::integer, v_max_hits, null::integer, null::timestamp with time zone, null::timestamp with time zone;
     return;
   end if;
 
@@ -112,7 +118,7 @@ begin
   if v_blocked_until is not null then
     return query select false,
       null::integer,
-      v_config.max_hits,
+      v_max_hits,
       greatest(1, ceil(extract(epoch from (v_blocked_until - v_now)))::integer),
       null::timestamp with time zone,
       v_blocked_until;
@@ -120,7 +126,7 @@ begin
   end if;
 
   v_window_start := to_timestamp(
-    floor(extract(epoch from v_now) / v_config.window_seconds) * v_config.window_seconds
+    floor(extract(epoch from v_now) / v_window_seconds) * v_window_seconds
   );
 
   if p_scope = 'auth' then
@@ -137,8 +143,8 @@ begin
       returning hits into v_hits;
   end if;
 
-  if v_hits > v_config.max_hits then
-    v_blocked_until := v_now + make_interval(secs => v_config.block_seconds);
+  if v_hits > v_max_hits then
+    v_blocked_until := v_now + make_interval(secs => v_block_seconds);
 
     if p_scope = 'auth' then
       update public.auth_rate_limits ar
@@ -155,10 +161,10 @@ begin
           and apr.window_start = v_window_start;
     end if;
 
-    return query select false, v_hits, v_config.max_hits, v_config.block_seconds, v_window_start, v_blocked_until;
+    return query select false, v_hits, v_max_hits, v_block_seconds, v_window_start, v_blocked_until;
     return;
   end if;
 
-  return query select true, v_hits, v_config.max_hits, null::integer, v_window_start, null::timestamp with time zone;
+  return query select true, v_hits, v_max_hits, null::integer, v_window_start, null::timestamp with time zone;
 end;
 $$;
