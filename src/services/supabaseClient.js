@@ -12,13 +12,6 @@ const resolveProxyBase = () => {
   if (proxyEnv) {
     return String(proxyEnv).trim().replace(/\/+$/, '')
   }
-  const apiBase = env('VITE_API_URL')
-  if (apiBase) {
-    return `${String(apiBase).trim().replace(/\/+$/, '')}/api/supabase`
-  }
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return `${window.location.origin.replace(/\/+$/, '')}/api/supabase`
-  }
   return ''
 }
 
@@ -28,8 +21,8 @@ const supabaseAnonKey = env('VITE_SUPABASE_ANON_KEY')
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        autoRefreshToken: false,
-        persistSession: false,
+        autoRefreshToken: true,
+        persistSession: true,
         detectSessionInUrl: false,
       },
     })

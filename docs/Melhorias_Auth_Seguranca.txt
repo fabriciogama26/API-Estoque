@@ -1,0 +1,27 @@
+Melhorias e Pendencias - Auth/Sessao
+===================================
+
+Resumo
+- Objetivo: remover tokens do JS usando cookie HttpOnly + backend guardando sessao.
+- Resultado: fluxo completo com cookie nao estabilizou em producao; retornou 401 em /api/auth/me.
+
+O que foi tentado (e nao funcionou)
+- Cookie HttpOnly + backend guardando tokens em auth_sessions.
+- Supabase JS no front com persistSession=false e autoRefreshToken=false.
+- Proxy /api/supabase para injetar Authorization a partir do cookie.
+- Ajustes de CORS (Allow-Credentials) e httpClient com credentials: include.
+
+Sintomas observados
+- /api/auth/me retornando 401 (AUTH_REQUIRED) apos login.
+- TypeError: Failed to fetch em telas que dependem de dados.
+- app_errors com 403 ao tentar registrar erro direto no Supabase.
+
+Decisao temporaria (para voltar a funcionar)
+- Login continua no backend, mas retorna access_token/refresh_token.
+- Front executa supabase.auth.setSession para reativar chamadas diretas ao Supabase.
+- Tokens voltam a ficar acessiveis no JS (regressao de seguranca temporaria).
+
+Melhorias futuras (quando houver tempo)
+- Voltar ao fluxo cookie-only e diagnosticar porque o cookie nao chega em /api/auth/me.
+- Investigar bloqueio de cookie (SameSite/Secure, politica do navegador, proxy/CDN).
+- Reduzir dependencias diretas do Supabase no front ou mover chamadas criticas para API.
