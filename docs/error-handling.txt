@@ -32,13 +32,14 @@ Frontend (React â€“ pasta src/)
   - Envia para `app_errors` com message, stack, page, context, userId, severity.
   - Deduplicacao por `fingerprint`: duplicados sao ignorados (upsert com `ignoreDuplicates`).
   - NÃ£o quebra UX; falha de log fica em console warn.
+  - Quando nao ha sessao (ex.: login), envia para `/api/log-error`, que grava em `app_errors` via service_role com `user_id` nulo.
 - Error boundary: `ErrorBoundaryWithLogger` (`src/components/ErrorBoundary.jsx`) captura erros de renderizaÃ§Ã£o e envia via `useErrorLogger(page)`. Usada em `src/App.jsx` na raiz.
 - PadrÃ£o de warns crÃ­ticos: `reportClientError` em `src/services/api.js` substitui `console.warn` em pontos sensÃ­veis (resolver centros/material/pessoa, histÃ³ricos, caches, filtros, buscas, RLS etc.), encaminhando para `app_errors` com contexto. Outros mÃ³dulos (AuthContext, Permissions, ConfiguraÃ§Ãµes, localData/localApi, authService, controllers) tambÃ©m enviam para `app_errors`.
 - System health: `src/components/SystemStatus.jsx` usa `useErrorLogger('system_status')` para falhas de health check e perfil.
 
 Como adicionar novos logs
 - Backend: use `handleError` nos handlers; para logs manuais, chame `logApiError({ message, method, path, status (HTTP), code, userId, context, stack, requestId })`.
-- Frontend: injete `const { reportError } = useErrorLogger('<page>')` e chame `reportError(err, { contexto })`; em serviÃ§os reutilize `reportClientError` (jÃ¡ importado em `src/services/api.js`).
+- Frontend: injete `const { reportError } = useErrorLogger('<page>')` e chame `reportError(err, { contexto })`; em serviÃ§os reutilize `reportClientError` (jÃ¡ importado em `src/services/api.js`). Para erros pre-login, `logError` usa `/api/log-error`.
 
 Checklist de operaÃ§Ã£o
 - VariÃ¡veis: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, opcional `APP_ENV`/`SERVICE_NAME`, `SLOW_REQUEST_THRESHOLD_MS` (padrÃ£o 2000 ms).

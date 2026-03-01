@@ -32,6 +32,70 @@ import { supabaseAdmin, supabaseAnon } from './_shared/supabaseClient.js'
 
 const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 
+const ERROR_CONTEXT_KEYS = new Set([
+  'route',
+  'feature',
+  'action',
+  'code',
+  'severity',
+  'source',
+  'status',
+  'stage',
+  'function',
+  'bucket',
+  'path',
+  'response',
+  'requestId',
+  'tenantHint',
+  'eventTypes',
+])
+const MAX_ERROR_FIELD_LENGTH = 500
+
+const scrubErrorString = (value) => {
+  if (typeof value !== 'string') {
+    value = value != null ? String(value) : ''
+  }
+  let sanitized = value.replace(
+    /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi,
+    '[redacted-email]'
+  )
+  sanitized = sanitized.replace(/[A-Za-z0-9._-]{24,}/g, '[redacted-token]')
+  if (sanitized.length > MAX_ERROR_FIELD_LENGTH) {
+    sanitized = `${sanitized.slice(0, MAX_ERROR_FIELD_LENGTH)}...`
+  }
+  return sanitized
+}
+
+const sanitizeErrorContext = (ctx) => {
+  if (!ctx || typeof ctx !== 'object') {
+    return null
+  }
+  const result = {}
+  Object.entries(ctx).forEach(([key, value]) => {
+    if (ERROR_CONTEXT_KEYS.has(key)) {
+      result[key] = scrubErrorString(value)
+    }
+  })
+  return Object.keys(result).length ? result : null
+}
+
+const buildErrorFingerprint = (base, context) =>
+  (
+    base.fingerprint ||
+    [
+      base.page || 'unknown',
+      scrubErrorString(base.message || '').slice(0, 200),
+      base.severity || 'error',
+      context?.action ? `action=${scrubErrorString(context.action)}` : '',
+      context?.path ? `path=${scrubErrorString(context.path)}` : '',
+      context?.requestId ? `req=${scrubErrorString(context.requestId)}` : '',
+    ]
+      .filter(Boolean)
+      .join('|')
+  )
+    .toString()
+    .slice(0, 200)
+
 const maskAuthHeader = (header) => {
   if (!header || typeof header !== 'string') {
     return null
@@ -132,6 +196,33 @@ export default withAuth(async (req, res, user) => {
         throw createHttpError(500, updateError.message || 'Falha ao atualizar senha.', {
           code: 'UPSTREAM_ERROR',
         })
+      }
+      return sendJson(res, 200, { ok: true })
+    }
+
+    if (path === '/api/log-error' && method === 'POST') {
+      const body = await readJson(req)
+      const base = body && typeof body === 'object' ? body : {}
+      const context = sanitizeErrorContext({
+        source: base?.context?.source || 'front',
+        ...(base?.context || {}),
+      })
+      const record = {
+        environment: 'app',
+        page: scrubErrorString(base.page || ''),
+        user_id: null,
+        message: scrubErrorString(base.message || 'Erro desconhecido'),
+        stack: base.stack ? scrubErrorString(base.stack) : null,
+        context,
+        severity: scrubErrorString(base.severity || 'error'),
+        fingerprint: buildErrorFingerprint(base, context),
+      }
+
+      const { error } = await supabaseAdmin
+        .from('app_errors')
+        .upsert(record, { onConflict: 'fingerprint', ignoreDuplicates: true })
+      if (error) {
+        throw createHttpError(500, 'Falha ao registrar erro.', { code: 'UPSTREAM_ERROR' })
       }
       return sendJson(res, 200, { ok: true })
     }
