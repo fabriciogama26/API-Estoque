@@ -143,6 +143,7 @@ export async function request(method, url, options = {}) {
     method,
     headers: normalizedHeaders,
     signal,
+    credentials: 'include',
   }
   if (hasBody && method !== 'GET') {
     config.body = payload

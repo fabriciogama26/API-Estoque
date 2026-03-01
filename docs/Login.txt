@@ -9,6 +9,7 @@ Arquitetura (modular)
 - Hooks: useLoginForm (estado, submit, recuperacao), useResetPassword (envia code + nova senha para /api/auth/reset).
 - Servicos: authService (login/recovery/reset/reauth/change) via API do backend; errorLogService registra falhas em app_errors.
 - Contexto: AuthContext fornece user, login, recoverPassword e logout; sincroniza user via /api/auth/me e nao persiste token no browser.
+- HTTP client envia `credentials: include` para garantir envio do cookie nas chamadas à API.
 
 Fluxos
 
