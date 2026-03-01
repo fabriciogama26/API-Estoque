@@ -1,6 +1,6 @@
 import { createHttpError } from '../http.js'
 
-const PUBLIC_ROUTES = new Set(['auth.login', 'auth.recover', 'health.check'])
+const PUBLIC_ROUTES = new Set(['auth.login', 'auth.recover', 'auth.reset', 'health.check'])
 
 export async function tenantGuard(ctx) {
   if (!ctx?.raw?.req) return undefined

@@ -1,34 +1,34 @@
 import { request as httpRequest } from '../services/httpClient.js'
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
+import { getSessionId } from '../services/sessionService.js'
 
 const DEFAULT_FILENAME = 'relatorio-estoque.pdf'
 
+function resolveProxyBase() {
+  const proxyEnv = (import.meta.env.VITE_SUPABASE_PROXY_URL || '').trim()
+  if (proxyEnv) {
+    return proxyEnv.replace(/\/+$/, '')
+  }
+  const apiBase = (import.meta.env.VITE_API_URL || '').trim()
+  if (apiBase) {
+    return `${apiBase.replace(/\/+$/, '')}/api/supabase`
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin.replace(/\/+$/, '')}/api/supabase`
+  }
+  return ''
+}
+
 function buildFunctionsUrl() {
-  const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
+  const base = resolveProxyBase()
   if (!base) {
-    throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
+    throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
   }
-  return base.replace(/\/+$/, '')
+  return `${base.replace(/\/+$/, '')}/functions/v1`
 }
 
-function resolveAnonKey() {
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-  if (!key) {
-    throw new Error('VITE_SUPABASE_ANON_KEY nao configurada.')
-  }
-  return key
-}
-
-async function resolveAccessToken() {
-  if (!isSupabaseConfigured() || !supabase) {
-    throw new Error('Supabase nao configurado.')
-  }
-  const { data } = await supabase.auth.getSession()
-  const token = data?.session?.access_token
-  if (!token) {
-    throw new Error('Sessao expirada. Faca login novamente.')
-  }
-  return token
+function buildSessionHeaders(extra = {}) {
+  const sessionId = getSessionId()
+  return sessionId ? { ...extra, 'X-Session-Id': sessionId } : { ...extra }
 }
 
 function formatMonthLabel(dateValue) {
@@ -52,15 +52,9 @@ export async function downloadRelatorioEstoquePdf({ html, report } = {}) {
 
   const normalizedHtml = normalizeHtmlForRemote(html)
   const endpoint = `${buildFunctionsUrl()}/relatorio-estoque-pdf`
-  const anonKey = resolveAnonKey()
-  const token = await resolveAccessToken()
-
   const blob = await httpRequest('POST', endpoint, {
     body: { html: normalizedHtml },
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${token}`,
-    },
+    headers: buildSessionHeaders(),
     responseType: 'blob',
     skipSessionGuard: true,
   })

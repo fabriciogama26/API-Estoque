@@ -21,7 +21,7 @@ Alternando para modo local
 Alternando para modo Supabase
 -----------------------------
 1. Remova ou defina `VITE_DATA_MODE=remote` no `.env.local`.
-2. Informe `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (e demais variáveis necessárias: `VITE_SUPABASE_PASSWORD_REDIRECT`, `VITE_SUPABASE_FUNCTIONS_URL`, etc.).
+2. Informe `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (e demais variáveis necessárias: `VITE_SUPABASE_PASSWORD_REDIRECT`, `VITE_SUPABASE_PROXY_URL` ou `VITE_API_URL`, etc.).
 3. Garanta que o usuário exista no Supabase Auth e tenha permissão RLS adequada.
 4. Reinicie o Vite (`npm run dev`) e faça login com o e-mail cadastrado no Supabase. O badge do `SystemStatus` deve indicar “Supabase”.
 

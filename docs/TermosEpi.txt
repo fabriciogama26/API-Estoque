@@ -2,7 +2,7 @@ Tela: Termo de EPI
 
 Visao geral
 
-Gerar e baixar o termo de responsabilidade de EPI para colaboradores, com pre-visualizacao HTML e PDF renderizado via Edge Function com JWT.
+Gerar e baixar o termo de responsabilidade de EPI para colaboradores, com pre-visualizacao HTML e PDF renderizado via Edge Function usando proxy /api/supabase e cookie HttpOnly.
 
 Arquitetura (modular)
 
@@ -15,7 +15,7 @@ Fluxos
 
 - Formulario: matricula ou nome (obrigatorio informar um), periodo opcional (dataInicio/dataFim). Valida datas (formato e ordem).
 - Gerar termo: busca contexto via service, monta HTML pelo template e mostra preview em iframe.
-- Download: gera PDF a partir do HTML e contexto; mostra erro em caso de falha.
+- Download: gera PDF a partir do HTML e contexto via proxy /api/supabase (cookie HttpOnly); mostra erro em caso de falha.
 - Resumo: exibe colaborador, centro de servico, ultima entrega, itens entregues e origem dos dados (local ou Supabase).
 
 Boas praticas
@@ -30,7 +30,7 @@ Atualizacao 2025-12
 Atualizacao 2026-02
 
 - Download do PDF agora usa httpClient para aplicar envelope de erro e request_id das Functions.
-- A Edge Function `termo-epi` passou a exigir Authorization Bearer JWT; o frontend envia o token de sessao.
+- A Edge Function `termo-epi` passou a exigir Authorization Bearer JWT; hoje o proxy backend injeta o token a partir do cookie HttpOnly.
 - Preview HTML passou a ser sanitizado e exibido em iframe sandbox.
 - Modo trusted (templates internos) usa allow-same-origin para auto-resize; modo untrusted usa sandbox vazio com scroll.
 - Sanitizacao preserva documento completo e estilos (head/style/class/id) para manter o layout da pre-visualizacao.
@@ -56,6 +56,13 @@ where account_owner_id = '<OWNER_ID>'
 - Antes/Depois:
 - Antes: download usava fetch direto e tratava erro manualmente.
 - Depois: download usa httpClient com responseType blob e envelope padronizado.
+
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Download de PDF passa pelo proxy `/api/supabase/functions/v1`, sem Authorization no frontend.
+- Cookie HttpOnly passou a ser a fonte de autenticacao; tokens nao ficam acessiveis no JS.
+- Arquivos alterados:
+- `src/utils/TermoEpiUtils.js`
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -99,7 +106,7 @@ Servicos e integracoes externas
 - Supabase Functions (renderizacao PDF)
   - Tipo: integracao externa
   - Caminho: supabase/functions/termo-epi
-  - Responsavel por: renderizar PDF; exige Authorization Bearer JWT.
+  - Responsavel por: renderizar PDF; autenticacao via proxy /api/supabase e cookie HttpOnly.
 
 Ajuda contextual
 ----------------

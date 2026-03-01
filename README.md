@@ -56,7 +56,7 @@ npm run preview
 Obrigatorias (frontend remoto):
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_SUPABASE_FUNCTIONS_URL`
+- `VITE_SUPABASE_PROXY_URL` (ou `VITE_API_URL`)
 
 Obrigatorias (API serverless e relatorios):
 - `SUPABASE_URL`
@@ -96,6 +96,11 @@ Opcionais / por feature:
 - `VITE_PUBLIC_ASSETS_ORIGIN`
 - `VITE_IMPORTS_BUCKET`
 - `VITE_IMPORTS_MAX_MB`
+- `SESSION_COOKIE_NAME`
+- `SESSION_COOKIE_SAMESITE`
+- `SESSION_COOKIE_SECURE`
+- `SESSION_COOKIE_MAX_AGE_MS`
+- `SESSION_TIMEBOX_MS`
 - `VITE_TERMO_EPI_EMPRESA_NOME`
 - `VITE_TERMO_EPI_EMPRESA_DOCUMENTO`
 - `VITE_TERMO_EPI_EMPRESA_ENDERECO`
@@ -152,6 +157,8 @@ api/
   _shared/
     auth.js  # helper compartilhado da API serverless
     authPublic.js  # auth publico (login e recuperacao)
+    authSessionStore.js  # store de sessoes autenticadas (cookie -> tokens)
+    cookies.js  # utilitario de cookies HttpOnly
     errorCore.js  # núcleo de padronização de erros da API serverless
     environment.js  # helper compartilhado da API serverless
     http.js  # helper compartilhado da API serverless
@@ -159,6 +166,7 @@ api/
     logger.js  # helper compartilhado da API serverless
     operations.js  # helper compartilhado da API serverless
     sessionActivity.js  # helper compartilhado da API serverless
+    supabaseProxy.js  # proxy /api/supabase para injecao de JWT
     supabaseClient.js  # helper compartilhado da API serverless
     withAuth.js  # helper compartilhado da API serverless
   index.js  # handler da API serverless
@@ -835,6 +843,7 @@ supabase/
     20260226_imports_bucket_owner_prefix.sql  # migration SQL
     20260227_accidents_unique_cat_cid.sql  # migration SQL
     20260228_register_missing_tables.sql  # migration SQL
+    20260301_add_auth_sessions_store.sql  # migration SQL
     20260301_fix_rpc_acidentes_import_hash.sql  # migration SQL
     20260302_fix_acidentes_cid_update_hash.sql  # migration SQL
     20260303_fix_acidentes_rehash_digest.sql  # migration SQL
@@ -886,7 +895,7 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Erro de API: validar `error.request_id` e correlacionar com `api_errors`.
 - Erro de RLS (42501): conferir `account_owner_id`, roles/permissions e policies do schema.
 - Erro de auth/URL: validar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-  - Edge function nao encontrada: validar `VITE_SUPABASE_FUNCTIONS_URL` e deploy das functions.
+  - Edge function nao encontrada: validar `VITE_SUPABASE_PROXY_URL`/`VITE_API_URL` e deploy das functions.
   - Violacao de CSP (Report-Only): revisar `vercel.json` e ajustar origens permitidas.
 - Erro 429 (rate limit): aguardar `Retry-After`. Em `auth.login`, bloqueio apos 3 tentativas em 60s; em `auth.recover`, segue `rate_limit_config`.
 - Erro 422 (Idempotency-Key): chave reutilizada com payload diferente.

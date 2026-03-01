@@ -1,4 +1,3 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { ApiError, request as httpRequest } from './httpClient.js'
 
 const SESSION_KEY = 'api-estoque-session-id'
@@ -112,20 +111,9 @@ const ensureSessionId = () => {
   return rotateSessionId()
 }
 
-const buildHeaders = async (includeInteraction) => {
-  if (!isSupabaseConfigured() || !supabase) {
-    return null
-  }
-  const { data } = await supabase.auth.getSession()
-  const token = data?.session?.access_token
-  if (!token) {
-    safeDispatch('session-expired', { code: 'SESSION_EXPIRED' })
-    return null
-  }
+const buildHeaders = (includeInteraction) => {
   const sessionId = includeInteraction ? ensureSessionId() : resolveSessionId()
-  const headers = {
-    Authorization: `Bearer ${token}`,
-  }
+  const headers = {}
   if (includeInteraction) {
     headers['X-User-Interaction'] = '1'
   }
@@ -145,10 +133,7 @@ export async function touchSession() {
     return { ok: false, skipped: true }
   }
 
-  const headers = await buildHeaders(true)
-  if (!headers) {
-    return { ok: false }
-  }
+  const headers = buildHeaders(true)
 
   try {
     await httpRequest('POST', `${base}/api/session/touch`, { headers })
@@ -167,10 +152,7 @@ export async function markSessionReauth() {
     return { ok: false, skipped: true }
   }
 
-  const headers = await buildHeaders(false)
-  if (!headers) {
-    return { ok: false }
-  }
+  const headers = buildHeaders(false)
 
   try {
     await httpRequest('POST', `${base}/api/session/reauth`, { headers })
@@ -189,10 +171,7 @@ export async function revokeSession() {
     return { ok: false, skipped: true }
   }
 
-  const headers = await buildHeaders(false)
-  if (!headers) {
-    return { ok: false }
-  }
+  const headers = buildHeaders(false)
 
   try {
     await httpRequest('POST', `${base}/api/session/revoke`, { headers })

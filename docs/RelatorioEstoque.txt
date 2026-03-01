@@ -6,7 +6,7 @@ Visao geral
 - Permite consultar o historico de relatorios mensais gravados em inventory_report.
 - Gera o HTML do relatorio no frontend a partir dos dados persistidos para pre-visualizacao.
 - O PDF e gerado separadamente, sem consumir o limite na pre-visualizacao.
-- A renderizacao de PDF via Edge Function `relatorio-estoque-pdf` exige Authorization Bearer JWT.
+- A renderizacao de PDF via Edge Function `relatorio-estoque-pdf` usa proxy /api/supabase com cookie HttpOnly (sem token no JS).
 - Relatorios mensais sao gerados automaticamente por Edge Functions e enviados por email HTML somente para o ultimo mes gerado.
 - Relatorios semanais sao gerados com CSVs (estoque atual, entradas, saidas, acidentes e HHT) e enviados por email com anexos.
 - Periodo semanal considera os ultimos 7 dias a partir do horario de execucao.
@@ -64,7 +64,7 @@ Atualizacao 2026-02
 - Limite de 1 PDF por mes por relatorio com registro em inventory_report.
 - Campos de controle de email adicionados em inventory_report (status, tentativas e erro).
 - PDF passou a ser renderizado pela Edge Function dedicada `relatorio-estoque-pdf`.
-- `relatorio-estoque-pdf` passou a exigir Authorization Bearer JWT; o frontend envia o token de sessao.
+- `relatorio-estoque-pdf` passou a exigir Authorization Bearer JWT; hoje o proxy backend injeta o token a partir do cookie HttpOnly.
 - Edge Function de email mensal aceita `test_email` para envio de teste sem atualizar status.
 - Remetente do email mensal passou a usar `RELATORIO_ESTOQUE_EMAIL_FROM`.
 - Header do email mensal passou a incluir duas logos e aviso de email automatico.
@@ -111,6 +111,13 @@ where account_owner_id = '<OWNER_ID>'
 - Antes/Depois:
 - Antes: os crons de relatorio nao registravam execucao em `edge_functions_error_report`.
 - Depois: os crons de relatorio registram resumo da execucao em `edge_functions_error_report`.
+
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Geracao de PDF passa pelo proxy `/api/supabase/functions/v1`, sem Authorization no frontend.
+- Cookie HttpOnly passou a ser a fonte de autenticacao; tokens nao ficam acessiveis no JS.
+- Arquivos alterados:
+- `src/utils/RelatorioEstoquePdfUtils.js`
 
 Atualizacao 2026-02 (semanal)
 -----------------------------
@@ -186,7 +193,7 @@ Servicos e integracoes externas
 - Supabase Functions (renderizacao PDF)
   - Tipo: integracao externa
   - Caminho: supabase/functions/relatorio-estoque-pdf
-  - Responsavel por: converter HTML em PDF.
+  - Responsavel por: converter HTML em PDF via proxy /api/supabase e cookie HttpOnly.
 - Brevo (email HTML)
   - Tipo: integracao externa
   - Caminho: supabase/functions/relatorio-estoque-mensal-email/_shared/relatorioEstoqueEmailCore.ts

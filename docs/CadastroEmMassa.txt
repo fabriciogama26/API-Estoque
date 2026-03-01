@@ -80,7 +80,7 @@ Service (frontend)
 
 Edge Function (Supabase)
 - supabase/functions/cadastro-import/index.ts
-  - Valida usuario logado via JWT (Authorization Bearer)
+  - Valida usuario logado via JWT (Authorization Bearer) injetado pelo proxy /api/supabase (cookie HttpOnly)
   - Faz download do arquivo XLSX no Storage (bucket "imports")
   - Le a planilha e valida cada linha
   - Insere em public.pessoas
@@ -118,6 +118,11 @@ Exemplo (todos os dias 00:00 horario de Brasilia):
 
 Payload de chamada:
 { "dryRun": false }
+
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Chamadas a Edge Functions passam pelo proxy `/api/supabase`.
+- Authorization nao e montado no frontend; o backend injeta a partir do cookie HttpOnly.
 
 Problemas comuns (checklist)
 ----------------------------

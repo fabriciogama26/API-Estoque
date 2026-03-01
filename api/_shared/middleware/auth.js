@@ -7,8 +7,10 @@ const reauthExemptPaths = new Set([
   '/api/session/reauth',
   '/api/session/revoke',
   '/api/health',
+  '/api/auth/reauth',
+  '/api/auth/password/change',
 ])
-const publicPaths = new Set(['/api/auth/login', '/api/auth/recover'])
+const publicPaths = new Set(['/api/auth/login', '/api/auth/recover', '/api/auth/reset'])
 
 const resolveAuthHeader = (req) =>
   req?.headers?.authorization ||

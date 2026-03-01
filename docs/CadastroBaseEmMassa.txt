@@ -55,7 +55,7 @@ Service (frontend)
 
 Edge Functions (Supabase)
 - supabase/functions/cadastro-base-import/index.ts
-  - valida usuario logado e owner
+  - valida usuario logado e owner via JWT (Authorization Bearer) injetado pelo proxy /api/supabase (cookie HttpOnly)
   - valida e insere linhas
   - gera CSV de erros quando necessario
   - remove o XLSX enviado (best-effort)
@@ -73,3 +73,8 @@ Quando houver erros, a Edge Function retorna:
 
 Formato do CSV:
 linha,coluna,motivo
+
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Chamadas a Edge Functions passam pelo proxy `/api/supabase`.
+- Authorization nao e montado no frontend; o backend injeta a partir do cookie HttpOnly.

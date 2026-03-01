@@ -19,6 +19,16 @@ import {
 } from './_shared/operations.js'
 import { touchSession, markSessionReauth, revokeSession } from './_shared/sessionActivity.js'
 import { loginWithLoginName, recoverWithLoginName } from './_shared/authPublic.js'
+import { createAuthSession, revokeAuthSession } from './_shared/authSessionStore.js'
+import {
+  appendSetCookie,
+  buildClearSessionCookie,
+  buildSessionCookie,
+  getSessionIdFromCookies,
+  SESSION_COOKIE,
+} from './_shared/cookies.js'
+import { proxySupabaseRequest } from './_shared/supabaseProxy.js'
+import { supabaseAdmin, supabaseAnon } from './_shared/supabaseClient.js'
 
 const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 
@@ -53,14 +63,140 @@ export default withAuth(async (req, res, user) => {
   const path = url.split('?')[0]
   const query = parseQuery(req)
 
+    if (path.startsWith('/api/supabase/')) {
+      return proxySupabaseRequest(req, res, req.authToken)
+    }
+
     if (path === '/api/auth/login' && method === 'POST') {
       const body = await readJson(req)
-      return sendJson(res, 200, await loginWithLoginName(body))
+      const { session, user: authUser } = await loginWithLoginName(body)
+      const { sessionId } = await createAuthSession({ session, user: authUser, req })
+      appendSetCookie(res, buildSessionCookie(sessionId, { maxAgeMs: SESSION_COOKIE.maxAgeMs() }))
+      return sendJson(res, 200, {
+        user: {
+          id: authUser?.id || null,
+          email: authUser?.email || null,
+          phone: authUser?.phone || null,
+          user_metadata: authUser?.user_metadata || {},
+          app_metadata: authUser?.app_metadata || {},
+        },
+      })
     }
 
     if (path === '/api/auth/recover' && method === 'POST') {
       const body = await readJson(req)
       return sendJson(res, 200, await recoverWithLoginName(body))
+    }
+
+    if (path === '/api/auth/me' && method === 'GET') {
+      if (!user) {
+        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
+      }
+      return sendJson(res, 200, {
+        user: {
+          id: user?.id || null,
+          email: user?.email || null,
+          phone: user?.phone || null,
+          user_metadata: user?.user_metadata || {},
+          app_metadata: user?.app_metadata || {},
+        },
+      })
+    }
+
+    if (path === '/api/auth/reset' && method === 'POST') {
+      const body = await readJson(req)
+      const code = String(body?.code || '').trim()
+      const newPassword = String(body?.newPassword || body?.password || '').trim()
+      if (!code || !newPassword) {
+        throw createHttpError(400, 'Codigo e nova senha sao obrigatorios.', {
+          code: 'VALIDATION_ERROR',
+        })
+      }
+      if (!supabaseAnon) {
+        throw createHttpError(500, 'SUPABASE_ANON_KEY nao definido.', { code: 'UPSTREAM_ERROR' })
+      }
+      const { data, error } = await supabaseAnon.auth.exchangeCodeForSession(code)
+      if (error || !data?.user?.id) {
+        throw createHttpError(400, 'Link de redefinicao invalido ou expirado.', {
+          code: 'AUTH_INVALID',
+        })
+      }
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        data.user.id,
+        {
+          password: newPassword,
+          user_metadata: { password_changed_at: new Date().toISOString() },
+        }
+      )
+      if (updateError) {
+        throw createHttpError(500, updateError.message || 'Falha ao atualizar senha.', {
+          code: 'UPSTREAM_ERROR',
+        })
+      }
+      return sendJson(res, 200, { ok: true })
+    }
+
+    if (path === '/api/auth/reauth' && method === 'POST') {
+      if (!user?.id || !user?.email) {
+        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
+      }
+      const body = await readJson(req)
+      const password = String(body?.password || '').trim()
+      if (!password) {
+        throw createHttpError(400, 'Informe sua senha.', { code: 'VALIDATION_ERROR' })
+      }
+      const { error } = await supabaseAdmin.auth.signInWithPassword({
+        email: user.email,
+        password,
+      })
+      if (error) {
+        throw createHttpError(401, 'Senha invalida.', { code: 'AUTH_INVALID' })
+      }
+      const result = await markSessionReauth(req, user, req.authToken)
+      if (!result?.ok) {
+        const status = result.status || 400
+        const code = resolveSessionErrorCode({ status, code: result.code })
+        throw createHttpError(
+          status,
+          result.message || 'Falha ao registrar reautenticacao.',
+          { code }
+        )
+      }
+      return sendJson(res, 200, { ok: true })
+    }
+
+    if (path === '/api/auth/password/change' && method === 'POST') {
+      if (!user?.id || !user?.email) {
+        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
+      }
+      const body = await readJson(req)
+      const currentPassword = String(body?.currentPassword || '').trim()
+      const newPassword = String(body?.newPassword || '').trim()
+      if (!currentPassword || !newPassword) {
+        throw createHttpError(400, 'Senha atual e nova senha sao obrigatorias.', {
+          code: 'VALIDATION_ERROR',
+        })
+      }
+      const { error: reauthError } = await supabaseAdmin.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      })
+      if (reauthError) {
+        throw createHttpError(401, 'Senha atual incorreta.', { code: 'AUTH_INVALID' })
+      }
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        user.id,
+        {
+          password: newPassword,
+          user_metadata: { password_changed_at: new Date().toISOString() },
+        }
+      )
+      if (updateError) {
+        throw createHttpError(500, updateError.message || 'Falha ao atualizar senha.', {
+          code: 'UPSTREAM_ERROR',
+        })
+      }
+      return sendJson(res, 200, { ok: true })
     }
 
     // Pessoas
@@ -310,6 +446,11 @@ export default withAuth(async (req, res, user) => {
           { code }
         )
       }
+      const cookieSessionId = getSessionIdFromCookies(req)
+      if (cookieSessionId) {
+        await revokeAuthSession(cookieSessionId)
+      }
+      appendSetCookie(res, buildClearSessionCookie())
       return sendJson(res, 200, { ok: true })
     }
 

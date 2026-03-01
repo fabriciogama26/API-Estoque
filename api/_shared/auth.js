@@ -1,5 +1,12 @@
 import { supabaseAdmin } from './supabaseClient.js'
 import { sendError, handleError } from './http.js'
+import {
+  ensureAuthSession,
+  loadAuthSession,
+  refreshAuthSession,
+  revokeAuthSession,
+} from './authSessionStore.js'
+import { getSessionIdFromCookies } from './cookies.js'
 
 import { validateSession } from './sessionActivity.js'
 
@@ -10,16 +17,86 @@ export async function requireAuth(req, res) {
     req.headers?.get?.('authorization') ||
     req.headers?.get?.('Authorization')
 
-  if (!header || !header.startsWith('Bearer ')) {
-    console.warn('[AUTH] Requisicao sem header de autorizacao.', {
-      method: req?.method,
-      path: req?.url || req?.originalUrl,
-    })
-    sendError(res, 401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED', req })
-    return null
+  const bearerMatch = typeof header === 'string' ? header.match(/Bearer\s+(.+)/i) : null
+  const bearerToken = bearerMatch?.[1]?.trim() || ''
+
+  const tryCookieSession = async () => {
+    const sessionId = getSessionIdFromCookies(req)
+    if (!sessionId) {
+      return null
+    }
+    const record = await loadAuthSession(sessionId)
+    if (!record) {
+      return null
+    }
+
+    let activeRecord = await ensureAuthSession(record)
+    let accessToken = activeRecord?.access_token || ''
+    let userResponse = await supabaseAdmin.auth.getUser(accessToken)
+    if (userResponse?.error || !userResponse?.data?.user) {
+      try {
+        activeRecord = await refreshAuthSession(activeRecord)
+        accessToken = activeRecord?.access_token || ''
+        userResponse = await supabaseAdmin.auth.getUser(accessToken)
+      } catch (refreshError) {
+        await revokeAuthSession(sessionId)
+        throw refreshError
+      }
+    }
+
+    if (userResponse?.error || !userResponse?.data?.user) {
+      await revokeAuthSession(sessionId)
+      return null
+    }
+
+    req.authToken = accessToken
+    req.authSessionId = sessionId
+    req.accountOwnerId = activeRecord?.account_owner_id || null
+    return userResponse.data.user
   }
 
-  const token = header.slice(7).trim()
+  if (!bearerToken) {
+    try {
+      const cookieUser = await tryCookieSession()
+      if (!cookieUser) {
+        console.warn('[AUTH] Requisicao sem token/cookie valido.', {
+          method: req?.method,
+          path: req?.url || req?.originalUrl,
+        })
+        sendError(res, 401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED', req })
+        return null
+      }
+      const sessionGuard = await validateSession(req, cookieUser, req.authToken, {
+        requireReauth: Boolean(req?.requiresReauth),
+      })
+      if (!sessionGuard?.ok) {
+        const status = sessionGuard.status || 401
+        const codeRaw = (sessionGuard.code || '').toString().trim().toUpperCase()
+        const code =
+          codeRaw === 'INTERACTION_REQUIRED'
+            ? 'VALIDATION_ERROR'
+            : 'AUTH_EXPIRED'
+        sendError(res, status, sessionGuard.message || 'Sessao expirada. Faca login novamente.', {
+          code,
+          req,
+        })
+        return null
+      }
+      return cookieUser
+    } catch (cookieError) {
+      const status = cookieError?.status || 401
+      const message = cookieError?.message || 'Token invalido ou expirado.'
+      if (status >= 500) {
+        handleError(res, cookieError, message, req)
+      } else {
+        const fallbackCode = status === 401 ? 'AUTH_EXPIRED' : null
+        sendError(res, status, message, { code: fallbackCode, req })
+      }
+      return null
+    }
+  }
+
+  const token = bearerToken
   req.authToken = token
   if (!token) {
     console.warn('[AUTH] Token vazio no header de autorizacao.', {

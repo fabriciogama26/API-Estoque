@@ -1,6 +1,10 @@
 const ROUTES = [
   { method: 'POST', path: '/api/auth/login', route: 'auth.login' },
   { method: 'POST', path: '/api/auth/recover', route: 'auth.recover' },
+  { method: 'GET', path: '/api/auth/me', route: 'auth.me' },
+  { method: 'POST', path: '/api/auth/reauth', route: 'auth.reauth' },
+  { method: 'POST', path: '/api/auth/reset', route: 'auth.reset' },
+  { method: 'POST', path: '/api/auth/password/change', route: 'auth.password_change' },
   { method: 'POST', path: '/api/pessoas', route: 'create.pessoa' },
   { method: 'POST', path: '/api/materiais', route: 'create.material' },
   { method: 'POST', path: '/api/acidentes', route: 'create.acidente' },
