@@ -1,4 +1,3 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { fetchCurrentUser } from './authService.js'
 import { request as httpRequest } from './httpClient.js'
 
@@ -153,32 +152,7 @@ async function insertError(payload) {
     return
   }
 
-  if (!isSupabaseConfigured() || !supabase || !userId) {
-    await postServerLog(record)
-    return
-  }
-
-  const { error } = await supabase
-    .from('app_errors')
-    .upsert(record, { onConflict: 'fingerprint', ignoreDuplicates: true })
-  if (error) {
-    if (userId && (error.code === '23503' || error.message?.includes('app_errors_user_id_fkey'))) {
-      const { error: retryError } = await supabase
-        .from('app_errors')
-        .upsert({ ...record, user_id: null }, { onConflict: 'fingerprint', ignoreDuplicates: true })
-      if (!retryError || retryError.code === '23505') {
-        return
-      }
-      console.warn('Falha ao registrar erro', retryError)
-      return
-    }
-    if (error.code === '23505') {
-      return
-    }
-    await postServerLog(record)
-    // Nao propaga falha de log para nao quebrar UX
-    console.warn('Falha ao registrar erro', error)
-  }
+  await postServerLog(record)
 }
 
 export async function logError(payload) {
