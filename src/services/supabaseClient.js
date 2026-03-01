@@ -7,16 +7,30 @@ const env = (name) => {
   return import.meta.env[name]
 }
 
-const supabaseUrl = env('VITE_SUPABASE_URL')
+const resolveProxyBase = () => {
+  const proxyEnv = env('VITE_SUPABASE_PROXY_URL')
+  if (proxyEnv) {
+    return String(proxyEnv).trim().replace(/\/+$/, '')
+  }
+  const apiBase = env('VITE_API_URL')
+  if (apiBase) {
+    return `${String(apiBase).trim().replace(/\/+$/, '')}/api/supabase`
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin.replace(/\/+$/, '')}/api/supabase`
+  }
+  return ''
+}
+
+const supabaseUrl = resolveProxyBase() || env('VITE_SUPABASE_URL')
 const supabaseAnonKey = env('VITE_SUPABASE_ANON_KEY')
 
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        autoRefreshToken: true,
-        // Mantem a sessao para que links de recuperacao de senha funcionem apos o redirect
-        persistSession: true,
-        detectSessionInUrl: true,
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
       },
     })
   : null

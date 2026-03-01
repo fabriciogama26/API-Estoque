@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { restoreResetSession, updatePassword } from '../services/authService.js'
-import { isSupabaseConfigured, supabase } from '../services/supabaseClient.js'
+import { resetPasswordWithCode } from '../services/authService.js'
 import { logError } from '../services/errorLogService.js'
 import { validatePasswordOrThrow } from '../services/passwordPolicyService.js'
 import { securityConfig } from '../config/security.js'
@@ -16,28 +15,28 @@ export function useResetPassword() {
   const [sessionError, setSessionError] = useState(null)
   const [isReady, setIsReady] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
-  const [userEmail, setUserEmail] = useState(null)
+  const [resetCode, setResetCode] = useState(null)
   const resetReason = new URLSearchParams(location.search).get('reason') || ''
   const isForcedReset = resetReason === 'expired'
 
   useEffect(() => {
     const ensureSession = async () => {
-      if (!isSupabaseConfigured() || !supabase) {
-        setSessionError('Supabase nao configurado para redefinir senha.')
-        setIsCheckingSession(false)
-        return
-      }
-
       try {
-        const session = await restoreResetSession()
-        setUserEmail(session?.user?.email || null)
+        const currentUrl = new URL(window.location.href)
+        const hashParams = new URLSearchParams(currentUrl.hash?.replace(/^#/, '') ?? '')
+        const searchParams = currentUrl.searchParams
+        const code = searchParams.get('code') || hashParams.get('code')
+        if (!code) {
+          throw new Error('Link de redefinicao invalido ou expirado.')
+        }
+        setResetCode(code)
         setIsReady(true)
       } catch (err) {
         setSessionError(err.message || 'Nao foi possivel validar o link de redefinicao.')
         logError({
           page: 'reset-password',
           message: err.message,
-          context: { source: 'restoreResetSession' },
+          context: { source: 'reset-link' },
           severity: 'error',
         })
       } finally {
@@ -46,22 +45,6 @@ export function useResetPassword() {
     }
 
     ensureSession()
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (!isSupabaseConfigured() || !supabase) {
-        return
-      }
-      supabase.auth.signOut({ scope: 'local' }).catch((err) => {
-        logError({
-          page: 'reset-password',
-          message: err?.message || 'Falha ao limpar sessao de redefinicao.',
-          context: { source: 'reset_cleanup' },
-          severity: 'warn',
-        })
-      })
-    }
   }, [])
 
   const handleChange = (event) => {
@@ -78,29 +61,12 @@ export function useResetPassword() {
     if (isSubmitting) {
       return
     }
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        await supabase.auth.signOut({ scope: 'local' })
-      } catch (err) {
-        logError({
-          page: 'reset-password',
-          message: err?.message || 'Falha ao cancelar redefinicao.',
-          context: { source: 'reset_cancel' },
-          severity: 'warn',
-        })
-      }
-    }
     navigate('/login', { replace: true })
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setStatus(null)
-
-    if (!isSupabaseConfigured() || !supabase) {
-      setStatus({ type: 'error', message: 'Supabase nao configurado para redefinir senha.' })
-      return
-    }
 
     if (!isReady) {
       setStatus({ type: 'error', message: 'Link de redefinicao invalido ou expirado.' })
@@ -115,13 +81,13 @@ export function useResetPassword() {
         }
       }
 
-      await validatePasswordOrThrow(form.newPassword, { email: userEmail })
+      await validatePasswordOrThrow(form.newPassword)
 
       if (form.newPassword !== form.confirmPassword) {
         throw new Error('A confirmacao precisa ser igual a nova senha.')
       }
 
-      await updatePassword(form.newPassword)
+      await resetPasswordWithCode(resetCode, form.newPassword)
       setStatus({ type: 'success', message: 'Senha atualizada! Redirecionando para o login...' })
       setForm({ newPassword: '', confirmPassword: '' })
     } catch (err) {
@@ -129,7 +95,7 @@ export function useResetPassword() {
       logError({
         page: 'reset-password',
         message: err.message,
-        context: { source: 'updatePassword' },
+        context: { source: 'resetPasswordWithCode' },
         severity: 'error',
       })
     } finally {

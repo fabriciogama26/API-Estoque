@@ -52,15 +52,9 @@ export async function loginWithLoginName(payload = {}) {
     throw createHttpError(401, 'Login ou senha invalidos.', { code: 'AUTH_INVALID' })
   }
 
-  const session = data.session
-
   return {
-    session: {
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-      expires_in: session.expires_in,
-      token_type: session.token_type,
-    },
+    session: data.session,
+    user: data.user,
   }
 }
 

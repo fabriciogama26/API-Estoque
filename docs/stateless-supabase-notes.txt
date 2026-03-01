@@ -14,7 +14,7 @@ Variáveis de ambiente
 - `VITE_SUPABASE_URL`: URL pública do projeto Supabase.
 - `VITE_SUPABASE_ANON_KEY`: chave `anon` usada pelo SDK.
 - `VITE_DATA_MODE`: `remote` (padrão) ou `local` (usa `localStorage`).【F:src/config/runtime.js†L1-L12】
-- `VITE_TERMO_EPI_EMPRESA_*`, `VITE_SUPABASE_FUNCTIONS_URL`, `VITE_LOCAL_*` complementam recursos de documentos e modo offline.【F:src/utils/TermoEpiUtils.js†L1-L94】【F:src/context/AuthContext.jsx†L7-L84】
+- `VITE_TERMO_EPI_EMPRESA_*`, `VITE_SUPABASE_PROXY_URL` (ou `VITE_API_URL`), `VITE_LOCAL_*` complementam recursos de documentos e modo offline.【F:src/utils/TermoEpiUtils.js†L1-L94】【F:src/context/AuthContext.jsx†L7-L84】
 
 Expectativas do schema Supabase
 -------------------------------

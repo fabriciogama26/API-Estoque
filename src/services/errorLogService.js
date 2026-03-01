@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { fetchCurrentUser } from './authService.js'
 
 const ALLOWED_CONTEXT_KEYS = new Set([
   'route',
@@ -59,14 +60,23 @@ const sanitizeContext = (ctx) => {
   return Object.keys(result).length ? result : null
 }
 
+const AUTH_USER_CACHE_TTL_MS = 10 * 1000
+let cachedUserId = null
+let cachedUserIdAt = 0
+
 const resolveSessionUserId = async () => {
-  if (!supabase) {
-    return null
+  if (cachedUserId && Date.now() - cachedUserIdAt < AUTH_USER_CACHE_TTL_MS) {
+    return cachedUserId
   }
   try {
-    const { data } = await supabase.auth.getSession()
-    return data?.session?.user?.id || null
+    const user = await fetchCurrentUser()
+    const userId = user?.id || null
+    cachedUserId = userId
+    cachedUserIdAt = Date.now()
+    return userId
   } catch (_) {
+    cachedUserId = null
+    cachedUserIdAt = 0
     return null
   }
 }

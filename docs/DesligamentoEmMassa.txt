@@ -76,7 +76,7 @@ Service (frontend)
 
 Edge Function (Supabase)
 - supabase/functions/desligamento-import/index.ts
-  - Valida o usuario logado via JWT (Authorization Bearer)
+  - Valida o usuario logado via JWT (Authorization Bearer) injetado pelo proxy /api/supabase (cookie HttpOnly)
   - Faz download do arquivo XLSX no Storage (bucket "imports")
   - Le a planilha e valida cada linha
   - Atualiza public.pessoas (update por id) e registra public.pessoas_historico
@@ -94,6 +94,12 @@ Permissoes e seguranca
 - A tela de Pessoas deve ser protegida por permissao no frontend (PermissionsProvider/ProtectedRoute).
 - Recomendacao: validar permissao tambem na Edge Function (defesa em profundidade),
   garantindo que apenas usuarios com acesso a pagina "cadastros-pessoas" consigam executar.
+
+
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Chamadas a Edge Functions passam pelo proxy `/api/supabase`.
+- Authorization nao e montado no frontend; o backend injeta a partir do cookie HttpOnly.
 
 
 Relatorio de erros (CSV)

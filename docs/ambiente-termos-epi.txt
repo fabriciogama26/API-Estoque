@@ -9,7 +9,7 @@ Frontend (Vite)
 ---------------
 1. Configure as variáveis no `.env.local` / `.env.production`:
    - `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`: habilitam a consulta ao contexto do colaborador.
-   - `VITE_SUPABASE_FUNCTIONS_URL`: base da função serverless que renderiza o PDF (ex.: `https://<project-ref>.functions.supabase.co`).
+   - `VITE_SUPABASE_PROXY_URL` (ou `VITE_API_URL`): base do proxy `/api/supabase` usado para chamar a função de PDF sem expor token no frontend.
    - `VITE_PUBLIC_ASSETS_ORIGIN` (opcional): URL pública usada para resolver imagens e assets no HTML antes de enviar para o backend. Se não informada, o código usa `window.location.origin`/`VITE_API_URL` como fallback.【F:src/utils/TermoEpiUtils.js†L1-L94】
 2. Personalize os metadados da empresa via `VITE_TERMO_EPI_EMPRESA_*` (nome, documento, endereço, contato, `logoUrl`, `logoSecundarioUrl`). O template lê esses valores ao montar o cabeçalho e dados de rodapé.【F:shared/documents/epiTermTemplate.js†L38-L120】
 

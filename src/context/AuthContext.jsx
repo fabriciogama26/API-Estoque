@@ -1,12 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
+import { isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
-import { loginWithLoginName, requestPasswordRecoveryByLoginName } from '../services/authService.js'
+import {
+  fetchCurrentUser,
+  loginWithLoginName,
+  reauthWithPassword,
+  requestPasswordRecoveryByLoginName,
+} from '../services/authService.js'
 import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../services/effectiveUserService.js'
 import { clearCatalogCache } from '../services/api.js'
 import {
-  markSessionReauth,
   touchSession,
   rotateSessionId,
   clearSessionId,
@@ -181,10 +185,10 @@ export function AuthProvider({ children }) {
   const lastTouchRef = useRef(0)
 
   useEffect(() => {
-    if (!hasSupabase || !supabase) {
-      if (isLocalMode) {
-        return () => {}
-      }
+    if (isLocalMode) {
+      return () => {}
+    }
+    if (!hasSupabase) {
       reportError(new Error('Supabase nao configurado. Autenticacao desativada.'), { stage: 'init' })
       return () => {}
     }
@@ -192,30 +196,20 @@ export function AuthProvider({ children }) {
     let active = true
 
     const syncUser = async () => {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-      if (!active) {
-        return
-      }
-      if (sessionError) {
-        reportError(sessionError, { stage: 'get_session' })
-        setUser(null)
-        window.localStorage.removeItem(STORAGE_KEY)
-        setReauthState({ open: false, error: null, isSubmitting: false })
-        return
-      }
-
-      const session = sessionData?.session
-      if (!session) {
-        setUser(null)
-        window.localStorage.removeItem(STORAGE_KEY)
-        setReauthState({ open: false, error: null, isSubmitting: false })
-        return
-      }
-
       try {
-        const { user: resolvedUser, effective } = await buildResolvedUser(session.user)
+        const apiUser = await fetchCurrentUser()
+        if (!active) {
+          return
+        }
+        if (!apiUser?.id) {
+          setUser(null)
+          window.localStorage.removeItem(STORAGE_KEY)
+          setReauthState({ open: false, error: null, isSubmitting: false })
+          return
+        }
+
+        const { user: resolvedUser, effective } = await buildResolvedUser(apiUser)
         if (effective?.active === false) {
-          await supabase.auth.signOut()
           setUser(null)
           window.localStorage.removeItem(STORAGE_KEY)
           setReauthState({ open: false, error: null, isSubmitting: false })
@@ -243,51 +237,10 @@ export function AuthProvider({ children }) {
 
     syncUser()
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const applySessionUser = async () => {
-        const currentSessionUser = session?.user
-        if (!currentSessionUser) {
-          setUser(null)
-          window.localStorage.removeItem(STORAGE_KEY)
-          setReauthState({ open: false, error: null, isSubmitting: false })
-          return
-        }
-        try {
-          const { user: resolvedUser, effective } = await buildResolvedUser(currentSessionUser)
-          if (effective?.active === false) {
-            await supabase.auth.signOut()
-            setUser(null)
-            window.localStorage.removeItem(STORAGE_KEY)
-            setReauthState({ open: false, error: null, isSubmitting: false })
-            return
-          }
-            clearCatalogCache()
-            setUser(resolvedUser)
-            if (resolvedUser) {
-              const storedUser = buildStoredUser(resolvedUser)
-              if (storedUser) {
-                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storedUser))
-              } else {
-                window.localStorage.removeItem(STORAGE_KEY)
-              }
-            } else {
-              window.localStorage.removeItem(STORAGE_KEY)
-            }
-        } catch (error) {
-          reportError(error, { stage: 'auth_state_change' })
-          setUser(null)
-          window.localStorage.removeItem(STORAGE_KEY)
-          setReauthState({ open: false, error: null, isSubmitting: false })
-        }
-      }
-      applySessionUser()
-    })
-
     return () => {
       active = false
-      listener?.subscription?.unsubscribe?.()
     }
-  }, [buildResolvedUser, hasSupabase, reportError])
+  }, [buildResolvedUser, hasSupabase, isLocalMode, reportError])
 
   const login = useCallback(
     async ({ loginName, username, password }) => {
@@ -319,28 +272,18 @@ export function AuthProvider({ children }) {
         return localUser
       }
 
-      if (!hasSupabase || !supabase) {
+      if (!hasSupabase) {
         throw new Error(
           'Supabase nao configurado. Configure as variaveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.'
         )
       }
 
       const identifier = rawLogin.trim()
-      const session = await loginWithLoginName(identifier, password)
-      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      })
-      if (sessionError) {
-        throw new Error(sessionError.message)
-      }
-
-      const supabaseUser = sessionData?.user
-
-      const { user: resolvedUser, effective } = await buildResolvedUser(supabaseUser)
+      const apiUser = await loginWithLoginName(identifier, password)
+      const { user: resolvedUser, effective } = await buildResolvedUser(apiUser)
 
       if (effective?.active === false) {
-        await supabase.auth.signOut()
+        await revokeSession()
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
         throw new Error('Usuario inativo. Procure um administrador.')
@@ -358,7 +301,7 @@ export function AuthProvider({ children }) {
         } else {
           window.localStorage.removeItem(STORAGE_KEY)
         }
-      if (!isLocalMode && hasSupabase && supabase) {
+      if (!isLocalMode && hasSupabase) {
         rotateSessionId()
         touchSession().catch((error) => {
           reportError(error, { stage: 'login_touch' })
@@ -382,7 +325,7 @@ export function AuthProvider({ children }) {
         throw new Error('Recuperacao de senha indisponivel no modo offline.')
       }
 
-      if (!hasSupabase || !supabase) {
+      if (!hasSupabase) {
         throw new Error(
           'Supabase nao configurado. Configure as variaveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.'
         )
@@ -395,10 +338,9 @@ export function AuthProvider({ children }) {
   )
 
   const logout = useCallback(async () => {
-    if (!isLocalMode && hasSupabase && supabase) {
+    if (!isLocalMode && hasSupabase) {
       try {
         await revokeSession()
-        await supabase.auth.signOut({ scope: 'local' })
       } catch (error) {
         reportError(error, { stage: 'logout' })
       }
@@ -444,7 +386,7 @@ export function AuthProvider({ children }) {
         return true
       }
 
-      if (!hasSupabase || !supabase) {
+      if (!hasSupabase) {
         setReauthState((prev) => ({
           ...prev,
           error: 'Supabase nao configurado. Nao foi possivel reautenticar.',
@@ -452,24 +394,9 @@ export function AuthProvider({ children }) {
         return false
       }
 
-      if (!user?.email) {
-        setReauthState((prev) => ({ ...prev, error: 'Email do usuario nao encontrado.' }))
-        return false
-      }
-
       setReauthState((prev) => ({ ...prev, isSubmitting: true, error: null }))
       try {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: user.email,
-          password: senha,
-        })
-        if (error) {
-          throw new Error('Senha invalida.')
-        }
-        const reauthResult = await markSessionReauth()
-        if (!reauthResult?.ok) {
-          throw new Error('Falha ao registrar reautenticacao.')
-        }
+        await reauthWithPassword(senha)
         setReauthState({ open: false, error: null, isSubmitting: false })
         return true
       } catch (error) {
@@ -481,7 +408,7 @@ export function AuthProvider({ children }) {
         return false
       }
     },
-    [hasSupabase, user?.email]
+    [hasSupabase]
   )
 
   useEffect(() => {

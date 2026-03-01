@@ -1,7 +1,7 @@
 import { CONSUME_LOCAL_DATA } from '../environment.js'
 import { resolveTenantId } from '../tenant.js'
 
-const PUBLIC_ROUTES = new Set(['auth.login', 'auth.recover', 'health.check'])
+const PUBLIC_ROUTES = new Set(['auth.login', 'auth.recover', 'auth.reset', 'health.check'])
 
 export async function tenantResolve(ctx) {
   if (!ctx?.raw?.req) return undefined
@@ -24,7 +24,8 @@ export async function tenantResolve(ctx) {
   }
 
   const token = ctx.raw.req?.authToken || null
-  const tenantId = await resolveTenantId({ user: ctx.user, token })
+  const cookieTenant = ctx.raw.req?.accountOwnerId || null
+  const tenantId = cookieTenant || (await resolveTenantId({ user: ctx.user, token }))
   ctx.tenantId = tenantId
   ctx.raw.req.tenantId = tenantId
   return undefined
