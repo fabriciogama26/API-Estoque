@@ -111,7 +111,7 @@ export function AuthProvider({ children }) {
         return { user: null, effective: null }
       }
 
-      if (isLocalMode || !hasSupabase || !supabase) {
+      if (isLocalMode || !hasSupabase) {
         return { user: parsed, effective: null }
       }
 
@@ -446,7 +446,7 @@ export function AuthProvider({ children }) {
     if (typeof window === 'undefined') {
       return undefined
     }
-    if (!user || isLocalMode || !hasSupabase || !supabase) {
+    if (!user || isLocalMode || !hasSupabase) {
       return undefined
     }
 
