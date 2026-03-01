@@ -4,6 +4,7 @@ import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import { loginWithLoginName, requestPasswordRecoveryByLoginName } from '../services/authService.js'
 import { resolveEffectiveAppUser, invalidateEffectiveAppUserCache } from '../services/effectiveUserService.js'
+import { clearCatalogCache } from '../services/api.js'
 import {
   markSessionReauth,
   touchSession,
@@ -220,6 +221,7 @@ export function AuthProvider({ children }) {
           setReauthState({ open: false, error: null, isSubmitting: false })
           return
         }
+        clearCatalogCache()
         setUser(resolvedUser)
         if (resolvedUser) {
           const storedUser = buildStoredUser(resolvedUser)
@@ -259,6 +261,7 @@ export function AuthProvider({ children }) {
             setReauthState({ open: false, error: null, isSubmitting: false })
             return
           }
+            clearCatalogCache()
             setUser(resolvedUser)
             if (resolvedUser) {
               const storedUser = buildStoredUser(resolvedUser)
@@ -304,6 +307,7 @@ export function AuthProvider({ children }) {
           throw new Error('Login ou senha invalidos')
         }
         const localUser = buildLocalUser(identifier)
+        clearCatalogCache()
         setUser(localUser)
         const storedUser = buildStoredUser(localUser)
         if (storedUser) {
@@ -342,6 +346,7 @@ export function AuthProvider({ children }) {
         throw new Error('Usuario inativo. Procure um administrador.')
       }
 
+        clearCatalogCache()
         setUser(resolvedUser)
         if (resolvedUser) {
           const storedUser = buildStoredUser(resolvedUser)
@@ -398,6 +403,7 @@ export function AuthProvider({ children }) {
         reportError(error, { stage: 'logout' })
       }
     }
+    clearCatalogCache()
     clearSessionId()
     invalidateEffectiveAppUserCache()
     setUser(null)

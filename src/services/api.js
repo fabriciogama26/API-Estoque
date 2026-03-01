@@ -786,7 +786,7 @@ async function resolveCatalogScope() {
     }
   } catch (error) {
     reportClientError('Falha ao resolver owner para catalogo.', error, { userId: user.id })
-    return { ownerId: null, isMaster: false }
+    return { ownerId: user.id, isMaster: false }
   }
 }
 
@@ -800,7 +800,7 @@ const buildCatalogCacheKey = ({ table, nameColumn, ownerScoped, ownerId, isMaste
 
 let pessoasOwnerScopeCache = null
 
-const clearCatalogCache = (tables = null) => {
+export const clearCatalogCache = (tables = null) => {
   if (!tables) {
     catalogCache.clear()
     pessoasOwnerScopeCache = null
@@ -918,6 +918,33 @@ async function loadCatalogList({ table, nameColumn = 'nome', ownerScoped = true,
   )
   const normalized = normalizeDomainOptions(data ?? [])
   writeCatalogCache(cacheKey, normalized)
+  return normalized
+}
+
+async function loadCatalogScopedList({ table, nameColumn = 'nome', ownerScoped = true, errorMessage }) {
+  ensureSupabase()
+  const scope = await resolveCatalogScope()
+  const isMaster = scope.isMaster
+  let query = supabase.from(table).select(`id, ${nameColumn}`)
+
+  if (ownerScoped && !isMaster) {
+    if (!scope.ownerId) {
+      reportClientError('Owner nao resolvido para catalogo.', new Error('owner_not_resolved'), { table })
+      return []
+    }
+    query = query.eq('account_owner_id', scope.ownerId)
+  }
+
+  const data = await execute(query.order(nameColumn, { ascending: true }), errorMessage)
+  const normalized = (Array.isArray(data) ? data : [])
+    .map((item) => {
+      const nome = resolveTextValue(item?.[nameColumn] ?? item?.nome ?? '')
+      if (!nome) {
+        return null
+      }
+      return { id: item?.id ?? null, nome }
+    })
+    .filter(Boolean)
   return normalized
 }
 
@@ -3182,11 +3209,12 @@ async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
 }
 
 async function carregarCentrosCusto() {
-  const data = await execute(
-    supabase.rpc('rpc_catalog_list', { p_table: 'centros_custo' }),
-    'Falha ao listar centros de custo.'
-  )
-  return normalizeDomainOptions(data ?? [])
+  return loadCatalogScopedList({
+    table: 'centros_custo',
+    nameColumn: 'nome',
+    ownerScoped: true,
+    errorMessage: 'Falha ao listar centros de custo.',
+  })
 }
 
 async function buscarCentrosEstoqueIdsPorTermo(valor) {
@@ -3195,10 +3223,12 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
     return []
   }
   try {
-    const registros = await execute(
-      supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
-      'Falha ao consultar centros de estoque.'
-    )
+    const registros = await loadCatalogScopedList({
+      table: 'centros_estoque',
+      nameColumn: 'almox',
+      ownerScoped: true,
+      errorMessage: 'Falha ao consultar centros de estoque.',
+    })
     const like = normalizeSearchTerm(termo)
     return (registros ?? [])
       .filter((item) => normalizeSearchTerm(item?.nome).includes(like))
@@ -3211,19 +3241,23 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
 }
 
 async function carregarCentrosEstoqueCatalogo() {
-  const data = await execute(
-    supabase.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
-    'Falha ao listar centros de estoque.'
-  )
-  return dedupeDomainOptionsByName(normalizeDomainOptions(data ?? []))
+  const data = await loadCatalogScopedList({
+    table: 'centros_estoque',
+    nameColumn: 'almox',
+    ownerScoped: true,
+    errorMessage: 'Falha ao listar centros de estoque.',
+  })
+  return dedupeDomainOptionsByName(data ?? [])
 }
 
 async function carregarCentrosServico() {
-  const data = await execute(
-    supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
-    'Falha ao listar centros de servico.'
-  )
-  return dedupeDomainOptionsByName(normalizeDomainOptions(data ?? []))
+  const data = await loadCatalogScopedList({
+    table: 'centros_servico',
+    nameColumn: 'nome',
+    ownerScoped: true,
+    errorMessage: 'Falha ao listar centros de servico.',
+  })
+  return dedupeDomainOptionsByName(data ?? [])
 }
 
 async function carregarPessoas() {
@@ -7086,28 +7120,36 @@ export const api = {
   references: {
     async pessoas() {
       const [centros, setores, cargos, tipos] = await Promise.all([
-        execute(
-          supabase.rpc('rpc_catalog_list', { p_table: 'centros_servico' }),
-          'Falha ao carregar centros de servico.'
-        ),
-        execute(
-          supabase.rpc('rpc_catalog_list', { p_table: 'setores' }),
-          'Falha ao carregar setores.'
-        ),
-        execute(
-          supabase.rpc('rpc_catalog_list', { p_table: 'cargos' }),
-          'Falha ao carregar cargos.'
-        ),
-        execute(
-          supabase.rpc('rpc_catalog_list', { p_table: 'tipo_execucao' }),
-          'Falha ao carregar tipos de execucao.'
-        ),
+        loadCatalogScopedList({
+          table: 'centros_servico',
+          nameColumn: 'nome',
+          ownerScoped: true,
+          errorMessage: 'Falha ao carregar centros de servico.',
+        }),
+        loadCatalogScopedList({
+          table: 'setores',
+          nameColumn: 'nome',
+          ownerScoped: true,
+          errorMessage: 'Falha ao carregar setores.',
+        }),
+        loadCatalogScopedList({
+          table: 'cargos',
+          nameColumn: 'nome',
+          ownerScoped: true,
+          errorMessage: 'Falha ao carregar cargos.',
+        }),
+        loadCatalogScopedList({
+          table: 'tipo_execucao',
+          nameColumn: 'nome',
+          ownerScoped: false,
+          errorMessage: 'Falha ao carregar tipos de execucao.',
+        }),
       ])
       return {
-        centrosServico: normalizeDomainOptions(centros),
-        setores: normalizeDomainOptions(setores),
-        cargos: normalizeDomainOptions(cargos),
-        tiposExecucao: normalizeDomainOptions(tipos),
+        centrosServico: centros,
+        setores: setores,
+        cargos: cargos,
+        tiposExecucao: tipos,
       }
     },
   },
