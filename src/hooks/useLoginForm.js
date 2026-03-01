@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { logError } from '../services/errorLogService.js'
 
 export function useLoginForm() {
   const { login, recoverPassword } = useAuth()
@@ -33,14 +32,6 @@ export function useLoginForm() {
       navigate(from, { replace: true })
     } catch (err) {
       setError(err.message)
-      const status = err?.status ?? null
-      logError({
-        page: 'login',
-        message: err.message,
-        status,
-        context: { loginName: form.loginName, status },
-        severity: 'error',
-      })
     } finally {
       setIsSubmitting(false)
     }
@@ -62,14 +53,6 @@ export function useLoginForm() {
       setStatus('Enviamos um link de recuperacao para o seu email.')
     } catch (err) {
       setError(err.message)
-      const status = err?.status ?? null
-      logError({
-        page: 'login',
-        message: err.message,
-        status,
-        context: { loginName, action: 'recoverPassword', status },
-        severity: 'error',
-      })
     } finally {
       setIsRecovering(false)
     }

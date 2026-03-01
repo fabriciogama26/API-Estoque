@@ -29,8 +29,8 @@ Fluxos
 Boas praticas
 
 - Manter variaveis VITE_SUPABASE_URL/ANON_KEY configuradas; definir VITE_SUPABASE_PROXY_URL ou VITE_API_URL para proxy; usar redirectTo para reset se necessario.
-- Registrar erros (login, recovery, updatePassword, restoreResetSession) em app_errors para auditoria.
-- Erros antes da sessao (ex.: login invalido) sao enviados para /api/log-error e gravados com user_id nulo.
+- Registrar erros de auth (updatePassword, restoreResetSession) em app_errors para auditoria.
+- Erros de login/recuperacao nao sao registrados para nao interferir no acesso.
 - Enviar X-User-Interaction somente em /api/session/touch; evitar polling para nao mascarar idle real.
 - Usar X-Session-Id gerado a cada login para criar nova linha de sessao (historico preservado).
 - O backend usa X-Session-Id quando enviado; caso contrario, usa session_id do JWT ou hash do token.
