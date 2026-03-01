@@ -34,7 +34,8 @@ export async function auth(ctx) {
   const path = (req.url || '').split('?')[0]
   const isPublicPath = publicPaths.has(path)
 
-  req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path)
+  const isSupabaseProxy = path.startsWith('/api/supabase/')
+  req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path) && !isSupabaseProxy
 
   let user = null
   const cronSecret = process.env.CRON_SECRET || ''
