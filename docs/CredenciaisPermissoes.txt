@@ -127,7 +127,7 @@ Fluxo de uso (frontend)
 
 - Contexto: `src/context/PermissionsContext.jsx`
 
-  - Carrega `v_me`; deriva `isMaster` se role master.
+  - Carrega `v_me` via `/api/permissions/me`; deriva `isMaster` se role master.
 
   - `allowedPaths`/`canAccessPath` usam `permissions.js` (PAGE_REQUIRED_PERMISSION).
 

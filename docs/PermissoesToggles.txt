@@ -17,6 +17,7 @@ Correcao aplicada:
 Impacto:
 - Menu/rotas refletem exatamente os toggles selecionados.
 - Chaves de dominio (estoque.read/write, acidentes.read/write) continuam existindo para RLS.
+- PermissionsContext usa /api/permissions/me no backend para obter v_me (sem chamada direta ao Supabase no browser).
 
 Atualizacao 2026-02 (reprocessar)
 - Adicionado grupo `estoque-reprocessar` para ligar a permissao `estoque.reprocessar`.
