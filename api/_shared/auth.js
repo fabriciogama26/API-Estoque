@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabaseClient.js'
+import { supabaseAdmin, supabaseAnonKey } from './supabaseClient.js'
 import { sendError, handleError } from './http.js'
 import {
   ensureAuthSession,
@@ -18,7 +18,32 @@ export async function requireAuth(req, res) {
     req.headers?.get?.('Authorization')
 
   const bearerMatch = typeof header === 'string' ? header.match(/Bearer\s+(.+)/i) : null
-  const bearerToken = bearerMatch?.[1]?.trim() || ''
+  const rawBearerToken = bearerMatch?.[1]?.trim() || ''
+
+  const decodeJwtPayload = (token) => {
+    if (!token || typeof token !== 'string') return null
+    const parts = token.split('.')
+    if (parts.length < 2) return null
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+    try {
+      const raw = Buffer.from(padded, 'base64').toString('utf8')
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }
+
+  const isAnonJwt = (token) => {
+    if (!token) return false
+    if (supabaseAnonKey && token === supabaseAnonKey) {
+      return true
+    }
+    const payload = decodeJwtPayload(token)
+    return payload?.role === 'anon'
+  }
+
+  const bearerToken = isAnonJwt(rawBearerToken) ? '' : rawBearerToken
 
   const tryCookieSession = async () => {
     const sessionId = getSessionIdFromCookies(req)

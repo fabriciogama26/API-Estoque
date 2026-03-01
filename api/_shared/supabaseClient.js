@@ -40,6 +40,8 @@ export const supabaseAnon = supabaseAnonKey
     })
   : null
 
+export { supabaseAnonKey }
+
 export function createUserClient(accessToken) {
   if (!accessToken) {
     throw new Error('Auth token ausente para criar client do usuario.')
