@@ -174,9 +174,21 @@ export function usePessoasController() {
   )
 
   useEffect(() => {
+    if (!user?.id && !user?.user?.id) {
+      return
+    }
+    pessoasOptionsRef.current = []
+    setPessoasOptions([])
+    const vazio = {
+      centrosServico: [],
+      setores: [],
+      cargos: [],
+      tiposExecucao: [],
+    }
+    referenciasRef.current = vazio
+    setReferencias(vazio)
     loadPessoas(PESSOAS_FILTER_DEFAULT, true)
-    refreshReferencias()
-  }, [loadPessoas, refreshReferencias])
+  }, [loadPessoas, refreshReferencias, user?.id, user?.user?.id])
 
   useEffect(() => {
     getPessoasResumo()

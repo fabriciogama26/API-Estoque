@@ -164,6 +164,10 @@ Atualizacao 2026-02
 - Importacao em massa valida tamanho do arquivo pelo plano (limit_import_mb, padrao 2 MB) e bloqueia acima do limite.
 - Importacao em massa aplica rate limit (1 requisicao a cada 60s) e limite diario por plano (limit_import_daily).
 
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Catalogo de centros de servico usado no formulario agora respeita `account_owner_id` no frontend.
+
 Atualizacao 2026-03
 -------------------
 - Arquivos alterados:

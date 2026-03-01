@@ -108,6 +108,10 @@ Atualizacao 2026-02 (API)
 - Pipeline aplica rate limit e idempotencia no create.
 - Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
 
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Catalogos de centros (estoque/custo/servico) agora usam query direta com filtro `account_owner_id` no frontend.
+
 Atualizacao 2026-02 (relatorio troca EPI)
 -----------------------------------------
 - Criado relatorio semanal de trocas de EPI (periodo de 7 dias).

@@ -142,3 +142,12 @@ Atualizacao 2026-02 (API)
 Atualizacao 2026-02 (Seguranca)
 - rpc_pessoas_completa passou a filtrar pelo tenant (account_owner_id/current_account_owner_id).
 - Consultas da tela usam RPC para respeitar o escopo de owner (evita vazamento cross-tenant).
+- Cache de catalogos e limpo em login/logout para evitar mistura de tenants no select.
+- Troca de usuario recarrega referencias e limpa opcoes locais da tela para evitar dados do tenant anterior.
+- Cache de catalogos usa fallback por auth user id quando falha resolver owner, evitando reaproveitar dados de outro tenant.
+
+Atualizacao 2026-03 (Seguranca/UX)
+- Catalogos de pessoas (centros/setores/cargos) agora usam query direta com filtro `account_owner_id` no frontend.
+- Carregamento de referencias ocorre uma vez por refresh para reduzir pisca no select.
+- Falha em resolver owner para catalogo retorna lista vazia (previne vazamento).
+- RPCs de resumo (`rpc_pessoas_resumo` e `rpc_pessoas_count_centro`) passaram a filtrar por tenant.

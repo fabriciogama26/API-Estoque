@@ -69,6 +69,10 @@ Atualizacao 2026-02
 - Botao "Atualizar" da lista padronizado com icone de refresh.
 - Ao clicar em Editar na tabela, a pagina rola para o topo e mostra o formulario em modo edicao.
 
+Atualizacao 2026-03 (Seguranca)
+-------------------------------
+- Lista de centros de servico agora respeita `account_owner_id` no frontend.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
