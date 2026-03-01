@@ -29,6 +29,7 @@ import {
 } from './_shared/cookies.js'
 import { proxySupabaseRequest } from './_shared/supabaseProxy.js'
 import { supabaseAdmin, supabaseAnon } from './_shared/supabaseClient.js'
+import { resolveEffectiveUserForAuth } from './_shared/effectiveUser.js'
 
 const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
 
@@ -165,6 +166,54 @@ export default withAuth(async (req, res, user) => {
           app_metadata: user?.app_metadata || {},
         },
       })
+    }
+
+    if (path === '/api/auth/effective' && method === 'GET') {
+      if (!user?.id) {
+        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
+      }
+      const effective = await resolveEffectiveUserForAuth(user.id)
+      return sendJson(res, 200, { effective })
+    }
+
+    if (path === '/api/permissions/me' && method === 'GET') {
+      if (!user?.id || !req?.authToken) {
+        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(req.authToken)
+      if (error || !data?.user) {
+        throw createHttpError(401, 'Sessao invalida.', { code: 'AUTH_EXPIRED' })
+      }
+      const jwt = req.authToken
+      const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
+      const anonKey =
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.VITE_SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        ''
+      if (!url) {
+        throw createHttpError(500, 'SUPABASE_URL nao definido.', { code: 'UPSTREAM_ERROR' })
+      }
+      if (!anonKey) {
+        throw createHttpError(500, 'SUPABASE_ANON_KEY nao definido.', { code: 'UPSTREAM_ERROR' })
+      }
+      const response = await fetch(`${url}/rest/v1/v_me?select=*`, {
+        method: 'GET',
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${jwt}`,
+        },
+      })
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        throw createHttpError(500, 'Falha ao carregar permissoes.', {
+          code: 'UPSTREAM_ERROR',
+          details: text,
+        })
+      }
+      const payload = await response.json()
+      const profile = Array.isArray(payload) ? payload[0] : payload
+      return sendJson(res, 200, { profile })
     }
 
     if (path === '/api/auth/reset' && method === 'POST') {

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
+import { request as httpRequest } from '../services/httpClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { PAGE_CATALOG, PAGE_REQUIRED_PERMISSION, canAccessPath as canAccessPathHelper, resolveAllowedPaths } from '../config/permissions.js'
 import { useAuth } from './AuthContext.jsx'
@@ -11,13 +11,11 @@ export function PermissionsProvider({ children }) {
   const { user, isAuthenticated } = useAuth()
   const { reportError } = useErrorLogger('permissions')
   const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(
-    () => isAuthenticated && !isLocalMode && isSupabaseConfigured() && Boolean(supabase)
-  )
+  const [loading, setLoading] = useState(() => isAuthenticated && !isLocalMode)
   const [error, setError] = useState(null)
 
   const loadProfile = useCallback(async () => {
-    if (!isAuthenticated || !user?.id || isLocalMode || !isSupabaseConfigured() || !supabase) {
+    if (!isAuthenticated || !user?.id || isLocalMode) {
       setProfile(null)
       setError(null)
       setLoading(false)
@@ -27,10 +25,8 @@ export function PermissionsProvider({ children }) {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: fetchError } = await supabase.from('v_me').select('*').single()
-      if (fetchError) {
-        throw fetchError
-      }
+      const response = await httpRequest('GET', '/api/permissions/me', { skipSessionGuard: true })
+      const data = response?.profile || null
       const profileData = data
         ? {
             user_id: data.user_id,
