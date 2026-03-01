@@ -29,10 +29,9 @@ Edge Functions (Supabase)
 
 Frontend (React â€“ pasta src/)
 - Pipeline de log: `useErrorLogger` + `logError` (`src/hooks/useErrorLogger.js`, `src/services/errorLogService.js`).
-  - Envia para `app_errors` com message, stack, page, context, userId, severity.
+  - Envia SEMPRE para `/api/log-error`, que grava em `app_errors` via service_role.
   - Deduplicacao por `fingerprint`: duplicados sao ignorados (upsert com `ignoreDuplicates`).
   - NÃ£o quebra UX; falha de log fica em console warn.
-  - Quando nao ha sessao, envia para `/api/log-error`, que grava em `app_errors` via service_role com `user_id` nulo.
   - Erros de login/recuperacao nao sao registrados para nao interferir no acesso.
 - Error boundary: `ErrorBoundaryWithLogger` (`src/components/ErrorBoundary.jsx`) captura erros de renderizaÃ§Ã£o e envia via `useErrorLogger(page)`. Usada em `src/App.jsx` na raiz.
 - PadrÃ£o de warns crÃ­ticos: `reportClientError` em `src/services/api.js` substitui `console.warn` em pontos sensÃ­veis (resolver centros/material/pessoa, histÃ³ricos, caches, filtros, buscas, RLS etc.), encaminhando para `app_errors` com contexto. Outros mÃ³dulos (AuthContext, Permissions, ConfiguraÃ§Ãµes, localData/localApi, authService, controllers) tambÃ©m enviam para `app_errors`.
