@@ -9,6 +9,9 @@ export async function cors(ctx) {
   const origin = req.headers?.origin || '*'
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Vary', 'Origin')
+  if (origin && origin !== '*') {
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+  }
 
   if ((req.method || '').toUpperCase() === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Methods', DEFAULT_ALLOW_METHODS)
