@@ -156,8 +156,8 @@ export function AuthProvider({ children }) {
 
         return { user: resolvedUser, effective }
       } catch (error) {
-        reportError(error, { stage: 'resolve_effective_user', userId: parsed?.id })
-        throw error
+        console.warn('Falha ao resolver usuario efetivo.', error)
+        return { user: parsed, effective: null }
       }
     },
     [hasSupabase, parseSupabaseUser, reportError]

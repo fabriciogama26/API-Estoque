@@ -14,6 +14,7 @@ Fluxos
 
 - Login: login_name + senha; em modo local compara com VITE_LOCAL_USERNAME/PASSWORD (case-insensitive).
 - Login remoto: front chama /api/auth/login; backend resolve login_name, cria sessao em auth_sessions e seta cookie HttpOnly; resposta retorna apenas dados nao sensiveis do user.
+- Se a resolucao do usuario efetivo falhar, o login segue com o usuario basico e a permissao pode ser recalculada depois.
 - Login: ao concluir, dispara um /api/session/touch para registrar atividade inicial.
 - Recuperacao: usa o login do formulario; backend envia reset sem expor email. Se nao houver email cadastrado, retorna erro especifico.
 - ResetPasswordPage: envia code + nova senha para /api/auth/reset; backend troca o code por sessao e atualiza a senha (100% server-side).
