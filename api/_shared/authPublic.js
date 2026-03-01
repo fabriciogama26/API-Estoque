@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabaseClient.js'
+import { supabaseAdmin, supabaseAnon } from './supabaseClient.js'
 import { createHttpError } from './http.js'
 
 const normalizeLoginName = (value) => {
@@ -43,7 +43,11 @@ export async function loginWithLoginName(payload = {}) {
     throw createHttpError(403, 'Usuario inativo. Procure um administrador.', { code: 'AUTH_INACTIVE' })
   }
 
-  const { data, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+  if (!supabaseAnon) {
+    throw createHttpError(500, 'SUPABASE_ANON_KEY nao definido.', { code: 'UPSTREAM_ERROR' })
+  }
+
+  const { data, error: signInError } = await supabaseAnon.auth.signInWithPassword({
     email: userRow.email,
     password,
   })
