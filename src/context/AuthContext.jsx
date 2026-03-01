@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { isSupabaseConfigured } from '../services/supabaseClient.js'
+import { isSupabaseConfigured, supabase } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import {
@@ -197,7 +197,16 @@ export function AuthProvider({ children }) {
 
     const syncUser = async () => {
       try {
-        const apiUser = await fetchCurrentUser()
+        let apiUser = null
+        if (supabase?.auth?.getUser) {
+          const { data, error: supaError } = await supabase.auth.getUser()
+          if (!supaError && data?.user) {
+            apiUser = data.user
+          }
+        }
+        if (!apiUser) {
+          apiUser = await fetchCurrentUser()
+        }
         if (!active) {
           return
         }
@@ -279,8 +288,18 @@ export function AuthProvider({ children }) {
       }
 
       const identifier = rawLogin.trim()
-      const apiUser = await loginWithLoginName(identifier, password)
-      const { user: resolvedUser, effective } = await buildResolvedUser(apiUser)
+        const { user: apiUser, session } = await loginWithLoginName(identifier, password)
+        if (session?.access_token && session?.refresh_token && supabase?.auth?.setSession) {
+          try {
+            await supabase.auth.setSession({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+            })
+          } catch (error) {
+            reportError(error, { stage: 'login_set_session' })
+          }
+        }
+        const { user: resolvedUser, effective } = await buildResolvedUser(apiUser)
 
       if (effective?.active === false) {
         await revokeSession()

@@ -27,10 +27,11 @@ export async function loginWithLoginName(loginName, password) {
     skipSessionGuard: true,
   })
   const user = response?.user || null
+  const session = response?.session || null
   if (!user?.id) {
     throw new Error('Falha ao autenticar.')
   }
-  return user
+  return { user, session }
 }
 
 export async function requestPasswordRecoveryByLoginName(loginName) {
