@@ -1,4 +1,5 @@
 import { request as httpRequest } from './httpClient.js'
+import { buildSupabaseAuthHeaders } from './supabaseClient.js'
 
 let effectiveUserCache = null
 
@@ -25,7 +26,9 @@ export async function resolveEffectiveAppUser(userId, { forceRefresh = false } =
     return null
   }
 
+  const headers = await buildSupabaseAuthHeaders()
   const response = await httpRequest('GET', `${base}/api/auth/effective`, {
+    headers,
     skipSessionGuard: true,
   })
   const effective = response?.effective || null

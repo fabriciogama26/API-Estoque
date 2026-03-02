@@ -1,4 +1,5 @@
 import { ApiError, request as httpRequest } from './httpClient.js'
+import { buildSupabaseAuthHeaders } from './supabaseClient.js'
 
 const SESSION_KEY = 'api-estoque-session-id'
 
@@ -133,7 +134,8 @@ export async function touchSession() {
     return { ok: false, skipped: true }
   }
 
-  const headers = buildHeaders(true)
+  const authHeaders = await buildSupabaseAuthHeaders()
+  const headers = { ...buildHeaders(true), ...authHeaders }
 
   try {
     await httpRequest('POST', `${base}/api/session/touch`, { headers })
@@ -152,7 +154,8 @@ export async function markSessionReauth() {
     return { ok: false, skipped: true }
   }
 
-  const headers = buildHeaders(false)
+  const authHeaders = await buildSupabaseAuthHeaders()
+  const headers = { ...buildHeaders(false), ...authHeaders }
 
   try {
     await httpRequest('POST', `${base}/api/session/reauth`, { headers })
@@ -171,7 +174,8 @@ export async function revokeSession() {
     return { ok: false, skipped: true }
   }
 
-  const headers = buildHeaders(false)
+  const authHeaders = await buildSupabaseAuthHeaders()
+  const headers = { ...buildHeaders(false), ...authHeaders }
 
   try {
     await httpRequest('POST', `${base}/api/session/revoke`, { headers })

@@ -11,6 +11,7 @@ Arquitetura (modular)
 - Contexto: AuthContext fornece user, login, recoverPassword e logout; sincroniza user via /api/auth/me e nao persiste token no browser.
 - HTTP client envia `credentials: include` para garantir envio do cookie nas chamadas à API.
 - AuthContext prioriza supabase.auth.getUser quando houver sessao no navegador; /api/auth/me fica como fallback.
+- Endpoints protegidos do backend aceitam Authorization Bearer do Supabase quando o cookie nao esta disponivel.
 
 Fluxos
 

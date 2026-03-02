@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { request as httpRequest } from '../services/httpClient.js'
+import { buildSupabaseAuthHeaders } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { PAGE_CATALOG, PAGE_REQUIRED_PERMISSION, canAccessPath as canAccessPathHelper, resolveAllowedPaths } from '../config/permissions.js'
 import { useAuth } from './AuthContext.jsx'
@@ -25,7 +26,11 @@ export function PermissionsProvider({ children }) {
     setLoading(true)
     setError(null)
     try {
-      const response = await httpRequest('GET', '/api/permissions/me', { skipSessionGuard: true })
+      const headers = await buildSupabaseAuthHeaders()
+      const response = await httpRequest('GET', '/api/permissions/me', {
+        headers,
+        skipSessionGuard: true,
+      })
       const data = response?.profile || null
       const profileData = data
         ? {
