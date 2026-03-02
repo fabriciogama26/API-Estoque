@@ -99,29 +99,68 @@ export function usePessoasController() {
     async (params = PESSOAS_FILTER_DEFAULT, refreshOptions = false) => {
       setIsLoading(true)
       setError(null)
+      const cachedOptions = pessoasOptionsRef.current
+      const hasCachedOptions = Array.isArray(cachedOptions) && cachedOptions.length > 0
       try {
-        const query = {} // filtros aplicados apenas no frontend
-        const needsOptionsRefresh = refreshOptions || pessoasOptions.length === 0
-        const [optionsData, filteredData] = await Promise.all([
-          needsOptionsRefresh ? listPessoas() : Promise.resolve(null),
-          listPessoas(query),
-        ])
+        if (!refreshOptions && hasCachedOptions) {
+          const baseOptions = cachedOptions
+          const referenciasAtuais = referenciasRef.current
+          const centrosMap = mapOptionsById(referenciasAtuais?.centrosServico)
+          const setoresMap = mapOptionsById(referenciasAtuais?.setores)
+          const cargosMap = mapOptionsById(referenciasAtuais?.cargos)
+          const tiposExecucaoMap = mapOptionsById(referenciasAtuais?.tiposExecucao)
 
-        const baseOptions = optionsData ?? pessoasOptionsRef.current
-        let referenciasAtuais = referenciasRef.current
-        if (optionsData) {
-          const nextOptions = optionsData ?? []
-          pessoasOptionsRef.current = nextOptions
-          setPessoasOptions(nextOptions)
-          referenciasAtuais = await refreshReferencias()
+          const enrichedPessoas = baseOptions.map((pessoa) => {
+            if (!pessoa || typeof pessoa !== 'object') return pessoa
+            const centroServicoIdAtual = pessoa.centroServicoId ?? pessoa.centroServico_id ?? null
+            const centroServicoAtual =
+              pessoa.centroServico ??
+              pessoa.local ??
+              (centroServicoIdAtual ? centrosMap.get(centroServicoIdAtual) ?? '' : '')
+            const localAtual =
+              pessoa.local ??
+              pessoa.centroServico ??
+              (centroServicoIdAtual ? centrosMap.get(centroServicoIdAtual) ?? '' : '')
+
+            const setorIdAtual = pessoa.setorId ?? pessoa.setor_id ?? null
+            const setorAtual = pessoa.setor ?? (setorIdAtual ? setoresMap.get(setorIdAtual) ?? '' : '')
+
+            const cargoIdAtual = pessoa.cargoId ?? pessoa.cargo_id ?? null
+            const cargoTextoAtual = pessoa.cargo ?? (cargoIdAtual ? cargosMap.get(cargoIdAtual) ?? '' : '')
+
+            const tipoExecucaoIdAtual = pessoa.tipoExecucaoId ?? pessoa.tipo_execucao_id ?? null
+            const tipoExecucaoAtual =
+              pessoa.tipoExecucao ?? (tipoExecucaoIdAtual ? tiposExecucaoMap.get(tipoExecucaoIdAtual) ?? '' : '')
+
+            return {
+              ...pessoa,
+              centroServico: centroServicoAtual,
+              local: localAtual,
+              setor: setorAtual,
+              cargo: cargoTextoAtual,
+              tipoExecucao: tipoExecucaoAtual,
+            }
+          })
+
+          const finalPessoas = filterPessoas(enrichedPessoas, { ...params })
+          setPessoas(finalPessoas)
+          return
         }
+
+        const optionsData = await listPessoas(params)
+        const baseOptions = optionsData ?? []
+        let referenciasAtuais = referenciasRef.current
+        const nextOptions = optionsData ?? []
+        pessoasOptionsRef.current = nextOptions
+        setPessoasOptions(nextOptions)
+        referenciasAtuais = await refreshReferencias()
 
         const centrosMap = mapOptionsById(referenciasAtuais?.centrosServico)
         const setoresMap = mapOptionsById(referenciasAtuais?.setores)
         const cargosMap = mapOptionsById(referenciasAtuais?.cargos)
         const tiposExecucaoMap = mapOptionsById(referenciasAtuais?.tiposExecucao)
 
-        const enrichedPessoas = (filteredData ?? []).map((pessoa) => {
+        const enrichedPessoas = (baseOptions ?? []).map((pessoa) => {
           if (!pessoa || typeof pessoa !== 'object') return pessoa
           const fallback = baseOptions.find((item) => item?.id === pessoa.id) || {}
           const centroServicoIdAtual = pessoa.centroServicoId ?? fallback.centroServicoId ?? null
@@ -166,11 +205,15 @@ export function usePessoasController() {
       } catch (err) {
         setError(err.message)
         reportError(err, { area: 'pessoas_load' })
+        if (hasCachedOptions) {
+          const finalPessoas = filterPessoas(cachedOptions, { ...params })
+          setPessoas(finalPessoas)
+        }
       } finally {
         setIsLoading(false)
       }
     },
-    [pessoasOptions.length, refreshReferencias, reportError],
+    [refreshReferencias, reportError],
   )
 
   useEffect(() => {

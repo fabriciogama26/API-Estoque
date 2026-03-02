@@ -24,6 +24,8 @@ Campos e fluxos
 - Historico: diff usa pessoas_view para comparar nomes resolvidos e busca observacao direto em pessoas.
 - Historico: quando nao ha alteracoes, o item exibe "Registro criado".
 - Filtros: termo livre, centro de servico, setor, cargo, ativo, cadastrado de/ate; aplicados apenas no frontend (backend jÃ¡ filtra por `account_owner_id`).
+- Filtros usam cache local quando ja existe lista carregada; evita reconsulta ao Supabase a cada ajuste.
+- Atualizacao manual (botao "Atualizar") forca recarregar lista + referencias.
 - Buscas (search/listByIds) retornam apenas pessoas ativas por padrao; use includeInactive para listar todas.
 - Listagem/busca de pessoas aplica escopo por `centro_servico_id` do owner quando a credencial nao e master.
 - Listas de centros/setores/cargos/tipos sao filtradas por owner quando a credencial nao e master.
@@ -64,6 +66,7 @@ Boas praticas
 -------------
 - Usar matricula como chave; manter catalogos de centro/setor/cargo atualizados.
 - Conferir pessoas_view/rpc_pessoas_completa apos migrations para garantir aliases usados na UI.
+- Em ambientes com grande volume, considerar paginacao/limite para evitar timeout do Postgres.
 - Duplicidade: preflight `pessoas_preflight_check` (20250114) bloqueia matricula duplicada e alerta nome igual com matricula diferente (modal). Trigger `evitar_duplicidade_pessoa` bloqueia matricula repetida em insert/update respeitando owner e ignorando o proprio id em update.
 
 ===========================================

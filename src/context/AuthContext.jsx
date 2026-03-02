@@ -356,16 +356,23 @@ export function AuthProvider({ children }) {
     [hasSupabase]
   )
 
-  const logout = useCallback(async () => {
-    if (!isLocalMode && hasSupabase) {
-      try {
-        await revokeSession()
-      } catch (error) {
-        reportError(error, { stage: 'logout' })
+    const logout = useCallback(async () => {
+      if (!isLocalMode && hasSupabase) {
+        try {
+          revokeSession().catch((error) => {
+            reportError(error, { stage: 'logout_revoke' })
+          })
+          if (supabase?.auth?.signOut) {
+            supabase.auth.signOut().catch((error) => {
+              reportError(error, { stage: 'logout_supabase' })
+            })
+          }
+        } catch (error) {
+          reportError(error, { stage: 'logout' })
+        }
       }
-    }
-    clearCatalogCache()
-    clearSessionId()
+      clearCatalogCache()
+      clearSessionId()
     invalidateEffectiveAppUserCache()
     setUser(null)
     window.localStorage.removeItem(STORAGE_KEY)
