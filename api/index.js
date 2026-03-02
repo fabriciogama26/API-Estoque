@@ -396,21 +396,25 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/materiais/search' && method === 'GET') {
       return sendJson(res, 200, await MateriaisOperations.search(query))
     }
-    if (path === '/api/materiais') {
-      if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
-      if (method === 'POST') {
-        const body = await readJson(req)
-        return sendJson(res, 201, await MateriaisOperations.create(body, user, req.authToken))
+      if (path === '/api/materiais') {
+        if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
+        if (method === 'POST') {
+          const body = await readJson(req)
+          return sendJson(
+            res,
+            201,
+            await MateriaisOperations.create(body, user, req.authToken, req.accountOwnerId)
+          )
+        }
       }
-    }
     if (path.startsWith('/api/materiais/') && method === 'PUT') {
       const id = path.split('/')[3]
       if (!id) {
         throw createHttpError(400, 'ID do material não informado.', { code: 'VALIDATION_ERROR' })
       }
-      const body = await readJson(req)
-      return sendJson(res, 200, await MateriaisOperations.update(id, body, user))
-    }
+        const body = await readJson(req)
+        return sendJson(res, 200, await MateriaisOperations.update(id, body, user, req.accountOwnerId))
+      }
     if (path.startsWith('/api/materiais/price-history/') && method === 'GET') {
       const id = path.split('/')[4]
       if (!id) {
@@ -443,7 +447,11 @@ export default withAuth(async (req, res, user) => {
       if (method === 'GET') return sendJson(res, 200, await EntradasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
-        return sendJson(res, 201, await EntradasOperations.create(body, user, req.authToken))
+        return sendJson(
+          res,
+          201,
+          await EntradasOperations.create(body, user, req.authToken, req.accountOwnerId)
+        )
       }
     }
     if (path.startsWith('/api/entradas/') && method === 'PUT') {
@@ -452,7 +460,7 @@ export default withAuth(async (req, res, user) => {
         throw createHttpError(400, 'ID da entrada nao informado.', { code: 'VALIDATION_ERROR' })
       }
       const body = await readJson(req)
-      return sendJson(res, 200, await EntradasOperations.update(id, body, user))
+      return sendJson(res, 200, await EntradasOperations.update(id, body, user, req.accountOwnerId))
     }
     if (path.startsWith('/api/entradas/history/') && method === 'GET') {
       const id = path.split('/')[4]

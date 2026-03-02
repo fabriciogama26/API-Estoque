@@ -1,5 +1,13 @@
 import { request as httpRequest } from './httpClient.js'
 import { buildSupabaseAuthHeaders } from './supabaseClient.js'
+import { getSessionId } from './sessionService.js'
+
+const buildSessionHeaders = async () => {
+  const sessionId = getSessionId()
+  const sessionHeader = sessionId ? { 'X-Session-Id': sessionId } : {}
+  const authHeaders = await buildSupabaseAuthHeaders()
+  return { ...sessionHeader, ...authHeaders }
+}
 
 const resolveApiBase = () => {
   const envBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
@@ -57,7 +65,7 @@ export async function fetchCurrentUser() {
   if (!base) {
     throw new Error('Base da API nao encontrada.')
   }
-  const headers = await buildSupabaseAuthHeaders()
+  const headers = await buildSessionHeaders()
   const response = await httpRequest('GET', `${base}/api/auth/me`, {
     headers,
     skipSessionGuard: true,
@@ -82,8 +90,10 @@ export async function reauthWithPassword(password) {
   if (!base) {
     throw new Error('Base da API nao encontrada.')
   }
+  const headers = await buildSessionHeaders()
   await httpRequest('POST', `${base}/api/auth/reauth`, {
     body: { password },
+    headers,
   })
   return true
 }
