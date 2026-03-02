@@ -31,6 +31,7 @@ Fluxos
 - Touch de sessao: front envia POST /api/session/touch com X-User-Interaction e X-Session-Id por login para marcar atividade humana (idle server).
 - Reauth: endpoints sensiveis exigem reautenticacao em 15 min; backend responde 403 REAUTH_REQUIRED e o front abre modal para confirmar senha.
 - Logout: antes de sair, o front chama /api/session/revoke para registrar revoked_at e limpar cookie.
+- Logout: chamada de revoke e signOut do Supabase acontecem em background para nao atrasar a UI.
 - Expiracao de senha: senha deve ser atualizada a cada 60 dias; fluxo usa /reset-password com sessao ativa.
 
 Boas praticas
