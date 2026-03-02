@@ -273,7 +273,10 @@ export async function validateSession(req, user, token, { requireReauth = false 
   }
 
   const payload = decodeJwtPayload(token)
-  const sessionInfo = resolveSessionIdInfo(req, token, payload)
+  const cookieSessionId = req?.authSessionId || null
+  const sessionInfo = cookieSessionId
+    ? { id: cookieSessionId, source: 'cookie' }
+    : resolveSessionIdInfo(req, token, payload)
   const sessionId = sessionInfo.id
   const tokenIatMs = payload?.iat ? Number(payload.iat) * 1000 : null
   const tokenExpMs = payload?.exp ? Number(payload.exp) * 1000 : null

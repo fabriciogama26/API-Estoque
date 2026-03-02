@@ -41,7 +41,7 @@ Boas praticas
 - Erros de login/recuperacao nao sao registrados para nao interferir no acesso.
 - Enviar X-User-Interaction somente em /api/session/touch; evitar polling para nao mascarar idle real.
 - Usar X-Session-Id gerado a cada login para criar nova linha de sessao (historico preservado).
-- O backend usa X-Session-Id quando enviado; caso contrario, usa session_id do JWT ou hash do token.
+- O backend usa X-Session-Id quando enviado; caso contrario, usa session_id do cookie, depois do JWT ou hash do token.
 - O backend busca sempre a sessao ativa com revoked_at IS NULL e nunca limpa revoked_at ao expirar.
 - Se precisar ajustar tempos de sessao, use as envs: SESSION_TIMEBOX_MS, SESSION_IDLE_MS, SESSION_REAUTH_WINDOW_MS, SESSION_TOUCH_THROTTLE_MS.
 
