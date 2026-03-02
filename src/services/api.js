@@ -1,4 +1,4 @@
-ï»¿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { supabase, isSupabaseConfigured, buildSupabaseAuthHeaders } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
 import { getSessionId, notifySessionGuardFromResponse } from './sessionService.js'
 import { request as httpRequest } from './httpClient.js'
@@ -1151,7 +1151,7 @@ const toMonthRefIso = (valor) => {
   if (!raw) {
     return null
   }
-  // Se for ISO ou YYYY-MM jÃ¡ retorna o prefixo para evitar problemas de fuso.
+  // Se for ISO ou YYYY-MM já retorna o prefixo para evitar problemas de fuso.
   const datePart = raw.split('T')[0]
   const monthPrefix = /^\d{4}-\d{2}$/.test(raw) ? raw : /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart.slice(0, 7) : null
   if (monthPrefix) {
@@ -1723,7 +1723,7 @@ const applyPessoaSearchFilters = (builder, like) => {
     `cargo.ilike.${like}`,
     `centro_custo.ilike.${like}`,
     `tipo_execucao.ilike.${like}`,
-    // Nomes dos usuâ”œÃ­rios (colunas text), evitando aplicar ilike em UUID.
+    // Nomes dos usu+írios (colunas text), evitando aplicar ilike em UUID.
     `usuario_cadastro_nome.ilike.${like}`,
     `usuario_edicao_nome.ilike.${like}`,
   ]
@@ -1876,7 +1876,7 @@ async function ensureAcidenteLesoes(agenteNome, nomes) {
 
 function ensureSupabase() {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase nâ”œÃºo configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
+    throw new Error('Supabase n+úo configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
   }
 }
 
@@ -2029,7 +2029,7 @@ async function replaceMaterialRelationsWithFallback({
     } catch (error) {
       if (!error || error.code !== '42703') {
         if (normalizedValues.length > 0) {
-          reportClientError('Supabase rejeitou IDs de vÃ­nculo de material.', error, {
+          reportClientError('Supabase rejeitou IDs de vínculo de material.', error, {
             table,
             columnName,
             values: normalizedValues,
@@ -2054,9 +2054,9 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
   const idValues = Array.isArray(corIds) ? corIds : []
   const nameValues = Array.isArray(corNames) ? corNames : []
 
-  // Se veio nome mas nÃ£o conseguimos IDs vÃ¡lidos, nÃ£o siga silenciosamente.
+  // Se veio nome mas não conseguimos IDs válidos, não siga silenciosamente.
   if (!idValues.length && nameValues.length) {
-    throw new Error('Cor informada nÃ£o encontrada no catÃ¡logo. Cadastre a cor ou selecione uma existente.')
+    throw new Error('Cor informada não encontrada no catálogo. Cadastre a cor ou selecione uma existente.')
   }
   // Nenhum dado de cor: nada a fazer.
   if (!idValues.length && !nameValues.length) {
@@ -2070,7 +2070,7 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
       materialId,
       columnCandidates: MATERIAL_COR_RELATION_ID_COLUMNS,
       values: idValues,
-      deleteMessage: 'Falha ao limpar vâ”œÂ¡nculos de cores do material.',
+      deleteMessage: 'Falha ao limpar v+¡nculos de cores do material.',
       insertMessage: 'Falha ao vincular cores ao material.',
     })
     idInserted = idValues.length > 0
@@ -2086,7 +2086,7 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
       materialId,
       columnCandidates: MATERIAL_COR_RELATION_TEXT_COLUMNS,
       values: nameValues,
-      deleteMessage: 'Falha ao limpar vâ”œÂ¡nculos de cores do material.',
+      deleteMessage: 'Falha ao limpar v+¡nculos de cores do material.',
       insertMessage: 'Falha ao vincular cores ao material.',
       deleteFirst: false,
     })
@@ -2102,7 +2102,7 @@ async function replaceMaterialCaracteristicaVinculos(
   const nameValues = Array.isArray(caracteristicaNames) ? caracteristicaNames : []
 
   if (!idValues.length && nameValues.length) {
-    throw new Error('CaracterÃ­stica informada nÃ£o encontrada no catÃ¡logo. Cadastre a caracterÃ­stica ou selecione uma existente.')
+    throw new Error('Característica informada não encontrada no catálogo. Cadastre a característica ou selecione uma existente.')
   }
   if (!idValues.length && !nameValues.length) {
     return
@@ -2115,8 +2115,8 @@ async function replaceMaterialCaracteristicaVinculos(
       materialId,
       columnCandidates: MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS,
       values: idValues,
-      deleteMessage: 'Falha ao limpar vâ”œÂ¡nculos de caracterâ”œÂ¡sticas do material.',
-      insertMessage: 'Falha ao vincular caracterâ”œÂ¡sticas ao material.',
+      deleteMessage: 'Falha ao limpar v+¡nculos de caracter+¡sticas do material.',
+      insertMessage: 'Falha ao vincular caracter+¡sticas ao material.',
     })
     idInserted = idValues.length > 0
   } catch (error) {
@@ -2131,8 +2131,8 @@ async function replaceMaterialCaracteristicaVinculos(
       materialId,
       columnCandidates: MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS,
       values: nameValues,
-      deleteMessage: 'Falha ao limpar vâ”œÂ¡nculos de caracterâ”œÂ¡sticas do material.',
-      insertMessage: 'Falha ao vincular caracterâ”œÂ¡sticas ao material.',
+      deleteMessage: 'Falha ao limpar v+¡nculos de caracter+¡sticas do material.',
+      insertMessage: 'Falha ao vincular caracter+¡sticas ao material.',
       deleteFirst: false,
     })
   }
@@ -2255,8 +2255,10 @@ async function resolveImportsOwnerId() {
 async function buildAuthHeaders(extra = {}) {
   const sessionId = getSessionId()
   const sessionHeader = sessionId ? { 'X-Session-Id': sessionId } : {}
-  return { ...extra, ...sessionHeader }
+  const authHeaders = await buildSupabaseAuthHeaders()
+  return { ...extra, ...sessionHeader, ...authHeaders }
 }
+
 
 async function resolveGrupoMaterialId(valor) {
   const texto = trim(valor)
@@ -4300,7 +4302,7 @@ export const api = {
       if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
         query = query.in('centro_servico_id', ownerScope.centroServicoIds)
       }
-      // Filtrar apenas pessoas ativas por padrÃ£o (regra centralizada)
+      // Filtrar apenas pessoas ativas por padrão (regra centralizada)
       if (!includeInactive) {
         query = query.eq('ativo', true)
       }
@@ -4331,7 +4333,7 @@ export const api = {
         if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
           query = query.in('centro_servico_id', ownerScope.centroServicoIds)
         }
-        // Filtrar apenas pessoas ativas por padrÃ£o (regra centralizada)
+        // Filtrar apenas pessoas ativas por padrão (regra centralizada)
         if (!includeInactive) {
           query = query.eq('ativo', true)
         }
@@ -4347,7 +4349,7 @@ export const api = {
         if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
           fallbackQuery = fallbackQuery.in('centro_servico_id', ownerScope.centroServicoIds)
         }
-        // Aplicar filtro de ativo tambÃ©m no fallback
+        // Aplicar filtro de ativo também no fallback
         if (!includeInactive) {
           fallbackQuery = fallbackQuery.eq('ativo', true)
         }
@@ -5003,7 +5005,7 @@ export const api = {
     },
     async update(id, payload) {
       if (!id) {
-        throw new Error('Material invâ”œÃ­lido.')
+        throw new Error('Material inv+ílido.')
       }
       const atualLista = await execute(
         supabase
@@ -5069,7 +5071,7 @@ export const api = {
               { materialId: id, camposAlterados: camposAlterados.length }
             )
           } else {
-            throw mapSupabaseError(historicoErro, 'Falha ao registrar histâ”œâ”‚rico do material.')
+            throw mapSupabaseError(historicoErro, 'Falha ao registrar hist+¦rico do material.')
           }
         }
       }
@@ -5138,9 +5140,9 @@ export const api = {
         }),
         'Falha no preflight de material.'
       )
-      // Em ediÃ§Ã£o sÃ³ alerta base igual + CA diferente (permite confirmar no modal)
+      // Em edição só alerta base igual + CA diferente (permite confirmar no modal)
       if (preflight?.base_match_ca_diff && !dadosCombinados.forceBaseCaDiff) {
-        // Se o CA nÃ£o mudou, nÃ£o faz sentido alertar (jÃ¡ existe com CA diferente e estamos mantendo o mesmo CA)
+        // Se o CA não mudou, não faz sentido alertar (já existe com CA diferente e estamos mantendo o mesmo CA)
         if (!caAlterado) {
           // prossegue sem modal
         } else {
@@ -5197,7 +5199,7 @@ export const api = {
           .select('*')
           .eq('materialId', id)
           .order('criadoEm', { ascending: false }),
-        'Falha ao obter histâ”œâ”‚rico de preâ”œÂºos.'
+        'Falha ao obter hist+¦rico de pre+ºos.'
       )
       return (data ?? []).map((registro) => ({
         id: registro.id,
@@ -5261,7 +5263,7 @@ export const api = {
           .from('medidas_calcado')
           .select('id, numero_calcado')
           .order('numero_calcado', { ascending: true }),
-        'Falha ao listar medidas de calâ”œÂºado.',
+        'Falha ao listar medidas de cal+ºado.',
       )
       return (data ?? [])
         .map((item) => {
@@ -5607,7 +5609,7 @@ export const api = {
 
       const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId, centroEstoqueIdFinal)
       if (quantidade > estoqueDisponivel) {
-        const error = new Error('Quantidade informada maior que o estoque disponâ”œÂ¡vel.')
+        const error = new Error('Quantidade informada maior que o estoque dispon+¡vel.')
         error.status = 400
         throw error
       }
@@ -5732,7 +5734,7 @@ export const api = {
       const estoqueConsiderado =
         materialId === saidaAtual.materialId ? estoqueDisponivel + quantidadeAnterior : estoqueDisponivel
       if (quantidade > estoqueConsiderado) {
-        const error = new Error('Quantidade informada maior que o estoque disponâ”œÂ¡vel.')
+        const error = new Error('Quantidade informada maior que o estoque dispon+¡vel.')
         error.status = 400
         throw error
       }

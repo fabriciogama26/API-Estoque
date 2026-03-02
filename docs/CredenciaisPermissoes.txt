@@ -103,6 +103,8 @@ Modelo de dados (Supabase)
 
 - Gestão de RBAC (0092+): policies de `user_roles`/`user_permission_overrides` exigem `has_permission('rbac.manage')`.
 
+- DELETE em `user_permission_overrides` é bloqueado pela ausência de policy de DELETE (RLS ON).
+
 - 0093/0094: master pode gerenciar qualquer owner; admin/owner só dependentes do próprio owner; dependente-admin não pode alterar titular nem atribuir master.
 
 
