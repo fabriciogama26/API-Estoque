@@ -1,4 +1,5 @@
 import { request as httpRequest } from './httpClient.js'
+import { buildSupabaseAuthHeaders } from './supabaseClient.js'
 
 const resolveApiBase = () => {
   const envBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
@@ -56,7 +57,9 @@ export async function fetchCurrentUser() {
   if (!base) {
     throw new Error('Base da API nao encontrada.')
   }
+  const headers = await buildSupabaseAuthHeaders()
   const response = await httpRequest('GET', `${base}/api/auth/me`, {
+    headers,
     skipSessionGuard: true,
   })
   return response?.user || null
