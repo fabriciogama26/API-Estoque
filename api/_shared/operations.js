@@ -793,22 +793,11 @@ async function resolveCentroCustoNome(valor) {
   }
 }
 
-async function registrarHistoricoEntrada(
-  entrada,
-  material,
-  usuarioNome,
-  entradaAnterior = null,
-  accountOwnerId = null
-) {
+async function registrarHistoricoEntrada(entrada, material, usuarioNome, entradaAnterior = null) {
   if (!entrada || !entrada.id) {
     return
   }
   try {
-    if (!accountOwnerId) {
-      throw createHttpError(400, 'Owner nao encontrado para registrar historico de entrada.', {
-        code: 'OWNER_REQUIRED',
-      })
-    }
     const snapshotAtual = await buildEntradaHistoricoSnapshot(entrada, material, usuarioNome)
     const snapshotAnterior = entradaAnterior ? await buildEntradaHistoricoSnapshot(entradaAnterior, null, usuarioNome) : null
     const payload =
@@ -822,7 +811,6 @@ async function registrarHistoricoEntrada(
         material_id: snapshotAtual.materialId,
         material_ent: payload,
         usuarioResponsavel: entrada.usuarioResponsavelId || null,
-        account_owner_id: accountOwnerId,
       }),
       'Falha ao registrar historico de entrada.'
     )
@@ -1070,7 +1058,6 @@ async function replaceMaterialRelations({
   values,
   deleteMessage,
   insertMessage,
-  accountOwnerId,
 }) {
   await execute(
     supabaseAdmin.from(table).delete().eq('material_id', materialId),
@@ -1080,16 +1067,10 @@ async function replaceMaterialRelations({
   if (!values || values.length === 0) {
     return
   }
-  if (!accountOwnerId) {
-    throw createHttpError(400, 'Owner nao encontrado para vinculos de material.', {
-      code: 'OWNER_REQUIRED',
-    })
-  }
 
   const rows = values.map((value) => ({
     material_id: materialId,
     [columnName]: value,
-    account_owner_id: accountOwnerId,
   }))
 
   await execute(supabaseAdmin.from(table).insert(rows), insertMessage)
@@ -1102,7 +1083,6 @@ async function replaceMaterialRelationsWithFallback({
   values,
   deleteMessage,
   insertMessage,
-  accountOwnerId,
 }) {
   let lastColumnError = null
 
@@ -1115,7 +1095,6 @@ async function replaceMaterialRelationsWithFallback({
         values,
         deleteMessage,
         insertMessage,
-        accountOwnerId,
       })
       return
     } catch (error) {
@@ -1132,7 +1111,7 @@ async function replaceMaterialRelationsWithFallback({
   }
 }
 
-async function replaceMaterialCorVinculos(materialId, corIds, accountOwnerId) {
+async function replaceMaterialCorVinculos(materialId, corIds) {
   await replaceMaterialRelationsWithFallback({
     table: MATERIAL_COR_RELATION_TABLE,
     materialId,
@@ -1140,11 +1119,10 @@ async function replaceMaterialCorVinculos(materialId, corIds, accountOwnerId) {
     values: corIds,
     deleteMessage: 'Falha ao limpar v�nculos de cores do material.',
     insertMessage: 'Falha ao vincular cores ao material.',
-    accountOwnerId,
   })
 }
 
-async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds, accountOwnerId) {
+async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds) {
   await replaceMaterialRelationsWithFallback({
     table: MATERIAL_CARACTERISTICA_RELATION_TABLE,
     materialId,
@@ -1156,32 +1134,12 @@ async function replaceMaterialCaracteristicaVinculos(materialId, caracteristicaI
     values: caracteristicaIds,
     deleteMessage: 'Falha ao limpar v�nculos de caracter�sticas do material.',
     insertMessage: 'Falha ao vincular caracter�sticas ao material.',
-    accountOwnerId,
   })
 }
 
-async function syncMaterialVinculos(materialId, { corIds, caracteristicaIds, accountOwnerId }) {
-  await replaceMaterialCorVinculos(materialId, corIds, accountOwnerId)
-  await replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds, accountOwnerId)
-}
-
-async function resolveMaterialOwnerId(materialId, accountOwnerId, userId) {
-  if (accountOwnerId) {
-    return accountOwnerId
-  }
-  if (materialId) {
-    const registro = await executeMaybeSingle(
-      supabaseAdmin.from('materiais').select('account_owner_id').eq('id', materialId),
-      'Falha ao resolver owner do material.'
-    )
-    if (registro?.account_owner_id) {
-      return registro.account_owner_id
-    }
-  }
-  if (userId) {
-    return resolveOwnerId(userId)
-  }
-  return null
+async function syncMaterialVinculos(materialId, { corIds, caracteristicaIds }) {
+  await replaceMaterialCorVinculos(materialId, corIds)
+  await replaceMaterialCaracteristicaVinculos(materialId, caracteristicaIds)
 }
 
 const getFirstAvailable = (obj, keys) => {
@@ -1555,14 +1513,9 @@ function calcularDataTroca(dataEntregaIso, validadeDias) {
   return data.toISOString()
 }
 
-async function registrarHistoricoPreco(materialId, valorUnitario, usuario, accountOwnerId) {
+async function registrarHistoricoPreco(materialId, valorUnitario, usuario) {
   if (!materialId) {
     return
-  }
-  if (!accountOwnerId) {
-    throw createHttpError(400, 'Owner nao encontrado para registrar historico de preco.', {
-      code: 'OWNER_REQUIRED',
-    })
   }
   await execute(
     supabaseAdmin.from('material_price_history').insert({
@@ -1571,7 +1524,6 @@ async function registrarHistoricoPreco(materialId, valorUnitario, usuario, accou
       valorUnitario,
       usuarioResponsavel: usuario || 'sistema',
       criadoEm: nowIso(),
-      account_owner_id: accountOwnerId,
     }),
     'Falha ao registrar histórico de preço.'
   )
@@ -2000,7 +1952,7 @@ export const PessoasOperations = {
       (await execute(query, 'Falha ao listar pessoas.')) ?? []
     return pessoas.map(mapPessoaRecord)
   },
-  async create(payload, user, authToken, accountOwnerId) {
+  async create(payload, user, authToken) {
     const params = {
       p_nome: pickParam(payload, ['p_nome', 'nome']),
       p_matricula: pickParam(payload, ['p_matricula', 'matricula']),
@@ -2155,7 +2107,7 @@ export const MateriaisOperations = {
     )
     return normalizeCatalogoLista(registros)
   },
-  async create(payload, user, authToken, accountOwnerId) {
+  async create(payload, user, authToken) {
     const params = {
       p_material: pickParam(payload, ['p_material', 'material']),
       p_cores_ids: pickParam(payload, ['p_cores_ids', 'coresIds', 'cores_ids'], []),
@@ -2180,12 +2132,11 @@ export const MateriaisOperations = {
     }
     const usuario = resolveUsuarioNome(user)
     const valorUnitario = params.p_material?.valorUnitario ?? params.p_material?.valor_unitario ?? 0
-    const ownerId = await resolveMaterialOwnerId(materialId, accountOwnerId, user?.id)
-    await registrarHistoricoPreco(materialId, valorUnitario, usuario, ownerId)
+    await registrarHistoricoPreco(materialId, valorUnitario, usuario)
 
     return await obterMaterialPorId(materialId)
   },
-  async update(id, payload, user, accountOwnerId) {
+  async update(id, payload, user) {
     const atual = await obterMaterialPorId(id)
     if (!atual) {
       throw createHttpError(404, 'Material não encontrado.')
@@ -2224,15 +2175,13 @@ export const MateriaisOperations = {
       'Falha ao atualizar material.',
     )
 
-    const ownerId = await resolveMaterialOwnerId(id, accountOwnerId, user?.id)
     await syncMaterialVinculos(id, {
       corIds: dados.corIds || [],
       caracteristicaIds: dados.caracteristicaIds || [],
-      accountOwnerId: ownerId,
     })
 
     if (Number(dados.valorUnitario) !== Number(atual.valorUnitario)) {
-      await registrarHistoricoPreco(id, dados.valorUnitario, usuario, ownerId)
+      await registrarHistoricoPreco(id, dados.valorUnitario, usuario)
     }
 
     return await obterMaterialPorId(id)
@@ -2323,7 +2272,7 @@ export const EntradasOperations = {
 
     return entradas
   },
-  async create(payload, user, authToken, accountOwnerId) {
+  async create(payload, user, authToken) {
     const params = {
       p_material_id: pickParam(payload, ['p_material_id', 'materialId', 'material_id']),
       p_quantidade: pickParam(payload, ['p_quantidade', 'quantidade']),
@@ -2355,12 +2304,10 @@ export const EntradasOperations = {
         await preencherUsuariosResponsaveis([mapEntradaRecord(entrada)])
       )
     )[0]
-    const ownerId =
-      accountOwnerId || normalizada?.account_owner_id || (user?.id ? await resolveOwnerId(user.id) : null)
-    await registrarHistoricoEntrada(normalizada, material, usuario, null, ownerId)
+    await registrarHistoricoEntrada(normalizada, material, usuario)
     return normalizada
   },
-  async update(id, payload, user, accountOwnerId) {
+  async update(id, payload, user) {
     if (!id) {
       throw createHttpError(400, 'Entrada invalida.')
     }
@@ -2395,9 +2342,7 @@ export const EntradasOperations = {
         await preencherUsuariosResponsaveis([mapEntradaRecord(entradaAtualizada)])
       )
     )[0]
-    const ownerId =
-      accountOwnerId || normalizada?.account_owner_id || (user?.id ? await resolveOwnerId(user.id) : null)
-    await registrarHistoricoEntrada(normalizada, material, usuario, entradaAnterior, ownerId)
+    await registrarHistoricoEntrada(normalizada, material, usuario, entradaAnterior)
     return normalizada
   },
   async history(id) {

@@ -69,21 +69,16 @@ export async function checkPasswordPwned(password) {
   if (!securityConfig.password.checkPwned) {
     return { found: false }
   }
-  try {
-    const sha1 = await sha1Hex(password)
-    const prefix = sha1.slice(0, 5)
-    const suffix = sha1.slice(5)
-    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`)
-    if (!response.ok) {
-      // Falha ao checar, preferimos nao bloquear o usuario
-      return { found: false, error: `HIBP status ${response.status}` }
-    }
-    const body = await response.text()
-    const hit = body.split('\n').some((line) => line.trim().toUpperCase().startsWith(suffix))
-    return { found: hit }
-  } catch (error) {
-    // CSP/bloqueio de rede nao deve impedir o reset
-    return { found: false, error: error?.message || 'HIBP fetch failed' }
+  const sha1 = await sha1Hex(password)
+  const prefix = sha1.slice(0, 5)
+  const suffix = sha1.slice(5)
+  const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`)
+  if (!response.ok) {
+    // Falha ao checar, preferimos nao bloquear o usuario
+    return { found: false, error: `HIBP status ${response.status}` }
   }
+  const body = await response.text()
+  const hit = body.split('\n').some((line) => line.trim().toUpperCase().startsWith(suffix))
+  return { found: hit }
 }
 

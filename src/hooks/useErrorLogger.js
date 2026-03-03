@@ -13,9 +13,6 @@ export function useErrorLogger(page) {
         if (!err) {
           return
         }
-        if (page === 'auth') {
-          return
-        }
         const message = err?.message ?? String(err)
         const stack = err?.stack ?? ''
         const context = {

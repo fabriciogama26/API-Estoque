@@ -7,15 +7,8 @@ const reauthExemptPaths = new Set([
   '/api/session/reauth',
   '/api/session/revoke',
   '/api/health',
-  '/api/auth/reauth',
-  '/api/auth/password/change',
 ])
-const publicPaths = new Set([
-  '/api/auth/login',
-  '/api/auth/recover',
-  '/api/auth/reset',
-  '/api/log-error',
-])
+const publicPaths = new Set(['/api/auth/login', '/api/auth/recover'])
 
 const resolveAuthHeader = (req) =>
   req?.headers?.authorization ||
@@ -39,8 +32,7 @@ export async function auth(ctx) {
   const path = (req.url || '').split('?')[0]
   const isPublicPath = publicPaths.has(path)
 
-  const isSupabaseProxy = path.startsWith('/api/supabase/')
-  req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path) && !isSupabaseProxy
+  req.requiresReauth = reauthRequiredMethods.has(method) && !reauthExemptPaths.has(path)
 
   let user = null
   const cronSecret = process.env.CRON_SECRET || ''

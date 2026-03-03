@@ -178,8 +178,8 @@ export function SystemStatus({ className = '' }) {
   const displayName = userProfile?.display_name || 'Usuario'
 
 
-  const handleLogout = () => {
-    logout().catch((err) => reportError?.(err, { stage: 'logout_click' }))
+  const handleLogout = async () => {
+    await logout()
     navigate('/login', { replace: true })
   }
 

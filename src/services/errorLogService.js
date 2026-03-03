@@ -1,5 +1,4 @@
-import { fetchCurrentUser } from './authService.js'
-import { request as httpRequest } from './httpClient.js'
+import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 
 const ALLOWED_CONTEXT_KEYS = new Set([
   'route',
@@ -47,17 +46,6 @@ const resolveStatus = (payload) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-const resolveApiBase = () => {
-  const envBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
-  if (envBase) {
-    return envBase
-  }
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin
-  }
-  return ''
-}
-
 const sanitizeContext = (ctx) => {
   if (!ctx || typeof ctx !== 'object') {
     return null
@@ -71,48 +59,29 @@ const sanitizeContext = (ctx) => {
   return Object.keys(result).length ? result : null
 }
 
-const postServerLog = async (record) => {
-  const base = resolveApiBase()
-  if (!base) {
-    return false
-  }
-  try {
-    await httpRequest('POST', `${base}/api/log-error`, {
-      body: { ...record, user_id: null },
-      skipSessionGuard: true,
-    })
-    return true
-  } catch (err) {
-    console.warn('Falha ao registrar erro via API', err)
-    return false
-  }
-}
-
-const AUTH_USER_CACHE_TTL_MS = 10 * 1000
-let cachedUserId = null
-let cachedUserIdAt = 0
-
 const resolveSessionUserId = async () => {
-  if (cachedUserId && Date.now() - cachedUserIdAt < AUTH_USER_CACHE_TTL_MS) {
-    return cachedUserId
+  if (!supabase) {
+    return null
   }
   try {
-    const user = await fetchCurrentUser()
-    const userId = user?.id || null
-    cachedUserId = userId
-    cachedUserIdAt = Date.now()
-    return userId
+    const { data } = await supabase.auth.getSession()
+    return data?.session?.user?.id || null
   } catch (_) {
-    cachedUserId = null
-    cachedUserIdAt = 0
     return null
   }
 }
 
 async function insertError(payload) {
+  if (!isSupabaseConfigured() || !supabase) {
+    return
+  }
+
   const base = payload || {}
   const userId = base.userId || (await resolveSessionUserId())
   const status = resolveStatus(base)
+  if (!userId && (status === 401 || status === 429)) {
+    return
+  }
   const context = sanitizeContext({
     source: base.context?.source || 'front',
     ...(base.context || {}),
@@ -142,17 +111,26 @@ async function insertError(payload) {
     fingerprint,
   }
 
-  const allowAuthErrorLog =
-    base.page === 'login' ||
-    base.page === 'auth' ||
-    base.page === 'reset' ||
-    base.context?.action === 'recoverPassword'
-
-  if (!userId && (status === 401 || status === 429) && !allowAuthErrorLog) {
-    return
+  const { error } = await supabase
+    .from('app_errors')
+    .upsert(record, { onConflict: 'fingerprint', ignoreDuplicates: true })
+  if (error) {
+    if (userId && (error.code === '23503' || error.message?.includes('app_errors_user_id_fkey'))) {
+      const { error: retryError } = await supabase
+        .from('app_errors')
+        .upsert({ ...record, user_id: null }, { onConflict: 'fingerprint', ignoreDuplicates: true })
+      if (!retryError || retryError.code === '23505') {
+        return
+      }
+      console.warn('Falha ao registrar erro', retryError)
+      return
+    }
+    if (error.code === '23505') {
+      return
+    }
+    // Nao propaga falha de log para nao quebrar UX
+    console.warn('Falha ao registrar erro', error)
   }
-
-  await postServerLog(record)
 }
 
 export async function logError(payload) {

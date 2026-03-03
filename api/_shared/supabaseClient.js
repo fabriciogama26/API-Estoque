@@ -31,17 +31,6 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
   },
 })
 
-export const supabaseAnon = supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  : null
-
-export { supabaseAnonKey }
-
 export function createUserClient(accessToken) {
   if (!accessToken) {
     throw new Error('Auth token ausente para criar client do usuario.')
