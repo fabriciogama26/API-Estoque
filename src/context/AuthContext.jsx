@@ -402,13 +402,14 @@ export function AuthProvider({ children }) {
       } catch (error) {
         reportError(error, { stage: 'logout' })
       }
-      clearCatalogCache()
-      clearSessionId()
+    }
+    clearCatalogCache()
+    clearSessionId()
     invalidateEffectiveAppUserCache()
     setUser(null)
     window.localStorage.removeItem(STORAGE_KEY)
     setReauthState({ open: false, error: null, isSubmitting: false })
-  }, [hasSupabase, reportError])
+  }, [hasSupabase, reportError, supabase])
 
   const openReauthPrompt = useCallback(() => {
     if (!user || isLocalMode || !hasSupabase) {
