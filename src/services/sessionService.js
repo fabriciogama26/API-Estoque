@@ -97,6 +97,7 @@ const notifySessionGuard = (status, payload) => {
     status === 401 &&
     (code === 'SESSION_EXPIRED' || code === 'AUTH_EXPIRED' || code === 'AUTH_REQUIRED')
   ) {
+    clearSessionId()
     safeDispatch('session-expired', payload)
   }
   if (status === 403 && (code === 'REAUTH_REQUIRED' || code === 'AUTH_EXPIRED')) {

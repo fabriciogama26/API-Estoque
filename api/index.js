@@ -228,23 +228,41 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/auth/reset' && method === 'POST') {
       const body = await readJson(req)
       const code = String(body?.code || '').trim()
+      const accessToken = String(body?.accessToken || body?.access_token || '').trim()
       const newPassword = String(body?.newPassword || body?.password || '').trim()
-      if (!code || !newPassword) {
+      if ((!code && !accessToken) || !newPassword) {
         throw createHttpError(400, 'Codigo e nova senha sao obrigatorios.', {
           code: 'VALIDATION_ERROR',
         })
       }
-      if (!supabaseAnon) {
-        throw createHttpError(500, 'SUPABASE_ANON_KEY nao definido.', { code: 'UPSTREAM_ERROR' })
+      let resolvedUserId = null
+      if (code) {
+        if (!supabaseAnon) {
+          throw createHttpError(500, 'SUPABASE_ANON_KEY nao definido.', { code: 'UPSTREAM_ERROR' })
+        }
+        const { data, error } = await supabaseAnon.auth.exchangeCodeForSession(code)
+        if (error || !data?.user?.id) {
+          throw createHttpError(400, 'Link de redefinicao invalido ou expirado.', {
+            code: 'AUTH_INVALID',
+          })
+        }
+        resolvedUserId = data.user.id
+      } else if (accessToken) {
+        const { data, error } = await supabaseAdmin.auth.getUser(accessToken)
+        if (error || !data?.user?.id) {
+          throw createHttpError(400, 'Link de redefinicao invalido ou expirado.', {
+            code: 'AUTH_INVALID',
+          })
+        }
+        resolvedUserId = data.user.id
       }
-      const { data, error } = await supabaseAnon.auth.exchangeCodeForSession(code)
-      if (error || !data?.user?.id) {
+      if (!resolvedUserId) {
         throw createHttpError(400, 'Link de redefinicao invalido ou expirado.', {
           code: 'AUTH_INVALID',
         })
       }
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        data.user.id,
+        resolvedUserId,
         {
           password: newPassword,
           user_metadata: { password_changed_at: new Date().toISOString() },
