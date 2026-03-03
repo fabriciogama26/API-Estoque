@@ -153,6 +153,19 @@ Atualizacao 2026-03 (Seguranca)
 - `src/hooks/useResetPassword.js`
 - `src/services/supabaseClient.js`
 
+Atualizacao 2026-03 (Reset e Sessao)
+------------------------------------
+- Reset de senha aceita `code` (PKCE) ou `access_token` do hash e remove o token da URL apos validar.
+- /api/auth/reset valida access_token direto no backend quando nao houver code.
+- Auth middleware limpa cookie de sessao quando a sessao esta expirada/invalidada.
+- Front limpa session_id local ao receber AUTH_EXPIRED/AUTH_REQUIRED.
+- Arquivos alterados:
+- `api/_shared/auth.js`
+- `api/index.js`
+- `src/hooks/useResetPassword.js`
+- `src/services/authService.js`
+- `src/services/sessionService.js`
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

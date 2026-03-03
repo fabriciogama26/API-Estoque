@@ -15,7 +15,7 @@ export function useResetPassword() {
   const [sessionError, setSessionError] = useState(null)
   const [isReady, setIsReady] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
-  const [resetCode, setResetCode] = useState(null)
+  const [resetPayload, setResetPayload] = useState(null)
   const resetReason = new URLSearchParams(location.search).get('reason') || ''
   const isForcedReset = resetReason === 'expired'
 
@@ -25,11 +25,24 @@ export function useResetPassword() {
         const currentUrl = new URL(window.location.href)
         const hashParams = new URLSearchParams(currentUrl.hash?.replace(/^#/, '') ?? '')
         const searchParams = currentUrl.searchParams
+        const reason = searchParams.get('reason') || ''
         const code = searchParams.get('code') || hashParams.get('code')
-        if (!code) {
+        const accessToken = searchParams.get('access_token') || hashParams.get('access_token')
+        const refreshToken = searchParams.get('refresh_token') || hashParams.get('refresh_token')
+        const type = searchParams.get('type') || hashParams.get('type')
+        if (!code && !accessToken) {
           throw new Error('Link de redefinicao invalido ou expirado.')
         }
-        setResetCode(code)
+        setResetPayload({
+          ...(code ? { code } : {}),
+          ...(accessToken ? { accessToken } : {}),
+          ...(refreshToken ? { refreshToken } : {}),
+          ...(type ? { type } : {}),
+        })
+        if (typeof window !== 'undefined' && window.history?.replaceState) {
+          const cleanedReason = reason ? `?reason=${encodeURIComponent(reason)}` : ''
+          window.history.replaceState({}, '', `${currentUrl.pathname}${cleanedReason}`)
+        }
         setIsReady(true)
       } catch (err) {
         setSessionError(err.message || 'Nao foi possivel validar o link de redefinicao.')
@@ -87,7 +100,7 @@ export function useResetPassword() {
         throw new Error('A confirmacao precisa ser igual a nova senha.')
       }
 
-      await resetPasswordWithCode(resetCode, form.newPassword)
+      await resetPasswordWithCode(resetPayload || {}, form.newPassword)
       setStatus({ type: 'success', message: 'Senha atualizada! Redirecionando para o login...' })
       setForm({ newPassword: '', confirmPassword: '' })
     } catch (err) {

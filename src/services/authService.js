@@ -78,8 +78,12 @@ export async function resetPasswordWithCode(code, newPassword) {
   if (!base) {
     throw new Error('Base da API nao encontrada.')
   }
+  const payload =
+    code && typeof code === 'object'
+      ? { ...code, newPassword: code.newPassword || newPassword }
+      : { code, newPassword }
   await httpRequest('POST', `${base}/api/auth/reset`, {
-    body: { code, newPassword },
+    body: payload,
     skipSessionGuard: true,
   })
   return true

@@ -6,7 +6,7 @@ import {
   refreshAuthSession,
   revokeAuthSession,
 } from './authSessionStore.js'
-import { getSessionIdFromCookies } from './cookies.js'
+import { appendSetCookie, buildClearSessionCookie, getSessionIdFromCookies } from './cookies.js'
 
 import { validateSession } from './sessionActivity.js'
 
@@ -80,6 +80,12 @@ export async function requireAuth(req, res) {
     return userResponse.data.user
   }
 
+  const clearSessionCookieIfPresent = () => {
+    const existing = getSessionIdFromCookies(req)
+    if (!existing) return
+    appendSetCookie(res, buildClearSessionCookie())
+  }
+
   if (!bearerToken) {
     try {
       const cookieUser = await tryCookieSession()
@@ -88,6 +94,7 @@ export async function requireAuth(req, res) {
           method: req?.method,
           path: req?.url || req?.originalUrl,
         })
+        clearSessionCookieIfPresent()
         sendError(res, 401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED', req })
         return null
       }
@@ -101,6 +108,9 @@ export async function requireAuth(req, res) {
           codeRaw === 'INTERACTION_REQUIRED'
             ? 'VALIDATION_ERROR'
             : 'AUTH_EXPIRED'
+        if (status === 401) {
+          clearSessionCookieIfPresent()
+        }
         sendError(res, status, sessionGuard.message || 'Sessao expirada. Faca login novamente.', {
           code,
           req,
@@ -111,6 +121,9 @@ export async function requireAuth(req, res) {
     } catch (cookieError) {
       const status = cookieError?.status || 401
       const message = cookieError?.message || 'Token invalido ou expirado.'
+      if (status === 401) {
+        clearSessionCookieIfPresent()
+      }
       if (status >= 500) {
         handleError(res, cookieError, message, req)
       } else {
