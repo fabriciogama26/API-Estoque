@@ -32,6 +32,7 @@ Cadastro
   - Para Cargos, a digitacao exige Caps Lock ativo (desktop). Colar so permite texto em maiusculo.
 - Inativacao:
   - Botao "Inativar" altera ativo=false.
+- Insercoes gravam `account_owner_id` do usuario efetivo para atender RLS.
 - Cadastro em massa:
   - Botao "Importar em massa" abre modal com selecao de tabela.
   - Modelo XLSX varia por tabela (nome + relacoes).
@@ -76,6 +77,10 @@ Atualizacao 2026-02
 - Importacao em massa valida tamanho do arquivo pelo plano (limit_import_mb, padrao 2 MB) e bloqueia acima do limite.
 - Importacao em massa aplica rate limit (1 requisicao a cada 60s) e limite diario por plano (limit_import_daily).
 - Submit do cadastro base aguarda sincronizacao do usuario efetivo (app_user_id) antes de salvar.
+
+Atualizacao 2026-03
+-------------------
+- Insercao passou a incluir `account_owner_id` no payload para cargos, setores e demais tabelas base (evita RLS_DENIED).
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
