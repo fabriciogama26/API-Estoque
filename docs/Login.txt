@@ -159,12 +159,14 @@ Atualizacao 2026-03 (Reset e Sessao)
 - /api/auth/reset valida access_token direto no backend quando nao houver code.
 - Auth middleware limpa cookie de sessao quando a sessao esta expirada/invalidada.
 - Front limpa session_id local ao receber AUTH_EXPIRED/AUTH_REQUIRED.
+- Checagem de senha vazada (HIBP) nao bloqueia reset quando o fetch for bloqueado por CSP/rede.
 - Arquivos alterados:
 - `api/_shared/auth.js`
 - `api/index.js`
 - `src/hooks/useResetPassword.js`
 - `src/services/authService.js`
 - `src/services/sessionService.js`
+- `src/utils/passwordPolicy.js`
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
