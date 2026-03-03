@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { changePassword } from '../services/authService.js'
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { logError } from '../services/errorLogService.js'
 
 const INITIAL_FORM = { currentPassword: '', newPassword: '', confirmPassword: '' }
@@ -23,6 +23,11 @@ export function useChangePassword(user) {
       event.preventDefault()
       setFeedback(null)
 
+      if (!isSupabaseConfigured() || !supabase) {
+        setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
+        return
+      }
+
       if (!form.newPassword || form.newPassword.length < 8) {
         setFeedback({ type: 'error', message: 'A nova senha deve ter pelo menos 8 caracteres.' })
         return
@@ -33,9 +38,29 @@ export function useChangePassword(user) {
         return
       }
 
+      if (!user?.email) {
+        setFeedback({ type: 'error', message: 'Email do usuario nao encontrado para validar senha.' })
+        return
+      }
+
       setIsSubmitting(true)
       try {
-        await changePassword(form.currentPassword, form.newPassword)
+        const { error: reauthError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: form.currentPassword,
+        })
+
+        if (reauthError) {
+          throw new Error('Senha atual incorreta.')
+        }
+
+        const { error } = await supabase.auth.updateUser({
+          password: form.newPassword,
+          data: { password_changed_at: new Date().toISOString() },
+        })
+        if (error) {
+          throw error
+        }
 
         setFeedback({ type: 'success', message: 'Senha atualizada com sucesso.' })
         resetForm()

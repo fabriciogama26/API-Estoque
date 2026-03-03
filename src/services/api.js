@@ -1,8 +1,7 @@
-import { supabase, isSupabaseConfigured, buildSupabaseAuthHeaders } from './supabaseClient.js'
+Ôªøimport { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
 import { getSessionId, notifySessionGuardFromResponse } from './sessionService.js'
 import { request as httpRequest } from './httpClient.js'
-import { fetchCurrentUser } from './authService.js'
 import {
   montarEstoqueAtual,
   montarDashboard,
@@ -14,48 +13,11 @@ import {
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
 import { resolveEffectiveAppUser } from './effectiveUserService.js'
 
+const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const IMPORTS_MAX_MB = Number(import.meta.env.VITE_IMPORTS_MAX_MB) || 50
 
 const GENERIC_ERROR = 'Falha ao comunicar com o Supabase.'
-
-const resolveSupabaseProxyBase = () => {
-  const proxyEnv = (import.meta.env.VITE_SUPABASE_PROXY_URL || '').trim()
-  if (proxyEnv) {
-    return proxyEnv.replace(/\/+$/, '')
-  }
-  const apiBase = (import.meta.env.VITE_API_URL || '').trim()
-  if (apiBase) {
-    return `${apiBase.replace(/\/+$/, '')}/api/supabase`
-  }
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return `${window.location.origin.replace(/\/+$/, '')}/api/supabase`
-  }
-  return ''
-}
-
-const SUPABASE_PROXY_BASE = resolveSupabaseProxyBase()
-const FUNCTIONS_URL = SUPABASE_PROXY_BASE ? `${SUPABASE_PROXY_BASE}/functions/v1` : ''
-
-const AUTH_USER_CACHE_TTL_MS = 10 * 1000
-let authUserCache = null
-let authUserCacheAt = 0
-
-const resolveAuthUser = async ({ forceRefresh = false } = {}) => {
-  if (!forceRefresh && authUserCache && Date.now() - authUserCacheAt < AUTH_USER_CACHE_TTL_MS) {
-    return authUserCache
-  }
-  try {
-    const user = await fetchCurrentUser()
-    authUserCache = user
-    authUserCacheAt = Date.now()
-    return user
-  } catch (error) {
-    authUserCache = null
-    authUserCacheAt = 0
-    return null
-  }
-}
 
 const resolveRequestIdFromError = (error, context = {}) => {
   return (
@@ -810,7 +772,8 @@ const mapBasicRegistrationRecord = (table, record) => {
 
 async function resolveCatalogScope() {
   ensureSupabase()
-  const user = await resolveAuthUser()
+  const { data } = await supabase.auth.getSession()
+  const user = data?.session?.user
   if (!user?.id) {
     return { ownerId: null, isMaster: false }
   }
@@ -1151,7 +1114,7 @@ const toMonthRefIso = (valor) => {
   if (!raw) {
     return null
   }
-  // Se for ISO ou YYYY-MM j· retorna o prefixo para evitar problemas de fuso.
+  // Se for ISO ou YYYY-MM j√° retorna o prefixo para evitar problemas de fuso.
   const datePart = raw.split('T')[0]
   const monthPrefix = /^\d{4}-\d{2}$/.test(raw) ? raw : /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart.slice(0, 7) : null
   if (monthPrefix) {
@@ -1723,7 +1686,7 @@ const applyPessoaSearchFilters = (builder, like) => {
     `cargo.ilike.${like}`,
     `centro_custo.ilike.${like}`,
     `tipo_execucao.ilike.${like}`,
-    // Nomes dos usu+Ìrios (colunas text), evitando aplicar ilike em UUID.
+    // Nomes dos usu‚îú√≠rios (colunas text), evitando aplicar ilike em UUID.
     `usuario_cadastro_nome.ilike.${like}`,
     `usuario_edicao_nome.ilike.${like}`,
   ]
@@ -1876,7 +1839,7 @@ async function ensureAcidenteLesoes(agenteNome, nomes) {
 
 function ensureSupabase() {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase n+˙o configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
+    throw new Error('Supabase n‚îú√∫o configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
   }
 }
 
@@ -2029,7 +1992,7 @@ async function replaceMaterialRelationsWithFallback({
     } catch (error) {
       if (!error || error.code !== '42703') {
         if (normalizedValues.length > 0) {
-          reportClientError('Supabase rejeitou IDs de vÌnculo de material.', error, {
+          reportClientError('Supabase rejeitou IDs de v√≠nculo de material.', error, {
             table,
             columnName,
             values: normalizedValues,
@@ -2054,9 +2017,9 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
   const idValues = Array.isArray(corIds) ? corIds : []
   const nameValues = Array.isArray(corNames) ? corNames : []
 
-  // Se veio nome mas n„o conseguimos IDs v·lidos, n„o siga silenciosamente.
+  // Se veio nome mas n√£o conseguimos IDs v√°lidos, n√£o siga silenciosamente.
   if (!idValues.length && nameValues.length) {
-    throw new Error('Cor informada n„o encontrada no cat·logo. Cadastre a cor ou selecione uma existente.')
+    throw new Error('Cor informada n√£o encontrada no cat√°logo. Cadastre a cor ou selecione uma existente.')
   }
   // Nenhum dado de cor: nada a fazer.
   if (!idValues.length && !nameValues.length) {
@@ -2070,7 +2033,7 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
       materialId,
       columnCandidates: MATERIAL_COR_RELATION_ID_COLUMNS,
       values: idValues,
-      deleteMessage: 'Falha ao limpar v+°nculos de cores do material.',
+      deleteMessage: 'Falha ao limpar v‚îú¬°nculos de cores do material.',
       insertMessage: 'Falha ao vincular cores ao material.',
     })
     idInserted = idValues.length > 0
@@ -2086,7 +2049,7 @@ async function replaceMaterialCorVinculos(materialId, corIds, corNames) {
       materialId,
       columnCandidates: MATERIAL_COR_RELATION_TEXT_COLUMNS,
       values: nameValues,
-      deleteMessage: 'Falha ao limpar v+°nculos de cores do material.',
+      deleteMessage: 'Falha ao limpar v‚îú¬°nculos de cores do material.',
       insertMessage: 'Falha ao vincular cores ao material.',
       deleteFirst: false,
     })
@@ -2102,7 +2065,7 @@ async function replaceMaterialCaracteristicaVinculos(
   const nameValues = Array.isArray(caracteristicaNames) ? caracteristicaNames : []
 
   if (!idValues.length && nameValues.length) {
-    throw new Error('CaracterÌstica informada n„o encontrada no cat·logo. Cadastre a caracterÌstica ou selecione uma existente.')
+    throw new Error('Caracter√≠stica informada n√£o encontrada no cat√°logo. Cadastre a caracter√≠stica ou selecione uma existente.')
   }
   if (!idValues.length && !nameValues.length) {
     return
@@ -2115,8 +2078,8 @@ async function replaceMaterialCaracteristicaVinculos(
       materialId,
       columnCandidates: MATERIAL_CARACTERISTICA_RELATION_ID_COLUMNS,
       values: idValues,
-      deleteMessage: 'Falha ao limpar v+°nculos de caracter+°sticas do material.',
-      insertMessage: 'Falha ao vincular caracter+°sticas ao material.',
+      deleteMessage: 'Falha ao limpar v‚îú¬°nculos de caracter‚îú¬°sticas do material.',
+      insertMessage: 'Falha ao vincular caracter‚îú¬°sticas ao material.',
     })
     idInserted = idValues.length > 0
   } catch (error) {
@@ -2131,8 +2094,8 @@ async function replaceMaterialCaracteristicaVinculos(
       materialId,
       columnCandidates: MATERIAL_CARACTERISTICA_RELATION_TEXT_COLUMNS,
       values: nameValues,
-      deleteMessage: 'Falha ao limpar v+°nculos de caracter+°sticas do material.',
-      insertMessage: 'Falha ao vincular caracter+°sticas ao material.',
+      deleteMessage: 'Falha ao limpar v‚îú¬°nculos de caracter‚îú¬°sticas do material.',
+      insertMessage: 'Falha ao vincular caracter‚îú¬°sticas ao material.',
       deleteFirst: false,
     })
   }
@@ -2186,7 +2149,8 @@ function buildMaterialSupabasePayload(dados, { usuario, agora, includeCreateAudi
 
 async function resolveUsuarioResponsavel() {
   ensureSupabase()
-  const user = await resolveAuthUser()
+  const { data } = await supabase.auth.getSession()
+  const user = data?.session?.user
   if (!user) {
     return 'anonimo'
   }
@@ -2219,7 +2183,8 @@ async function resolveUsuarioResponsavel() {
 
 async function resolveUsuarioId() {
   ensureSupabase()
-  const user = await resolveAuthUser()
+  const { data } = await supabase.auth.getSession()
+  const user = data?.session?.user
   if (!user?.id) {
     return null
   }
@@ -2253,12 +2218,13 @@ async function resolveImportsOwnerId() {
 }
 
 async function buildAuthHeaders(extra = {}) {
+  ensureSupabase()
+  const { data } = await supabase.auth.getSession()
+  const token = data?.session?.access_token
   const sessionId = getSessionId()
   const sessionHeader = sessionId ? { 'X-Session-Id': sessionId } : {}
-  const authHeaders = await buildSupabaseAuthHeaders()
-  return { ...extra, ...sessionHeader, ...authHeaders }
+  return token ? { ...extra, ...sessionHeader, Authorization: `Bearer ${token}` } : { ...extra, ...sessionHeader }
 }
-
 
 async function resolveGrupoMaterialId(valor) {
   const texto = trim(valor)
@@ -4302,7 +4268,7 @@ export const api = {
       if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
         query = query.in('centro_servico_id', ownerScope.centroServicoIds)
       }
-      // Filtrar apenas pessoas ativas por padr„o (regra centralizada)
+      // Filtrar apenas pessoas ativas por padr√£o (regra centralizada)
       if (!includeInactive) {
         query = query.eq('ativo', true)
       }
@@ -4333,7 +4299,7 @@ export const api = {
         if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
           query = query.in('centro_servico_id', ownerScope.centroServicoIds)
         }
-        // Filtrar apenas pessoas ativas por padr„o (regra centralizada)
+        // Filtrar apenas pessoas ativas por padr√£o (regra centralizada)
         if (!includeInactive) {
           query = query.eq('ativo', true)
         }
@@ -4349,7 +4315,7 @@ export const api = {
         if (!ownerScope.isMaster && ownerScope.centroServicoIds?.length) {
           fallbackQuery = fallbackQuery.in('centro_servico_id', ownerScope.centroServicoIds)
         }
-        // Aplicar filtro de ativo tambÈm no fallback
+        // Aplicar filtro de ativo tamb√©m no fallback
         if (!includeInactive) {
           fallbackQuery = fallbackQuery.eq('ativo', true)
         }
@@ -4433,6 +4399,9 @@ export const api = {
       }
 
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/pessoas`
       const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
@@ -4639,7 +4608,7 @@ export const api = {
 
     async downloadDesligamentoTemplate() {
       if (!FUNCTIONS_URL) {
-        throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
       }
       const headers = await buildAuthHeaders()
       const resp = await fetch(`${FUNCTIONS_URL}/desligamento-template`, { headers })
@@ -4652,7 +4621,7 @@ export const api = {
 
     async downloadCadastroTemplate() {
       if (!FUNCTIONS_URL) {
-        throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
       }
       const headers = await buildAuthHeaders()
       const resp = await fetch(`${FUNCTIONS_URL}/cadastro-template`, { headers })
@@ -4688,7 +4657,7 @@ export const api = {
         }
 
         if (!FUNCTIONS_URL) {
-          throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
         }
 
         const headers = await buildAuthHeaders({
@@ -4792,7 +4761,7 @@ export const api = {
         }
 
         if (!FUNCTIONS_URL) {
-          throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
         }
 
         const headers = await buildAuthHeaders({
@@ -4998,6 +4967,9 @@ export const api = {
       }
 
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/materiais`
       const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
@@ -5005,7 +4977,7 @@ export const api = {
     },
     async update(id, payload) {
       if (!id) {
-        throw new Error('Material inv+Ìlido.')
+        throw new Error('Material inv‚îú√≠lido.')
       }
       const atualLista = await execute(
         supabase
@@ -5071,7 +5043,7 @@ export const api = {
               { materialId: id, camposAlterados: camposAlterados.length }
             )
           } else {
-            throw mapSupabaseError(historicoErro, 'Falha ao registrar hist+¶rico do material.')
+            throw mapSupabaseError(historicoErro, 'Falha ao registrar hist‚îú‚îÇrico do material.')
           }
         }
       }
@@ -5140,9 +5112,9 @@ export const api = {
         }),
         'Falha no preflight de material.'
       )
-      // Em ediÁ„o sÛ alerta base igual + CA diferente (permite confirmar no modal)
+      // Em edi√ß√£o s√≥ alerta base igual + CA diferente (permite confirmar no modal)
       if (preflight?.base_match_ca_diff && !dadosCombinados.forceBaseCaDiff) {
-        // Se o CA n„o mudou, n„o faz sentido alertar (j· existe com CA diferente e estamos mantendo o mesmo CA)
+        // Se o CA n√£o mudou, n√£o faz sentido alertar (j√° existe com CA diferente e estamos mantendo o mesmo CA)
         if (!caAlterado) {
           // prossegue sem modal
         } else {
@@ -5199,7 +5171,7 @@ export const api = {
           .select('*')
           .eq('materialId', id)
           .order('criadoEm', { ascending: false }),
-        'Falha ao obter hist+¶rico de pre+∫os.'
+        'Falha ao obter hist‚îú‚îÇrico de pre‚îú¬∫os.'
       )
       return (data ?? []).map((registro) => ({
         id: registro.id,
@@ -5263,7 +5235,7 @@ export const api = {
           .from('medidas_calcado')
           .select('id, numero_calcado')
           .order('numero_calcado', { ascending: true }),
-        'Falha ao listar medidas de cal+∫ado.',
+        'Falha ao listar medidas de cal‚îú¬∫ado.',
       )
       return (data ?? [])
         .map((item) => {
@@ -5336,7 +5308,7 @@ export const api = {
     materialOptions: carregarMateriaisDeEntradas,
     async downloadTemplate() {
       if (!FUNCTIONS_URL) {
-        throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
       }
       const headers = await buildAuthHeaders()
       const resp = await fetch(`${FUNCTIONS_URL}/entrada-template`, { headers })
@@ -5370,7 +5342,7 @@ export const api = {
         }
 
         if (!FUNCTIONS_URL) {
-          throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
         }
 
         const headers = await buildAuthHeaders({
@@ -5464,6 +5436,9 @@ export const api = {
       }
 
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/entradas`
       const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
@@ -5609,7 +5584,7 @@ export const api = {
 
       const estoqueDisponivel = await calcularSaldoMaterialAtual(materialId, centroEstoqueIdFinal)
       if (quantidade > estoqueDisponivel) {
-        const error = new Error('Quantidade informada maior que o estoque dispon+°vel.')
+        const error = new Error('Quantidade informada maior que o estoque dispon‚îú¬°vel.')
         error.status = 400
         throw error
       }
@@ -5656,6 +5631,9 @@ export const api = {
       }
 
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/saidas`
       const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
@@ -5734,7 +5712,7 @@ export const api = {
       const estoqueConsiderado =
         materialId === saidaAtual.materialId ? estoqueDisponivel + quantidadeAnterior : estoqueDisponivel
       if (quantidade > estoqueConsiderado) {
-        const error = new Error('Quantidade informada maior que o estoque dispon+°vel.')
+        const error = new Error('Quantidade informada maior que o estoque dispon‚îú¬°vel.')
         error.status = 400
         throw error
       }
@@ -5870,6 +5848,9 @@ export const api = {
     async report(params = {}) {
       ensureSupabase()
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
 
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/estoque/relatorio`
@@ -5878,6 +5859,9 @@ export const api = {
     async reportHistory(params = {}) {
       ensureSupabase()
       const headers = await buildAuthHeaders()
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
 
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const query = new URLSearchParams()
@@ -5892,6 +5876,9 @@ export const api = {
     async reportHtml(params = {}) {
       ensureSupabase()
       const headers = await buildAuthHeaders()
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
 
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const query = new URLSearchParams()
@@ -5906,6 +5893,9 @@ export const api = {
     async reportPdf(params = {}) {
       ensureSupabase()
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
 
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/estoque/relatorio/pdf`
@@ -5914,6 +5904,9 @@ export const api = {
     async forecast(params = {}) {
       ensureSupabase()
       const headers = await buildAuthHeaders()
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
 
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const query = new URLSearchParams()
@@ -6135,7 +6128,7 @@ export const api = {
     },
     async downloadTemplate() {
       if (!FUNCTIONS_URL) {
-        throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
       }
       const headers = await buildAuthHeaders()
       const resp = await fetch(`${FUNCTIONS_URL}/acidente-template`, { headers })
@@ -6169,7 +6162,7 @@ export const api = {
         }
 
         if (!FUNCTIONS_URL) {
-          throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
         }
 
         const headers = await buildAuthHeaders({
@@ -6347,6 +6340,9 @@ export const api = {
       }
 
       const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Fa√ßa login novamente.')
+      }
       const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
       const endpoint = `${base}/api/acidentes`
       const registro = await httpRequest('POST', endpoint, { body: rpcPayload, headers })
@@ -7280,7 +7276,7 @@ export const api = {
     },
     async downloadTemplate(params = {}) {
       if (!FUNCTIONS_URL) {
-        throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+        throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
       }
       const { table } = params
       const { key } = resolveBasicRegistrationConfig(table)
@@ -7318,7 +7314,7 @@ export const api = {
         }
 
         if (!FUNCTIONS_URL) {
-          throw new Error('Base do proxy Supabase nao configurada. Defina VITE_SUPABASE_PROXY_URL ou VITE_API_URL.')
+          throw new Error('VITE_SUPABASE_FUNCTIONS_URL nao configurada.')
         }
 
         const headers = await buildAuthHeaders({

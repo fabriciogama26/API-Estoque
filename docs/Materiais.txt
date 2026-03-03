@@ -91,8 +91,3 @@ Atualizacao 2026-02 (API)
 - Cadastro passou a chamar `/api/materiais` (Vercel) em vez de RPC direta.
 - Pipeline aplica rate limit e idempotencia no create.
 - Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
-
-Atualizacao 2026-03 (API)
-- Historico de preco grava `account_owner_id` pelo backend (evita NOT NULL em material_price_history).
-- Vinculos de cores/caracteristicas agora incluem `account_owner_id` ao atualizar material.
-- Arquivos: api/index.js, api/_shared/operations.js.

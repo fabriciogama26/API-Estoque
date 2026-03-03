@@ -19,83 +19,8 @@ import {
 } from './_shared/operations.js'
 import { touchSession, markSessionReauth, revokeSession } from './_shared/sessionActivity.js'
 import { loginWithLoginName, recoverWithLoginName } from './_shared/authPublic.js'
-import { createAuthSession, revokeAuthSession } from './_shared/authSessionStore.js'
-import {
-  appendSetCookie,
-  buildClearSessionCookie,
-  buildSessionCookie,
-  getSessionIdFromCookies,
-  SESSION_COOKIE,
-} from './_shared/cookies.js'
-import { proxySupabaseRequest } from './_shared/supabaseProxy.js'
-import { supabaseAdmin, supabaseAnon } from './_shared/supabaseClient.js'
-import { resolveEffectiveUserForAuth } from './_shared/effectiveUser.js'
 
 const SESSION_TOUCH_DEBUG = process.env.SESSION_TOUCH_DEBUG === 'true'
-
-const ERROR_CONTEXT_KEYS = new Set([
-  'route',
-  'feature',
-  'action',
-  'code',
-  'severity',
-  'source',
-  'status',
-  'stage',
-  'function',
-  'bucket',
-  'path',
-  'response',
-  'requestId',
-  'tenantHint',
-  'eventTypes',
-])
-const MAX_ERROR_FIELD_LENGTH = 500
-
-const scrubErrorString = (value) => {
-  if (typeof value !== 'string') {
-    value = value != null ? String(value) : ''
-  }
-  let sanitized = value.replace(
-    /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi,
-    '[redacted-email]'
-  )
-  sanitized = sanitized.replace(/[A-Za-z0-9._-]{24,}/g, '[redacted-token]')
-  if (sanitized.length > MAX_ERROR_FIELD_LENGTH) {
-    sanitized = `${sanitized.slice(0, MAX_ERROR_FIELD_LENGTH)}...`
-  }
-  return sanitized
-}
-
-const sanitizeErrorContext = (ctx) => {
-  if (!ctx || typeof ctx !== 'object') {
-    return null
-  }
-  const result = {}
-  Object.entries(ctx).forEach(([key, value]) => {
-    if (ERROR_CONTEXT_KEYS.has(key)) {
-      result[key] = scrubErrorString(value)
-    }
-  })
-  return Object.keys(result).length ? result : null
-}
-
-const buildErrorFingerprint = (base, context) =>
-  (
-    base.fingerprint ||
-    [
-      base.page || 'unknown',
-      scrubErrorString(base.message || '').slice(0, 200),
-      base.severity || 'error',
-      context?.action ? `action=${scrubErrorString(context.action)}` : '',
-      context?.path ? `path=${scrubErrorString(context.path)}` : '',
-      context?.requestId ? `req=${scrubErrorString(context.requestId)}` : '',
-    ]
-      .filter(Boolean)
-      .join('|')
-  )
-    .toString()
-    .slice(0, 200)
 
 const maskAuthHeader = (header) => {
   if (!header || typeof header !== 'string') {
@@ -128,242 +53,14 @@ export default withAuth(async (req, res, user) => {
   const path = url.split('?')[0]
   const query = parseQuery(req)
 
-    if (path.startsWith('/api/supabase/')) {
-      return proxySupabaseRequest(req, res, req.authToken)
-    }
-
     if (path === '/api/auth/login' && method === 'POST') {
       const body = await readJson(req)
-      const { session, user: authUser } = await loginWithLoginName(body)
-      const { sessionId } = await createAuthSession({ session, user: authUser, req })
-      appendSetCookie(res, buildSessionCookie(sessionId, { maxAgeMs: SESSION_COOKIE.maxAgeMs() }))
-      return sendJson(res, 200, {
-        user: {
-          id: authUser?.id || null,
-          email: authUser?.email || null,
-          phone: authUser?.phone || null,
-          user_metadata: authUser?.user_metadata || {},
-          app_metadata: authUser?.app_metadata || {},
-        },
-        session: session
-          ? {
-              access_token: session.access_token,
-              refresh_token: session.refresh_token,
-              expires_in: session.expires_in ?? null,
-              expires_at: session.expires_at ?? null,
-              token_type: session.token_type ?? 'bearer',
-            }
-          : null,
-      })
+      return sendJson(res, 200, await loginWithLoginName(body))
     }
 
     if (path === '/api/auth/recover' && method === 'POST') {
       const body = await readJson(req)
       return sendJson(res, 200, await recoverWithLoginName(body))
-    }
-
-    if (path === '/api/auth/me' && method === 'GET') {
-      if (!user) {
-        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
-      }
-      return sendJson(res, 200, {
-        user: {
-          id: user?.id || null,
-          email: user?.email || null,
-          phone: user?.phone || null,
-          user_metadata: user?.user_metadata || {},
-          app_metadata: user?.app_metadata || {},
-        },
-      })
-    }
-
-    if (path === '/api/auth/effective' && method === 'GET') {
-      if (!user?.id) {
-        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
-      }
-      const effective = await resolveEffectiveUserForAuth(user.id)
-      return sendJson(res, 200, { effective })
-    }
-
-    if (path === '/api/permissions/me' && method === 'GET') {
-      if (!user?.id || !req?.authToken) {
-        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
-      }
-      const { data, error } = await supabaseAdmin.auth.getUser(req.authToken)
-      if (error || !data?.user) {
-        throw createHttpError(401, 'Sessao invalida.', { code: 'AUTH_EXPIRED' })
-      }
-      const jwt = req.authToken
-      const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
-      const anonKey =
-        process.env.SUPABASE_ANON_KEY ||
-        process.env.VITE_SUPABASE_ANON_KEY ||
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-        ''
-      if (!url) {
-        throw createHttpError(500, 'SUPABASE_URL nao definido.', { code: 'UPSTREAM_ERROR' })
-      }
-      if (!anonKey) {
-        throw createHttpError(500, 'SUPABASE_ANON_KEY nao definido.', { code: 'UPSTREAM_ERROR' })
-      }
-      const response = await fetch(`${url}/rest/v1/v_me?select=*`, {
-        method: 'GET',
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${jwt}`,
-        },
-      })
-      if (!response.ok) {
-        const text = await response.text().catch(() => '')
-        throw createHttpError(500, 'Falha ao carregar permissoes.', {
-          code: 'UPSTREAM_ERROR',
-          details: text,
-        })
-      }
-      const payload = await response.json()
-      const profile = Array.isArray(payload) ? payload[0] : payload
-      return sendJson(res, 200, { profile })
-    }
-
-    if (path === '/api/auth/reset' && method === 'POST') {
-      const body = await readJson(req)
-      const code = String(body?.code || '').trim()
-      const accessToken = String(body?.accessToken || body?.access_token || '').trim()
-      const newPassword = String(body?.newPassword || body?.password || '').trim()
-      if ((!code && !accessToken) || !newPassword) {
-        throw createHttpError(400, 'Codigo e nova senha sao obrigatorios.', {
-          code: 'VALIDATION_ERROR',
-        })
-      }
-      let resolvedUserId = null
-      if (code) {
-        if (!supabaseAnon) {
-          throw createHttpError(500, 'SUPABASE_ANON_KEY nao definido.', { code: 'UPSTREAM_ERROR' })
-        }
-        const { data, error } = await supabaseAnon.auth.exchangeCodeForSession(code)
-        if (error || !data?.user?.id) {
-          throw createHttpError(400, 'Link de redefinicao invalido ou expirado.', {
-            code: 'AUTH_INVALID',
-          })
-        }
-        resolvedUserId = data.user.id
-      } else if (accessToken) {
-        const { data, error } = await supabaseAdmin.auth.getUser(accessToken)
-        if (error || !data?.user?.id) {
-          throw createHttpError(400, 'Link de redefinicao invalido ou expirado.', {
-            code: 'AUTH_INVALID',
-          })
-        }
-        resolvedUserId = data.user.id
-      }
-      if (!resolvedUserId) {
-        throw createHttpError(400, 'Link de redefinicao invalido ou expirado.', {
-          code: 'AUTH_INVALID',
-        })
-      }
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        resolvedUserId,
-        {
-          password: newPassword,
-          user_metadata: { password_changed_at: new Date().toISOString() },
-        }
-      )
-      if (updateError) {
-        throw createHttpError(500, updateError.message || 'Falha ao atualizar senha.', {
-          code: 'UPSTREAM_ERROR',
-        })
-      }
-      return sendJson(res, 200, { ok: true })
-    }
-
-    if (path === '/api/log-error' && method === 'POST') {
-      const body = await readJson(req)
-      const base = body && typeof body === 'object' ? body : {}
-      const context = sanitizeErrorContext({
-        source: base?.context?.source || 'front',
-        ...(base?.context || {}),
-      })
-      const record = {
-        environment: 'app',
-        page: scrubErrorString(base.page || ''),
-        user_id: null,
-        message: scrubErrorString(base.message || 'Erro desconhecido'),
-        stack: base.stack ? scrubErrorString(base.stack) : null,
-        context,
-        severity: scrubErrorString(base.severity || 'error'),
-        fingerprint: buildErrorFingerprint(base, context),
-      }
-
-      const { error } = await supabaseAdmin
-        .from('app_errors')
-        .upsert(record, { onConflict: 'fingerprint', ignoreDuplicates: true })
-      if (error) {
-        throw createHttpError(500, 'Falha ao registrar erro.', { code: 'UPSTREAM_ERROR' })
-      }
-      return sendJson(res, 200, { ok: true })
-    }
-
-    if (path === '/api/auth/reauth' && method === 'POST') {
-      if (!user?.id || !user?.email) {
-        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
-      }
-      const body = await readJson(req)
-      const password = String(body?.password || '').trim()
-      if (!password) {
-        throw createHttpError(400, 'Informe sua senha.', { code: 'VALIDATION_ERROR' })
-      }
-      const { error } = await supabaseAdmin.auth.signInWithPassword({
-        email: user.email,
-        password,
-      })
-      if (error) {
-        throw createHttpError(401, 'Senha invalida.', { code: 'AUTH_INVALID' })
-      }
-      const result = await markSessionReauth(req, user, req.authToken)
-      if (!result?.ok) {
-        const status = result.status || 400
-        const code = resolveSessionErrorCode({ status, code: result.code })
-        throw createHttpError(
-          status,
-          result.message || 'Falha ao registrar reautenticacao.',
-          { code }
-        )
-      }
-      return sendJson(res, 200, { ok: true })
-    }
-
-    if (path === '/api/auth/password/change' && method === 'POST') {
-      if (!user?.id || !user?.email) {
-        throw createHttpError(401, 'Autorizacao requerida.', { code: 'AUTH_REQUIRED' })
-      }
-      const body = await readJson(req)
-      const currentPassword = String(body?.currentPassword || '').trim()
-      const newPassword = String(body?.newPassword || '').trim()
-      if (!currentPassword || !newPassword) {
-        throw createHttpError(400, 'Senha atual e nova senha sao obrigatorias.', {
-          code: 'VALIDATION_ERROR',
-        })
-      }
-      const { error: reauthError } = await supabaseAdmin.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
-      })
-      if (reauthError) {
-        throw createHttpError(401, 'Senha atual incorreta.', { code: 'AUTH_INVALID' })
-      }
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        user.id,
-        {
-          password: newPassword,
-          user_metadata: { password_changed_at: new Date().toISOString() },
-        }
-      )
-      if (updateError) {
-        throw createHttpError(500, updateError.message || 'Falha ao atualizar senha.', {
-          code: 'UPSTREAM_ERROR',
-        })
-      }
-      return sendJson(res, 200, { ok: true })
     }
 
     // Pessoas
@@ -414,25 +111,21 @@ export default withAuth(async (req, res, user) => {
     if (path === '/api/materiais/search' && method === 'GET') {
       return sendJson(res, 200, await MateriaisOperations.search(query))
     }
-      if (path === '/api/materiais') {
-        if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
-        if (method === 'POST') {
-          const body = await readJson(req)
-          return sendJson(
-            res,
-            201,
-            await MateriaisOperations.create(body, user, req.authToken, req.accountOwnerId)
-          )
-        }
+    if (path === '/api/materiais') {
+      if (method === 'GET') return sendJson(res, 200, await MateriaisOperations.list())
+      if (method === 'POST') {
+        const body = await readJson(req)
+        return sendJson(res, 201, await MateriaisOperations.create(body, user, req.authToken))
       }
+    }
     if (path.startsWith('/api/materiais/') && method === 'PUT') {
       const id = path.split('/')[3]
       if (!id) {
         throw createHttpError(400, 'ID do material não informado.', { code: 'VALIDATION_ERROR' })
       }
-        const body = await readJson(req)
-        return sendJson(res, 200, await MateriaisOperations.update(id, body, user, req.accountOwnerId))
-      }
+      const body = await readJson(req)
+      return sendJson(res, 200, await MateriaisOperations.update(id, body, user))
+    }
     if (path.startsWith('/api/materiais/price-history/') && method === 'GET') {
       const id = path.split('/')[4]
       if (!id) {
@@ -465,11 +158,7 @@ export default withAuth(async (req, res, user) => {
       if (method === 'GET') return sendJson(res, 200, await EntradasOperations.list(query))
       if (method === 'POST') {
         const body = await readJson(req)
-        return sendJson(
-          res,
-          201,
-          await EntradasOperations.create(body, user, req.authToken, req.accountOwnerId)
-        )
+        return sendJson(res, 201, await EntradasOperations.create(body, user, req.authToken))
       }
     }
     if (path.startsWith('/api/entradas/') && method === 'PUT') {
@@ -478,7 +167,7 @@ export default withAuth(async (req, res, user) => {
         throw createHttpError(400, 'ID da entrada nao informado.', { code: 'VALIDATION_ERROR' })
       }
       const body = await readJson(req)
-      return sendJson(res, 200, await EntradasOperations.update(id, body, user, req.accountOwnerId))
+      return sendJson(res, 200, await EntradasOperations.update(id, body, user))
     }
     if (path.startsWith('/api/entradas/history/') && method === 'GET') {
       const id = path.split('/')[4]
@@ -621,11 +310,6 @@ export default withAuth(async (req, res, user) => {
           { code }
         )
       }
-      const cookieSessionId = getSessionIdFromCookies(req)
-      if (cookieSessionId) {
-        await revokeAuthSession(cookieSessionId)
-      }
-      appendSetCookie(res, buildClearSessionCookie())
       return sendJson(res, 200, { ok: true })
     }
 
