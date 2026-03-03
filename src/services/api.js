@@ -684,36 +684,42 @@ const BASIC_REGISTRATION_TABLE_CONFIG = {
     select:
       'id,fabricante,ativo,created_at,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
     order: ['fabricante'],
+    ownerScoped: true,
   },
   cargos: {
     nameColumn: 'nome',
     select:
       'id,nome,ativo,criado_em,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
     order: ['nome'],
+    ownerScoped: true,
   },
   centros_custo: {
     nameColumn: 'nome',
     select:
       'id,nome,ativo,criado_em,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
     order: ['nome'],
+    ownerScoped: true,
   },
   centros_servico: {
     nameColumn: 'nome',
     select:
       'id,nome,ativo,criado_em,updated_at,centro_custo_id,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
     order: ['nome'],
+    ownerScoped: true,
   },
   centros_estoque: {
     nameColumn: 'almox',
     select:
       'id,almox,centro_custo,ativo,created_at,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
     order: ['almox'],
+    ownerScoped: true,
   },
   setores: {
     nameColumn: 'nome',
     select:
       'id,nome,ativo,criado_em,updated_at,centro_servico_id,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
     order: ['nome'],
+    ownerScoped: true,
   },
 }
 
@@ -7180,12 +7186,21 @@ export const api = {
       if (!nome) {
         throw new Error('Informe o nome para cadastro.')
       }
+      let ownerId = null
+      if (config.ownerScoped) {
+        const scope = await resolveCatalogScope()
+        ownerId = scope?.ownerId || null
+        if (!ownerId) {
+          throw new Error('Sessao invalida para cadastrar item.')
+        }
+      }
       const actorId = data?.usuarioId || (await resolveUsuarioId())
       const payload = {
         [config.nameColumn]: nome,
         ativo: data?.ativo !== false,
         created_by_user_id: actorId,
         updated_by_user_id: actorId,
+        ...(ownerId ? { account_owner_id: ownerId } : {}),
       }
       if (data?.usuarioNome) {
         payload.created_by_user_name = data.usuarioNome
