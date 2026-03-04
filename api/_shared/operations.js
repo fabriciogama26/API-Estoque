@@ -1513,12 +1513,12 @@ function calcularDataTroca(dataEntregaIso, validadeDias) {
   return data.toISOString()
 }
 
-async function registrarHistoricoPreco(materialId, valorUnitario, usuario) {
+async function registrarHistoricoPreco(materialId, valorUnitario, usuario, authToken) {
   if (!materialId) {
     return
   }
   await execute(
-    supabaseAdmin.from('material_price_history').insert({
+    buildUserClient(authToken).from('material_price_history').insert({
       id: randomId(),
       materialId,
       valorUnitario,
@@ -2132,11 +2132,11 @@ export const MateriaisOperations = {
     }
     const usuario = resolveUsuarioNome(user)
     const valorUnitario = params.p_material?.valorUnitario ?? params.p_material?.valor_unitario ?? 0
-    await registrarHistoricoPreco(materialId, valorUnitario, usuario)
+    await registrarHistoricoPreco(materialId, valorUnitario, usuario, authToken)
 
     return await obterMaterialPorId(materialId)
   },
-  async update(id, payload, user) {
+  async update(id, payload, user, authToken) {
     const atual = await obterMaterialPorId(id)
     if (!atual) {
       throw createHttpError(404, 'Material não encontrado.')
@@ -2181,7 +2181,7 @@ export const MateriaisOperations = {
     })
 
     if (Number(dados.valorUnitario) !== Number(atual.valorUnitario)) {
-      await registrarHistoricoPreco(id, dados.valorUnitario, usuario)
+      await registrarHistoricoPreco(id, dados.valorUnitario, usuario, authToken)
     }
 
     return await obterMaterialPorId(id)

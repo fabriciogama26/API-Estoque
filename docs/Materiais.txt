@@ -39,6 +39,7 @@ AtualizaÃ§Ãµes recentes
 - 2026-02: CA pode repetir em bases diferentes; conflito apenas quando base completa + CA forem iguais.
 - 2026-01: RPCs material_create_full e material_update_full gravam material + vinculos (cores/caracteristicas) em uma unica transacao; evita 42501 em RLS de tabelas de vinculo.
 - 2026-01: Migrations registram tabelas de catalogo e vinculos de materiais (cores/caracteristicas/medidas/fabricantes/epi_classe) e coluna created_at nos vinculos.
+- 2026-03: Historico de preco agora e gravado com client autenticado para preencher account_owner_id via RLS.
 
 ===========================================
 Mapa de CÃ³digo (funÃ§Ãµes, hooks e constantes)

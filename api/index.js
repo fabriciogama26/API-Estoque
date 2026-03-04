@@ -124,7 +124,7 @@ export default withAuth(async (req, res, user) => {
         throw createHttpError(400, 'ID do material não informado.', { code: 'VALIDATION_ERROR' })
       }
       const body = await readJson(req)
-      return sendJson(res, 200, await MateriaisOperations.update(id, body, user))
+      return sendJson(res, 200, await MateriaisOperations.update(id, body, user, req.authToken))
     }
     if (path.startsWith('/api/materiais/price-history/') && method === 'GET') {
       const id = path.split('/')[4]
