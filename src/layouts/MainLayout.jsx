@@ -1,7 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { NavBar } from '../components/NavBar.jsx'
 import { SystemStatus } from '../components/SystemStatus.jsx'
-import { SessionReauthModal } from '../components/SessionReauthModal.jsx'
 import '../styles/layout.css'
 
 const logoSrc = '/logo_segtrab.png'
@@ -23,7 +22,6 @@ export function MainLayout() {
           <Outlet />
         </main>
       </div>
-      <SessionReauthModal />
     </div>
   )
 }
