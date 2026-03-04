@@ -1,4 +1,7 @@
+import { useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useLoginForm } from '../hooks/useLoginForm.js'
+import { getRecoveryRedirect } from '../utils/recoveryRedirect.js'
 import '../styles/LoginPage.css'
 
 const logoSrc = '/logo_segtrab.png'
@@ -23,6 +26,8 @@ const LockIcon = () => (
 )
 
 export function LoginPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const {
     form,
     isSubmitting,
@@ -33,6 +38,13 @@ export function LoginPage() {
     handleSubmit,
     handlePasswordRecovery,
   } = useLoginForm()
+
+  useEffect(() => {
+    const recoveryRedirect = getRecoveryRedirect(location)
+    if (recoveryRedirect) {
+      navigate(recoveryRedirect, { replace: true })
+    }
+  }, [location, navigate])
 
   return (
     <div className="login-auth login-auth--login">
