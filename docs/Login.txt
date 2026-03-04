@@ -145,6 +145,12 @@ Atualizacao 2026-03 (Reset via token)
 - Antes: reset dependia do /auth/v1/verify para gerar sessao e repassar tokens ao front.
 - Depois: quando o link traz token_hash ou token+email, o front usa verifyOtp e restaura a sessao sem passar pelo /auth/v1/verify.
 
+Atualizacao 2026-03 (Debug auth-recover)
+
+- Edge function auth-recover registra detalhes do erro no log quando AUTH_RECOVER_DEBUG=true para diagnostico de envio de email.
+- Arquivos alterados/criados:
+- `supabase/functions/auth-recover/index.ts`
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

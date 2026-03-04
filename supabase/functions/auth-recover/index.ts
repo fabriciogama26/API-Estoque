@@ -48,6 +48,7 @@ const sha256Hex = async (value: string) => {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const redirectTo = (Deno.env.get('SUPABASE_PASSWORD_REDIRECT') ?? '').trim()
+const debugAuthRecover = (Deno.env.get('AUTH_RECOVER_DEBUG') ?? '').trim() === 'true'
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
@@ -137,8 +138,17 @@ serve(async (req) => {
   const options = redirectTo ? { redirectTo } : undefined
   const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, options)
   if (resetError) {
+    console.error('auth-recover resetPasswordForEmail failed', {
+      message: resetError.message,
+      status: resetError.status,
+      code: resetError.code,
+    })
     return respond(500, {
-      error: { message: 'Falha ao enviar email de recuperacao.', code: 'UPSTREAM_ERROR' },
+      error: {
+        message: 'Falha ao enviar email de recuperacao.',
+        code: 'UPSTREAM_ERROR',
+        ...(debugAuthRecover ? { details: resetError.message || String(resetError) } : {}),
+      },
     })
   }
 
