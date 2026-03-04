@@ -39,6 +39,12 @@ export function usePessoasController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('pessoas')
 
+  const userScopeKey = useMemo(() => {
+    const authId = user?.id ?? user?.user?.id ?? ''
+    const ownerId = user?.metadata?.app_user_id ?? user?.metadata?.dependent_of ?? ''
+    return `${authId}|${ownerId}`
+  }, [user?.id, user?.user?.id, user?.metadata?.app_user_id, user?.metadata?.dependent_of])
+
   const [form, setForm] = useState(() => ({ ...PESSOAS_FORM_DEFAULT }))
   const [filters, setFilters] = useState(() => ({ ...PESSOAS_FILTER_DEFAULT }))
   const [pessoas, setPessoas] = useState([])
@@ -67,6 +73,7 @@ export function usePessoasController() {
     tiposExecucao: [],
   })
   const referenciasRef = useRef(referencias)
+  const userScopeRef = useRef(userScopeKey)
 
   useEffect(() => {
     pessoasOptionsRef.current = pessoasOptions
@@ -76,9 +83,17 @@ export function usePessoasController() {
     referenciasRef.current = referencias
   }, [referencias])
 
+  useEffect(() => {
+    userScopeRef.current = userScopeKey
+  }, [userScopeKey])
+
   const refreshReferencias = useCallback(async () => {
     try {
+      const scopeKey = userScopeRef.current
       const data = await listPessoasReferences()
+      if (scopeKey !== userScopeRef.current) {
+        return referenciasRef.current
+      }
       if (!data) return referenciasRef.current
       const normalizado = {
         centrosServico: data?.centrosServico ?? [],
@@ -99,6 +114,7 @@ export function usePessoasController() {
     async (params = PESSOAS_FILTER_DEFAULT, refreshOptions = false) => {
       setIsLoading(true)
       setError(null)
+      const scopeKey = userScopeRef.current
       const cachedOptions = pessoasOptionsRef.current
       const hasCachedOptions = Array.isArray(cachedOptions) && cachedOptions.length > 0
       try {
@@ -148,12 +164,18 @@ export function usePessoasController() {
         }
 
         const optionsData = await listPessoas(params)
+        if (scopeKey !== userScopeRef.current) {
+          return
+        }
         const baseOptions = optionsData ?? []
         let referenciasAtuais = referenciasRef.current
         const nextOptions = optionsData ?? []
         pessoasOptionsRef.current = nextOptions
         setPessoasOptions(nextOptions)
         referenciasAtuais = await refreshReferencias()
+        if (scopeKey !== userScopeRef.current) {
+          return
+        }
 
         const centrosMap = mapOptionsById(referenciasAtuais?.centrosServico)
         const setoresMap = mapOptionsById(referenciasAtuais?.setores)
@@ -231,7 +253,7 @@ export function usePessoasController() {
     referenciasRef.current = vazio
     setReferencias(vazio)
     loadPessoas(PESSOAS_FILTER_DEFAULT, true)
-  }, [loadPessoas, refreshReferencias, user?.id, user?.user?.id])
+  }, [loadPessoas, refreshReferencias, userScopeKey, user?.id, user?.user?.id])
 
   useEffect(() => {
     getPessoasResumo()

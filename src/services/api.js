@@ -787,12 +787,12 @@ async function resolveCatalogScope() {
     const effective = await resolveEffectiveAppUser(user.id)
     const cred = (effective?.credential || '').toString().toLowerCase()
     return {
-      ownerId: effective?.appUserId || user.id,
+      ownerId: effective?.appUserId || null,
       isMaster: cred === 'master',
     }
   } catch (error) {
     reportClientError('Falha ao resolver owner para catalogo.', error, { userId: user.id })
-    return { ownerId: user.id, isMaster: false }
+    return { ownerId: null, isMaster: false }
   }
 }
 
@@ -931,6 +931,17 @@ async function loadCatalogScopedList({ table, nameColumn = 'nome', ownerScoped =
   ensureSupabase()
   const scope = await resolveCatalogScope()
   const isMaster = scope.isMaster
+  const cacheKey = buildCatalogCacheKey({
+    table,
+    nameColumn,
+    ownerScoped,
+    ownerId: scope.ownerId,
+    isMaster,
+  })
+  const cached = readCatalogCache(cacheKey)
+  if (cached) {
+    return cached
+  }
   let query = supabase.from(table).select(`id, ${nameColumn}`)
 
   if (ownerScoped && !isMaster) {
@@ -951,6 +962,7 @@ async function loadCatalogScopedList({ table, nameColumn = 'nome', ownerScoped =
       return { id: item?.id ?? null, nome }
     })
     .filter(Boolean)
+  writeCatalogCache(cacheKey, normalized)
   return normalized
 }
 
