@@ -22,7 +22,6 @@ Fluxos
 - Inatividade: monitora atividade (mouse, teclado, scroll, touch, foco) e envia /api/session/touch; expiracao vem do servidor e o front redireciona ao receber SESSION_EXPIRED.
 - Sessao (servidor): valida timebox de 12h e idle de 30min via tabela auth_session_activity; requests com X-User-Interaction atualizam last_seen_at; expiracao retorna 401 com code SESSION_EXPIRED.
 - Touch de sessao: front envia POST /api/session/touch com X-User-Interaction e X-Session-Id por login para marcar atividade humana (idle server).
-- Reauth: endpoints sensiveis exigem reautenticacao em 15 min; backend responde 403 REAUTH_REQUIRED e o front abre modal para confirmar senha.
 - Logout: antes de sair, o front chama /api/session/revoke para registrar revoked_at.
 - Expiracao de senha: senha deve ser atualizada a cada 60 dias; fluxo usa /reset-password com sessao ativa.
 
@@ -34,7 +33,7 @@ Boas praticas
 - Usar X-Session-Id gerado a cada login para criar nova linha de sessao (historico preservado).
 - O backend usa X-Session-Id quando enviado; caso contrario, usa session_id do JWT ou hash do token.
 - O backend busca sempre a sessao ativa com revoked_at IS NULL e nunca limpa revoked_at ao expirar.
-- Se precisar ajustar tempos de sessao, use as envs: SESSION_TIMEBOX_MS, SESSION_IDLE_MS, SESSION_REAUTH_WINDOW_MS, SESSION_TOUCH_THROTTLE_MS.
+- Se precisar ajustar tempos de sessao, use as envs: SESSION_TIMEBOX_MS, SESSION_IDLE_MS, SESSION_TOUCH_THROTTLE_MS.
 
 Atualizacao 2025-12
 
@@ -44,7 +43,7 @@ Atualizacao 2026-02
 
 - Monitoramento de atividade reforcado (inclui scroll e eventos pointer) e touch de sessao; logout limpa sessao local quando disparado.
 - Guard de sessao no backend com timebox/idle e registro em auth_session_activity.
-- /api/session/touch + X-Session-Id para marcar atividade; reauth exigida para operacoes sensiveis.
+- /api/session/touch + X-Session-Id para marcar atividade.
 - /api/session/* no front agora usa httpClient para padronizar envelope e request_id.
 - Politica de senha: atualizacao a cada 60 dias via metadata password_changed_at.
 - Arquivos alterados/criados:
@@ -65,7 +64,7 @@ Atualizacao 2026-02
 - `src/layouts/MainLayout.jsx`
 - Antes/Depois:
 - Antes: expiracao ocorria apenas no front e nao havia timebox/idle no servidor.
-- Depois: servidor valida timebox (12h), idle (30min) e reauth (15min), e o front limpa tokens ao receber SESSION_EXPIRED/REAUTH_REQUIRED.
+- Depois: servidor valida timebox (12h) e idle (30min), e o front limpa tokens ao receber SESSION_EXPIRED.
 - Antes: pagina de reset podia falhar com `securityConfig is not defined` ao validar captcha.
 - Depois: hook de reset importa `securityConfig` e a validacao roda sem erro de referencia.
 - Antes: sessao de recuperacao podia manter o usuario preso no reset mesmo ao voltar para o login.
@@ -134,6 +133,17 @@ Atualizacao 2026-03 (Redirect de recuperacao)
 - Antes/Depois:
 - Antes: link de recovery que chegava em /login ou / era direcionado para login e perdia a rota de reset.
 - Depois: /login e rotas protegidas detectam type=recovery e redirecionam para /reset-password mantendo query/hash.
+
+Atualizacao 2026-03 (Reauth removida)
+
+- Reautenticacao obrigatoria foi desativada; operacoes sensiveis nao exigem confirmacao de senha.
+- Modal de reauth nao e mais renderizado na UI.
+- Arquivos alterados/criados:
+- `api/_shared/middleware/auth.js`
+- `src/layouts/MainLayout.jsx`
+- Antes/Depois:
+- Antes: backend retornava REAUTH_REQUIRED e o front abria modal de confirmacao.
+- Depois: reauth desativada e nao ha prompt de senha adicional.
 
 Atualizacao 2026-03 (Reset via token)
 
@@ -232,16 +242,12 @@ Servicos e integracoes externas
   - Tipo: handlers publicos de auth
   - Caminho: api/_shared/authPublic.js
   - Responsavel por: resolver login_name para email e autenticar no backend sem expor email.
-- validateSession / touchSession / markSessionReauth / revokeSession
+- validateSession / touchSession / revokeSession
   - Tipo: guard de sessao no backend
   - Caminho: api/_shared/sessionActivity.js
-  - Responsavel por: validar timebox/idle/reauth, atualizar last_seen_at apenas no /touch e revogar sessao no logout.
-- sessionService (touchSession, markSessionReauth, revokeSession, rotateSessionId, clearSessionId)
+  - Responsavel por: validar timebox/idle, atualizar last_seen_at apenas no /touch e revogar sessao no logout.
+- sessionService (touchSession, revokeSession, rotateSessionId, clearSessionId)
   - Tipo: servico de sessao no front
   - Caminho: src/services/sessionService.js
-  - Responsavel por: enviar /api/session/touch, registrar reautenticacao, revogar sessao e rotacionar session_id por login.
-- SessionReauthModal
-  - Tipo: componente de modal
-  - Caminho: src/components/SessionReauthModal.jsx
-  - Responsavel por: coletar senha e reautenticar quando requerido.
+  - Responsavel por: enviar /api/session/touch, revogar sessao e rotacionar session_id por login.
 

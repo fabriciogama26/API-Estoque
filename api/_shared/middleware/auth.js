@@ -1,7 +1,7 @@
 import { requireAuth } from '../auth.js'
 import { CONSUME_LOCAL_DATA } from '../environment.js'
 
-const reauthRequiredMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+const reauthRequiredMethods = new Set()
 const reauthExemptPaths = new Set([
   '/api/session/touch',
   '/api/session/reauth',
