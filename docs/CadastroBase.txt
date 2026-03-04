@@ -81,6 +81,8 @@ Atualizacao 2026-02
 Atualizacao 2026-03
 -------------------
 - Insercao passou a incluir `account_owner_id` no payload para cargos, setores e demais tabelas base (evita RLS_DENIED).
+- `resolveCatalogScope` nao usa fallback para `auth.uid()` quando `appUserId` nao resolve; evita gravar em tenant errado.
+- `AuthContext` limpa cache de usuario efetivo e catalogos quando a sessao expira/sai.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -133,6 +135,16 @@ Servicos e integracoes externas
   - Tipo: dataClient
   - Caminho: src/services/api.js, src/services/localApi.js
   - Responsavel por: execucao Supabase e modo local.
+
+- resolveCatalogScope
+  - Tipo: funcao de escopo multi-tenant
+  - Caminho: src/services/api.js
+  - Responsavel por: resolver `account_owner_id` antes de inserir no cadastro base.
+
+- AuthContext (limpeza de cache)
+  - Tipo: contexto de autenticacao
+  - Caminho: src/context/AuthContext.jsx
+  - Responsavel por: limpar cache de usuario efetivo e catalogos quando a sessao expira ou sai.
 - Edge Functions (importacao)
   - Tipo: Supabase Edge Functions
   - Caminho: supabase/functions/cadastro-base-import/index.ts, supabase/functions/cadastro-base-template/index.ts

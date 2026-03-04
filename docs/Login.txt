@@ -151,6 +151,16 @@ Atualizacao 2026-03 (Debug auth-recover)
 - Arquivos alterados/criados:
 - `supabase/functions/auth-recover/index.ts`
 
+Atualizacao 2026-03 (Cache/tenant no login)
+
+- Limpeza de caches antes de setSession e antes de resolver usuario no onAuthStateChange.
+- Logout agora revoga sessao no servidor (signOut global) para evitar reaproveitar sessao anterior.
+- Arquivos alterados/criados:
+- `src/context/AuthContext.jsx`
+- Antes/Depois:
+- Antes: signOut local podia manter sessao ativa no servidor e o cache podia ser reutilizado entre tenants.
+- Depois: signOut revoga no servidor e o cache efetivo e limpo antes da resolucao do usuario.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -217,7 +227,7 @@ Servicos e integracoes externas
 - AuthContext
   - Tipo: contexto de autenticacao
   - Caminho: src/context/AuthContext.jsx
-  - Responsavel por: login via API, logout, recoverPassword e persistencia de sessao.
+  - Responsavel por: login via API, logout, recoverPassword, persistencia de sessao e limpeza de cache em eventos de auth.
 - authPublic (loginWithLoginName, recoverWithLoginName)
   - Tipo: handlers publicos de auth
   - Caminho: api/_shared/authPublic.js

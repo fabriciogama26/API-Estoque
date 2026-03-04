@@ -198,6 +198,8 @@ export function AuthProvider({ children }) {
       }
       if (sessionError) {
         reportError(sessionError, { stage: 'get_session' })
+        clearCatalogCache()
+        invalidateEffectiveAppUserCache()
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
         setReauthState({ open: false, error: null, isSubmitting: false })
@@ -206,6 +208,8 @@ export function AuthProvider({ children }) {
 
       const session = sessionData?.session
       if (!session) {
+        clearCatalogCache()
+        invalidateEffectiveAppUserCache()
         setUser(null)
         window.localStorage.removeItem(STORAGE_KEY)
         setReauthState({ open: false, error: null, isSubmitting: false })
@@ -216,6 +220,8 @@ export function AuthProvider({ children }) {
         const { user: resolvedUser, effective } = await buildResolvedUser(session.user)
         if (effective?.active === false) {
           await supabase.auth.signOut()
+          clearCatalogCache()
+          invalidateEffectiveAppUserCache()
           setUser(null)
           window.localStorage.removeItem(STORAGE_KEY)
           setReauthState({ open: false, error: null, isSubmitting: false })
@@ -247,15 +253,20 @@ export function AuthProvider({ children }) {
       const applySessionUser = async () => {
         const currentSessionUser = session?.user
         if (!currentSessionUser) {
+          clearCatalogCache()
+          invalidateEffectiveAppUserCache()
           setUser(null)
           window.localStorage.removeItem(STORAGE_KEY)
           setReauthState({ open: false, error: null, isSubmitting: false })
           return
         }
         try {
+          invalidateEffectiveAppUserCache()
           const { user: resolvedUser, effective } = await buildResolvedUser(currentSessionUser)
           if (effective?.active === false) {
             await supabase.auth.signOut()
+            clearCatalogCache()
+            invalidateEffectiveAppUserCache()
             setUser(null)
             window.localStorage.removeItem(STORAGE_KEY)
             setReauthState({ open: false, error: null, isSubmitting: false })
@@ -327,6 +338,8 @@ export function AuthProvider({ children }) {
 
       const identifier = rawLogin.trim()
       const session = await loginWithLoginName(identifier, password)
+      clearCatalogCache()
+      invalidateEffectiveAppUserCache()
       const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
@@ -398,7 +411,7 @@ export function AuthProvider({ children }) {
     if (!isLocalMode && hasSupabase && supabase) {
       try {
         await revokeSession()
-        await supabase.auth.signOut({ scope: 'local' })
+        await supabase.auth.signOut()
       } catch (error) {
         reportError(error, { stage: 'logout' })
       }
