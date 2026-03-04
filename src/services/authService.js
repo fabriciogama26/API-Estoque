@@ -114,6 +114,46 @@ export async function restoreResetSession() {
     throw sessionResult.error
   }
 
+  const currentUrl = new URL(window.location.href)
+  const hashParams = new URLSearchParams(currentUrl.hash?.replace(/^#/, '') ?? '')
+  const searchParams = currentUrl.searchParams
+  const token = searchParams.get('token') || hashParams.get('token')
+  const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash')
+  const type = searchParams.get('type') || hashParams.get('type')
+  const email = searchParams.get('email') || hashParams.get('email')
+
+  if (type === 'recovery') {
+    if (tokenHash) {
+      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'recovery',
+      })
+      if (otpError) {
+        throw otpError
+      }
+      if (otpData?.session) {
+        return otpData.session
+      }
+    }
+
+    if (token) {
+      if (!email) {
+        throw new Error('Email ausente para validar o token de redefinicao.')
+      }
+      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'recovery',
+      })
+      if (otpError) {
+        throw otpError
+      }
+      if (otpData?.session) {
+        return otpData.session
+      }
+    }
+  }
+
   // Tenta usar helper oficial
   try {
     const { data: urlSessionData, error: urlSessionError } = await supabase.auth.getSessionFromUrl({
@@ -131,10 +171,6 @@ export async function restoreResetSession() {
       stack: urlError?.stack,
     }).catch(() => {})
   }
-
-  const currentUrl = new URL(window.location.href)
-  const hashParams = new URLSearchParams(currentUrl.hash?.replace(/^#/, '') ?? '')
-  const searchParams = currentUrl.searchParams
 
   const code = searchParams.get('code') || hashParams.get('code')
   if (code) {
