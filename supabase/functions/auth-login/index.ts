@@ -111,24 +111,45 @@ serve(async (req) => {
     )
   }
 
-  const { data: userRow, error } = await supabase
+  const { data: ownerRow, error: ownerError } = await supabase
     .from('app_users')
     .select('id, email, ativo')
     .eq('login_name', loginName)
     .maybeSingle()
 
-  if (error) {
+  if (ownerError) {
     return respond(500, { error: { message: 'Falha ao consultar login.', code: 'UPSTREAM_ERROR' } })
   }
 
-  if (!userRow?.email) {
-    return respond(401, { error: { message: 'Login ou senha invalidos.', code: 'AUTH_INVALID' } })
+  let authEmail = ownerRow?.email || ''
+  let ownerActive = ownerRow?.ativo !== false
+
+  if (!authEmail) {
+    const { data: dependentRow, error: dependentError } = await supabase
+      .from('app_users_dependentes')
+      .select(
+        `id, email, ativo, owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, ativo)`
+      )
+      .eq('username', loginName)
+      .maybeSingle()
+
+    if (dependentError && dependentError.code !== 'PGRST116') {
+      return respond(500, { error: { message: 'Falha ao consultar login.', code: 'UPSTREAM_ERROR' } })
+    }
+
+    if (dependentRow?.email) {
+      authEmail = String(dependentRow.email).trim()
+      ownerActive = dependentRow?.owner?.ativo !== false
+      if (dependentRow.ativo === false || ownerActive === false) {
+        return respond(403, {
+          error: { message: 'Usuario inativo. Procure um administrador.', code: 'AUTH_INACTIVE' },
+        })
+      }
+    }
   }
 
-  if (userRow.ativo === false) {
-    return respond(403, {
-      error: { message: 'Usuario inativo. Procure um administrador.', code: 'AUTH_INACTIVE' },
-    })
+  if (!authEmail) {
+    return respond(401, { error: { message: 'Login ou senha invalidos.', code: 'AUTH_INVALID' } })
   }
 
   const { data, error: signInError } = await supabase.auth.signInWithPassword({
