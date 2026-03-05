@@ -730,6 +730,32 @@ function PermissionsSection({ currentUser }) {
       setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
       return
     }
+    if (selectedUser.id === currentUser?.id) {
+      const roleName = rolesCatalog.find((role) => role.id === draftRoleId)?.name?.toLowerCase()
+      const isRoleSafe = roleName === 'admin' || roleName === 'master'
+      const hasRbacManage = appliedPermissions.includes('rbac.manage')
+      if (!isActive) {
+        setFeedback({
+          type: 'error',
+          message: 'Voce nao pode desativar o proprio usuario.',
+        })
+        return
+      }
+      if (!isRoleSafe) {
+        setFeedback({
+          type: 'error',
+          message: 'Voce nao pode rebaixar a propria credencial.',
+        })
+        return
+      }
+      if (!hasRbacManage) {
+        setFeedback({
+          type: 'error',
+          message: 'Voce nao pode remover sua permissao de configuracoes.',
+        })
+        return
+      }
+    }
     const beforePerms = baselinePermissions
     const afterPerms = appliedPermissions
     setIsLoading(true)

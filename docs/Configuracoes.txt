@@ -37,6 +37,14 @@ Fluxos principais
   - Buscar usuario/dependente com email -> Enviar reset de senha (indisponivel no modo local).
   - Registra historico de password_reset.
 
+Atualizacao 2026-03
+-------------------
+- Bloqueio de auto-rebaixamento e auto-desativacao na tela para evitar perda de acesso.
+- RPCs impedem rebaixar/desativar o proprio usuario e remover rbac.manage.
+- Arquivos alterados:
+  - src/pages/Configuracoes.jsx
+  - supabase/migrations/20260305_prevent_self_demotion.sql
+
 Integracao com Supabase
 -----------------------
 - Leitura/escrita: tabelas app_users, user_roles, user_permission_overrides, app_users_credential_history.
