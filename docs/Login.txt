@@ -13,7 +13,7 @@ Arquitetura (modular)
 Fluxos
 
 - Login: login_name + senha; em modo local compara com VITE_LOCAL_USERNAME/PASSWORD (case-insensitive).
-- Login remoto: front chama edge function auth-login, resolve login_name -> email e retorna tokens; front aplica supabase.auth.setSession.
+- Login remoto: front chama edge function auth-login, resolve login_name (titular ou dependente) -> email e retorna tokens; front aplica supabase.auth.setSession.
 - Login: ao concluir, dispara um /api/session/touch para registrar atividade inicial.
 - Recuperacao: usa o login do formulario; edge function auth-recover dispara reset sem expor email. Se nao houver email cadastrado, retorna erro especifico.
 - Recuperacao (redirect): se o link cair em /login ou / com type=recovery, o front redireciona para /reset-password preservando query/hash.
@@ -144,6 +144,13 @@ Atualizacao 2026-03 (Reauth removida)
 - Antes/Depois:
 - Antes: backend retornava REAUTH_REQUIRED e o front abria modal de confirmacao.
 - Depois: reauth desativada e nao ha prompt de senha adicional.
+
+Atualizacao 2026-03 (Login dependentes)
+
+- Edge function auth-login agora tenta autenticar dependentes por username quando nao encontra titular.
+- Dependentes e owners inativos sao bloqueados com AUTH_INACTIVE.
+- Arquivos alterados/criados:
+- `supabase/functions/auth-login/index.ts`
 
 Atualizacao 2026-03 (Reset via token)
 
