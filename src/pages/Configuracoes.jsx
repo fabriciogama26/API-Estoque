@@ -28,7 +28,7 @@ import { useErrorLogger } from '../hooks/useErrorLogger.js'
 
 import '../styles/ConfiguracoesPage.css'
 
-import { PERMISSION_LABELS, PERMISSION_GROUPS } from '../config/permissions.js'
+import { PERMISSION_LABELS, PERMISSION_GROUPS, applyPermissionDependencies } from '../config/permissions.js'
 
 
 
@@ -385,7 +385,10 @@ function PermissionsSection({ currentUser }) {
 
 
 
-  const appliedPermissions = draftPermissions
+  const appliedPermissions = useMemo(
+    () => applyPermissionDependencies(draftPermissions),
+    [draftPermissions]
+  )
 
 
 

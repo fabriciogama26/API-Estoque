@@ -140,6 +140,36 @@ const PERMISSION_GROUPS = [
   { id: 'cadastro-base', label: 'Cadastro Base', keys: ['basic_registration.read', 'basic_registration.write'] },
 ]
 
+const PERMISSION_DEPENDENCIES = {
+  'estoque.atual': ['estoque.read'],
+  'estoque.entradas': ['estoque.read'],
+  'estoque.saidas': ['estoque.read', 'pessoas.read'],
+  'estoque.materiais': ['estoque.read'],
+  'estoque.termo': ['estoque.read', 'pessoas.read'],
+  'estoque.relatorio': ['estoque.read'],
+  'estoque.reprocessar': ['estoque.read'],
+  'acidentes.dashboard': ['acidentes.read'],
+}
+
+function applyPermissionDependencies(permissions = []) {
+  const result = new Set(Array.isArray(permissions) ? permissions : [])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const perm of Array.from(result)) {
+      const deps = PERMISSION_DEPENDENCIES[perm]
+      if (!deps) continue
+      deps.forEach((dep) => {
+        if (!result.has(dep)) {
+          result.add(dep)
+          changed = true
+        }
+      })
+    }
+  }
+  return Array.from(result)
+}
+
 export {
   PAGE_CATALOG,
   PAGE_REQUIRED_PERMISSION,
@@ -152,4 +182,6 @@ export {
   CREDENTIAL_OPTIONS,
   PERMISSION_LABELS,
   PERMISSION_GROUPS,
+  PERMISSION_DEPENDENCIES,
+  applyPermissionDependencies,
 }
