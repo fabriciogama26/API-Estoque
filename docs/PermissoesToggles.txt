@@ -21,6 +21,15 @@ Impacto:
 Atualizacao 2026-02 (reprocessar)
 - Adicionado grupo `estoque-reprocessar` para ligar a permissao `estoque.reprocessar`.
 
+Atualizacao 2026-03 (dependencias de permissao)
+- Permissoes de pagina passam a incluir chaves obrigatorias de leitura.
+- Exemplo: `estoque.saidas` adiciona `estoque.read` e `pessoas.read` para carregar centros/pessoas.
+- Mantem toggles independentes, mas garante RLS para dados base.
+
+Arquivos:
+- src/config/permissions.js
+- src/pages/Configuracoes.jsx
+
 Arquivos:
 - src/config/permissions.js
 - supabase/migrations/20260217_page_permission_keys.sql

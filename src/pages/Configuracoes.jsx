@@ -28,7 +28,7 @@ import { useErrorLogger } from '../hooks/useErrorLogger.js'
 
 import '../styles/ConfiguracoesPage.css'
 
-import { PERMISSION_LABELS, PERMISSION_GROUPS } from '../config/permissions.js'
+import { PERMISSION_LABELS, PERMISSION_GROUPS, applyPermissionDependencies } from '../config/permissions.js'
 
 
 
@@ -385,7 +385,10 @@ function PermissionsSection({ currentUser }) {
 
 
 
-  const appliedPermissions = draftPermissions
+  const appliedPermissions = useMemo(
+    () => applyPermissionDependencies(draftPermissions),
+    [draftPermissions]
+  )
 
 
 
@@ -729,6 +732,32 @@ function PermissionsSection({ currentUser }) {
     if (!isSupabaseConfigured() || !supabase) {
       setFeedback({ type: 'error', message: 'Supabase nao configurado.' })
       return
+    }
+    if (selectedUser.id === currentUser?.id) {
+      const roleName = rolesCatalog.find((role) => role.id === draftRoleId)?.name?.toLowerCase()
+      const isRoleSafe = roleName === 'admin' || roleName === 'master'
+      const hasRbacManage = appliedPermissions.includes('rbac.manage')
+      if (!isActive) {
+        setFeedback({
+          type: 'error',
+          message: 'Voce nao pode desativar o proprio usuario.',
+        })
+        return
+      }
+      if (!isRoleSafe) {
+        setFeedback({
+          type: 'error',
+          message: 'Voce nao pode rebaixar a propria credencial.',
+        })
+        return
+      }
+      if (!hasRbacManage) {
+        setFeedback({
+          type: 'error',
+          message: 'Voce nao pode remover sua permissao de configuracoes.',
+        })
+        return
+      }
     }
     const beforePerms = baselinePermissions
     const afterPerms = appliedPermissions
