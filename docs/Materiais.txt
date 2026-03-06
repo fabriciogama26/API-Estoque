@@ -92,3 +92,7 @@ Atualizacao 2026-02 (API)
 - Cadastro passou a chamar `/api/materiais` (Vercel) em vez de RPC direta.
 - Pipeline aplica rate limit e idempotencia no create.
 - Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
+
+Atualizacao 2026-03 (Auditoria)
+- Cadastros e edicoes feitos por dependentes deixaram de gravar o owner do tenant em `usuarioCadastro`/`usuarioAtualizacao`.
+- O helper `resolveUsuarioId()` agora retorna o ator real da sessao para manter "Cadastrado por" alinhado com quem executou a acao.

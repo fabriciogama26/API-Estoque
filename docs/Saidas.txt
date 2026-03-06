@@ -231,3 +231,8 @@ Atualizacao 2026-03 (Banco/RPC)
 - Diagnostico SQL com sessao simulada de dependente confirmou vazamento cross-tenant em `public.rpc_catalog_list('centros_estoque')`.
 - A migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` passa a exigir `account_owner_id` para tabelas owner-scoped quando o usuario nao e master.
 - O item `TESTE` era retornado indevidamente por `rpc_catalog_list`; a query direta em `public.centros_estoque` filtrada por `current_account_owner_id()` mostrou que o dado base do tenant estava correto.
+
+Atualizacao 2026-03 (Auditoria)
+-------------------------------
+- `resolveUsuarioId()` deixou de devolver o owner do tenant quando a sessao e de dependente.
+- Campos de auditoria/registro da tela passam a preservar o ator real da sessao em vez do titular.

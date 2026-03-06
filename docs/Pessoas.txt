@@ -178,3 +178,8 @@ Atualizacao 2026-03 (Banco/RPC)
 - Diagnostico SQL com `request.jwt.claim.sub` confirmou vazamento cross-tenant em `public.rpc_catalog_list(text)` para dependente.
 - A migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` endurece o branch owner-scoped e remove o fallback global para usuario nao-master.
 - O teste de referencia da tela passou a ser a comparacao entre `rpc_catalog_list('centros_servico')` e a query direta filtrada por `current_account_owner_id()`.
+
+Atualizacao 2026-03 (Auditoria)
+- `resolveUsuarioId()` passou a devolver o ator real da sessao (`auth_user_id` do dependente) em vez do owner do tenant.
+- Com isso, `usuarioCadastro`/`usuarioEdicao` e o campo "Cadastrado por" passam a mostrar quem executou a acao, nao o titular.
+- Uploads/importacoes continuam usando o owner do tenant via `resolveImportsOwnerId()`.

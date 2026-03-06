@@ -2216,7 +2216,7 @@ async function resolveUsuarioId() {
     if (effective?.active === false) {
       throw new Error('Usuario inativo. Procure um administrador.')
     }
-    return effective?.appUserId || user.id
+    return effective?.dependentProfile?.auth_user_id || effective?.profile?.id || user.id
   } catch (error) {
     reportClientError('Falha ao resolver usuario efetivo.', error, { userId: user.id })
     throw error
@@ -2231,8 +2231,35 @@ async function resolveUsuarioIdOrThrow() {
   return usuarioId
 }
 
+async function resolveOwnerUsuarioId() {
+  ensureSupabase()
+  const { data } = await supabase.auth.getSession()
+  const user = data?.session?.user
+  if (!user?.id) {
+    return null
+  }
+  try {
+    const effective = await resolveEffectiveAppUser(user.id)
+    if (effective?.active === false) {
+      throw new Error('Usuario inativo. Procure um administrador.')
+    }
+    return effective?.appUserId || effective?.profile?.parent_user_id || effective?.profile?.id || user.id
+  } catch (error) {
+    reportClientError('Falha ao resolver owner do usuario efetivo.', error, { userId: user.id })
+    throw error
+  }
+}
+
+async function resolveOwnerUsuarioIdOrThrow() {
+  const ownerId = await resolveOwnerUsuarioId()
+  if (!ownerId) {
+    throw new Error('Sessao invalida, owner nao identificado.')
+  }
+  return ownerId
+}
+
 async function resolveImportsOwnerId() {
-  const ownerId = await resolveUsuarioIdOrThrow()
+  const ownerId = await resolveOwnerUsuarioIdOrThrow()
   const normalized = normalizeUuid(ownerId)
   if (!normalized) {
     throw new Error('Owner invalido para importacao.')

@@ -13,12 +13,15 @@
 - Cache de catalogos owner-scoped foi removido no service; controladores de Saidas, Entradas, Cadastro Base e Acidentes limpam selects locais ao trocar de usuario.
 - Diagnostico SQL confirmou que o vazamento real estava em `public.rpc_catalog_list(text)`, nao no cache do frontend.
 - Migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` criada para impedir fallback global em catalogos owner-scoped.
+- `resolveUsuarioId()` foi corrigido para devolver o ator real da sessao; dependentes deixam de gravar o owner em campos de auditoria/"cadastrado por".
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260305_expand_permission_dependencies.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` no projeto Supabase.
 - Validar por SQL com `request.jwt.claim.sub` de owner e dependente que `rpc_catalog_list('centros_servico')` e `rpc_catalog_list('centros_estoque')` nao retornam dados de outro `account_owner_id`.
 - Validar em producao o carregamento de centros de estoque/servico/custo para dependentes em Entradas, Saidas, Pessoas e cadastros que usam SelectBox owner-scoped.
+- Validar no app que "Cadastrado por"/"Registrado por" mostra o dependente nas telas Pessoas, Materiais, Saidas e Cadastro Base.
+- Validar no app que Acidentes continua exibindo o dependente em "Registrado por" e que HHT mensal permanece consistente no historico/listagem.
 - Revisar o limite global de emails do Supabase Auth (`Auth -> Rate limits -> Rate limit for sending emails`).
 
 ## Observacoes
