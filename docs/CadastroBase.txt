@@ -154,3 +154,8 @@ Servicos e integracoes externas
 Ajuda contextual
 ----------------
 - Nao ha ajuda contextual dedicada ainda.
+
+Atualizacao 2026-03 (Auditoria)
+-------------------------------
+- O cadastro base deixou de gravar o owner do tenant como `created_by_user_id`/`updated_by_user_id` quando um dependente salva um registro.
+- `resolveUsuarioId()` agora devolve o ator real da sessao; imports continuam usando o owner via `resolveImportsOwnerId()`.

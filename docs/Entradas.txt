@@ -127,6 +127,11 @@ Atualizacao 2026-02 (API)
 - Cadastro passou a chamar `/api/entradas` (Vercel) em vez de RPC direta.
 - Pipeline aplica rate limit e idempotencia no create.
 - Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
+
+Atualizacao 2026-03 (Auditoria)
+-------------------------------
+- `resolveUsuarioId()` deixou de devolver o owner do tenant quando a sessao e de dependente.
+- O campo de responsavel/registro das entradas passa a refletir o ator real da sessao.
 - Importacao em massa valida tamanho do arquivo pelo plano (limit_import_mb, padrao 2 MB) e bloqueia acima do limite.
 - Importacao em massa aplica rate limit (1 requisicao a cada 60s) e limite diario por plano (limit_import_daily).
 

@@ -131,3 +131,8 @@ Ajuda contextual
 ----------------
 - HelpButton no header abre conteudo "hhtMensal".
 - Conteudo vem de src/help/helpHhtMensal.json e midias em public/help/hht-mensal.
+
+Atualizacao 2026-03 (Auditoria)
+-------------------------------
+- O fluxo de HHT mensal nao usa o helper que estava devolvendo o owner do tenant em cadastros do frontend.
+- Create/update continuam dependendo do contexto autenticado do RPC (`rpc_hht_mensal_create_full`/`rpc_hht_mensal_update_full`), sem troca adicional para owner no frontend.

@@ -124,6 +124,11 @@ Atualizacao 2026-02 (API)
 - Cadastro passou a chamar `/api/acidentes` (Vercel) em vez de RPC direta.
 - Pipeline aplica rate limit e idempotencia no create.
 - Arquivos: src/services/api.js, api/index.js, api/_shared/operations.js.
+
+Atualizacao 2026-03 (Auditoria)
+-------------------------------
+- O create/update de acidentes ja usa `resolveUsuarioResponsavel()`, que prioriza o perfil do dependente e preserva o nome do ator real em `registradoPor`/`atualizadoPor`.
+- O cancelamento passou a se beneficiar da correcao em `resolveUsuarioId()`, evitando gravar o owner do tenant em `updated_by_username` quando a sessao e de dependente.
 - `createAcidentePayload` e `updateAcidentePayload`:
   - Montam o payload no formato esperado pela API/BD.
   - Mantem consistencia entre listas (`agentes`, `tipos`, `lesoes`, `partesLesionadas`) e campos unicos legados (`agente`, `tipo`, `lesao`, `parteLesionada`).
