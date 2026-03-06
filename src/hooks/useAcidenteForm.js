@@ -42,6 +42,11 @@ export function useAcidenteForm({
   onError,
 }) {
   const { user } = useAuth()
+  const userScopeKey = useMemo(() => {
+    const authId = user?.id ?? user?.user?.id ?? ''
+    const ownerId = user?.metadata?.app_user_id ?? user?.metadata?.dependent_of ?? ''
+    return `${authId}|${ownerId}`
+  }, [user?.id, user?.user?.id, user?.metadata?.app_user_id, user?.metadata?.dependent_of])
 
   const [form, setForm] = useState(() => ({ ...ACIDENTES_FORM_DEFAULT }))
   const [editingAcidente, setEditingAcidente] = useState(null)
@@ -895,6 +900,8 @@ export function useAcidenteForm({
 
   useEffect(() => {
     let cancelado = false
+    setCentrosServicoOptions([])
+    setCentrosServicoMap(new Map())
     const carregarCentros = async () => {
       try {
         const data = await listCentrosServico()
@@ -930,7 +937,7 @@ export function useAcidenteForm({
     return () => {
       cancelado = true
     }
-  }, [normalizeLookupKey])
+  }, [normalizeLookupKey, userScopeKey])
 
   useEffect(() => {
     // HHT não é mais preenchido no formulário; taxas são calculadas no dashboard usando hht_mensal.

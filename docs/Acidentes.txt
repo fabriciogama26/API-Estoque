@@ -19,7 +19,7 @@ Arquitetura (modular)
 ---------------------
 - Hooks principais:
   - `useAcidentes`: carrega a lista de acidentes, controla `isLoading`, `error` e expÃµe `reload()`.
-  - `useAcidenteForm`: controla estado do formulario, validacao, submit, edicao/cancelamento.
+  - `useAcidenteForm`: controla estado do formulario, validacao, submit, edicao/cancelamento e recarrega `centrosServicoOptions` quando muda o usuario/owner logado.
   - `useAcidenteFiltro`: guarda `filters` e aplica `filterAcidentes` gerando a lista filtrada.
   - `usePessoas`, `useAgentes`, `useLocais`, `usePartes`: carregam catÃ¡logos auxiliares de forma isolada, cada um com seu loading/erro.
 - Contexto opcional:

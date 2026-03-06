@@ -56,6 +56,11 @@ const resolveTableConfig = (key) => TABLES.find((item) => item.key === key) || T
 export function useCadastroBaseController() {
   const { reportError } = useErrorLogger('cadastro-base')
   const { user } = useAuth()
+  const userScopeKey = useMemo(() => {
+    const authId = user?.id ?? user?.user?.id ?? ''
+    const ownerId = user?.metadata?.app_user_id ?? user?.metadata?.dependent_of ?? ''
+    return `${authId}|${ownerId}`
+  }, [user?.id, user?.user?.id, user?.metadata?.app_user_id, user?.metadata?.dependent_of])
 
   const [tableKey, setTableKey] = useState(TABLES[0].key)
   const [form, setForm] = useState(buildDefaultForm)
@@ -139,6 +144,25 @@ export function useCadastroBaseController() {
     setForm(buildDefaultForm())
     setEditingItem(null)
   }, [loadList, tableKey])
+
+  useEffect(() => {
+    setItems([])
+    setCentrosCustoOptions([])
+    setCentrosServicoOptions([])
+    setHistoryModal({
+      open: false,
+      isLoading: false,
+      error: null,
+      item: null,
+      registros: [],
+    })
+    setFilters({ ...DEFAULT_FILTERS })
+    setForm(buildDefaultForm())
+    setEditingItem(null)
+    loadDependencies()
+    loadList({ ...DEFAULT_FILTERS })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userScopeKey])
 
   const dependencyStatus = useMemo(() => {
     const deps = tableConfig.dependsOn || []

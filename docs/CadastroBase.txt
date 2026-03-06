@@ -14,6 +14,7 @@ Arquitetura
 - Hook `useCadastroBaseController`:
   - Centraliza estado de tabela selecionada, formulario, filtros, lista e historico.
   - Carrega dependencias (centros de custo/servico) para selects obrigatorios.
+  - Ao trocar de usuario, limpa dependencias locais e recarrega os catalogos owner-scoped.
   - Integra com logs via `useErrorLogger('cadastro-base')`.
 - Servicos:
   - `basicRegistrationService` concentra CRUD e historico via `dataClient`.

@@ -23,6 +23,9 @@ Arquitetura
     - Busca/listagem de materiais e centros de estoque/custo.
 - Erros:
   - `useErrorLogger('entradas')` registra falhas de carga, submit, filtros, historico e erros de busca de materiais.
+- Troca de usuario:
+  - `useEntradasController` limpa materiais, centros e status locais quando o `userScopeKey` muda.
+  - O objetivo e evitar reaproveitamento de selects owner-scoped apos logout/login no mesmo navegador.
 
 Cadastro
 --------

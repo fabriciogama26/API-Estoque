@@ -894,8 +894,8 @@ async function resolvePessoasOwnerScope() {
 }
 
 async function loadCatalogList({ table, nameColumn = 'nome', ownerScoped = true, errorMessage }) {
+  const scope = await resolveCatalogScope()
   if (!ownerScoped) {
-    const scope = await resolveCatalogScope()
     const cacheKey = buildCatalogCacheKey({
       table,
       nameColumn,
@@ -917,25 +917,11 @@ async function loadCatalogList({ table, nameColumn = 'nome', ownerScoped = true,
     return normalized
   }
 
-  const scope = await resolveCatalogScope()
-  const cacheKey = buildCatalogCacheKey({
-    table,
-    nameColumn,
-    ownerScoped,
-    ownerId: scope.ownerId,
-    isMaster: scope.isMaster,
-    authUserId: scope.authUserId,
-  })
-  const cached = readCatalogCache(cacheKey)
-  if (cached) {
-    return cached
-  }
   const data = await execute(
     supabase.rpc('rpc_catalog_list', { p_table: table }),
     errorMessage
   )
   const normalized = normalizeDomainOptions(data ?? [])
-  writeCatalogCache(cacheKey, normalized)
   return normalized
 }
 
@@ -943,17 +929,21 @@ async function loadCatalogScopedList({ table, nameColumn = 'nome', ownerScoped =
   ensureSupabase()
   const scope = await resolveCatalogScope()
   const isMaster = scope.isMaster
-  const cacheKey = buildCatalogCacheKey({
-    table,
-    nameColumn,
-    ownerScoped,
-    ownerId: scope.ownerId,
-    isMaster,
-    authUserId: scope.authUserId,
-  })
-  const cached = readCatalogCache(cacheKey)
-  if (cached) {
-    return cached
+  const cacheKey = ownerScoped
+    ? null
+    : buildCatalogCacheKey({
+        table,
+        nameColumn,
+        ownerScoped,
+        ownerId: scope.ownerId,
+        isMaster,
+        authUserId: scope.authUserId,
+      })
+  if (cacheKey) {
+    const cached = readCatalogCache(cacheKey)
+    if (cached) {
+      return cached
+    }
   }
   let query = supabase.from(table).select(`id, ${nameColumn}`)
 
@@ -975,7 +965,9 @@ async function loadCatalogScopedList({ table, nameColumn = 'nome', ownerScoped =
       return { id: item?.id ?? null, nome }
     })
     .filter(Boolean)
-  writeCatalogCache(cacheKey, normalized)
+  if (cacheKey) {
+    writeCatalogCache(cacheKey, normalized)
+  }
   return normalized
 }
 

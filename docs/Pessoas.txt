@@ -161,7 +161,7 @@ Atualizacao 2026-02 (Seguranca)
 - Cache de catalogos usa fallback por auth user id quando falha resolver owner, evitando reaproveitar dados de outro tenant.
 
 Atualizacao 2026-03 (Seguranca/UX)
-- Catalogos de pessoas (centros/setores/cargos) usam cache curto no frontend e filtro de tenant via `rpc_catalog_list`.
+- Catalogos de pessoas (centros/setores/cargos) usam filtro de tenant via `rpc_catalog_list`.
 - Carregamento de referencias ocorre uma vez por refresh para reduzir pisca no select.
 - Falha em resolver owner para catalogo retorna lista vazia (previne vazamento).
 - RPCs de resumo (`rpc_pessoas_resumo` e `rpc_pessoas_count_centro`) passaram a filtrar por tenant.
@@ -172,4 +172,9 @@ Atualizacao 2026-03 (Seguranca/UX)
 - `resolveEffectiveAppUser` agora prioriza `app_users_dependentes` antes do espelho em `app_users`, para dependente herdar o owner correto nos catalogos scoped.
 - `usePessoasController` nao deriva "Centro de servico" da lista de pessoas quando o usuario logado e dependente e as referencias scoped vierem vazias.
 - As referencias da tela (`centros_servico`, `setores`, `cargos`) voltaram a usar `rpc_catalog_list`, deixando o filtro de tenant no banco em vez de depender do owner resolvido no frontend.
-- O cache de catalogos passou a incluir o `authUserId` na chave para evitar reaproveitamento entre usuarios diferentes no mesmo navegador.
+- Catalogos owner-scoped deixaram de usar cache compartilhado no service; cada troca de usuario recarrega as referencias da tela.
+
+Atualizacao 2026-03 (Banco/RPC)
+- Diagnostico SQL com `request.jwt.claim.sub` confirmou vazamento cross-tenant em `public.rpc_catalog_list(text)` para dependente.
+- A migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` endurece o branch owner-scoped e remove o fallback global para usuario nao-master.
+- O teste de referencia da tela passou a ser a comparacao entre `rpc_catalog_list('centros_servico')` e a query direta filtrada por `current_account_owner_id()`.
