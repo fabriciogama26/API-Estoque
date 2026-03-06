@@ -781,27 +781,30 @@ async function resolveCatalogScope() {
   const { data } = await supabase.auth.getSession()
   const user = data?.session?.user
   if (!user?.id) {
-    return { ownerId: null, isMaster: false }
+    return { authUserId: null, ownerId: null, isMaster: false }
   }
   try {
     const effective = await resolveEffectiveAppUser(user.id)
     const cred = (effective?.credential || '').toString().toLowerCase()
     return {
+      authUserId: user.id,
       ownerId: effective?.appUserId || null,
       isMaster: cred === 'master',
     }
   } catch (error) {
     reportClientError('Falha ao resolver owner para catalogo.', error, { userId: user.id })
-    return { ownerId: null, isMaster: false }
+    return { authUserId: user.id, ownerId: null, isMaster: false }
   }
 }
 
 const CATALOG_CACHE_TTL_MS = 30 * 1000
 const catalogCache = new Map()
 
-const buildCatalogCacheKey = ({ table, nameColumn, ownerScoped, ownerId, isMaster }) => {
+const buildCatalogCacheKey = ({ table, nameColumn, ownerScoped, ownerId, isMaster, authUserId }) => {
   const scopeLabel = ownerScoped ? (isMaster ? 'master' : ownerId || 'unknown') : 'global'
-  return `${table}|${nameColumn}|${ownerScoped ? 'scoped' : 'global'}|${scopeLabel}`
+  const actorLabel = authUserId || 'anonymous'
+  const scope = ownerScoped ? `${scopeLabel}|${actorLabel}` : `global|${actorLabel}`
+  return `${table}|${nameColumn}|${ownerScoped ? 'scoped' : 'global'}|${scope}`
 }
 
 let pessoasOwnerScopeCache = null
@@ -892,7 +895,15 @@ async function resolvePessoasOwnerScope() {
 
 async function loadCatalogList({ table, nameColumn = 'nome', ownerScoped = true, errorMessage }) {
   if (!ownerScoped) {
-    const cacheKey = buildCatalogCacheKey({ table, nameColumn, ownerScoped, ownerId: null, isMaster: false })
+    const scope = await resolveCatalogScope()
+    const cacheKey = buildCatalogCacheKey({
+      table,
+      nameColumn,
+      ownerScoped,
+      ownerId: null,
+      isMaster: false,
+      authUserId: scope.authUserId,
+    })
     const cached = readCatalogCache(cacheKey)
     if (cached) {
       return cached
@@ -913,6 +924,7 @@ async function loadCatalogList({ table, nameColumn = 'nome', ownerScoped = true,
     ownerScoped,
     ownerId: scope.ownerId,
     isMaster: scope.isMaster,
+    authUserId: scope.authUserId,
   })
   const cached = readCatalogCache(cacheKey)
   if (cached) {
@@ -937,6 +949,7 @@ async function loadCatalogScopedList({ table, nameColumn = 'nome', ownerScoped =
     ownerScoped,
     ownerId: scope.ownerId,
     isMaster,
+    authUserId: scope.authUserId,
   })
   const cached = readCatalogCache(cacheKey)
   if (cached) {
@@ -3227,7 +3240,7 @@ async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
 }
 
 async function carregarCentrosCusto() {
-  return loadCatalogScopedList({
+  return loadCatalogList({
     table: 'centros_custo',
     nameColumn: 'nome',
     ownerScoped: true,
@@ -3241,7 +3254,7 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
     return []
   }
   try {
-    const registros = await loadCatalogScopedList({
+    const registros = await loadCatalogList({
       table: 'centros_estoque',
       nameColumn: 'almox',
       ownerScoped: true,
@@ -3259,7 +3272,7 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
 }
 
 async function carregarCentrosEstoqueCatalogo() {
-  const data = await loadCatalogScopedList({
+  const data = await loadCatalogList({
     table: 'centros_estoque',
     nameColumn: 'almox',
     ownerScoped: true,
@@ -3269,7 +3282,7 @@ async function carregarCentrosEstoqueCatalogo() {
 }
 
 async function carregarCentrosServico() {
-  const data = await loadCatalogScopedList({
+  const data = await loadCatalogList({
     table: 'centros_servico',
     nameColumn: 'nome',
     ownerScoped: true,
@@ -7138,25 +7151,25 @@ export const api = {
   references: {
     async pessoas() {
       const [centros, setores, cargos, tipos] = await Promise.all([
-        loadCatalogScopedList({
+        loadCatalogList({
           table: 'centros_servico',
           nameColumn: 'nome',
           ownerScoped: true,
           errorMessage: 'Falha ao carregar centros de servico.',
         }),
-        loadCatalogScopedList({
+        loadCatalogList({
           table: 'setores',
           nameColumn: 'nome',
           ownerScoped: true,
           errorMessage: 'Falha ao carregar setores.',
         }),
-        loadCatalogScopedList({
+        loadCatalogList({
           table: 'cargos',
           nameColumn: 'nome',
           ownerScoped: true,
           errorMessage: 'Falha ao carregar cargos.',
         }),
-        loadCatalogScopedList({
+        loadCatalogList({
           table: 'tipo_execucao',
           nameColumn: 'nome',
           ownerScoped: false,

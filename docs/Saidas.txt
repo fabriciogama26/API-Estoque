@@ -40,6 +40,7 @@ Cadastro
   - Bloqueia registro quando saldo do material <= 0 ou quando a quantidade informada supera o saldo disponivel.
   - Erros aparecem em area de feedback.
   - Dependentes usam o owner efetivo resolvido por `effectiveUserService`; isso evita lista vazia de centro de estoque quando existe espelho do dependente em `app_users`.
+  - A lista de centros owner-scoped usa `rpc_catalog_list`, com cache isolado por usuario autenticado.
 
 Filtros, auto-complete e listagem
 ---------------------------------
@@ -111,7 +112,7 @@ Atualizacao 2026-02 (API)
 
 Atualizacao 2026-03 (Seguranca)
 -------------------------------
-- Catalogos de centros (estoque/custo/servico) agora usam query direta com filtro `account_owner_id` no frontend.
+- Catalogos de centros (estoque/custo/servico) usam `rpc_catalog_list` com filtro de tenant no banco.
 
 Atualizacao 2026-02 (relatorio troca EPI)
 -----------------------------------------
