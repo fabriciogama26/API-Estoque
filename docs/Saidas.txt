@@ -40,7 +40,8 @@ Cadastro
   - Bloqueia registro quando saldo do material <= 0 ou quando a quantidade informada supera o saldo disponivel.
   - Erros aparecem em area de feedback.
   - Dependentes usam o owner efetivo resolvido por `effectiveUserService`; isso evita lista vazia de centro de estoque quando existe espelho do dependente em `app_users`.
-  - A lista de centros owner-scoped usa `rpc_catalog_list`, com cache isolado por usuario autenticado.
+  - A lista de centros owner-scoped usa `rpc_catalog_list`, sem reaproveitar cache entre usuarios.
+  - Ao trocar de usuario, a tela zera as listas locais de centros e recarrega os selects antes de exibir os dados.
 
 Filtros, auto-complete e listagem
 ---------------------------------
@@ -224,3 +225,9 @@ Ajuda contextual
 ----------------
 - Botao "Ajuda" no cabecalho abre modal com passos e notas desta pagina.
 - Conteudo em src/help/helpSaidas.json; midias em /public/help/saidas/*.
+
+Atualizacao 2026-03 (Banco/RPC)
+-------------------------------
+- Diagnostico SQL com sessao simulada de dependente confirmou vazamento cross-tenant em `public.rpc_catalog_list('centros_estoque')`.
+- A migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` passa a exigir `account_owner_id` para tabelas owner-scoped quando o usuario nao e master.
+- O item `TESTE` era retornado indevidamente por `rpc_catalog_list`; a query direta em `public.centros_estoque` filtrada por `current_account_owner_id()` mostrou que o dado base do tenant estava correto.

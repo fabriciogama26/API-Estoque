@@ -54,6 +54,11 @@ const CANCEL_INITIAL = {
 export function useEntradasController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('entradas')
+  const userScopeKey = useMemo(() => {
+    const authId = user?.id ?? user?.user?.id ?? ''
+    const ownerId = user?.metadata?.app_user_id ?? user?.metadata?.dependent_of ?? ''
+    return `${authId}|${ownerId}`
+  }, [user?.id, user?.user?.id, user?.metadata?.app_user_id, user?.metadata?.dependent_of])
   const [materiais, setMateriais] = useState([])
   const [entradas, setEntradas] = useState([])
   const [centrosCusto, setCentrosCusto] = useState([])
@@ -130,9 +135,23 @@ export function useEntradasController() {
   )
 
   useEffect(() => {
-    load(initialEntradaFilters, { resetPage: true, refreshCatalogs: true })
+    setMateriais([])
+    setEntradas([])
+    setCentrosCusto([])
+    setStatusOptions([])
+    setEditingEntrada(null)
+    setForm(initialEntradaForm)
+    setFilters(initialEntradaFilters)
+    setCurrentPage(1)
+    setMaterialSearchValue('')
+    setMaterialSuggestions([])
+    setMaterialDropdownOpen(false)
+    setMaterialSearchError(null)
+    load(initialEntradaFilters, { resetPage: true, refreshCatalogs: true }).catch((err) =>
+      reportError(err, { area: 'entradas_scope_change', userScopeKey }),
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [userScopeKey])
 
   const handleChange = (event) => {
     const { name, value } = event.target

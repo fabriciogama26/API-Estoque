@@ -68,6 +68,11 @@ const TROCA_PROMPT_INITIAL = {
 export function useSaidasController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('saidas')
+  const userScopeKey = useMemo(() => {
+    const authId = user?.id ?? user?.user?.id ?? ''
+    const ownerId = user?.metadata?.app_user_id ?? user?.metadata?.dependent_of ?? ''
+    return `${authId}|${ownerId}`
+  }, [user?.id, user?.user?.id, user?.metadata?.app_user_id, user?.metadata?.dependent_of])
 
   const [pessoas, setPessoas] = useState([])
   const [materiais, setMateriais] = useState([])
@@ -173,11 +178,6 @@ export function useSaidasController() {
     [filters, centrosEstoqueOptions.length, centrosCustoOptions.length, centrosServicoOptions.length, reportError],
   )
 
-  useEffect(() => {
-    load(initialSaidaFilters, { resetPage: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const dedupeMateriais = useCallback((lista = []) => {
     const mapa = new Map()
     ;(Array.isArray(lista) ? lista : []).forEach((item) => {
@@ -237,6 +237,25 @@ export function useSaidasController() {
   const closeTrocaPrompt = useCallback(() => {
     setTrocaPrompt(TROCA_PROMPT_INITIAL)
   }, [])
+
+  useEffect(() => {
+    setPessoas([])
+    setMateriais([])
+    setSaidas([])
+    setCentrosEstoqueOptions([])
+    setCentrosCustoOptions([])
+    setCentrosServicoOptions([])
+    setStatusOptions([])
+    setFilters(initialSaidaFilters)
+    setEditingSaida(null)
+    setCurrentPage(1)
+    materialSaldoCacheRef.current = new Map()
+    resetFormState()
+    load(initialSaidaFilters, { resetPage: true }).catch((err) => {
+      reportError(err, { area: 'saidas_scope_change', userScopeKey })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userScopeKey])
 
   const confirmTroca = useCallback(async () => {
     if (!trocaPrompt.open || !trocaPrompt.payload) {
