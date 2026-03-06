@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 
-const APP_USER_SELECT = 'id, display_name, username, email, credential, page_permissions, ativo'
+const APP_USER_SELECT = 'id, parent_user_id, display_name, username, email, credential, page_permissions, ativo'
 let effectiveUserCache = null
 let credentialCatalogCache = null
 
@@ -71,35 +71,6 @@ export async function resolveEffectiveAppUser(userId, { forceRefresh = false } =
     return effectiveUserCache
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from('app_users')
-    .select(APP_USER_SELECT)
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (profileError && profileError.code !== 'PGRST116') {
-    throw profileError
-  }
-
-  if (profile) {
-    const credentialText = await credentialUuidToText(profile.credential)
-    const resolved = {
-      authUserId: userId,
-      appUserId: profile.id,
-      profile: { ...profile, credential_text: credentialText },
-      dependentProfile: null,
-      isDependent: false,
-      credential: credentialText || 'admin',
-      credentialId: profile.credential || null,
-      pagePermissions: normalizePagePermissions(profile.page_permissions),
-      active: profile.ativo !== false,
-      ownerActive: profile.ativo !== false,
-      dependentActive: null,
-    }
-    effectiveUserCache = resolved
-    return resolved
-  }
-
   const { data: dependent, error: dependentError } = await supabase
     .from('app_users_dependentes')
     .select(
@@ -157,6 +128,37 @@ export async function resolveEffectiveAppUser(userId, { forceRefresh = false } =
       active: ownerActive && dependentActive,
       ownerActive,
       dependentActive,
+    }
+    effectiveUserCache = resolved
+    return resolved
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('app_users')
+    .select(APP_USER_SELECT)
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (profileError && profileError.code !== 'PGRST116') {
+    throw profileError
+  }
+
+  if (profile) {
+    const credentialText = await credentialUuidToText(profile.credential)
+    const ownerAppUserId = profile.parent_user_id || profile.id
+    const isDependent = Boolean(profile.parent_user_id)
+    const resolved = {
+      authUserId: userId,
+      appUserId: ownerAppUserId,
+      profile: { ...profile, credential_text: credentialText },
+      dependentProfile: null,
+      isDependent,
+      credential: credentialText || 'admin',
+      credentialId: profile.credential || null,
+      pagePermissions: normalizePagePermissions(profile.page_permissions),
+      active: profile.ativo !== false,
+      ownerActive: profile.ativo !== false,
+      dependentActive: isDependent ? profile.ativo !== false : null,
     }
     effectiveUserCache = resolved
     return resolved

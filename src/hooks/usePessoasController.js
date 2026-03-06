@@ -38,6 +38,7 @@ const CANCEL_INITIAL = {
 export function usePessoasController() {
   const { user } = useAuth()
   const { reportError } = useErrorLogger('pessoas')
+  const isDependentUser = Boolean(user?.metadata?.dependent_of)
 
   const userScopeKey = useMemo(() => {
     const authId = user?.id ?? user?.user?.id ?? ''
@@ -505,8 +506,9 @@ export function usePessoasController() {
   const centrosServico = useMemo(() => {
     const referenciasNomes = (referencias.centrosServico ?? []).map((item) => item?.nome ?? '').filter(Boolean)
     if (referenciasNomes.length > 0) return uniqueSorted(referenciasNomes)
+    if (isDependentUser) return []
     return extractCentrosServico(pessoasOptions)
-  }, [referencias.centrosServico, pessoasOptions])
+  }, [isDependentUser, referencias.centrosServico, pessoasOptions])
 
   const setores = useMemo(() => {
     const referenciasNomes = (referencias.setores ?? []).map((item) => item?.nome ?? '').filter(Boolean)

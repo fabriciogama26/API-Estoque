@@ -48,6 +48,11 @@ Atualizacao 2026-03
 - Arquivos alterados:
   - src/pages/Configuracoes.jsx
   - src/config/permissions.js
+- Permissoes efetivas no banco agora tambem expandem dependencias de pagina antes da RLS.
+- Exemplo: dependente com `estoque.saidas` passa a herdar `estoque.read` e `pessoas.read` mesmo sem regravar o cadastro.
+- Arquivos alterados:
+  - supabase/migrations/20260305_expand_permission_dependencies.sql
+  - src/config/permissions.js
 
 Integracao com Supabase
 -----------------------
