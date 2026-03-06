@@ -39,6 +39,7 @@ Cadastro
   - Ao editar, rola para o topo e habilita "Cancelar edicao".
   - Bloqueia registro quando saldo do material <= 0 ou quando a quantidade informada supera o saldo disponivel.
   - Erros aparecem em area de feedback.
+  - Dependentes usam o owner efetivo resolvido por `effectiveUserService`; isso evita lista vazia de centro de estoque quando existe espelho do dependente em `app_users`.
 
 Filtros, auto-complete e listagem
 ---------------------------------

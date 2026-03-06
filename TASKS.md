@@ -1,0 +1,21 @@
+# Tasks
+
+## Concluido
+- Removida a reautenticacao obrigatoria nas rotas protegidas do backend/front.
+- Fluxo de reset de senha voltou a usar Supabase direto com `token_hash` na tela de reset.
+- Configuracoes agora bloqueiam auto-rebaixamento, auto-desativacao e remocao de `rbac.manage`.
+- Historico de preco de material passou a usar client autenticado para respeitar RLS.
+- Login de dependentes foi habilitado na edge function `auth-login`.
+- Toggles de permissao no front passaram a aplicar dependencias de leitura.
+- Permissoes efetivas no banco agora expandem dependencias de pagina para atender a RLS dos catalogos.
+- Resolucao de owner efetivo passou a priorizar dependentes em `app_users_dependentes` para corrigir catalogos owner-scoped.
+
+## Pendente
+- Aplicar a migration `supabase/migrations/20260305_expand_permission_dependencies.sql` no projeto Supabase.
+- Validar em producao o carregamento de centros de estoque/servico/custo para dependentes em Entradas, Saidas e cadastros que usam SelectBox owner-scoped.
+- Validar especificamente a tela Pessoas com dependente para confirmar que "Centro de servico" nao cai no fallback com dados fora do escopo.
+- Revisar o limite global de emails do Supabase Auth (`Auth -> Rate limits -> Rate limit for sending emails`).
+
+## Observacoes
+- `git status` no sandbox exige `safe.directory` por causa do ownership do workspace.
+- Existem alteracoes locais previas em `src/pages/Configuracoes.jsx`, `src/config/permissions.js`, `docs/Configuracoes.txt` e `docs/PermissoesToggles.txt` que continuam sendo usadas.

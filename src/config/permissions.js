@@ -141,6 +141,8 @@ const PERMISSION_GROUPS = [
 ]
 
 const PERMISSION_DEPENDENCIES = {
+  'estoque.dashboard': ['estoque.read'],
+  dashboard_analise_estoque: ['estoque.read'],
   'estoque.atual': ['estoque.read'],
   'estoque.entradas': ['estoque.read'],
   'estoque.saidas': ['estoque.read', 'pessoas.read'],

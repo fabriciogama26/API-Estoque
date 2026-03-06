@@ -169,3 +169,5 @@ Atualizacao 2026-03 (Seguranca/UX)
 - `loadCatalogScopedList` passou a aplicar cache (TTL 30s) para evitar reconsultas em renders rapidos.
 - `AuthContext` limpa cache de usuario efetivo e catalogos quando a sessao expira/sai.
 - `usePessoasController` ignora respostas async se o user/owner mudou (evita referencias de outro tenant).
+- `resolveEffectiveAppUser` agora prioriza `app_users_dependentes` antes do espelho em `app_users`, para dependente herdar o owner correto nos catalogos scoped.
+- `usePessoasController` nao deriva "Centro de servico" da lista de pessoas quando o usuario logado e dependente e as referencias scoped vierem vazias.

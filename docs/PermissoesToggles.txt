@@ -25,10 +25,12 @@ Atualizacao 2026-03 (dependencias de permissao)
 - Permissoes de pagina passam a incluir chaves obrigatorias de leitura.
 - Exemplo: `estoque.saidas` adiciona `estoque.read` e `pessoas.read` para carregar centros/pessoas.
 - Mantem toggles independentes, mas garante RLS para dados base.
+- A expansao agora tambem roda no banco (`has_permission` e `resolve_user_permissions`), entao dependentes antigos passam a receber as permissoes base sem precisar salvar novamente.
 
 Arquivos:
 - src/config/permissions.js
 - src/pages/Configuracoes.jsx
+- supabase/migrations/20260305_expand_permission_dependencies.sql
 
 Arquivos:
 - src/config/permissions.js
