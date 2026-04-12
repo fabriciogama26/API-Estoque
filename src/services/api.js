@@ -1,4 +1,4 @@
-﻿import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { logError } from './errorLogService.js'
 import { getSessionId, notifySessionGuardFromResponse } from './sessionService.js'
 import { request as httpRequest } from './httpClient.js'
@@ -2543,6 +2543,12 @@ function mapAsoRecord(record) {
     criadoEm: record.criado_em ?? record.criadoEm ?? null,
     atualizadoEm: record.atualizado_em ?? record.atualizadoEm ?? null,
     accountOwnerId: record.account_owner_id ?? record.accountOwnerId ?? null,
+    dataDemissao: record.data_demissao ?? record.dataDemissao ?? null,
+    ativo: record.ativo ?? null,
+    statusRegistro: resolveTextValue(record.status_registro ?? record.statusRegistro ?? 'ativo'),
+    registroOrigemId: record.registro_origem_id ?? record.registroOrigemId ?? null,
+    baixadoEm: record.baixado_em ?? record.baixadoEm ?? null,
+    baixadoPor: record.baixado_por ?? record.baixadoPor ?? null,
   }
 }
 
