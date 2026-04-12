@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import Eye from 'lucide-react/dist/esm/icons/eye.js'
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off.js'
 import { useResetPassword } from '../hooks/useResetPassword.js'
 import { securityConfig } from '../config/security.js'
 import { CaptchaGuard } from '../components/CaptchaGuard.jsx'
@@ -6,6 +9,10 @@ import '../styles/ResetPasswordPage.css'
 const logoSrc = '/logo_segtrab.png'
 
 export function ResetPasswordPage() {
+  const [visibleFields, setVisibleFields] = useState({
+    newPassword: false,
+    confirmPassword: false,
+  })
   const {
     form,
     status,
@@ -19,6 +26,13 @@ export function ResetPasswordPage() {
     handleCaptchaToken,
     handleCancel,
   } = useResetPassword()
+
+  const toggleFieldVisibility = (fieldName) => {
+    setVisibleFields((prev) => ({
+      ...prev,
+      [fieldName]: !prev[fieldName],
+    }))
+  }
 
   return (
     <div className="reset-page">
@@ -51,31 +65,55 @@ export function ResetPasswordPage() {
         <form className="reset-form" onSubmit={handleSubmit}>
           <label className="reset-field">
             <span>Nova senha</span>
-            <input
-              type="password"
-              name="newPassword"
-              value={form.newPassword}
-              onChange={handleChange}
-              minLength={securityConfig.password.minLength}
-              autoComplete="new-password"
-              placeholder="Digite a nova senha"
-              disabled={isFormDisabled}
-              required
-            />
+            <div className="reset-field__input-wrap">
+              <input
+                type={visibleFields.newPassword ? 'text' : 'password'}
+                name="newPassword"
+                value={form.newPassword}
+                onChange={handleChange}
+                minLength={securityConfig.password.minLength}
+                autoComplete="new-password"
+                placeholder="Digite a nova senha"
+                disabled={isFormDisabled}
+                required
+              />
+              <button
+                type="button"
+                className="reset-field__toggle"
+                onClick={() => toggleFieldVisibility('newPassword')}
+                aria-label={visibleFields.newPassword ? 'Ocultar nova senha' : 'Mostrar nova senha'}
+                aria-pressed={visibleFields.newPassword}
+                disabled={isFormDisabled}
+              >
+                {visibleFields.newPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
+              </button>
+            </div>
           </label>
 
           <label className="reset-field">
             <span>Confirmar nova senha</span>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              autoComplete="new-password"
-              placeholder="Repita a nova senha"
-              disabled={isFormDisabled}
-              required
-            />
+            <div className="reset-field__input-wrap">
+              <input
+                type={visibleFields.confirmPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                autoComplete="new-password"
+                placeholder="Repita a nova senha"
+                disabled={isFormDisabled}
+                required
+              />
+              <button
+                type="button"
+                className="reset-field__toggle"
+                onClick={() => toggleFieldVisibility('confirmPassword')}
+                aria-label={visibleFields.confirmPassword ? 'Ocultar confirmacao de senha' : 'Mostrar confirmacao de senha'}
+                aria-pressed={visibleFields.confirmPassword}
+                disabled={isFormDisabled}
+              >
+                {visibleFields.confirmPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
+              </button>
+            </div>
           </label>
 
           {status ? <p className={`feedback feedback--${status.type}`}>{status.message}</p> : null}
