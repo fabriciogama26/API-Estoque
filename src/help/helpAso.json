@@ -1,0 +1,46 @@
+{
+  "aso": {
+    "title": "Controle de ASO",
+    "summary": "Cadastro, acompanhamento de vencimento e historico de exames ocupacionais por funcionario.",
+    "steps": [
+      {
+        "title": "Cadastrar ASO manualmente",
+        "description": "Digite a matricula, selecione o funcionario retornado na busca e confira o nome preenchido automaticamente. Em seguida, informe o tipo de exame, a data do exame e, se necessario, a observacao.",
+        "mediaHint": "Formulario principal da tela ASO."
+      },
+      {
+        "title": "Conferir proximo vencimento",
+        "description": "O campo Proximo ao vencimento e calculado automaticamente no padrao brasileiro. Exames admissionais e periodicos somam 1 ano; demissional nao gera renovacao nem alerta.",
+        "mediaHint": "Campo derivado de proximo vencimento."
+      },
+      {
+        "title": "Filtrar e analisar alertas",
+        "description": "Use os cards e a legenda da lista para identificar registros vencidos, vencendo em 60/30/15 dias e vence hoje. Os filtros aceitam nome, matricula, tipo, status e estrutura da pessoa.",
+        "mediaHint": "Cards, filtros e legenda acima da tabela."
+      },
+      {
+        "title": "Registrar novo exame",
+        "description": "Na lista, use o botao Registrar exame para abrir o modal, informar a data realizada e salvar. O sistema atualiza a data do exame, recalcula o vencimento e grava no historico.",
+        "mediaHint": "Modal de registrar exame."
+      },
+      {
+        "title": "Tratar duplicidade",
+        "description": "A tela bloqueia duplicidade exata por funcionario + tipo + data. Admissional e demissional tambem bloqueiam novo cadastro quando ja existe um registro do mesmo tipo; periodico permite continuar apenas quando houver outro exame proximo na janela de 15 dias.",
+        "mediaHint": "Modal de duplicidade orientando o reaproveitamento do registro."
+      },
+      {
+        "title": "Cadastrar em massa",
+        "description": "Use o botao Cadastrar em massa para baixar o modelo XLSX e importar matricula, tipo_exame e data_exame. O retorno informa quantos registros entraram e libera CSV de erros quando houver rejeicoes.",
+        "mediaHint": "Modal de importacao em massa com download do modelo e upload da planilha."
+      }
+    ],
+    "notes": [
+      "Campos marcados com * sao obrigatorios.",
+      "O banco bloqueia duplicidade exata por funcionario + tipo de exame + data do exame.",
+      "Admissional e demissional sao tratados como unicos por funcionario; para corrigir data, edite o registro existente.",
+      "Periodico pode ter varios registros; quando houver outro dentro de 15 dias, a tela alerta antes de salvar.",
+      "Demissional nao abre renovacao e nao entra nas contagens de alerta de vencimento.",
+      "No cadastro em massa, a matricula precisa existir em Pessoas e o tipo_exame precisa ser admissional, periodico ou demissional."
+    ]
+  }
+}

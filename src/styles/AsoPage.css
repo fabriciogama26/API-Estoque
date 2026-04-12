@@ -1,0 +1,133 @@
+.aso-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+}
+
+.aso-history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.aso-history-entry {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  background: var(--color-card, #fff);
+}
+
+.aso-history-entry__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.aso-history-entry__note {
+  margin: 0 0 0.75rem;
+  color: var(--color-text);
+}
+
+.aso-history-entry__changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.aso-history-entry__changes li {
+  display: grid;
+  gap: 0.15rem;
+  color: var(--color-text);
+}
+
+.aso-register-modal__body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.aso-status-chip {
+  border: 1px solid transparent;
+}
+
+.aso-status-chip--ok {
+  background: #e8f7ee;
+  color: #117a3b;
+  border-color: #b7e4c7;
+}
+
+.aso-status-chip--warning-soft {
+  background: #fff7e6;
+  color: #9a6700;
+  border-color: #f5d08a;
+}
+
+.aso-status-chip--warning {
+  background: #fff1db;
+  color: #b45309;
+  border-color: #fbbf24;
+}
+
+.aso-status-chip--warning-strong {
+  background: #ffe7cc;
+  color: #c2410c;
+  border-color: #fb923c;
+}
+
+.aso-status-chip--today {
+  background: #fde8e8;
+  color: #b91c1c;
+  border-color: #f87171;
+}
+
+.aso-status-chip--danger {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border-color: #c084fc;
+}
+
+.aso-status-chip--neutral {
+  background: #eef2f7;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.aso-legend__dot--30 {
+  background: #fb923c;
+  border-color: #ea580c;
+}
+
+.aso-legend__dot--15 {
+  background: #f97316;
+  border-color: #c2410c;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-ok td {
+  background: #f0fdf4;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-warning-soft td {
+  background: #fffbeb;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-warning td {
+  background: #fff7ed;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-warning-strong td {
+  background: #ffedd5;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-today td {
+  background: #fef2f2;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-danger td {
+  background: #faf5ff;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-neutral td {
+  background: #f8fafc;
+}

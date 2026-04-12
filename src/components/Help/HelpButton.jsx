@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import helpAcidentes from '../../help/helpAcidentes.json'
+import helpAso from '../../help/helpAso.json'
 import helpDashboard from '../../help/helpDashboard.json'
 import helpDashboardAcidentes from '../../help/helpDashboardAcidentes.json'
 import helpEntradas from '../../help/helpEntradas.json'
@@ -25,6 +26,7 @@ const buildFallback = (topic) => ({
 
 const helpByTopic = {
   acidentes: helpAcidentes,
+  aso: helpAso,
   dashboard: helpDashboard,
   dashboardAcidentes: helpDashboardAcidentes,
   entradas: helpEntradas,
@@ -126,7 +128,7 @@ function HelpDialog({ open, onClose, content, topic }) {
             {summary ? <p className="help-summary">{summary}</p> : null}
             {!hasContent ? (
               <p className="help-warning">
-                Adicione o topico "{topic}" em src/help/helpContent.json para exibir instrucoes especificas aqui.
+                Adicione o topico "{topic}" em src/help/ para exibir instrucoes especificas aqui.
               </p>
             ) : null}
           </div>

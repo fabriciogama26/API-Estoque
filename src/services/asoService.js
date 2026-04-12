@@ -6,6 +6,23 @@ export const listAsos = (query = {}) =>
 export const listAsoTiposExame = () =>
   api?.aso?.types ? api.aso.types() : Promise.resolve([])
 
+export const downloadAsoTemplate = () => {
+  if (api?.aso?.downloadTemplate) {
+    return api.aso.downloadTemplate()
+  }
+  return Promise.reject(new Error('Endpoint de download de modelo de ASO nao configurado.'))
+}
+
+export const importAsoPlanilha = (file) => {
+  if (!file) {
+    return Promise.reject(new Error('Selecione um arquivo XLSX.'))
+  }
+  if (api?.aso?.importPlanilha) {
+    return api.aso.importPlanilha(file)
+  }
+  return Promise.reject(new Error('Endpoint de importacao de ASO nao configurado.'))
+}
+
 export const createAso = (payload) => {
   if (!api?.aso?.create) {
     return Promise.reject(new Error('Endpoint de cadastro de ASO nao configurado.'))

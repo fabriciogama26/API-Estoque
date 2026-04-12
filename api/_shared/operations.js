@@ -593,6 +593,8 @@ function mapAsoRecord(record) {
     setor: record.setor ?? '',
     cargoId: record.cargo_id ?? record.cargoId ?? null,
     cargo: record.cargo ?? '',
+    dataDemissao: record.data_demissao ?? record.dataDemissao ?? null,
+    ativo: record.ativo ?? null,
     tipoExameId: record.tipo_exame_id ?? record.tipoExameId ?? null,
     tipoExameCodigo: record.tipo_exame_codigo ?? record.tipoExameCodigo ?? '',
     tipoExame: record.tipo_exame ?? record.tipoExame ?? '',
@@ -635,8 +637,11 @@ function normalizeAsoHistory(lista) {
           registro.usuario_responsavel ??
           registro.usuarioResponsavel ??
           'sistema',
-        dadosAntes: registro.dados_antes ?? recordToObject(registro.dadosAntes) ?? null,
-        dadosDepois: registro.dados_depois ?? recordToObject(registro.dadosDepois) ?? {},
+        dadosAntes:
+          registro.dados_antes || recordToObject(registro.dadosAntes)
+            ? mapAsoRecord(registro.dados_antes ?? recordToObject(registro.dadosAntes))
+            : null,
+        dadosDepois: mapAsoRecord(registro.dados_depois ?? recordToObject(registro.dadosDepois) ?? {}),
       }
     })
     .filter(Boolean)
