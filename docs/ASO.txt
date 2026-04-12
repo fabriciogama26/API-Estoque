@@ -102,6 +102,11 @@ Boas praticas
 -------------
 - Usar a matricula apenas para localizar/selecionar a pessoa; o vinculo persistido e `pessoa_id`.
 - Manter o catalogo `aso_tipos_exame` versionado via migration com IDs fixos para suportar regras por tipo.
+- Os UUIDs de `aso_tipos_exame` nao sao aleatorios por design:
+  - a tabela e um catalogo fechado (`admissional`, `periodico`, `demissional`)
+  - os IDs fixos deixam o seed idempotente entre ambientes
+  - as regras de negocio, RPCs e importacoes podem referenciar os tipos de forma estavel sem depender de texto
+  - UUID aleatorio so faria mais sentido se esse catalogo virasse cadastro livre/administravel
 - Preferir o calculo de vencimento no banco para manter consistencia entre frontend, API e importacao futura.
 - Mudancas de exame devem passar pelo historico para manter auditoria.
 - Em caso de correcao de data para admissional/demissional, editar o registro existente em vez de criar outro.
