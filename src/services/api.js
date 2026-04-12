@@ -2512,6 +2512,72 @@ function mapPessoaRecord(record) {
   }
 }
 
+function mapAsoRecord(record) {
+  if (!record) {
+    return null
+  }
+  return {
+    id: record.id ?? null,
+    pessoaId: record.pessoa_id ?? record.pessoaId ?? null,
+    funcionario: resolveTextValue(record.funcionario ?? record.nome ?? ''),
+    nome: resolveTextValue(record.nome ?? record.funcionario ?? ''),
+    matricula: resolveTextValue(record.matricula ?? ''),
+    centroServicoId: record.centro_servico_id ?? record.centroServicoId ?? null,
+    centroServico: resolveTextValue(record.centro_servico ?? record.centroServico ?? ''),
+    setorId: record.setor_id ?? record.setorId ?? null,
+    setor: resolveTextValue(record.setor ?? ''),
+    cargoId: record.cargo_id ?? record.cargoId ?? null,
+    cargo: resolveTextValue(record.cargo ?? ''),
+    tipoExameId: record.tipo_exame_id ?? record.tipoExameId ?? null,
+    tipoExameCodigo: resolveTextValue(record.tipo_exame_codigo ?? record.tipoExameCodigo ?? ''),
+    tipoExame: resolveTextValue(record.tipo_exame ?? record.tipoExame ?? ''),
+    dataExame: record.data_exame ?? record.dataExame ?? null,
+    proximoVencimento: record.proximo_vencimento ?? record.proximoVencimento ?? null,
+    diasParaVencer: toNullableNumber(record.dias_para_vencer ?? record.diasParaVencer),
+    statusVencimento: resolveTextValue(record.status_vencimento ?? record.statusVencimento ?? ''),
+    observacao: resolveTextValue(record.observacao ?? ''),
+    usuarioCadastro: record.usuario_cadastro ?? record.usuarioCadastro ?? null,
+    usuarioCadastroNome: resolveTextValue(record.usuario_cadastro_nome ?? record.usuarioCadastroNome ?? ''),
+    usuarioEdicao: record.usuario_edicao ?? record.usuarioEdicao ?? null,
+    usuarioEdicaoNome: resolveTextValue(record.usuario_edicao_nome ?? record.usuarioEdicaoNome ?? ''),
+    criadoEm: record.criado_em ?? record.criadoEm ?? null,
+    atualizadoEm: record.atualizado_em ?? record.atualizadoEm ?? null,
+    accountOwnerId: record.account_owner_id ?? record.accountOwnerId ?? null,
+  }
+}
+
+function normalizeAsoHistory(registros = []) {
+  if (!Array.isArray(registros)) {
+    return []
+  }
+  return registros
+    .map((registro) => {
+      if (!registro || typeof registro !== 'object') {
+        return null
+      }
+      return {
+        id: registro.id ?? null,
+        asoId: registro.aso_id ?? registro.asoId ?? null,
+        pessoaId: registro.pessoa_id ?? registro.pessoaId ?? null,
+        acao: resolveTextValue(registro.acao ?? ''),
+        criadoEm: registro.criado_em ?? registro.criadoEm ?? null,
+        observacao: resolveTextValue(registro.observacao ?? ''),
+        usuarioResponsavelId:
+          registro.usuario_responsavel_id ?? registro.usuario_responsavel ?? registro.usuarioResponsavel ?? null,
+        usuarioResponsavel: resolveTextValue(
+          registro.usuario_responsavel_nome ??
+            registro.usuarioResponsavelNome ??
+            registro.usuario_responsavel ??
+            registro.usuarioResponsavel ??
+            'sistema'
+        ),
+        dadosAntes: registro.dados_antes ?? registro.dadosAntes ?? null,
+        dadosDepois: registro.dados_depois ?? registro.dadosDepois ?? {},
+      }
+    })
+    .filter(Boolean)
+}
+
 function mapEntradaRecord(record) {
   if (!record) {
     return null
@@ -4889,6 +4955,157 @@ export const api = {
         )
         throw err
       }
+    },
+  },
+  aso: {
+    async list(params = {}) {
+      let query = supabase.from('aso_controle_view').select('*').order('proximo_vencimento', { ascending: true })
+
+      const termo = trim(params.termo ?? params.buscar ?? '')
+      if (termo) {
+        const like = `%${termo}%`
+        query = query.or(`funcionario.ilike.${like},nome.ilike.${like},matricula.ilike.${like}`)
+      }
+
+      const tipoExameId = trim(params.tipoExameId ?? params.tipo_exame_id ?? '')
+      if (tipoExameId) {
+        query = query.eq('tipo_exame_id', tipoExameId)
+      }
+
+      const status = trim(params.status ?? '')
+      if (status) {
+        query = query.eq('status_vencimento', status)
+      }
+
+      const centroServico = trim(params.centroServico ?? params.centro_servico ?? '')
+      if (centroServico) {
+        query = query.ilike('centro_servico', `%${centroServico}%`)
+      }
+
+      const setor = trim(params.setor ?? '')
+      if (setor) {
+        query = query.ilike('setor', `%${setor}%`)
+      }
+
+      const cargo = trim(params.cargo ?? '')
+      if (cargo) {
+        query = query.ilike('cargo', `%${cargo}%`)
+      }
+
+      const dataInicio = trim(params.dataInicio ?? params.data_inicial ?? '')
+      if (dataInicio) {
+        query = query.gte('data_exame', dataInicio)
+      }
+
+      const dataFim = trim(params.dataFim ?? params.data_final ?? '')
+      if (dataFim) {
+        query = query.lte('data_exame', dataFim)
+      }
+
+      const registros = await execute(query, 'Falha ao listar ASOs.')
+      return (registros ?? []).map(mapAsoRecord)
+    },
+
+    async types() {
+      const registros = await execute(
+        supabase
+          .from('aso_tipos_exame')
+          .select('id, codigo, nome, gera_vencimento, anos_validade, ordem, ativo')
+          .eq('ativo', true)
+          .order('ordem', { ascending: true }),
+        'Falha ao listar tipos de exame.'
+      )
+      return registros ?? []
+    },
+
+    async create(payload) {
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/aso`
+      const registro = await httpRequest('POST', endpoint, { body: payload, headers })
+      return mapAsoRecord(registro)
+    },
+
+    async update(id, payload) {
+      if (!id) {
+        throw new Error('ID obrigatorio.')
+      }
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/aso/${id}`
+      const registro = await httpRequest('PUT', endpoint, { body: payload, headers })
+      return mapAsoRecord(registro)
+    },
+
+    async registerExam(id, payload) {
+      if (!id) {
+        throw new Error('ID obrigatorio.')
+      }
+      const headers = await buildAuthHeaders({ 'Content-Type': 'application/json' })
+      if (!headers.Authorization) {
+        throw new Error('Sessao expirada. Faça login novamente.')
+      }
+      const base = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+      const endpoint = `${base}/api/aso/register-exam/${id}`
+      const registro = await httpRequest('POST', endpoint, { body: payload, headers })
+      return mapAsoRecord(registro)
+    },
+
+    async history(id) {
+      if (!id) {
+        throw new Error('ID obrigatorio.')
+      }
+      const registros = await execute(
+        supabase
+          .from('aso_historico')
+          .select('id, aso_id, pessoa_id, acao, dados_antes, dados_depois, observacao, usuario_responsavel, criado_em')
+          .eq('aso_id', id)
+          .order('criado_em', { ascending: true }),
+        'Falha ao obter historico de ASO.'
+      )
+
+      const lista = registros ?? []
+      const usuariosIds = Array.from(
+        new Set(
+          lista
+            .map((item) => item?.usuario_responsavel)
+            .filter((value) => typeof value === 'string' && value.trim())
+        )
+      )
+
+      let usuariosMap = new Map()
+      if (usuariosIds.length > 0) {
+        const usuarios = await execute(
+          supabase
+            .from('app_users')
+            .select('id, display_name, username, email')
+            .in('id', usuariosIds),
+          'Falha ao resolver usuarios do historico de ASO.'
+        )
+        usuariosMap = new Map(
+          (usuarios ?? []).map((item) => [
+            item.id,
+            resolveTextValue(item.username) ||
+              resolveTextValue(item.display_name) ||
+              resolveTextValue(item.email) ||
+              item.id,
+          ])
+        )
+      }
+
+      const enriquecido = lista.map((item) => ({
+        ...item,
+        usuario_responsavel_id: item?.usuario_responsavel ?? null,
+        usuario_responsavel_nome: usuariosMap.get(item?.usuario_responsavel) || item?.usuario_responsavel || 'sistema',
+      }))
+
+      return normalizeAsoHistory(enriquecido)
     },
   },
   materiais: {
