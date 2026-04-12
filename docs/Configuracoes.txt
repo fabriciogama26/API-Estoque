@@ -54,6 +54,20 @@ Atualizacao 2026-03
   - supabase/migrations/20260305_expand_permission_dependencies.sql
   - src/config/permissions.js
 
+Atualizacao 2026-04
+-------------------
+- `Credenciais e Permissoes` passa a exibir `Controle de ASO` como toggle proprio, sem compartilhar a chave da tela `Pessoas`.
+- `Pessoas` passa a usar a chave de pagina `cadastros.pessoas`.
+- `Controle de ASO` passa a usar a chave de pagina `pcsmo.controle_aso`.
+- As duas chaves expandem para `pessoas.read` e `pessoas.write`, mantendo a RLS e os catalogos de pessoa.
+- A migration faz backfill de roles e overrides legados baseados em `pessoas.write` para evitar perda de acesso apos o deploy.
+- Arquivos alterados:
+  - src/config/permissions.js
+  - supabase/migrations/20260412_add_aso_page_permissions.sql
+  - docs/Configuracoes.txt
+  - docs/CredenciaisPermissoes.txt
+  - docs/PermissoesToggles.txt
+
 Integracao com Supabase
 -----------------------
 - Leitura/escrita: tabelas app_users, user_roles, user_permission_overrides, app_users_credential_history.
@@ -76,7 +90,7 @@ Notas de UX
 - Status toggles usam texto Ativo/Inativo e feedback textual.
 
 
-- Toggles de permissao usam PERMISSION_GROUPS com chaves por pagina (ex.: estoque.atual, estoque.relatorio), evitando vinculos entre switches. Ver detalhes em docs/PermissoesToggles.txt.
+- Toggles de permissao usam PERMISSION_GROUPS com chaves por pagina (ex.: estoque.atual, estoque.relatorio, cadastros.pessoas, pcsmo.controle_aso), evitando vinculos entre switches. Ver detalhes em docs/PermissoesToggles.txt.
 
 - Ajuda contextual: HelpButton top-right, conteudo em src/help/helpConfiguracoes.json; assets em public/help/configuracoes/.
 

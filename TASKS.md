@@ -3,6 +3,7 @@
 ## Concluido
 - Tela de ASO foi criada com cadastro manual, cards, filtros, lista, detalhes, historico e modal de registro de exame.
 - Navegacao e controle de acesso da tela ASO foram integrados em rota, menu lateral e `permissions.js`.
+- `Credenciais e Permissoes` ganhou toggle proprio para `Controle de ASO`, separado de `Pessoas`, com chaves de pagina dedicadas e backfill de roles/overrides.
 - Documentacao obrigatoria da tela ASO foi criada em `docs/ASO.txt` e o README foi atualizado com a nova estrutura.
 - Base do dominio de ASO foi criada com migration versionada (`aso_tipos_exame`, `aso_controle`, `aso_historico`), view (`aso_controle_view`) e RPCs de create/update/registrar exame.
 - API e services ganharam a base de integracao para ASO (listagem, tipos, cadastro, edicao, registro de exame e historico).
@@ -31,6 +32,8 @@
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260412_create_aso_control.sql` no projeto Supabase.
+- Aplicar a migration `supabase/migrations/20260412_add_aso_page_permissions.sql` no projeto Supabase.
+- Revisar a regra de `PermissionsContext` para role `admin`: hoje ela libera todas as rotas, entao os toggles de pagina em `Credenciais e Permissoes` nao restringem navegacao para esse perfil.
 - Publicar/deploy das Edge Functions `aso-template` e `aso-import` no projeto Supabase.
 - Validar no banco o comportamento de `proximo_vencimento`:
   - admissional e periodico somam 1 ano a partir de `data_exame`
