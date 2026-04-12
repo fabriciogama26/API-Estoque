@@ -1,6 +1,7 @@
 # Tasks
 
 ## Concluido
+- Tela de reset de senha passou a traduzir o erro de senha repetida para portugues e ganhou exibicao/ocultacao por icone de olho nos campos de senha.
 - Removida a reautenticacao obrigatoria nas rotas protegidas do backend/front.
 - Fluxo de reset de senha voltou a usar Supabase direto com `token_hash` na tela de reset.
 - Configuracoes agora bloqueiam auto-rebaixamento, auto-desativacao e remocao de `rbac.manage`.

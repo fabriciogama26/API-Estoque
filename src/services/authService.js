@@ -3,6 +3,19 @@ import { logError } from './errorLogService.js'
 import { validatePasswordOrThrow } from './passwordPolicyService.js'
 import { request as httpRequest } from './httpClient.js'
 
+function translateAuthErrorMessage(message) {
+  const normalized = (message || '').trim()
+  if (!normalized) {
+    return 'Nao foi possivel concluir a operacao de autenticacao.'
+  }
+
+  if (normalized === 'New password should be different from the old password.') {
+    return 'A nova senha deve ser diferente da senha anterior.'
+  }
+
+  return normalized
+}
+
 function assertSupabase() {
   if (!isSupabaseConfigured() || !supabase) {
     throw new Error('Supabase nao configurado. Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.')
@@ -97,7 +110,7 @@ export async function updatePassword(newPassword) {
     data: { password_changed_at: new Date().toISOString() },
   })
   if (error) {
-    throw new Error(error.message)
+    throw new Error(translateAuthErrorMessage(error.message))
   }
   return true
 }
