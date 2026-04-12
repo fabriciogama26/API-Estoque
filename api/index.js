@@ -8,6 +8,7 @@ import {
 } from './_shared/http.js'
 import {
   PessoasOperations,
+  AsoOperations,
   MateriaisOperations,
   AcidentesOperations,
   EntradasOperations,
@@ -87,6 +88,45 @@ export default withAuth(async (req, res, user) => {
         })
       }
       return sendJson(res, 200, await PessoasOperations.history(id))
+    }
+
+    // ASO
+    if (path === '/api/aso/tipos' && method === 'GET') {
+      return sendJson(res, 200, await AsoOperations.types())
+    }
+    if (path === '/api/aso') {
+      if (method === 'GET') return sendJson(res, 200, await AsoOperations.list(query, user))
+      if (method === 'POST') {
+        const body = await readJson(req)
+        return sendJson(res, 201, await AsoOperations.create(body, user, req.authToken))
+      }
+    }
+    if (path.startsWith('/api/aso/register-exam/') && method === 'POST') {
+      const id = path.split('/')[4]
+      if (!id) {
+        throw createHttpError(400, 'ID do ASO nao informado para registrar exame.', {
+          code: 'VALIDATION_ERROR',
+        })
+      }
+      const body = await readJson(req)
+      return sendJson(res, 200, await AsoOperations.registerExam(id, body, user, req.authToken))
+    }
+    if (path.startsWith('/api/aso/history/') && method === 'GET') {
+      const id = path.split('/')[4]
+      if (!id) {
+        throw createHttpError(400, 'ID do ASO nao informado para historico.', {
+          code: 'VALIDATION_ERROR',
+        })
+      }
+      return sendJson(res, 200, await AsoOperations.history(id))
+    }
+    if (path.startsWith('/api/aso/') && method === 'PUT') {
+      const id = path.split('/')[3]
+      if (!id) {
+        throw createHttpError(400, 'ID do ASO nao informado.', { code: 'VALIDATION_ERROR' })
+      }
+      const body = await readJson(req)
+      return sendJson(res, 200, await AsoOperations.update(id, body, user, req.authToken))
     }
 
     // Materiais

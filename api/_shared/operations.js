@@ -576,6 +576,79 @@ function normalizePessoaHistorico(lista) {
     .filter(Boolean)
 }
 
+function mapAsoRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return record
+  }
+  return {
+    ...record,
+    id: record.id ?? null,
+    pessoaId: record.pessoa_id ?? record.pessoaId ?? null,
+    funcionario: record.funcionario ?? record.nome ?? '',
+    nome: record.nome ?? record.funcionario ?? '',
+    matricula: record.matricula ?? '',
+    centroServicoId: record.centro_servico_id ?? record.centroServicoId ?? null,
+    centroServico: record.centro_servico ?? record.centroServico ?? '',
+    setorId: record.setor_id ?? record.setorId ?? null,
+    setor: record.setor ?? '',
+    cargoId: record.cargo_id ?? record.cargoId ?? null,
+    cargo: record.cargo ?? '',
+    tipoExameId: record.tipo_exame_id ?? record.tipoExameId ?? null,
+    tipoExameCodigo: record.tipo_exame_codigo ?? record.tipoExameCodigo ?? '',
+    tipoExame: record.tipo_exame ?? record.tipoExame ?? '',
+    dataExame: record.data_exame ?? record.dataExame ?? null,
+    proximoVencimento: record.proximo_vencimento ?? record.proximoVencimento ?? null,
+    diasParaVencer: record.dias_para_vencer ?? record.diasParaVencer ?? null,
+    statusVencimento: record.status_vencimento ?? record.statusVencimento ?? '',
+    observacao: record.observacao ?? '',
+    usuarioCadastro: record.usuario_cadastro ?? record.usuarioCadastro ?? null,
+    usuarioCadastroNome: record.usuario_cadastro_nome ?? record.usuarioCadastroNome ?? '',
+    usuarioEdicao: record.usuario_edicao ?? record.usuarioEdicao ?? null,
+    usuarioEdicaoNome: record.usuario_edicao_nome ?? record.usuarioEdicaoNome ?? '',
+    criadoEm: record.criado_em ?? record.criadoEm ?? null,
+    atualizadoEm: record.atualizado_em ?? record.atualizadoEm ?? null,
+    accountOwnerId: record.account_owner_id ?? record.accountOwnerId ?? null,
+  }
+}
+
+function normalizeAsoHistory(lista) {
+  if (!Array.isArray(lista)) {
+    return []
+  }
+  return lista
+    .map((registro) => {
+      if (!registro || typeof registro !== 'object') {
+        return null
+      }
+      return {
+        id: registro.id ?? randomId(),
+        asoId: registro.aso_id ?? registro.asoId ?? null,
+        pessoaId: registro.pessoa_id ?? registro.pessoaId ?? null,
+        acao: trim(registro.acao ?? ''),
+        criadoEm: registro.criado_em ?? registro.criadoEm ?? null,
+        observacao: registro.observacao ?? '',
+        usuarioResponsavelId:
+          registro.usuario_responsavel_id ?? registro.usuario_responsavel ?? registro.usuarioResponsavel ?? null,
+        usuarioResponsavel:
+          registro.usuario_responsavel_nome ??
+          registro.usuarioResponsavelNome ??
+          registro.usuario_responsavel ??
+          registro.usuarioResponsavel ??
+          'sistema',
+        dadosAntes: registro.dados_antes ?? recordToObject(registro.dadosAntes) ?? null,
+        dadosDepois: registro.dados_depois ?? recordToObject(registro.dadosDepois) ?? {},
+      }
+    })
+    .filter(Boolean)
+}
+
+function recordToObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+  return value
+}
+
 async function ensureMatriculaDisponivel(matricula, ignoreId) {
   if (!matricula) {
     return
@@ -2026,6 +2099,205 @@ export const PessoasOperations = {
         'Falha ao obter hist?rico.'
       )) ?? []
     return normalizePessoaHistorico(registros)
+  },
+}
+
+export const AsoOperations = {
+  async list(params = {}, user = {}) {
+    const ownerId = user?.id ? await resolveOwnerId(user.id) : null
+    let query = supabaseAdmin.from('aso_controle_view').select('*').order('proximo_vencimento', { ascending: true })
+
+    if (ownerId) {
+      query = query.eq('account_owner_id', ownerId)
+    }
+
+    const termo = trim(params.termo ?? params.buscar ?? '')
+    if (termo) {
+      const like = `%${termo}%`
+      query = query.or(`funcionario.ilike.${like},nome.ilike.${like},matricula.ilike.${like}`)
+    }
+
+    const tipoExameId = trim(params.tipoExameId ?? params.tipo_exame_id ?? '')
+    if (tipoExameId) {
+      query = query.eq('tipo_exame_id', tipoExameId)
+    }
+
+    const status = trim(params.status ?? '')
+    if (status) {
+      query = query.eq('status_vencimento', status)
+    }
+
+    const centroServico = trim(params.centroServico ?? params.centro_servico ?? '')
+    if (centroServico) {
+      query = query.ilike('centro_servico', `%${centroServico}%`)
+    }
+
+    const setor = trim(params.setor ?? '')
+    if (setor) {
+      query = query.ilike('setor', `%${setor}%`)
+    }
+
+    const cargo = trim(params.cargo ?? '')
+    if (cargo) {
+      query = query.ilike('cargo', `%${cargo}%`)
+    }
+
+    const dataInicio = trim(params.dataInicio ?? params.data_inicial ?? '')
+    if (dataInicio) {
+      query = query.gte('data_exame', dataInicio)
+    }
+
+    const dataFim = trim(params.dataFim ?? params.data_final ?? '')
+    if (dataFim) {
+      query = query.lte('data_exame', dataFim)
+    }
+
+    const registros = await execute(query, 'Falha ao listar registros de ASO.')
+    return (registros ?? []).map(mapAsoRecord)
+  },
+
+  async types() {
+    const registros = await execute(
+      supabaseAdmin
+        .from('aso_tipos_exame')
+        .select('id, codigo, nome, gera_vencimento, anos_validade, ordem, ativo')
+        .eq('ativo', true)
+        .order('ordem', { ascending: true }),
+      'Falha ao listar tipos de exame.'
+    )
+    return registros ?? []
+  },
+
+  async create(payload, user, authToken) {
+    const params = {
+      p_pessoa_id: pickParam(payload, ['p_pessoa_id', 'pessoaId', 'pessoa_id']),
+      p_tipo_exame_id: pickParam(payload, ['p_tipo_exame_id', 'tipoExameId', 'tipo_exame_id']),
+      p_data_exame: pickParam(payload, ['p_data_exame', 'dataExame', 'data_exame']),
+      p_observacao: pickParam(payload, ['p_observacao', 'observacao']),
+      p_usuario_id: pickParam(payload, ['p_usuario_id'], user?.id ?? null),
+    }
+
+    if (!params.p_pessoa_id) {
+      throw createHttpError(400, 'Funcionario obrigatorio para cadastrar ASO.')
+    }
+    if (!params.p_tipo_exame_id) {
+      throw createHttpError(400, 'Tipo de exame obrigatorio.')
+    }
+    if (!params.p_data_exame) {
+      throw createHttpError(400, 'Data do exame obrigatoria.')
+    }
+
+    const client = buildUserClient(authToken)
+    const registro = await executeSingle(
+      client.rpc('rpc_aso_create_full', params),
+      'Falha ao criar ASO.'
+    )
+
+    return mapAsoRecord(registro)
+  },
+
+  async update(id, payload, user, authToken) {
+    if (!id) {
+      throw createHttpError(400, 'ASO invalido.')
+    }
+
+    const params = {
+      p_id: id,
+      p_tipo_exame_id: pickParam(payload, ['p_tipo_exame_id', 'tipoExameId', 'tipo_exame_id']),
+      p_data_exame: pickParam(payload, ['p_data_exame', 'dataExame', 'data_exame']),
+      p_observacao: pickParam(payload, ['p_observacao', 'observacao']),
+      p_usuario_id: pickParam(payload, ['p_usuario_id'], user?.id ?? null),
+      p_acao: 'edicao',
+    }
+
+    if (!params.p_tipo_exame_id) {
+      throw createHttpError(400, 'Tipo de exame obrigatorio.')
+    }
+    if (!params.p_data_exame) {
+      throw createHttpError(400, 'Data do exame obrigatoria.')
+    }
+
+    const client = buildUserClient(authToken)
+    const registro = await executeSingle(
+      client.rpc('rpc_aso_update_full', params),
+      'Falha ao atualizar ASO.'
+    )
+
+    return mapAsoRecord(registro)
+  },
+
+  async registerExam(id, payload, user, authToken) {
+    if (!id) {
+      throw createHttpError(400, 'ASO invalido.')
+    }
+
+    const params = {
+      p_id: id,
+      p_data_realizada: pickParam(payload, ['p_data_realizada', 'dataRealizada', 'data_realizada']),
+      p_observacao: pickParam(payload, ['p_observacao', 'observacao']),
+      p_usuario_id: pickParam(payload, ['p_usuario_id'], user?.id ?? null),
+    }
+
+    if (!params.p_data_realizada) {
+      throw createHttpError(400, 'Data realizada obrigatoria.')
+    }
+
+    const client = buildUserClient(authToken)
+    const registro = await executeSingle(
+      client.rpc('rpc_aso_register_exam', params),
+      'Falha ao registrar exame.'
+    )
+
+    return mapAsoRecord(registro)
+  },
+
+  async history(id) {
+    if (!id) {
+      throw createHttpError(400, 'ASO invalido.')
+    }
+
+    const registros = await execute(
+      supabaseAdmin
+        .from('aso_historico')
+        .select('id, aso_id, pessoa_id, acao, dados_antes, dados_depois, observacao, usuario_responsavel, criado_em')
+        .eq('aso_id', id)
+        .order('criado_em', { ascending: true }),
+      'Falha ao obter historico do ASO.'
+    )
+
+    const lista = registros ?? []
+    const usuariosIds = Array.from(
+      new Set(
+        lista
+          .map((item) => item?.usuario_responsavel)
+          .filter((value) => typeof value === 'string' && value.trim())
+      )
+    )
+
+    let usuariosMap = new Map()
+    if (usuariosIds.length > 0) {
+      const usuarios = await execute(
+        supabaseAdmin
+          .from('app_users')
+          .select('id, display_name, username, email')
+          .in('id', usuariosIds),
+        'Falha ao resolver usuarios do historico de ASO.'
+      )
+      usuariosMap = new Map(
+        (usuarios ?? []).map((item) => [
+          item.id,
+          trim(item.username) || trim(item.display_name) || trim(item.email) || item.id,
+        ])
+      )
+    }
+
+    const enriquecido = lista.map((item) => ({
+      ...item,
+      usuario_responsavel_id: item?.usuario_responsavel ?? null,
+      usuario_responsavel_nome: usuariosMap.get(item?.usuario_responsavel) || item?.usuario_responsavel || 'sistema',
+    }))
+
+    return normalizeAsoHistory(enriquecido)
   },
 }
 
