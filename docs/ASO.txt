@@ -7,6 +7,7 @@ Visao geral
 - A tela segue o padrao do sistema com bloco de cadastro, cards resumo, filtros, lista, ajuda contextual, exportacao CSV e historico.
 - O acesso principal foi criado em `/pcsmo/controledeaso`, mantendo alias em `/cadastros/aso`.
 - No menu lateral, a funcionalidade fica na nova secao `PCSMO` como `Controle de ASO`.
+- Em `Credenciais e Permissoes`, a tela usa a chave de pagina `pcsmo.controle_aso`, separada de `Pessoas`.
 - O campo "Proximo ao vencimento" e somente leitura:
   - admissional e periodico somam 1 ano a partir de `data_exame`
   - demissional fica sem renovacao e sem alerta

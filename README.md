@@ -867,6 +867,21 @@ supabase/
     20260302_fix_acidentes_cid_update_hash.sql  # migration SQL
     20260303_fix_acidentes_rehash_digest.sql  # migration SQL
     20260304_fix_acidentes_rehash_search_path.sql  # migration SQL
+    20260305_edge_functions_error_report_actor.sql  # migration SQL
+    20260305_expand_permission_dependencies.sql  # migration SQL
+    20260305_prevent_self_demotion.sql  # migration SQL
+    20260306_add_login_name_to_app_users.sql  # migration SQL
+    20260307_add_fk_indexes_advisor_large_tables.sql  # migration SQL
+    20260308_add_api_rate_limits_and_idempotency.sql  # migration SQL
+    20260308_add_plan_burst_limits.sql  # migration SQL
+    20260308_fix_rate_limit_fn_ambiguous.sql  # migration SQL
+    20260308_fix_rate_limit_fn_conflict.sql  # migration SQL
+    20260308_fix_rate_limit_fn_plan_override.sql  # migration SQL
+    20260308_fix_rate_limit_fn_window_start_ambiguous.sql  # migration SQL
+    20260308_fix_rpc_catalog_list_owner_scope.sql  # migration SQL
+    20260308_update_auth_login_rate_limit.sql  # migration SQL
+    20260412_add_aso_page_permissions.sql  # migration SQL
+    20260412_create_aso_control.sql  # migration SQL
   migrations_rebuild/
     0001_extensions.sql  # migration rebuild SQL
     0002_tables.sql  # migration rebuild SQL

@@ -27,10 +27,22 @@ Atualizacao 2026-03 (dependencias de permissao)
 - Mantem toggles independentes, mas garante RLS para dados base.
 - A expansao agora tambem roda no banco (`has_permission` e `resolve_user_permissions`), entao dependentes antigos passam a receber as permissoes base sem precisar salvar novamente.
 
+Atualizacao 2026-04 (Pessoas e Controle de ASO)
+- `Pessoas` e `Controle de ASO` passam a ter toggles independentes.
+- Novas chaves: `cadastros.pessoas` e `pcsmo.controle_aso`.
+- As duas expandem para `pessoas.read` e `pessoas.write`, preservando a RLS do dominio.
+- A migration tambem faz backfill de `user_permission_overrides` herdados de `pessoas.write` para evitar acesso quebrado ou pagina liberada com backend negando acao.
+
 Arquivos:
 - src/config/permissions.js
 - src/pages/Configuracoes.jsx
 - supabase/migrations/20260305_expand_permission_dependencies.sql
+
+Arquivos:
+- src/config/permissions.js
+- supabase/migrations/20260412_add_aso_page_permissions.sql
+- docs/Configuracoes.txt
+- docs/CredenciaisPermissoes.txt
 
 Arquivos:
 - src/config/permissions.js

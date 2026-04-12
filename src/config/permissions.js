@@ -27,8 +27,8 @@ const PAGE_REQUIRED_PERMISSION = {
   estoque: 'estoque.atual',
   entradas: 'estoque.entradas',
   saidas: 'estoque.saidas',
-  'cadastros-pessoas': 'pessoas.write',
-  'cadastros-aso': 'pessoas.write',
+  'cadastros-pessoas': 'cadastros.pessoas',
+  'cadastros-aso': 'pcsmo.controle_aso',
   'cadastros-materiais': 'estoque.materiais',
   'cadastros-base': 'basic_registration.write',
   'acidentes-cadastro': 'acidentes.write',
@@ -114,6 +114,8 @@ const PERMISSION_LABELS = {
   'estoque.termo': 'Termo de EPI',
   'estoque.relatorio': 'Relatorio de Estoque',
   'estoque.reprocessar': 'Estoque - Reprocessar previsao',
+  'cadastros.pessoas': 'Pessoas',
+  'pcsmo.controle_aso': 'Controle de ASO',
   'pessoas.read': 'Pessoas - Ler',
   'pessoas.write': 'Pessoas - Alterar',
   'acidentes.read': 'Acidentes - Ler',
@@ -138,7 +140,8 @@ const PERMISSION_GROUPS = [
   { id: 'estoque-reprocessar', label: 'Reprocessar previsao', keys: ['estoque.reprocessar'] },
   { id: 'acidentes', label: 'Cadastro de Acidentes', keys: ['acidentes.read', 'acidentes.write'] },
   { id: 'hht', label: 'HHT Mensal', keys: ['hht.read', 'hht.write'] },
-  { id: 'pessoas', label: 'Pessoas', keys: ['pessoas.read', 'pessoas.write'] },
+  { id: 'pessoas', label: 'Pessoas', keys: ['cadastros.pessoas'] },
+  { id: 'controle-aso', label: 'Controle de ASO', keys: ['pcsmo.controle_aso'] },
   { id: 'cadastro-base', label: 'Cadastro Base', keys: ['basic_registration.read', 'basic_registration.write'] },
 ]
 
@@ -152,6 +155,8 @@ const PERMISSION_DEPENDENCIES = {
   'estoque.termo': ['estoque.read', 'pessoas.read'],
   'estoque.relatorio': ['estoque.read'],
   'estoque.reprocessar': ['estoque.read'],
+  'cadastros.pessoas': ['pessoas.read', 'pessoas.write'],
+  'pcsmo.controle_aso': ['pessoas.read', 'pessoas.write'],
   'acidentes.dashboard': ['acidentes.read'],
 }
 
