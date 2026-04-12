@@ -14,7 +14,7 @@ export function AsoRegisterExamModal({
     <div className="modal__overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="modal__content" onClick={(event) => event.stopPropagation()}>
         <header className="modal__header">
-          <h3>Registrar exame</h3>
+          <h3>Baixa de exame</h3>
           <button type="button" className="modal__close" onClick={onClose} aria-label="Fechar">
             x
           </button>
@@ -61,7 +61,7 @@ export function AsoRegisterExamModal({
               Cancelar
             </button>
             <button type="submit" className="button button--primary" disabled={state.isSaving}>
-              {state.isSaving ? 'Salvando...' : 'Salvar'}
+              {state.isSaving ? 'Salvando...' : 'Confirmar baixa'}
             </button>
           </footer>
         </form>

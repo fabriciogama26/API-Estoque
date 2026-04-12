@@ -9,7 +9,7 @@ export function AsoHistoryTimeline({ registros = [] }) {
           <article key={registro.id} className="aso-history-entry">
             <header className="aso-history-entry__header">
               <div>
-                <strong>{registro.acao || 'acao nao informada'}</strong>
+                <strong>{registro.acaoLabel || registro.acao || 'acao nao informada'}</strong>
                 <p className="data-table__muted">
                   {registro.usuarioResponsavel || 'sistema'} | {formatDateTime(registro.criadoEm)}
                 </p>
@@ -23,7 +23,7 @@ export function AsoHistoryTimeline({ registros = [] }) {
             ) : null}
 
             {changes.length === 0 ? (
-              <p className="feedback">Registro criado.</p>
+              <p className="feedback">Nenhuma alteracao registrada.</p>
             ) : (
               <ul className="aso-history-entry__changes">
                 {changes.map((change, index) => (

@@ -104,7 +104,7 @@ export default withAuth(async (req, res, user) => {
     if (path.startsWith('/api/aso/register-exam/') && method === 'POST') {
       const id = path.split('/')[4]
       if (!id) {
-        throw createHttpError(400, 'ID do ASO nao informado para registrar exame.', {
+        throw createHttpError(400, 'ID do ASO nao informado para baixa do exame.', {
           code: 'VALIDATION_ERROR',
         })
       }

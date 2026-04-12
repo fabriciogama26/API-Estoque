@@ -35,7 +35,7 @@ export function AsoTable({
     <>
       <div className="saidas-legend" aria-label="Legenda dos vencimentos de ASO">
         <div className="saidas-legend__item">
-          <span className="saidas-legend__dot saidas-legend__dot--alerta" aria-hidden="true" />
+          <span className="saidas-legend__dot aso-legend__dot--60" aria-hidden="true" />
           <span>60 a 31 dias</span>
         </div>
         <div className="saidas-legend__item">
@@ -53,6 +53,10 @@ export function AsoTable({
         <div className="saidas-legend__item">
           <span className="saidas-legend__dot saidas-legend__dot--atrasada" aria-hidden="true" />
           <span>Vencido</span>
+        </div>
+        <div className="saidas-legend__item">
+          <span className="saidas-legend__dot aso-legend__dot--baixado" aria-hidden="true" />
+          <span>Baixado</span>
         </div>
       </div>
 

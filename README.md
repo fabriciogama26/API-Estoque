@@ -881,6 +881,7 @@ supabase/
     20260308_fix_rpc_catalog_list_owner_scope.sql  # migration SQL
     20260308_update_auth_login_rate_limit.sql  # migration SQL
     20260412_add_aso_page_permissions.sql  # migration SQL
+    20260412_aso_baixa_e_historico.sql  # migration SQL
     20260412_create_aso_control.sql  # migration SQL
   migrations_rebuild/
     0001_extensions.sql  # migration rebuild SQL

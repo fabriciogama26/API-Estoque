@@ -19,9 +19,9 @@
         "mediaHint": "Cards, filtros e legenda acima da tabela."
       },
       {
-        "title": "Registrar novo exame",
-        "description": "Na lista, use o botao Registrar exame para abrir o modal, informar a data realizada e salvar. O sistema atualiza a data do exame, recalcula o vencimento e grava no historico.",
-        "mediaHint": "Modal de registrar exame."
+        "title": "Dar baixa no exame",
+        "description": "Na lista, use o botao de baixa para abrir o modal, informar a data realizada e salvar. O sistema marca o registro atual como baixado, cria um novo ciclo com a data realizada e recalcula o proximo vencimento.",
+        "mediaHint": "Modal de baixa de exame."
       },
       {
         "title": "Tratar duplicidade",
@@ -37,7 +37,7 @@
     "notes": [
       "Campos marcados com * sao obrigatorios.",
       "O banco bloqueia duplicidade exata por funcionario + tipo de exame + data do exame.",
-      "Admissional e demissional sao tratados como unicos por funcionario; para corrigir data, edite o registro existente.",
+      "Admissional e demissional sao tratados como unicos por funcionario enquanto houver registro ativo; para corrigir data, edite o registro existente.",
       "Periodico pode ter varios registros; quando houver outro dentro de 15 dias, a tela alerta antes de salvar.",
       "Demissional nao abre renovacao e nao entra nas contagens de alerta de vencimento.",
       "No cadastro em massa, a matricula precisa existir em Pessoas e o tipo_exame precisa ser admissional, periodico ou demissional."

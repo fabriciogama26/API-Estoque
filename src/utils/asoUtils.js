@@ -55,7 +55,8 @@ export const formatDateTime = (value) => {
 export const resolveAsoStatusMeta = (status = '') => {
   const normalized = String(status || '').trim().toLowerCase()
   const map = {
-    demissional: { label: 'Demissional', variant: 'neutral' },
+    ativo: { label: 'Ativo', variant: 'ok' },
+    sem_renovacao: { label: 'Sem renovacao', variant: 'neutral' },
     sem_vencimento: { label: 'Sem vencimento', variant: 'neutral' },
     em_dia: { label: 'Em dia', variant: 'ok' },
     vence_60: { label: 'Vence em 60 dias', variant: 'warning-soft' },
@@ -63,6 +64,7 @@ export const resolveAsoStatusMeta = (status = '') => {
     vence_15: { label: 'Vence em 15 dias', variant: 'warning-strong' },
     vence_hoje: { label: 'Vence hoje', variant: 'today' },
     vencido: { label: 'Vencido', variant: 'danger' },
+    baixado: { label: 'Baixado', variant: 'closed' },
   }
   return map[normalized] || { label: normalized || 'Nao informado', variant: 'neutral' }
 }
@@ -135,11 +137,11 @@ export const buildAsoCards = (lista = []) => {
   const summary = buildAsoSummary(lista)
   return [
     { id: 'total', title: 'Total de registros', value: numberFormatter.format(summary.totalRegistros), variant: 'blue' },
-    { id: '60', title: 'Vencendo em 60 dias', value: numberFormatter.format(summary.vencendo60), variant: 'cyan' },
-    { id: '30', title: 'Vencendo em 30 dias', value: numberFormatter.format(summary.vencendo30), variant: 'amber' },
+    { id: '60', title: 'Vencendo em 60 dias', value: numberFormatter.format(summary.vencendo60), variant: 'blue' },
+    { id: '30', title: 'Vencendo em 30 dias', value: numberFormatter.format(summary.vencendo30), variant: 'green' },
     { id: '15', title: 'Vencendo em 15 dias', value: numberFormatter.format(summary.vencendo15), variant: 'orange' },
     { id: 'hoje', title: 'Vence hoje', value: numberFormatter.format(summary.venceHoje), variant: 'red' },
-    { id: 'vencidos', title: 'Vencidos', value: numberFormatter.format(summary.vencidos), variant: 'danger' },
+    { id: 'vencidos', title: 'Vencidos', value: numberFormatter.format(summary.vencidos), variant: 'slate' },
     { id: 'demissionais', title: 'Demissionais', value: numberFormatter.format(summary.demissionais), variant: 'slate' },
   ]
 }
@@ -152,6 +154,7 @@ const HISTORY_FIELDS = [
   { key: 'proximoVencimento', label: 'Proximo vencimento' },
   { key: 'diasParaVencer', label: 'Dias para vencer' },
   { key: 'statusVencimento', label: 'Status' },
+  { key: 'statusRegistro', label: 'Situacao do registro' },
   { key: 'observacao', label: 'Observacao' },
 ]
 
@@ -172,9 +175,29 @@ export const buildAsoHistoryChanges = (registro = {}) => {
       }
       return {
         campo: field.label,
-        de: field.key.toLowerCase().includes('data') ? formatDate(de) : normalizeCompareValue(de) || 'Nao informado',
-        para: field.key.toLowerCase().includes('data') ? formatDate(para) : normalizeCompareValue(para) || 'Nao informado',
+        de:
+          field.key.toLowerCase().includes('data')
+            ? formatDate(de)
+            : field.key.toLowerCase().includes('status')
+              ? resolveAsoStatusMeta(de).label
+              : normalizeCompareValue(de) || 'Nao informado',
+        para:
+          field.key.toLowerCase().includes('data')
+            ? formatDate(para)
+            : field.key.toLowerCase().includes('status')
+              ? resolveAsoStatusMeta(para).label
+              : normalizeCompareValue(para) || 'Nao informado',
       }
     })
     .filter(Boolean)
+}
+
+export const resolveAsoHistoryActionLabel = (acao = '') => {
+  const normalized = String(acao || '').trim().toLowerCase()
+  const map = {
+    edicao: 'Edicao',
+    registro_exame: 'Baixa de exame',
+    baixa_exame: 'Baixa de exame',
+  }
+  return map[normalized] || normalized || 'Acao nao informada'
 }

@@ -12,24 +12,23 @@ Visao geral
   - admissional e periodico somam 1 ano a partir de `data_exame`
   - demissional fica sem renovacao e sem alerta
 - Historico de multiplos registros e obrigatorio:
-  - cadastro inicial
   - edicao
-  - registrar exame
+  - baixa de exame
 
 Arquitetura
 -----------
 - Contexto:
   - `AsoProvider` (`AsoContext`) expoe o estado e as acoes do hook `useAsoController`.
 - Hook `useAsoController`:
-  - centraliza formulario, busca de funcionario, filtros, listagem, exportacao, historico, modal "Registrar exame" e modal de conflito
+  - centraliza formulario, busca de funcionario, filtros, listagem, exportacao, historico, modal de baixa e modal de conflito
   - integra erros com `useErrorLogger('aso')`
 - Servicos:
-  - `asoService` encapsula listagem, tipos, cadastro, edicao, registro de exame e historico
+  - `asoService` encapsula listagem, tipos, cadastro, edicao, baixa de exame e historico
   - `api.js` expande o `dataClient` com o dominio `aso`
 - Banco:
   - `aso_tipos_exame`: catalogo fixo de tipos de exame
   - `aso_controle`: estado atual do ASO por funcionario/tipo/data
-  - `aso_historico`: auditoria de cadastro, edicao e registro de exame
+  - `aso_historico`: auditoria apenas de alteracoes reais (edicao e baixa de exame)
   - `aso_controle_view`: view pronta para lista/cards/filtros com dados de pessoa (`ativo`, `dataDemissao`)
 
 Cadastro
@@ -55,7 +54,7 @@ Cadastro
   - upload vai para `imports/<owner_id>/aso/<uuid>-<arquivo>.xlsx`
   - a Edge Function valida JWT, prefixo do owner, limite do plano e rate limit
   - linhas invalidas retornam em CSV de erros assinado
-  - a importacao reaproveita `rpc_aso_create_full` para manter historico e regras do banco
+  - a importacao reaproveita `rpc_aso_create_full` para manter as regras do banco
 - Modal de conflito:
   - admissional/demissional:
     - titulo "Exame ja cadastrado"
@@ -90,10 +89,15 @@ Filtros, auto-complete e listagem
   - Demissionais
 - Tabela:
   - Colunas: Funcionario, Matricula, Tipo de exame, Data do exame, Proximo vencimento, Dias para vencer, Status, Cadastrado em, Acoes
-  - Acoes: Ver detalhes, Editar, Historico, Registrar exame
-  - `Registrar exame` fica desabilitado para demissional
+  - Acoes: Ver detalhes, Editar, Historico, Dar baixa no exame
+  - `Dar baixa no exame` fica desabilitado para demissional e para registros ja baixados
   - legenda de vencimento segue o padrao visual da tela Saidas
   - botao `Exportar Excel (CSV)` exporta a lista filtrada no formato CSV
+- Fluxo de baixa:
+  - a baixa fecha o registro atual com status `Baixado`
+  - a linha original permanece na lista como historico operacional
+  - um novo registro e criado com a `data realizada` informada no modal
+  - o proximo vencimento do novo registro e recalculado automaticamente
 - Datas:
   - exibicao usa parser local para evitar deslocamento de dia em `YYYY-MM-DD`
   - o problema anterior de data ISO/UTC foi corrigido em formulario, tabela, detalhes, historico e exportacao
@@ -109,11 +113,12 @@ Boas praticas
   - UUID aleatorio so faria mais sentido se esse catalogo virasse cadastro livre/administravel
 - Preferir o calculo de vencimento no banco para manter consistencia entre frontend, API e importacao futura.
 - Mudancas de exame devem passar pelo historico para manter auditoria.
+- Cadastro inicial nao gera historico proprio; o historico fica reservado para alteracoes reais.
 - Em caso de correcao de data para admissional/demissional, editar o registro existente em vez de criar outro.
 
 Atualizacao 2026-04
 -------------------
-- Criado o dominio inicial de ASO com tela manual, cards, filtros, lista, detalhes, historico e modal `Registrar exame`.
+- Criado o dominio inicial de ASO com tela manual, cards, filtros, lista, detalhes, historico e modal de baixa.
 - Criadas migration, view e RPCs especificas para o fluxo.
 - `Cadastrar em massa` ficou reservado para a etapa de importacao.
 
@@ -125,14 +130,22 @@ Atualizacao 2026-04 (regras)
 - Datas corrigidas para exibicao no padrao brasileiro sem deslocamento por timezone.
 - Regras de duplicidade ajustadas:
   - banco bloqueia duplicidade exata por funcionario + tipo + data
-  - admissional e demissional bloqueiam novo cadastro por funcionario
+  - admissional e demissional bloqueiam novo cadastro por funcionario enquanto houver registro ativo
   - periodico alerta em janela de 15 dias e permite continuar
 - Demissional passou a exigir funcionario inativo ou com `dataDemissao`.
+
+Atualizacao 2026-04 (baixa e ciclo)
+-----------------------------------
+- A acao da lista deixa de apenas atualizar a linha e passa a funcionar como baixa do ciclo.
+- O registro atual muda para `Baixado` e permanece visivel na lista.
+- A baixa cria um novo registro com a data realizada e novo proximo vencimento.
+- O historico deixa de registrar cadastro inicial e passa a guardar apenas edicao e baixa de exame.
+- As cores de `60 dias`, `30 dias` e `15 dias` foram separadas melhor na legenda, chips e linhas.
 
 Atualizacao 2026-04 (importacao)
 --------------------------------
 - `Cadastrar em massa` implementado com template XLSX e importacao via Edge Function.
-- O fluxo importa por matricula, resolve o tipo de exame pelo catalogo e chama `rpc_aso_create_full` para manter auditoria/historico.
+- O fluxo importa por matricula, resolve o tipo de exame pelo catalogo e chama `rpc_aso_create_full` para manter as regras do banco.
 - O retorno da importacao mostra processados/importados/erros e libera CSV para linhas rejeitadas.
 
 ===========================================
@@ -148,7 +161,7 @@ Funcoes principais
 - useAsoController
   - Tipo: hook/controller
   - Caminho: src/hooks/useAsoController.js
-  - Responsavel por: estado de formulario, busca de pessoa, filtros, submit, pre-validacao de duplicidade, historico e modal de registro.
+  - Responsavel por: estado de formulario, busca de pessoa, filtros, submit, pre-validacao de duplicidade, historico e modal de baixa.
 - AsoContext
   - Tipo: contexto
   - Caminho: src/context/AsoContext.jsx
@@ -167,14 +180,14 @@ Constantes e configuracoes
 - Defaults de formulario/filtros/modais
   - Tipo: constantes
   - Caminho: src/config/AsoConfig.js
-  - Uso: estados iniciais da tela, modal de registrar exame e modal de conflito.
+  - Uso: estados iniciais da tela, modal de baixa de exame e modal de conflito.
 
 Funcoes utilitarias relacionadas
 --------------------------------
 - asoUtils
   - Tipo: utilitarios
   - Caminho: src/utils/asoUtils.js
-  - Responsavel por: parse/formatacao de datas, status, cards, comparacao de historico e calculo de vencimento.
+  - Responsavel por: parse/formatacao de datas, status, cards, comparacao de historico, rotulos de acao e calculo de vencimento.
 - asoExport
   - Tipo: utilitarios
   - Caminho: src/utils/asoExport.js
@@ -185,11 +198,11 @@ Servicos e integracoes externas
 - asoService
   - Tipo: service frontend
   - Caminho: src/services/asoService.js
-  - Responsavel por: expor o dominio `aso` do `dataClient`, incluindo download do modelo e importacao em massa.
+  - Responsavel por: expor o dominio `aso` do `dataClient`, incluindo download do modelo, importacao em massa e baixa de exame.
 - api.js
   - Tipo: service frontend
   - Caminho: src/services/api.js
-  - Responsavel por: listar ASOs, tipos, criar, editar, registrar exame e consultar historico.
+  - Responsavel por: listar ASOs, tipos, criar, editar, dar baixa no exame e consultar historico.
 - API serverless
   - Tipo: backend Vercel
   - Caminho: api/index.js e api/_shared/operations.js
@@ -202,6 +215,10 @@ Servicos e integracoes externas
   - Tipo: banco
   - Caminho: supabase/migrations/20260412_create_aso_control.sql
   - Responsavel por: criar tabelas, view, trigger de vencimento, indices unicos e RPCs.
+- Migration SQL
+  - Tipo: banco
+  - Caminho: supabase/migrations/20260412_aso_baixa_e_historico.sql
+  - Responsavel por: adicionar status de registro, baixa do exame, criacao de novo ciclo e ajuste do historico.
 
 Ajuda contextual
 ----------------
@@ -243,7 +260,8 @@ Comportamento antes/depois
 - Depois:
   - a tela tambem atende em `/pcsmo/controledeaso`
   - a exibicao de datas ficou em padrao brasileiro sem deslocamento
-  - a lista ganhou ajuda, legenda, exportacao CSV e cadastro em massa
+  - a lista ganhou ajuda, legenda, exportacao CSV, cadastro em massa e baixa operacional do exame
   - o banco bloqueia duplicidade exata por `funcionario + tipo + data`
-  - admissional/demissional bloqueiam novo cadastro por funcionario
+  - admissional/demissional bloqueiam novo cadastro por funcionario enquanto houver registro ativo
   - periodico alerta em janela de 15 dias, com opcao de continuar
+  - o historico mostra apenas alteracoes reais, sem registrar o cadastro inicial

@@ -609,6 +609,10 @@ function mapAsoRecord(record) {
     usuarioEdicaoNome: record.usuario_edicao_nome ?? record.usuarioEdicaoNome ?? '',
     criadoEm: record.criado_em ?? record.criadoEm ?? null,
     atualizadoEm: record.atualizado_em ?? record.atualizadoEm ?? null,
+    statusRegistro: record.status_registro ?? record.statusRegistro ?? 'ativo',
+    registroOrigemId: record.registro_origem_id ?? record.registroOrigemId ?? null,
+    baixadoEm: record.baixado_em ?? record.baixadoEm ?? null,
+    baixadoPor: record.baixado_por ?? record.baixadoPor ?? null,
     accountOwnerId: record.account_owner_id ?? record.accountOwnerId ?? null,
   }
 }
@@ -627,6 +631,14 @@ function normalizeAsoHistory(lista) {
         asoId: registro.aso_id ?? registro.asoId ?? null,
         pessoaId: registro.pessoa_id ?? registro.pessoaId ?? null,
         acao: trim(registro.acao ?? ''),
+        acaoLabel:
+          trim(registro.acao ?? '') === 'baixa_exame'
+            ? 'Baixa de exame'
+            : trim(registro.acao ?? '') === 'registro_exame'
+              ? 'Baixa de exame'
+            : trim(registro.acao ?? '') === 'edicao'
+              ? 'Edicao'
+              : trim(registro.acao ?? ''),
         criadoEm: registro.criado_em ?? registro.criadoEm ?? null,
         observacao: registro.observacao ?? '',
         usuarioResponsavelId:
@@ -2110,7 +2122,11 @@ export const PessoasOperations = {
 export const AsoOperations = {
   async list(params = {}, user = {}) {
     const ownerId = user?.id ? await resolveOwnerId(user.id) : null
-    let query = supabaseAdmin.from('aso_controle_view').select('*').order('proximo_vencimento', { ascending: true })
+    let query = supabaseAdmin
+      .from('aso_controle_view')
+      .select('*')
+      .order('status_registro', { ascending: true })
+      .order('proximo_vencimento', { ascending: true })
 
     if (ownerId) {
       query = query.eq('account_owner_id', ownerId)
@@ -2250,7 +2266,7 @@ export const AsoOperations = {
     const client = buildUserClient(authToken)
     const registro = await executeSingle(
       client.rpc('rpc_aso_register_exam', params),
-      'Falha ao registrar exame.'
+      'Falha ao dar baixa no exame.'
     )
 
     return mapAsoRecord(registro)
@@ -2266,6 +2282,7 @@ export const AsoOperations = {
         .from('aso_historico')
         .select('id, aso_id, pessoa_id, acao, dados_antes, dados_depois, observacao, usuario_responsavel, criado_em')
         .eq('aso_id', id)
+        .neq('acao', 'cadastro')
         .order('criado_em', { ascending: true }),
       'Falha ao obter historico do ASO.'
     )

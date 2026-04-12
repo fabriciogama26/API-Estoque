@@ -313,7 +313,8 @@ export function useAsoController() {
           (item) =>
             item?.id !== editingAso?.id &&
             item?.pessoaId === payload.pessoaId &&
-            item?.tipoExameId === payload.tipoExameId,
+            item?.tipoExameId === payload.tipoExameId &&
+            item?.statusRegistro !== 'baixado',
         )
         .sort((left, right) => String(right?.dataExame || '').localeCompare(String(left?.dataExame || '')))
 
@@ -476,6 +477,7 @@ export function useAsoController() {
       open: true,
       aso,
       dataRealizada: '',
+      observacao: aso?.observacao ?? '',
     })
   }
 
@@ -506,7 +508,7 @@ export function useAsoController() {
       setRegisterExamState((prev) => ({
         ...prev,
         isSaving: false,
-        error: err.message || 'Falha ao registrar exame.',
+        error: err.message || 'Falha ao dar baixa no exame.',
       }))
       reportError(err, { area: 'aso_register_exam', asoId: registerExamState.aso.id })
     }

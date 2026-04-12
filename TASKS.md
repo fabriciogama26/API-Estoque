@@ -15,6 +15,7 @@
   - periodico alerta sobre possivel duplicidade na janela de 15 dias e pode continuar
   - demissional exige pessoa inativa ou com `dataDemissao`
 - Cadastro em massa de ASO foi implementado com template XLSX, upload para Storage, Edge Function de importacao e CSV de erros.
+- Fluxo de baixa do ASO passou a fechar o registro atual como `Baixado`, criar um novo ciclo com a data realizada e registrar historico apenas em edicao/baixa.
 - Tela de reset de senha passou a traduzir o erro de senha repetida para portugues e ganhou exibicao/ocultacao por icone de olho nos campos de senha.
 - Removida a reautenticacao obrigatoria nas rotas protegidas do backend/front.
 - Fluxo de reset de senha voltou a usar Supabase direto com `token_hash` na tela de reset.
@@ -33,6 +34,7 @@
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260412_create_aso_control.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260412_add_aso_page_permissions.sql` no projeto Supabase.
+- Aplicar a migration `supabase/migrations/20260412_aso_baixa_e_historico.sql` no projeto Supabase.
 - Revisar a regra de `PermissionsContext` para role `admin`: hoje ela libera todas as rotas, entao os toggles de pagina em `Credenciais e Permissoes` nao restringem navegacao para esse perfil.
 - Publicar/deploy das Edge Functions `aso-template` e `aso-import` no projeto Supabase.
 - Validar no banco o comportamento de `proximo_vencimento`:
