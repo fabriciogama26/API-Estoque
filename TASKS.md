@@ -1,8 +1,19 @@
 # Tasks
 
 ## Concluido
+- Tela de ASO foi criada com cadastro manual, cards, filtros, lista, detalhes, historico e modal de registro de exame.
+- Navegacao e controle de acesso da tela ASO foram integrados em rota, menu lateral e `permissions.js`.
+- Documentacao obrigatoria da tela ASO foi criada em `docs/ASO.txt` e o README foi atualizado com a nova estrutura.
 - Base do dominio de ASO foi criada com migration versionada (`aso_tipos_exame`, `aso_controle`, `aso_historico`), view (`aso_controle_view`) e RPCs de create/update/registrar exame.
 - API e services ganharam a base de integracao para ASO (listagem, tipos, cadastro, edicao, registro de exame e historico).
+- Tela ASO ganhou rota principal `/pcsmo/controledeaso` com alias em `/cadastros/aso`, botao `Ajuda`, legenda visual e exportacao `Excel (CSV)`.
+- Datas do ASO foram corrigidas para exibicao no padrao brasileiro sem deslocamento de timezone.
+- Regras de ASO foram refinadas:
+  - bloqueio duro no banco para `funcionario + tipo de exame + data do exame`
+  - admissional e demissional bloqueiam novo cadastro por funcionario
+  - periodico alerta sobre possivel duplicidade na janela de 15 dias e pode continuar
+  - demissional exige pessoa inativa ou com `dataDemissao`
+- Cadastro em massa de ASO foi implementado com template XLSX, upload para Storage, Edge Function de importacao e CSV de erros.
 - Tela de reset de senha passou a traduzir o erro de senha repetida para portugues e ganhou exibicao/ocultacao por icone de olho nos campos de senha.
 - Removida a reautenticacao obrigatoria nas rotas protegidas do backend/front.
 - Fluxo de reset de senha voltou a usar Supabase direto com `token_hash` na tela de reset.
@@ -19,14 +30,15 @@
 - `resolveUsuarioId()` foi corrigido para devolver o ator real da sessao; dependentes deixam de gravar o owner em campos de auditoria/"cadastrado por".
 
 ## Pendente
-- Implementar a tela de ASO (cadastro, cards, filtros, lista, detalhes, historico e modal "Registrar exame").
-- Implementar cadastro em massa de ASO via XLSX com template, validacoes, relatorio de erros e bloqueio de duplicidade.
 - Aplicar a migration `supabase/migrations/20260412_create_aso_control.sql` no projeto Supabase.
+- Publicar/deploy das Edge Functions `aso-template` e `aso-import` no projeto Supabase.
 - Validar no banco o comportamento de `proximo_vencimento`:
   - admissional e periodico somam 1 ano a partir de `data_exame`
   - demissional fica sem renovacao e sem alerta
-- Validar por SQL e no app a constraint de duplicidade por tenant em `aso_controle` (`account_owner_id + pessoa_id + tipo_exame_id`).
-- Atualizar a documentacao obrigatoria da feature (`docs/ASO.txt`) e o `README.md` se a mudanca impactar uso/configuracao.
+- Validar por SQL e no app as regras de duplicidade do ASO:
+  - bloqueio exato por `account_owner_id + pessoa_id + tipo_exame_id + data_exame`
+  - unicidade de admissional/demissional por funcionario
+  - alerta de periodico dentro de 15 dias
 - Aplicar a migration `supabase/migrations/20260305_expand_permission_dependencies.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` no projeto Supabase.
 - Validar por SQL com `request.jwt.claim.sub` de owner e dependente que `rpc_catalog_list('centros_servico')` e `rpc_catalog_list('centros_estoque')` nao retornam dados de outro `account_owner_id`.

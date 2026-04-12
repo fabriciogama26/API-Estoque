@@ -13,6 +13,7 @@ create table if not exists public.aso_tipos_exame (
 );
 
 insert into public.aso_tipos_exame (
+  id,
   codigo,
   nome,
   gera_vencimento,
@@ -21,11 +22,12 @@ insert into public.aso_tipos_exame (
   ativo
 )
 values
-  ('admissional', 'Admissional', true, 1, 1, true),
-  ('periodico', 'Periodico', true, 1, 2, true),
-  ('demissional', 'Demissional', false, null, 3, true)
+  ('11111111-1111-4111-8111-111111111111', 'admissional', 'Admissional', true, 1, 1, true),
+  ('22222222-2222-4222-8222-222222222222', 'periodico', 'Periodico', true, 1, 2, true),
+  ('33333333-3333-4333-8333-333333333333', 'demissional', 'Demissional', false, null, 3, true)
 on conflict (codigo) do update
 set
+  id = excluded.id,
   nome = excluded.nome,
   gera_vencimento = excluded.gera_vencimento,
   anos_validade = excluded.anos_validade,
@@ -44,8 +46,7 @@ create table if not exists public.aso_controle (
   usuario_edicao uuid null references public.app_users(id),
   criado_em timestamptz not null default now(),
   atualizado_em timestamptz null,
-  account_owner_id uuid not null default public.my_owner_id() references public.app_users(id),
-  constraint aso_controle_owner_pessoa_tipo_unique unique (account_owner_id, pessoa_id, tipo_exame_id)
+  account_owner_id uuid not null default public.my_owner_id() references public.app_users(id)
 );
 
 create index if not exists aso_controle_owner_idx
@@ -53,6 +54,17 @@ create index if not exists aso_controle_owner_idx
 
 create index if not exists aso_controle_pessoa_idx
   on public.aso_controle (pessoa_id, tipo_exame_id);
+
+create unique index if not exists aso_controle_owner_pessoa_tipo_data_unique_idx
+  on public.aso_controle (account_owner_id, pessoa_id, tipo_exame_id, data_exame);
+
+create unique index if not exists aso_controle_owner_pessoa_admissional_unique_idx
+  on public.aso_controle (account_owner_id, pessoa_id)
+  where tipo_exame_id = '11111111-1111-4111-8111-111111111111';
+
+create unique index if not exists aso_controle_owner_pessoa_demissional_unique_idx
+  on public.aso_controle (account_owner_id, pessoa_id)
+  where tipo_exame_id = '33333333-3333-4333-8333-333333333333';
 
 create index if not exists aso_controle_vencimento_idx
   on public.aso_controle (proximo_vencimento);
@@ -161,7 +173,9 @@ select
   coalesce(ue.username, ue.display_name, ue.email, aso.usuario_edicao::text) as usuario_edicao_nome,
   aso.criado_em,
   aso.atualizado_em,
-  aso.account_owner_id
+  aso.account_owner_id,
+  pv."dataDemissao" as data_demissao,
+  pv.ativo
 from public.aso_controle aso
 join public.pessoas_view pv on pv.id = aso.pessoa_id
 join public.aso_tipos_exame tipo on tipo.id = aso.tipo_exame_id
@@ -297,6 +311,10 @@ declare
   v_is_master boolean := public.is_master();
   v_user uuid := case when v_is_master and p_usuario_id is not null then p_usuario_id else auth.uid() end;
   v_row_owner uuid;
+  v_pessoa_ativo boolean;
+  v_pessoa_data_demissao timestamptz;
+  v_tipo_codigo text;
+  v_tipo_nome text;
   v_id uuid;
   v_after jsonb;
 begin
@@ -308,8 +326,14 @@ begin
     raise exception 'owner_not_resolved' using errcode = '42501';
   end if;
 
-  select p.account_owner_id
-    into v_row_owner
+  select
+    p.account_owner_id,
+    p.ativo,
+    p."dataDemissao"
+    into
+      v_row_owner,
+      v_pessoa_ativo,
+      v_pessoa_data_demissao
   from public.pessoas p
   where p.id = p_pessoa_id;
 
@@ -321,16 +345,52 @@ begin
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
+  select
+    codigo,
+    nome
+  into
+    v_tipo_codigo,
+    v_tipo_nome
+  from public.aso_tipos_exame
+  where id = p_tipo_exame_id
+    and ativo = true;
+
+  if v_tipo_codigo is null then
+    raise exception 'tipo_exame_aso_not_found' using errcode = '23503';
+  end if;
+
   if exists (
     select 1
     from public.aso_controle aso
     where aso.account_owner_id = v_row_owner
       and aso.pessoa_id = p_pessoa_id
       and aso.tipo_exame_id = p_tipo_exame_id
+      and aso.data_exame = p_data_exame
   ) then
     raise exception 'aso_duplicate'
       using errcode = '23505',
-            message = 'Ja existe um ASO deste tipo para o funcionario informado.';
+            message = 'Ja existe um ASO deste tipo para o funcionario informado na mesma data.';
+  end if;
+
+  if v_tipo_codigo in ('admissional', 'demissional')
+     and exists (
+       select 1
+       from public.aso_controle aso
+       where aso.account_owner_id = v_row_owner
+         and aso.pessoa_id = p_pessoa_id
+         and aso.tipo_exame_id = p_tipo_exame_id
+     ) then
+    raise exception 'aso_unique_tipo'
+      using errcode = '23505',
+            message = format('Ja existe um exame %s cadastrado para este funcionario.', lower(v_tipo_nome));
+  end if;
+
+  if v_tipo_codigo = 'demissional'
+     and coalesce(v_pessoa_ativo, true) = true
+     and v_pessoa_data_demissao is null then
+    raise exception 'aso_demissional_requires_inactive'
+      using errcode = '23514',
+            message = 'Exame demissional so pode ser cadastrado para funcionario inativo ou com data de desligamento.';
   end if;
 
   insert into public.aso_controle (
@@ -418,6 +478,10 @@ declare
   v_user uuid := case when v_is_master and p_usuario_id is not null then p_usuario_id else auth.uid() end;
   v_row_owner uuid;
   v_pessoa_id uuid;
+  v_pessoa_ativo boolean;
+  v_pessoa_data_demissao timestamptz;
+  v_tipo_codigo text;
+  v_tipo_nome text;
   v_before jsonb;
   v_after jsonb;
   v_acao text := case when p_acao in ('edicao', 'registro_exame') then p_acao else 'edicao' end;
@@ -432,11 +496,16 @@ begin
 
   select
     aso.account_owner_id,
-    aso.pessoa_id
+    aso.pessoa_id,
+    p.ativo,
+    p."dataDemissao"
   into
     v_row_owner,
-    v_pessoa_id
+    v_pessoa_id,
+    v_pessoa_ativo,
+    v_pessoa_data_demissao
   from public.aso_controle aso
+  join public.pessoas p on p.id = aso.pessoa_id
   where aso.id = p_id;
 
   if v_row_owner is null then
@@ -447,17 +516,54 @@ begin
     raise exception 'forbidden' using errcode = '42501';
   end if;
 
+  select
+    codigo,
+    nome
+  into
+    v_tipo_codigo,
+    v_tipo_nome
+  from public.aso_tipos_exame
+  where id = p_tipo_exame_id
+    and ativo = true;
+
+  if v_tipo_codigo is null then
+    raise exception 'tipo_exame_aso_not_found' using errcode = '23503';
+  end if;
+
   if exists (
     select 1
     from public.aso_controle aso
     where aso.account_owner_id = v_row_owner
       and aso.pessoa_id = v_pessoa_id
       and aso.tipo_exame_id = p_tipo_exame_id
+      and aso.data_exame = p_data_exame
       and aso.id <> p_id
   ) then
     raise exception 'aso_duplicate'
       using errcode = '23505',
-            message = 'Ja existe um ASO deste tipo para o funcionario informado.';
+            message = 'Ja existe um ASO deste tipo para o funcionario informado na mesma data.';
+  end if;
+
+  if v_tipo_codigo in ('admissional', 'demissional')
+     and exists (
+       select 1
+       from public.aso_controle aso
+       where aso.account_owner_id = v_row_owner
+         and aso.pessoa_id = v_pessoa_id
+         and aso.tipo_exame_id = p_tipo_exame_id
+         and aso.id <> p_id
+     ) then
+    raise exception 'aso_unique_tipo'
+      using errcode = '23505',
+            message = format('Ja existe um exame %s cadastrado para este funcionario.', lower(v_tipo_nome));
+  end if;
+
+  if v_tipo_codigo = 'demissional'
+     and coalesce(v_pessoa_ativo, true) = true
+     and v_pessoa_data_demissao is null then
+    raise exception 'aso_demissional_requires_inactive'
+      using errcode = '23514',
+            message = 'Exame demissional so pode ser cadastrado para funcionario inativo ou com data de desligamento.';
   end if;
 
   select to_jsonb(vw)

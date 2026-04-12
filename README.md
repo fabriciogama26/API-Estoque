@@ -163,6 +163,7 @@ api/
     withAuth.js  # helper compartilhado da API serverless
   index.js  # handler da API serverless
 docs/
+  ASO.txt  # documentacao: ASO.txt
   Acidentes.txt  # documentacao: Acidentes.txt
   AcidentesEmMassa.txt  # documentacao: AcidentesEmMassa.txt
   AnaliseEstoque.txt  # documentacao: AnaliseEstoque.txt
@@ -272,6 +273,18 @@ src/
       Table/
         AcidentesTable.jsx  # componente React
         AcidentesTableRow.jsx  # componente React
+    Aso/
+      AsoActions.jsx  # componente React
+      AsoConflictModal.jsx  # componente React
+      AsoDetailsModal.jsx  # componente React
+      AsoFilters.jsx  # componente React
+      AsoForm.jsx  # componente React
+      AsoHistoryModal.jsx  # componente React
+      AsoHistoryTimeline.jsx  # componente React
+      AsoImportModal.jsx  # componente React
+      AsoRegisterExamModal.jsx  # componente React
+      AsoSummaryCards.jsx  # componente React
+      AsoTable.jsx  # componente React
     AutoResizeIframe.jsx  # componente React
     CadastroBase/
       CadastroBaseFilters.jsx  # componente React
@@ -372,6 +385,7 @@ src/
     security.js  # configuracoes/constantes
   context/
     AcidentesContext.jsx  # contexto React
+    AsoContext.jsx  # contexto React
     AuthContext.jsx  # contexto React
     CadastroBaseContext.jsx  # contexto React
     DashboardAcidentesContext.jsx  # contexto React
@@ -406,6 +420,7 @@ src/
     helpGrupoMaterial.json  # conteudo de ajuda
     helpHhtMensal.json  # conteudo de ajuda
     helpMateriais.json  # conteudo de ajuda
+    helpAso.json  # conteudo de ajuda
     helpPessoas.json  # conteudo de ajuda
     helpRelatorioEstoque.json  # conteudo de ajuda
     helpSaidas.json  # conteudo de ajuda
@@ -415,6 +430,7 @@ src/
     useAcidenteForm.js  # hook de estado/efeitos
     useAcidentes.js  # hook de estado/efeitos
     useAgentes.js  # hook de estado/efeitos
+    useAsoController.js  # hook de estado/efeitos
     useCadastroBaseController.js  # hook de estado/efeitos
     useChangePassword.js  # hook de estado/efeitos
     useDashboardAcidentes.js  # hook de estado/efeitos
@@ -451,6 +467,7 @@ src/
   pages/
     Acidentes.jsx  # pagina React
     AnaliseEstoquePage.jsx  # pagina React
+    AsoPage.jsx  # pagina React
     CadastroBase.jsx  # pagina React
     Configuracoes.jsx  # pagina React
     DashboardAcidentes.jsx  # pagina React
@@ -498,6 +515,7 @@ src/
     saidaRoutes.js  # definicao de rotas
   services/
     acidentesService.js  # service frontend (API/data client)
+    asoService.js  # service frontend (API/data client)
     api.js  # service frontend (API/data client)
     authService.js  # service frontend (API/data client)
     basicRegistrationService.js  # service frontend (API/data client)
@@ -532,6 +550,7 @@ src/
   styles/
     AcidentesPage.css  # estilos
     AcidentesTableStatus.css  # estilos
+    AsoPage.css  # estilos
     CadastroBasePage.css  # estilos
     ConfiguracoesPage.css  # estilos
     DashboardPage.css  # estilos
@@ -566,6 +585,7 @@ src/
     indicadores.js  # utilitario
     inventoryReportUtils.js  # utilitario
     passwordPolicy.js  # utilitario
+    asoExport.js  # utilitario
     pessoasUtils.js  # utilitario
     saidasExport.js  # utilitario
     saidasUtils.js  # utilitario
@@ -592,6 +612,14 @@ supabase/
     auth-recover/
       index.ts  # edge function (Supabase)
     acidente-import/
+      index.ts  # edge function (Supabase)
+    aso-import/
+      _shared/
+        importLimits.ts  # helper de limite de importacao da edge function
+      index.ts  # edge function (Supabase)
+    aso-template/
+      _shared/
+        auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
     acidente-template/
       _shared/
@@ -867,6 +895,7 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Autenticar no Supabase e carregar contexto do usuario.
 - Cadastrar catalogos base (grupos, fabricantes, cores, caracteristicas, medidas).
 - Cadastrar materiais e pessoas.
+- Cadastrar e acompanhar ASOs por funcionario em `/pcsmo/controledeaso`.
 - Registrar entradas para compor saldo.
 - Registrar saidas e acompanhar historico.
 - Exportar lista de materiais em CSV quando necessario.

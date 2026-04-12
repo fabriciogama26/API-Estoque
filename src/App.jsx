@@ -19,6 +19,7 @@ import { RelatorioEstoquePage } from './pages/RelatorioEstoque.jsx'
 import { NoAccessPage } from './pages/NoAccessPage.jsx'
 import { ErrorBoundaryWithLogger } from './components/ErrorBoundary.jsx'
 import { CadastroBasePage } from './pages/CadastroBase.jsx'
+import { AsoPage } from './pages/AsoPage.jsx'
 
 function App() {
   return (
@@ -37,8 +38,13 @@ function App() {
 
             <Route path="cadastros">
               <Route path="pessoas" element={<PessoasPage />} />
+              <Route path="aso" element={<AsoPage />} />
               <Route path="materiais" element={<MateriaisPage />} />
               <Route path="base" element={<CadastroBasePage />} />
+            </Route>
+
+            <Route path="pcsmo">
+              <Route path="controledeaso" element={<AsoPage />} />
             </Route>
 
             <Route path="acidentes">

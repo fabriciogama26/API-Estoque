@@ -56,6 +56,14 @@ const navSections = [
     ],
   },
   {
+    id: 'pcsmo',
+    title: 'PCSMO',
+    icon: ChecklistIcon,
+    items: [
+      { to: '/pcsmo/controledeaso', label: 'Controle de ASO', icon: ChecklistIcon, pageId: 'cadastros-aso' },
+    ],
+  },
+  {
     id: 'termos',
     title: 'Termos',
     icon: ChecklistIcon,
