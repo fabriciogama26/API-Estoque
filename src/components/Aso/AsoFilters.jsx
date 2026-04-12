@@ -46,7 +46,8 @@ export function AsoFilters({
             <option value="vence_15">Vencendo em 15 dias</option>
             <option value="vence_hoje">Vence hoje</option>
             <option value="vencido">Vencidos</option>
-            <option value="demissional">Demissional</option>
+            <option value="baixado">Baixado</option>
+            <option value="sem_renovacao">Sem renovacao</option>
           </select>
         </label>
 

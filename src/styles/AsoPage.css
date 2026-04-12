@@ -59,21 +59,21 @@
 }
 
 .aso-status-chip--warning-soft {
-  background: #fff7e6;
-  color: #9a6700;
-  border-color: #f5d08a;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
 }
 
 .aso-status-chip--warning {
-  background: #fff1db;
-  color: #b45309;
-  border-color: #fbbf24;
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #f59e0b;
 }
 
 .aso-status-chip--warning-strong {
-  background: #ffe7cc;
+  background: #ffedd5;
   color: #c2410c;
-  border-color: #fb923c;
+  border-color: #f97316;
 }
 
 .aso-status-chip--today {
@@ -83,9 +83,15 @@
 }
 
 .aso-status-chip--danger {
-  background: #f3e8ff;
-  color: #7e22ce;
-  border-color: #c084fc;
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #ef4444;
+}
+
+.aso-status-chip--closed {
+  background: #eef2ff;
+  color: #4338ca;
+  border-color: #a5b4fc;
 }
 
 .aso-status-chip--neutral {
@@ -94,9 +100,14 @@
   border-color: #cbd5e1;
 }
 
+.aso-legend__dot--60 {
+  background: #60a5fa;
+  border-color: #2563eb;
+}
+
 .aso-legend__dot--30 {
-  background: #fb923c;
-  border-color: #ea580c;
+  background: #fbbf24;
+  border-color: #d97706;
 }
 
 .aso-legend__dot--15 {
@@ -104,20 +115,25 @@
   border-color: #c2410c;
 }
 
+.aso-legend__dot--baixado {
+  background: #a5b4fc;
+  border-color: #4f46e5;
+}
+
 .data-table--saidas tbody tr.data-table__row--aso-ok td {
   background: #f0fdf4;
 }
 
 .data-table--saidas tbody tr.data-table__row--aso-warning-soft td {
-  background: #fffbeb;
+  background: #eff6ff;
 }
 
 .data-table--saidas tbody tr.data-table__row--aso-warning td {
-  background: #fff7ed;
+  background: #fffbeb;
 }
 
 .data-table--saidas tbody tr.data-table__row--aso-warning-strong td {
-  background: #ffedd5;
+  background: #fff7ed;
 }
 
 .data-table--saidas tbody tr.data-table__row--aso-today td {
@@ -125,9 +141,13 @@
 }
 
 .data-table--saidas tbody tr.data-table__row--aso-danger td {
-  background: #faf5ff;
+  background: #fef2f2;
 }
 
 .data-table--saidas tbody tr.data-table__row--aso-neutral td {
   background: #f8fafc;
+}
+
+.data-table--saidas tbody tr.data-table__row--aso-closed td {
+  background: #eef2ff;
 }

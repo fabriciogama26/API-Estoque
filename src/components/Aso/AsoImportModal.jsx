@@ -141,7 +141,7 @@ export function AsoImportModal({
               <li>Tipo de exame deve ser admissional, periodico ou demissional.</li>
               <li>Data do exame deve estar em dd/MM/yyyy ou formato de data do Excel.</li>
               <li>Bloqueia duplicidade exata por matricula + tipo + data.</li>
-              <li>Admissional e demissional bloqueiam novo cadastro para a mesma matricula.</li>
+              <li>Admissional e demissional bloqueiam novo cadastro enquanto houver registro ativo para a mesma matricula.</li>
               <li>Demissional exige pessoa inativa ou com data de desligamento.</li>
             </ul>
           </details>

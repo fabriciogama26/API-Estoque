@@ -39,7 +39,7 @@ export const updateAso = (id, payload) => {
 
 export const registerAsoExam = (id, payload) => {
   if (!api?.aso?.registerExam) {
-    return Promise.reject(new Error('Endpoint de registro de exame nao configurado.'))
+    return Promise.reject(new Error('Endpoint de baixa de exame nao configurado.'))
   }
   return api.aso.registerExam(id, payload)
 }

@@ -48,9 +48,15 @@ export function AsoActions({
         type="button"
         className="materiais-table-action-button"
         onClick={() => onRegisterExam?.(aso)}
-        disabled={isSaving || isDemissional}
-        aria-label={`Registrar exame do ASO ${aso?.matricula || ''}`}
-        title={isDemissional ? 'Demissional nao possui renovacao' : 'Registrar exame'}
+        disabled={isSaving || isDemissional || aso?.statusRegistro === 'baixado'}
+        aria-label={`Dar baixa no exame do ASO ${aso?.matricula || ''}`}
+        title={
+          isDemissional
+            ? 'Demissional nao possui renovacao'
+            : aso?.statusRegistro === 'baixado'
+              ? 'Registro ja baixado'
+              : 'Dar baixa no exame'
+        }
       >
         <PlusCircleIcon size={16} strokeWidth={1.8} />
       </button>
