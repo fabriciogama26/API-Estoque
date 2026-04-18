@@ -8,6 +8,7 @@ const CENTRO_ESTOQUE_TABLE = "centros_estoque"
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
 const materiaisView = Deno.env.get("MATERIAIS_VIEW") || DEFAULT_MATERIAIS_VIEW
+const MATERIAIS_VIEW_BATCH_SIZE = 50
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false },
@@ -1005,6 +1006,16 @@ const execute = async (builder: Promise<{ data: any; error: any }>, fallbackMess
   }
   return data
 }
+
+const chunkArray = (items: any[] = [], size = MATERIAIS_VIEW_BATCH_SIZE) => {
+  const chunks: any[][] = []
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size))
+  }
+  return chunks
+}
+
+const sortByNome = (a: any, b: any) => trim(a?.nome ?? "").localeCompare(trim(b?.nome ?? ""))
 
 const executeSingle = async (builder: any, fallbackMessage: string) => {
   const { data, error } = await builder.single()
@@ -2042,11 +2053,15 @@ const carregarMateriaisPorOwner = async (ownerId: string) => {
   if (!ids.length) {
     return []
   }
-  const materiaisRegistros = await execute(
-    supabaseAdmin.from(materiaisView).select("*").in("id", ids).order("nome"),
-    "Falha ao listar materiais.",
-  )
-  return (materiaisRegistros ?? []).map((item: any) => mapMaterialRecord(item))
+  const materiaisRegistros: any[] = []
+  for (const idsLote of chunkArray(ids)) {
+    const lote = await execute(
+      supabaseAdmin.from(materiaisView).select("*").in("id", idsLote).order("nome"),
+      "Falha ao listar materiais.",
+    )
+    materiaisRegistros.push(...(lote ?? []))
+  }
+  return materiaisRegistros.sort(sortByNome).map((item: any) => mapMaterialRecord(item))
 }
 
 const preencherCentrosEstoque = async (registros: any[] = [], ownerId: string) => {
