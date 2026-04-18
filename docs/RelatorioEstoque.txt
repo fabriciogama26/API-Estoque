@@ -129,6 +129,22 @@ Atualizacao 2026-02 (semanal)
 - `supabase/functions/relatorio-estoque-semanal-email/_shared/relatorioEstoqueSemanalEmailCore.ts`
 - `supabase/functions/cleanup-import-errors/index.ts`
 
+Atualizacao 2026-04
+-------------------
+- Geracao semanal e mensal passou a buscar `materiais_view` em lotes de 50 IDs.
+- A mudanca evita URL gigante em PostgREST (`id=in.(...)`) quando o tenant tem muitos materiais.
+- Diagnostico: logs de cron em 2026-03 e 2026-04 falhavam em `Falha ao listar materiais` com erro HTTP/2 na chamada de `materiais_view`.
+- O filtro de tenant permanece em `materiais.account_owner_id`; a view recebe somente IDs do owner atual.
+- Relatorios de dependentes continuam entrando quando as movimentacoes foram gravadas no mesmo `account_owner_id` do owner.
+- Antes/Depois:
+- Antes: um tenant com muitos materiais podia abortar a geracao semanal/mensal antes de criar novo `inventory_report`.
+- Depois: a consulta de materiais e particionada, reduzindo o tamanho das requisicoes e permitindo gerar novos relatorios.
+- Arquivos alterados:
+- `supabase/functions/relatorio-estoque-semanal/_shared/relatorioEstoqueSemanalCore.ts`
+- `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`
+- `docs/RelatorioEstoque.txt`
+- `TASKS.md`
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -162,6 +178,10 @@ Funcoes principais
   - Caminho: supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts
   - Responsavel por: montar dados e persistir em inventory_report.
   - Calcula ranking de consumo, desvios e cobertura por centro/setor.
+- relatorioEstoqueSemanalCore
+  - Tipo: utilitario de edge function
+  - Caminho: supabase/functions/relatorio-estoque-semanal/_shared/relatorioEstoqueSemanalCore.ts
+  - Responsavel por: montar CSVs semanais, carregar materiais em lotes e persistir anexos em inventory_report.
 
 Constantes e configuracoes
 --------------------------
@@ -169,6 +189,11 @@ Constantes e configuracoes
   - Tipo: configuracao
   - Caminho: src/config/RelatorioEstoqueConfig.js
   - Uso: limite mensal de geracao de PDF por relatorio.
+- MATERIAIS_VIEW_BATCH_SIZE
+  - Tipo: constante de Edge Function
+  - Caminho: supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts
+  - Caminho: supabase/functions/relatorio-estoque-semanal/_shared/relatorioEstoqueSemanalCore.ts
+  - Uso: tamanho do lote para consultar `materiais_view` sem montar URL longa.
 
 Funcoes utilitarias relacionadas
 --------------------------------
@@ -176,6 +201,11 @@ Funcoes utilitarias relacionadas
   - Tipo: utilitario
   - Caminho: src/utils/RelatorioEstoquePdfUtils.js
   - Responsavel por: enviar HTML para renderizacao e baixar PDF.
+- carregarMateriaisPorOwner
+  - Tipo: utilitario de Edge Function
+  - Caminho: supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts
+  - Caminho: supabase/functions/relatorio-estoque-semanal/_shared/relatorioEstoqueSemanalCore.ts
+  - Responsavel por: buscar materiais do owner e consultar `materiais_view` em lotes.
 
 Servicos e integracoes externas
 -------------------------------

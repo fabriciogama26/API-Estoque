@@ -51,8 +51,17 @@
 - Validar no app que "Cadastrado por"/"Registrado por" mostra o dependente nas telas Pessoas, Materiais, Saidas e Cadastro Base.
 - Validar no app que Acidentes continua exibindo o dependente em "Registrado por" e que HHT mensal permanece consistente no historico/listagem.
 - Revisar o limite global de emails do Supabase Auth (`Auth -> Rate limits -> Rate limit for sending emails`).
+- Validar em producao o ultimo `inventory_report` semanal/mensal por `account_owner_id`, conferindo `metadados->>tipo`, `email_status`, `email_enviado_em`, `email_erro` e `email_tentativas`.
+- Validar em producao quais usuarios entram como destinatarios por owner nas funcoes de email (`credential` admin/master, `parent_user_id`, `email` e `ativo`).
+- Validar em producao a geracao `relatorio-estoque-semanal` apos 2026-03-06 para o owner `59191387-669b-4585-8e11-7070d9769d86`, pois o log Brevo mostra semanal enviado para Fabiana em 2026-03-06 e depois apenas relatorio de troca de EPI.
+- Publicar/deploy das Edge Functions `relatorio-estoque-semanal` e `relatorio-estoque-mensal` com busca de `materiais_view` em lotes.
+- Reexecutar/validar os crons `relatorio-estoque-semanal` e `relatorio-estoque-mensal` em producao para confirmar que nao ocorre mais erro HTTP/2 em `materiais_view?id=in.(...)`.
+- Validar que o owner `59191387-669b-4585-8e11-7070d9769d86` volta a criar `inventory_report` semanal/mensal pendente e que o job de email envia para `fabiana.gomes@faa.edu.br`.
 
 ## Observacoes
 - `git status` no sandbox exige `safe.directory` por causa do ownership do workspace.
 - Existem alteracoes locais previas em `src/pages/Configuracoes.jsx`, `src/config/permissions.js`, `docs/Configuracoes.txt` e `docs/PermissoesToggles.txt` que continuam sendo usadas.
 - O item `TESTE` foi reproduzido por SQL em `rpc_catalog_list('centros_estoque')` e `rpc_catalog_list('centros_servico')` com sessao simulada de dependente.
+- Auditoria local dos relatorios automaticos: as Edge Functions de geracao semanal/mensal/troca percorrem todos os owners ativos; logs de producao informados em 2026-04-18 mostram `test=false` no cron semanal, mensal e troca. Proxima suspeita: relatorios de outros owners ja marcados como enviados/erro ou usuarios fora do filtro de destinatarios.
+- CSV Brevo `logs-10552678-1776523890567.csv`: semanal foi enviado para `fabiana.gomes@faa.edu.br` em 2026-03-06; depois os semanais do CSV aparecem somente para `toka.fgg@gmail.com`, enquanto troca de EPI continua indo para Fabiana.
+- Diagnostico 2026-04-18: o motivo provavel da ausencia dos relatorios semanais/mensais da Fabiana nao e o dependente gravar movimentacao; a geracao falha ao listar muitos materiais em `materiais_view` por uma URL PostgREST gigante. O codigo filtra movimentacoes por `account_owner_id`, entao dependentes do mesmo owner devem entrar no relatorio.
