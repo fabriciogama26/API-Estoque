@@ -29,22 +29,10 @@ import {
 } from '../services/asoService.js'
 import { listPessoasReferences, searchPessoas } from '../services/pessoasService.js'
 
-const PERIODICO_DUPLICATE_WINDOW_DAYS = 15
-const DAY_IN_MS = 24 * 60 * 60 * 1000
+const RENEWABLE_EXAM_CODES = new Set(['admissional', 'periodico', 'mudanca_funcao_setor'])
+const NEXT_EXAM_ALLOWED_CODES = new Set(['periodico', 'mudanca_funcao_setor', 'demissional'])
 
 const normalizeDateKey = (value) => formatDateInputValue(value)
-
-const diffInDays = (leftValue, rightValue) => {
-  const left = normalizeDateKey(leftValue)
-  const right = normalizeDateKey(rightValue)
-  if (!left || !right) return Number.POSITIVE_INFINITY
-  const leftDate = new Date(`${left}T00:00:00`)
-  const rightDate = new Date(`${right}T00:00:00`)
-  if (Number.isNaN(leftDate.getTime()) || Number.isNaN(rightDate.getTime())) {
-    return Number.POSITIVE_INFINITY
-  }
-  return Math.round(Math.abs(leftDate.getTime() - rightDate.getTime()) / DAY_IN_MS)
-}
 
 const buildConflictState = (overrides = {}) => ({
   ...ASO_CONFLICT_DEFAULT,
@@ -313,10 +301,29 @@ export function useAsoController() {
           (item) =>
             item?.id !== editingAso?.id &&
             item?.pessoaId === payload.pessoaId &&
-            item?.tipoExameId === payload.tipoExameId &&
-            item?.statusRegistro !== 'baixado',
+            item?.tipoExameId === payload.tipoExameId,
         )
         .sort((left, right) => String(right?.dataExame || '').localeCompare(String(left?.dataExame || '')))
+
+      const activeRenewable = allAsos
+        .filter(
+          (item) =>
+            item?.id !== editingAso?.id &&
+            item?.pessoaId === payload.pessoaId &&
+            item?.statusRegistro !== 'baixado' &&
+            RENEWABLE_EXAM_CODES.has(String(item?.tipoExameCodigo || '').trim().toLowerCase()),
+        )
+        .sort((left, right) => String(right?.dataExame || '').localeCompare(String(left?.dataExame || '')))[0]
+
+      const activeDemissional = allAsos
+        .filter(
+          (item) =>
+            item?.id !== editingAso?.id &&
+            item?.pessoaId === payload.pessoaId &&
+            item?.statusRegistro !== 'baixado' &&
+            String(item?.tipoExameCodigo || '').trim().toLowerCase() === 'demissional',
+        )
+        .sort((left, right) => String(right?.dataExame || '').localeCompare(String(left?.dataExame || '')))[0]
 
       const exactDuplicate = samePersonSameType.find(
         (item) => normalizeDateKey(item?.dataExame) === normalizeDateKey(payload.dataExame),
@@ -335,37 +342,31 @@ export function useAsoController() {
         })
       }
 
-      if ((tipoCodigo === 'admissional' || tipoCodigo === 'demissional') && samePersonSameType.length > 0) {
-        const existing = samePersonSameType[0]
+      if (RENEWABLE_EXAM_CODES.has(tipoCodigo) && activeRenewable) {
         return buildConflictState({
-          title: 'Exame ja cadastrado',
-          message: `Este funcionario ja possui um exame ${tipo?.nome?.toLowerCase() || 'deste tipo'} registrado em ${formatDate(
-            existing.dataExame,
-          )}. Para corrigir a data, edite o registro existente.`,
-          existing,
+          title: 'Exame ativo existente',
+          message: `Este funcionario ja possui um exame ${activeRenewable.tipoExame?.toLowerCase() || 'ativo'} em ${formatDate(
+            activeRenewable.dataExame,
+          )}. Use a baixa / novo exame para encerrar o atual antes de cadastrar outro.`,
+          existing: activeRenewable,
           canContinue: false,
-          openExistingLabel: 'Editar registro',
+          openExistingLabel: 'Editar registro ativo',
           pendingPayload: payload,
         })
       }
 
-      if (tipoCodigo === 'periodico') {
-        const existing = samePersonSameType.find(
-          (item) => diffInDays(item?.dataExame, payload.dataExame) <= PERIODICO_DUPLICATE_WINDOW_DAYS,
-        )
-
-        if (existing) {
-          return buildConflictState({
-            title: 'Possivel exame ja cadastrado',
-            message: `Este funcionario ja possui um exame periodico registrado em ${formatDate(
-              existing.dataExame,
-            )}. Verifique se deseja editar o registro existente ou continuar com um novo cadastro.`,
-            existing,
-            canContinue: true,
-            openExistingLabel: 'Ver registro existente',
-            pendingPayload: payload,
-          })
-        }
+      if (tipoCodigo === 'demissional' && (activeRenewable || activeDemissional)) {
+        const existing = activeRenewable || activeDemissional
+        return buildConflictState({
+          title: 'Exame ativo existente',
+          message: `Este funcionario ja possui um exame ${existing?.tipoExame?.toLowerCase() || 'ativo'} em ${formatDate(
+            existing?.dataExame,
+          )}. Use a baixa / novo exame para encerrar o atual antes de cadastrar um demissional.`,
+          existing,
+          canContinue: false,
+          openExistingLabel: 'Editar registro ativo',
+          pendingPayload: payload,
+        })
       }
 
       return null
@@ -448,7 +449,8 @@ export function useAsoController() {
 
   const openHistory = async (aso) => {
     if (!aso?.id) return
-    const cached = historyCache[aso.id]
+    const historyKey = aso.pessoaId || aso.id
+    const cached = historyCache[historyKey]
     if (cached) {
       setHistoryState({ ...ASO_HISTORY_DEFAULT, open: true, aso, registros: cached })
       return
@@ -456,7 +458,7 @@ export function useAsoController() {
     setHistoryState({ ...ASO_HISTORY_DEFAULT, open: true, aso, isLoading: true })
     try {
       const registros = await getAsoHistory(aso.id)
-      setHistoryCache((prev) => ({ ...prev, [aso.id]: registros ?? [] }))
+      setHistoryCache((prev) => ({ ...prev, [historyKey]: registros ?? [] }))
       setHistoryState({ ...ASO_HISTORY_DEFAULT, open: true, aso, registros: registros ?? [] })
     } catch (err) {
       setHistoryState({
@@ -472,10 +474,13 @@ export function useAsoController() {
   const closeHistory = () => setHistoryState({ ...ASO_HISTORY_DEFAULT })
 
   const openRegisterExam = (aso) => {
+    const defaultNextType =
+      tiposExame.find((item) => String(item?.codigo || '').trim().toLowerCase() === 'periodico')?.id || ''
     setRegisterExamState({
       ...ASO_REGISTER_EXAM_DEFAULT,
       open: true,
       aso,
+      proximoTipoExameId: defaultNextType,
       dataRealizada: '',
       observacao: aso?.observacao ?? '',
     })
@@ -491,13 +496,36 @@ export function useAsoController() {
   const handleRegisterExamSubmit = async (event) => {
     event.preventDefault()
     if (!registerExamState.aso?.id) return
+    if (!registerExamState.proximoTipoExameId) {
+      setRegisterExamState((prev) => ({ ...prev, error: 'Selecione o tipo do proximo exame.' }))
+      return
+    }
     if (!registerExamState.dataRealizada) {
       setRegisterExamState((prev) => ({ ...prev, error: 'Informe a data realizada.' }))
+      return
+    }
+    const proximoTipo = tiposExameMap.get(registerExamState.proximoTipoExameId)
+    const proximoCodigo = String(proximoTipo?.codigo || '').trim().toLowerCase()
+    if (!NEXT_EXAM_ALLOWED_CODES.has(proximoCodigo)) {
+      setRegisterExamState((prev) => ({ ...prev, error: 'Selecione um tipo valido para o proximo exame.' }))
+      return
+    }
+    if (
+      proximoCodigo === 'demissional' &&
+      registerExamState.aso &&
+      registerExamState.aso.ativo !== false &&
+      !registerExamState.aso.dataDemissao
+    ) {
+      setRegisterExamState((prev) => ({
+        ...prev,
+        error: 'Exame demissional so pode ser gerado para funcionario inativo ou com data de desligamento.',
+      }))
       return
     }
     setRegisterExamState((prev) => ({ ...prev, isSaving: true, error: null }))
     try {
       await registerAsoExam(registerExamState.aso.id, {
+        proximoTipoExameId: registerExamState.proximoTipoExameId,
         dataRealizada: registerExamState.dataRealizada,
         observacao: registerExamState.observacao,
       })

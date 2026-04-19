@@ -91,7 +91,7 @@ export function AsoImportModal({
               <li>tipo_exame</li>
               <li>data_exame (dd/MM/yyyy)</li>
             </ul>
-            <p className="desligamento-help__text">`tipo_exame` aceita admissional, periodico ou demissional.</p>
+            <p className="desligamento-help__text">`tipo_exame` aceita admissional, periodico, mudanca_funcao_setor ou demissional.</p>
             <p className="desligamento-help__text">`observacao` e opcional, se a coluna existir na planilha.</p>
           </section>
 
@@ -138,10 +138,10 @@ export function AsoImportModal({
             <ul>
               <li>Formato: XLSX obrigatorio.</li>
               <li>Matricula deve existir no cadastro de pessoas do tenant.</li>
-              <li>Tipo de exame deve ser admissional, periodico ou demissional.</li>
+              <li>Tipo de exame deve ser admissional, periodico, mudanca_funcao_setor ou demissional.</li>
               <li>Data do exame deve estar em dd/MM/yyyy ou formato de data do Excel.</li>
               <li>Bloqueia duplicidade exata por matricula + tipo + data.</li>
-              <li>Admissional e demissional bloqueiam novo cadastro enquanto houver registro ativo para a mesma matricula.</li>
+              <li>Admissional, periodico e mudanca_funcao_setor nao podem coexistir como ativos para a mesma matricula.</li>
               <li>Demissional exige pessoa inativa ou com data de desligamento.</li>
             </ul>
           </details>

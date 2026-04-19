@@ -27,6 +27,7 @@ Deno.serve(async (req) => {
   const data = [
     ["matricula", "tipo_exame", "data_exame", "observacao"],
     ["10", "periodico", "12/10/2026", "Observacao opcional"],
+    ["10", "mudanca_funcao_setor", "12/11/2026", "Opcional"],
   ]
   const ws = XLSX.utils.aoa_to_sheet(data)
   const wb = XLSX.utils.book_new()

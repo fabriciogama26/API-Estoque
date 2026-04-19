@@ -3,13 +3,13 @@ Tela: Controle de ASO
 
 Visao geral
 -----------
-- Controla exames ocupacionais por funcionario com foco em ASO admissional, periodico e demissional.
+- Controla exames ocupacionais por funcionario com foco em ASO admissional, periodico, mudanca de funcao/Setor e demissional.
 - A tela segue o padrao do sistema com bloco de cadastro, cards resumo, filtros, lista, ajuda contextual, exportacao CSV e historico.
 - O acesso principal foi criado em `/pcsmo/controledeaso`, mantendo alias em `/cadastros/aso`.
 - No menu lateral, a funcionalidade fica na nova secao `PCSMO` como `Controle de ASO`.
 - Em `Credenciais e Permissoes`, a tela usa a chave de pagina `pcsmo.controle_aso`, separada de `Pessoas`.
 - O campo "Proximo ao vencimento" e somente leitura:
-  - admissional e periodico somam 1 ano a partir de `data_exame`
+  - admissional, periodico e mudanca de funcao/Setor somam 1 ano a partir de `data_exame`
   - demissional fica sem renovacao e sem alerta
 - Historico de multiplos registros e obrigatorio:
   - edicao
@@ -45,9 +45,9 @@ Cadastro
   - `Cadastrar em massa` abre modal de importacao XLSX
 - Regras de duplicidade e consistencia:
   - bloqueio duro no banco para `funcionario + tipo de exame + data do exame`
-  - admissional: unico por funcionario/vinculo; novo cadastro e bloqueado quando ja existir um registro
-  - demissional: unico por funcionario e so pode ser cadastrado para pessoa inativa ou com `dataDemissao`
-  - periodico: pode existir varias vezes; quando houver outro periodico na janela de 15 dias, a tela alerta antes de salvar
+  - admissional, periodico e mudanca de funcao/Setor formam um grupo renovavel com apenas um registro ativo por funcionario
+  - demissional so pode ser cadastrado para pessoa inativa ou com `dataDemissao`
+  - quando ja existir um exame ativo, o fluxo correto e usar `Baixa / novo exame`
   - editar reutiliza o mesmo bloco de cadastro, rolando a tela para o topo
 - Cadastro em massa:
   - usa modelo XLSX com colunas `matricula`, `tipo_exame`, `data_exame` e `observacao` opcional
@@ -56,14 +56,10 @@ Cadastro
   - linhas invalidas retornam em CSV de erros assinado
   - a importacao reaproveita `rpc_aso_create_full` para manter as regras do banco
 - Modal de conflito:
-  - admissional/demissional:
-    - titulo "Exame ja cadastrado"
-    - orienta editar o registro existente
-    - botoes: `Editar registro` e `Cancelar`
-  - periodico proximo:
-    - titulo "Possivel exame ja cadastrado"
-    - mostra a data existente
-    - botoes: `Ver registro existente`, `Continuar mesmo assim`, `Cancelar`
+  - quando existe um exame ativo:
+    - titulo "Exame ativo existente"
+    - orienta usar a baixa / novo exame para encerrar o atual
+    - botoes: `Editar registro ativo` e `Cancelar`
 
 Filtros, auto-complete e listagem
 ---------------------------------
@@ -89,15 +85,17 @@ Filtros, auto-complete e listagem
   - Demissionais
 - Tabela:
   - Colunas: Funcionario, Matricula, Tipo de exame, Data do exame, Proximo vencimento, Dias para vencer, Status, Cadastrado em, Acoes
-  - Acoes: Ver detalhes, Editar, Historico, Dar baixa no exame
-  - `Dar baixa no exame` fica desabilitado para demissional e para registros ja baixados
+  - Acoes: Ver detalhes, Editar, Historico, Baixa / novo exame
+  - `Baixa / novo exame` fica desabilitado para demissional e para registros ja baixados
   - legenda de vencimento segue o padrao visual da tela Saidas
   - botao `Exportar Excel (CSV)` exporta a lista filtrada no formato CSV
 - Fluxo de baixa:
   - a baixa fecha o registro atual com status `Baixado`
   - a linha original permanece na lista como historico operacional
-  - um novo registro e criado com a `data realizada` informada no modal
-  - o proximo vencimento do novo registro e recalculado automaticamente
+  - o modal exige `Tipo do proximo exame`
+  - opcoes de proximo exame: `Periodico`, `Mudanca de funcao/Setor` e `Demissional`
+  - um novo registro e criado com a `data realizada` e o `tipo do proximo exame` informados no modal
+  - o proximo vencimento do novo registro e recalculado automaticamente quando o novo tipo for renovavel
 - Datas:
   - exibicao usa parser local para evitar deslocamento de dia em `YYYY-MM-DD`
   - o problema anterior de data ISO/UTC foi corrigido em formulario, tabela, detalhes, historico e exportacao
@@ -107,7 +105,7 @@ Boas praticas
 - Usar a matricula apenas para localizar/selecionar a pessoa; o vinculo persistido e `pessoa_id`.
 - Manter o catalogo `aso_tipos_exame` versionado via migration com IDs fixos para suportar regras por tipo.
 - Os UUIDs de `aso_tipos_exame` nao sao aleatorios por design:
-  - a tabela e um catalogo fechado (`admissional`, `periodico`, `demissional`)
+  - a tabela e um catalogo fechado (`admissional`, `periodico`, `mudanca_funcao_setor`, `demissional`)
   - os IDs fixos deixam o seed idempotente entre ambientes
   - as regras de negocio, RPCs e importacoes podem referenciar os tipos de forma estavel sem depender de texto
   - UUID aleatorio so faria mais sentido se esse catalogo virasse cadastro livre/administravel
@@ -115,6 +113,7 @@ Boas praticas
 - Mudancas de exame devem passar pelo historico para manter auditoria.
 - Cadastro inicial nao gera historico proprio; o historico fica reservado para alteracoes reais.
 - Em caso de correcao de data para admissional/demissional, editar o registro existente em vez de criar outro.
+- Para trocar o tipo do ASO ativo para `periodico`, `mudanca de funcao/Setor` ou `demissional`, usar a baixa / novo exame.
 
 Atualizacao 2026-04
 -------------------
@@ -130,17 +129,24 @@ Atualizacao 2026-04 (regras)
 - Datas corrigidas para exibicao no padrao brasileiro sem deslocamento por timezone.
 - Regras de duplicidade ajustadas:
   - banco bloqueia duplicidade exata por funcionario + tipo + data
-  - admissional e demissional bloqueiam novo cadastro por funcionario enquanto houver registro ativo
-  - periodico alerta em janela de 15 dias e permite continuar
+  - admissional, periodico e mudanca de funcao/Setor passam a formar um grupo renovavel unico por funcionario
 - Demissional passou a exigir funcionario inativo ou com `dataDemissao`.
 
 Atualizacao 2026-04 (baixa e ciclo)
 -----------------------------------
 - A acao da lista deixa de apenas atualizar a linha e passa a funcionar como baixa do ciclo.
 - O registro atual muda para `Baixado` e permanece visivel na lista.
-- A baixa cria um novo registro com a data realizada e novo proximo vencimento.
+- A baixa exige o tipo do proximo exame e cria um novo registro com a data realizada.
+- O proximo exame pode ser `periodico`, `mudanca de funcao/Setor` ou `demissional`.
 - O historico deixa de registrar cadastro inicial e passa a guardar apenas edicao e baixa de exame.
 - As cores de `60 dias`, `30 dias` e `15 dias` foram separadas melhor na legenda, chips e linhas.
+
+Atualizacao 2026-04 (grupo renovavel)
+-------------------------------------
+- Adicionado o tipo `Mudanca de funcao/Setor` com validade de 1 ano.
+- `Admissional`, `Periodico` e `Mudanca de funcao/Setor` passam a compor o grupo renovavel ativo.
+- So pode existir 1 registro ativo por funcionario nesse grupo.
+- O erro legado da constraint `aso_controle_owner_pessoa_tipo_unique` passa a ser resolvido pela migration que remove a regra antiga e passa a validar o grupo ativo pelas RPCs e indices de apoio.
 
 Atualizacao 2026-04 (importacao)
 --------------------------------
@@ -169,7 +175,7 @@ Funcoes principais
 - AsoConflictModal
   - Tipo: componente de UI
   - Caminho: src/components/Aso/AsoConflictModal.jsx
-  - Responsavel por: orientar conflito de duplicidade exata, unicidade por tipo e alerta de periodico proximo.
+  - Responsavel por: orientar conflito de duplicidade exata e existencia de exame ativo no grupo renovavel.
 - AsoImportModal
   - Tipo: componente de UI
   - Caminho: src/components/Aso/AsoImportModal.jsx
@@ -219,6 +225,22 @@ Servicos e integracoes externas
   - Tipo: banco
   - Caminho: supabase/migrations/20260412_aso_baixa_e_historico.sql
   - Responsavel por: adicionar status de registro, baixa do exame, criacao de novo ciclo e ajuste do historico.
+- Migration SQL
+  - Tipo: banco
+  - Caminho: supabase/migrations/20260418_01_aso_mudanca_funcao_schema.sql
+  - Responsavel por: adicionar `mudanca_funcao_setor`, ajustar colunas/indices/historico e recriar `aso_controle_view`.
+- Migration SQL
+  - Tipo: banco
+  - Caminho: supabase/migrations/20260418_02_aso_rpc_create_full.sql
+  - Responsavel por: recriar `rpc_aso_create_full` com regra de grupo renovavel e duplicidade exata.
+- Migration SQL
+  - Tipo: banco
+  - Caminho: supabase/migrations/20260418_03_aso_rpc_update_full.sql
+  - Responsavel por: recriar `rpc_aso_update_full` com regra de grupo renovavel e duplicidade exata.
+- Migration SQL
+  - Tipo: banco
+  - Caminho: supabase/migrations/20260418_04_aso_rpc_register_exam_next.sql
+  - Responsavel por: recriar `rpc_aso_register_exam_next` para a baixa com selecao do proximo tipo.
 
 Ajuda contextual
 ----------------
@@ -233,12 +255,20 @@ Arquivos alterados/criados
   - supabase/functions/aso-template/index.ts
   - supabase/functions/aso-template/_shared/auth.ts
   - supabase/functions/aso-import/index.ts
+  - supabase/migrations/20260418_01_aso_mudanca_funcao_schema.sql
+  - supabase/migrations/20260418_02_aso_rpc_create_full.sql
+  - supabase/migrations/20260418_03_aso_rpc_update_full.sql
+  - supabase/migrations/20260418_04_aso_rpc_register_exam_next.sql
 - Alterados:
+  - src/components/Aso/AsoActions.jsx
+  - src/components/Aso/AsoRegisterExamModal.jsx
+  - src/components/Aso/AsoTable.jsx
   - src/pages/AsoPage.jsx
   - src/hooks/useAsoController.js
   - src/components/Aso/AsoForm.jsx
   - src/components/Help/HelpButton.jsx
   - src/help/helpAso.json
+  - src/config/AsoConfig.js
   - src/services/asoService.js
   - src/services/api.js
   - src/App.jsx
@@ -246,7 +276,9 @@ Arquivos alterados/criados
   - src/config/permissions.js
   - src/utils/asoUtils.js
   - api/_shared/operations.js
+  - api/index.js
   - supabase/migrations/20260412_create_aso_control.sql
+  - supabase/migrations/20260418_aso_mudanca_funcao_e_baixa_com_tipo.sql
   - README.md
   - TASKS.md
 
@@ -262,6 +294,7 @@ Comportamento antes/depois
   - a exibicao de datas ficou em padrao brasileiro sem deslocamento
   - a lista ganhou ajuda, legenda, exportacao CSV, cadastro em massa e baixa operacional do exame
   - o banco bloqueia duplicidade exata por `funcionario + tipo + data`
-  - admissional/demissional bloqueiam novo cadastro por funcionario enquanto houver registro ativo
-  - periodico alerta em janela de 15 dias, com opcao de continuar
+  - `admissional`, `periodico` e `mudanca_funcao_setor` passam a competir pelo mesmo registro ativo
+  - a baixa passa a exigir o tipo do proximo exame
   - o historico mostra apenas alteracoes reais, sem registrar o cadastro inicial
+  - a aplicacao manual no Supabase SQL Editor passou a usar 4 migrations separadas, em ordem, para evitar erro por selecao parcial de funcao

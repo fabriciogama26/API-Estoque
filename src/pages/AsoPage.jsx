@@ -166,6 +166,9 @@ function AsoContent() {
       <AsoHistoryModal state={historyState} onClose={closeHistory} />
       <AsoRegisterExamModal
         state={registerExamState}
+        tiposExame={tiposExame.filter((item) =>
+          ['periodico', 'mudanca_funcao_setor', 'demissional'].includes(String(item?.codigo || '').toLowerCase())
+        )}
         onClose={closeRegisterExam}
         onChange={handleRegisterExamChange}
         onSubmit={handleRegisterExamSubmit}

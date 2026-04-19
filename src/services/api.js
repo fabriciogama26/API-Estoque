@@ -2566,6 +2566,14 @@ function normalizeAsoHistory(registros = []) {
         asoId: registro.aso_id ?? registro.asoId ?? null,
         pessoaId: registro.pessoa_id ?? registro.pessoaId ?? null,
         acao: resolveTextValue(registro.acao ?? ''),
+        acaoLabel:
+          resolveTextValue(registro.acao ?? '') === 'baixa_exame'
+            ? 'Baixa de exame'
+            : resolveTextValue(registro.acao ?? '') === 'registro_exame'
+              ? 'Baixa de exame'
+              : resolveTextValue(registro.acao ?? '') === 'edicao'
+                ? 'Edicao'
+                : resolveTextValue(registro.acao ?? ''),
         criadoEm: registro.criado_em ?? registro.criadoEm ?? null,
         observacao: resolveTextValue(registro.observacao ?? ''),
         usuarioResponsavelId:
@@ -4965,7 +4973,11 @@ export const api = {
   },
   aso: {
     async list(params = {}) {
-      let query = supabase.from('aso_controle_view').select('*').order('proximo_vencimento', { ascending: true })
+      let query = supabase
+        .from('aso_controle_view')
+        .select('*')
+        .order('status_registro', { ascending: true })
+        .order('proximo_vencimento', { ascending: true })
 
       const termo = trim(params.termo ?? params.buscar ?? '')
       if (termo) {
@@ -5181,11 +5193,19 @@ export const api = {
       if (!id) {
         throw new Error('ID obrigatorio.')
       }
+      const aso = await executeMaybeSingle(
+        supabase.from('aso_controle').select('id, pessoa_id').eq('id', id),
+        'Falha ao resolver ASO para historico.'
+      )
+      if (!aso?.pessoa_id) {
+        throw new Error('ASO nao encontrado.')
+      }
       const registros = await execute(
         supabase
           .from('aso_historico')
           .select('id, aso_id, pessoa_id, acao, dados_antes, dados_depois, observacao, usuario_responsavel, criado_em')
-          .eq('aso_id', id)
+          .eq('pessoa_id', aso.pessoa_id)
+          .neq('acao', 'cadastro')
           .order('criado_em', { ascending: true }),
         'Falha ao obter historico de ASO.'
       )

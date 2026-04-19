@@ -1,0 +1,10 @@
+-- Migration consolidada desativada.
+-- Para execucao manual no SQL Editor do Supabase, use a sequencia:
+-- 1. 20260418_01_aso_mudanca_funcao_schema.sql
+-- 2. 20260418_02_aso_rpc_create_full.sql
+-- 3. 20260418_03_aso_rpc_update_full.sql
+-- 4. 20260418_04_aso_rpc_register_exam_next.sql
+--
+-- Motivo:
+-- O editor SQL do Supabase pode interpretar selecoes parciais de funcoes PL/pgSQL
+-- como SQL puro. Ao separar em etapas, a aplicacao fica mais previsivel.

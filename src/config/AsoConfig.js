@@ -30,6 +30,7 @@ export const ASO_HISTORY_DEFAULT = {
 export const ASO_REGISTER_EXAM_DEFAULT = {
   open: false,
   aso: null,
+  proximoTipoExameId: '',
   dataRealizada: '',
   observacao: '',
   isSaving: false,
