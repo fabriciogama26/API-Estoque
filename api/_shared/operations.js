@@ -2254,18 +2254,22 @@ export const AsoOperations = {
 
     const params = {
       p_id: id,
+      p_proximo_tipo_exame_id: pickParam(payload, ['p_proximo_tipo_exame_id', 'proximoTipoExameId', 'proximo_tipo_exame_id']),
       p_data_realizada: pickParam(payload, ['p_data_realizada', 'dataRealizada', 'data_realizada']),
       p_observacao: pickParam(payload, ['p_observacao', 'observacao']),
       p_usuario_id: pickParam(payload, ['p_usuario_id'], user?.id ?? null),
     }
 
+    if (!params.p_proximo_tipo_exame_id) {
+      throw createHttpError(400, 'Tipo do proximo exame obrigatorio.')
+    }
     if (!params.p_data_realizada) {
       throw createHttpError(400, 'Data realizada obrigatoria.')
     }
 
     const client = buildUserClient(authToken)
     const registro = await executeSingle(
-      client.rpc('rpc_aso_register_exam', params),
+      client.rpc('rpc_aso_register_exam_next', params),
       'Falha ao dar baixa no exame.'
     )
 
@@ -2277,11 +2281,19 @@ export const AsoOperations = {
       throw createHttpError(400, 'ASO invalido.')
     }
 
+    const aso = await executeMaybeSingle(
+      supabaseAdmin.from('aso_controle').select('id, pessoa_id').eq('id', id),
+      'Falha ao resolver ASO para historico.'
+    )
+    if (!aso?.pessoa_id) {
+      throw createHttpError(404, 'ASO nao encontrado.')
+    }
+
     const registros = await execute(
       supabaseAdmin
         .from('aso_historico')
         .select('id, aso_id, pessoa_id, acao, dados_antes, dados_depois, observacao, usuario_responsavel, criado_em')
-        .eq('aso_id', id)
+        .eq('pessoa_id', aso.pessoa_id)
         .neq('acao', 'cadastro')
         .order('criado_em', { ascending: true }),
       'Falha ao obter historico do ASO.'

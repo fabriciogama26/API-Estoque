@@ -1,4 +1,4 @@
-import { buildAsoHistoryChanges, formatDateTime } from '../../utils/asoUtils.js'
+import { buildAsoHistoryChanges, formatDateTime, resolveAsoHistoryActionLabel } from '../../utils/asoUtils.js'
 
 export function AsoHistoryTimeline({ registros = [] }) {
   return (
@@ -9,7 +9,7 @@ export function AsoHistoryTimeline({ registros = [] }) {
           <article key={registro.id} className="aso-history-entry">
             <header className="aso-history-entry__header">
               <div>
-                <strong>{registro.acaoLabel || registro.acao || 'acao nao informada'}</strong>
+                <strong>{registro.acaoLabel || resolveAsoHistoryActionLabel(registro.acao) || 'acao nao informada'}</strong>
                 <p className="data-table__muted">
                   {registro.usuarioResponsavel || 'sistema'} | {formatDateTime(registro.criadoEm)}
                 </p>

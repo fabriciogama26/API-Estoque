@@ -883,6 +883,11 @@ supabase/
     20260412_add_aso_page_permissions.sql  # migration SQL
     20260412_aso_baixa_e_historico.sql  # migration SQL
     20260412_create_aso_control.sql  # migration SQL
+    20260418_01_aso_mudanca_funcao_schema.sql  # migration SQL
+    20260418_02_aso_rpc_create_full.sql  # migration SQL
+    20260418_03_aso_rpc_update_full.sql  # migration SQL
+    20260418_04_aso_rpc_register_exam_next.sql  # migration SQL
+    20260418_aso_mudanca_funcao_e_baixa_com_tipo.sql  # migration SQL
   migrations_rebuild/
     0001_extensions.sql  # migration rebuild SQL
     0002_tables.sql  # migration rebuild SQL

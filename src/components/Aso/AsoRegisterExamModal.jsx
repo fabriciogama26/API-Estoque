@@ -2,6 +2,7 @@ import { formatDate } from '../../utils/asoUtils.js'
 
 export function AsoRegisterExamModal({
   state,
+  tiposExame = [],
   onClose,
   onChange,
   onSubmit,
@@ -14,7 +15,7 @@ export function AsoRegisterExamModal({
     <div className="modal__overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="modal__content" onClick={(event) => event.stopPropagation()}>
         <header className="modal__header">
-          <h3>Baixa de exame</h3>
+          <h3>Baixa / Novo exame</h3>
           <button type="button" className="modal__close" onClick={onClose} aria-label="Fechar">
             x
           </button>
@@ -28,13 +29,30 @@ export function AsoRegisterExamModal({
             </label>
 
             <label className="field field--accent">
-              <span>Tipo</span>
+              <span>Tipo atual</span>
               <input value={state.aso.tipoExame || '-'} readOnly disabled />
             </label>
 
             <label className="field field--accent">
               <span>Data prevista</span>
               <input value={formatDate(state.aso.proximoVencimento)} readOnly disabled />
+            </label>
+
+            <label className="field">
+              <span>Tipo do proximo exame <span className="asterisco">*</span></span>
+              <select
+                name="proximoTipoExameId"
+                value={state.proximoTipoExameId}
+                onChange={onChange}
+                required
+              >
+                <option value="">Selecione</option>
+                {tiposExame.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nome}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="field">

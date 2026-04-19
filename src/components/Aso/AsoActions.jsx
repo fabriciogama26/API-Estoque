@@ -49,13 +49,13 @@ export function AsoActions({
         className="materiais-table-action-button"
         onClick={() => onRegisterExam?.(aso)}
         disabled={isSaving || isDemissional || aso?.statusRegistro === 'baixado'}
-        aria-label={`Dar baixa no exame do ASO ${aso?.matricula || ''}`}
+        aria-label={`Baixa e novo exame do ASO ${aso?.matricula || ''}`}
         title={
           isDemissional
             ? 'Demissional nao possui renovacao'
             : aso?.statusRegistro === 'baixado'
               ? 'Registro ja baixado'
-              : 'Dar baixa no exame'
+              : 'Baixa / novo exame'
         }
       >
         <PlusCircleIcon size={16} strokeWidth={1.8} />

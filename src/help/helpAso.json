@@ -10,7 +10,7 @@
       },
       {
         "title": "Conferir proximo vencimento",
-        "description": "O campo Proximo ao vencimento e calculado automaticamente no padrao brasileiro. Exames admissionais e periodicos somam 1 ano; demissional nao gera renovacao nem alerta.",
+        "description": "O campo Proximo ao vencimento e calculado automaticamente no padrao brasileiro. Admissional, periodico e mudanca de funcao/Setor somam 1 ano; demissional nao gera renovacao nem alerta.",
         "mediaHint": "Campo derivado de proximo vencimento."
       },
       {
@@ -20,12 +20,12 @@
       },
       {
         "title": "Dar baixa no exame",
-        "description": "Na lista, use o botao de baixa para abrir o modal, informar a data realizada e salvar. O sistema marca o registro atual como baixado, cria um novo ciclo com a data realizada e recalcula o proximo vencimento.",
+        "description": "Na lista, use o botao de baixa para abrir o modal, escolher o tipo do proximo exame, informar a data realizada e salvar. O sistema marca o registro atual como baixado, cria um novo ciclo e recalcula o proximo vencimento quando o novo tipo for renovavel.",
         "mediaHint": "Modal de baixa de exame."
       },
       {
         "title": "Tratar duplicidade",
-        "description": "A tela bloqueia duplicidade exata por funcionario + tipo + data. Admissional e demissional tambem bloqueiam novo cadastro quando ja existe um registro do mesmo tipo; periodico permite continuar apenas quando houver outro exame proximo na janela de 15 dias.",
+        "description": "A tela bloqueia duplicidade exata por funcionario + tipo + data. Alem disso, admissional, periodico e mudanca de funcao/Setor formam um grupo renovavel com apenas um registro ativo por funcionario.",
         "mediaHint": "Modal de duplicidade orientando o reaproveitamento do registro."
       },
       {
@@ -37,10 +37,10 @@
     "notes": [
       "Campos marcados com * sao obrigatorios.",
       "O banco bloqueia duplicidade exata por funcionario + tipo de exame + data do exame.",
-      "Admissional e demissional sao tratados como unicos por funcionario enquanto houver registro ativo; para corrigir data, edite o registro existente.",
-      "Periodico pode ter varios registros; quando houver outro dentro de 15 dias, a tela alerta antes de salvar.",
+      "Admissional, periodico e mudanca de funcao/Setor formam um grupo renovavel unico por funcionario enquanto houver registro ativo.",
+      "Para gerar um novo periodico, mudanca de funcao/Setor ou demissional quando ja existe um ativo, use a baixa / novo exame.",
       "Demissional nao abre renovacao e nao entra nas contagens de alerta de vencimento.",
-      "No cadastro em massa, a matricula precisa existir em Pessoas e o tipo_exame precisa ser admissional, periodico ou demissional."
+      "No cadastro em massa, a matricula precisa existir em Pessoas e o tipo_exame precisa ser admissional, periodico, mudanca_funcao_setor ou demissional."
     ]
   }
 }
