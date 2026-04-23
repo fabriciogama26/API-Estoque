@@ -65,6 +65,8 @@ Boas praticas
 - Previsao no front le direto do Supabase quando em modo remoto (sem depender de API).
 - O select de periodo usa `inventory_forecast` e lista todos os historicos do tenant (por id).
 - RPCs de previsao atualizam `inventory_forecast_id` automaticamente em `f_previsao_gasto_mensal` (backfill do periodo).
+- Snapshots de forecast agora preservam as linhas mensais por `inventory_forecast_id`; um snapshot novo nao sobrescreve outro snapshot de auditoria.
+- O rolling operacional continua reaproveitando o mesmo `inventory_forecast` enquanto a previsao estiver aberta (`qtd_meses_base < 12`).
 - O card exibe a sazonalidade media do periodo com base na media movel de 3 meses.
 - Tooltip da previsao inclui contingencia (P75), P90, mediana e alerta de volatilidade (CV > 1) calculados no RPC.
 - Previsao considera entradas, saidas e saldo anual no card e no grafico.
@@ -139,6 +141,20 @@ Atualizacao 2026-04
 - Antes: a previsao ficava em um unico bloco visual.
 - Depois: a navegacao do forecast foi segmentada por finalidade sem alterar os Paretos.
 
+Atualizacao 2026-04 (snapshot)
+------------------------------
+- Migration `supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql` criada para preservar as previsoes mensais por `inventory_forecast_id`.
+- `rpc_previsao_gasto_mensal_consultar` passou a ler o snapshot mais recente pelo `forecast_id` e nao mais pela faixa mensal agregada do tenant.
+- `rpc_previsao_gasto_mensal_calcular` e `rpc_previsao_gasto_mensal_calcular_periodo` passaram a recriar somente as linhas do snapshot atual, sem sobrescrever linhas de outro snapshot.
+- `api/_shared/operations.js` passou a filtrar a previsao mensal pelo `forecast_id` selecionado/derivado do resumo.
+- Arquivos alterados:
+- `supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql`
+- `api/_shared/operations.js`
+- `docs/AnaliseEstoque.txt`
+- Antes/Depois:
+- Antes: `f_previsao_gasto_mensal` era unica por owner + mes + cenario, e snapshots novos podiam sobrescrever snapshots antigos.
+- Depois: o snapshot fechado fica preservado por `inventory_forecast_id`, e a auditoria consegue ler a previsao mensal da versao correta.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -198,6 +214,10 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260204_create_gasto_forecast_tables.sql
   - Responsavel por: gerar agregados mensais e previsoes por tenant.
+- Migration de versionamento do snapshot
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql
+  - Responsavel por: preservar previsoes mensais por `inventory_forecast_id` e evitar sobrescrita entre snapshots.
 - Edge Function forecast-gasto-mensal
   - Tipo: Supabase Edge Function
   - Caminho: supabase/functions/forecast-gasto-mensal/index.ts
