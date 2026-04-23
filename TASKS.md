@@ -31,11 +31,16 @@
 - Diagnostico SQL confirmou que o vazamento real estava em `public.rpc_catalog_list(text)`, nao no cache do frontend.
 - Migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` criada para impedir fallback global em catalogos owner-scoped.
 - `resolveUsuarioId()` foi corrigido para devolver o ator real da sessao; dependentes deixam de gravar o owner em campos de auditoria/"cadastrado por".
+- Tela `Analise de Estoque` passou a separar o bloco de forecast em abas `Operacional`, `Compra` e `Auditoria`, mantendo os Paretos sem alteracao.
+- Ajuda contextual e documentacao da tela `Analise de Estoque` foram atualizadas para refletir as abas e os novos blocos de leitura do forecast.
+- Snapshot de forecast passou a preservar as linhas mensais por `inventory_forecast_id`, evitando que um forecast novo sobrescreva a previsao mensal de um snapshot antigo.
+- API de forecast (`api/_shared/operations.js`) passou a ler a serie mensal pelo `forecast_id` selecionado/derivado do resumo.
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260412_create_aso_control.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260412_add_aso_page_permissions.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260412_aso_baixa_e_historico.sql` no projeto Supabase.
+- Aplicar a migration `supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql` no projeto Supabase.
 - Aplicar no projeto Supabase, nesta ordem:
   - `supabase/migrations/20260418_01_aso_mudanca_funcao_schema.sql`
   - `supabase/migrations/20260418_02_aso_rpc_create_full.sql`
@@ -71,3 +76,5 @@
 - Auditoria local dos relatorios automaticos: as Edge Functions de geracao semanal/mensal/troca percorrem todos os owners ativos; logs de producao informados em 2026-04-18 mostram `test=false` no cron semanal, mensal e troca. Proxima suspeita: relatorios de outros owners ja marcados como enviados/erro ou usuarios fora do filtro de destinatarios.
 - CSV Brevo `logs-10552678-1776523890567.csv`: semanal foi enviado para `fabiana.gomes@faa.edu.br` em 2026-03-06; depois os semanais do CSV aparecem somente para `toka.fgg@gmail.com`, enquanto troca de EPI continua indo para Fabiana.
 - Diagnostico 2026-04-18: o motivo provavel da ausencia dos relatorios semanais/mensais da Fabiana nao e o dependente gravar movimentacao; a geracao falha ao listar muitos materiais em `materiais_view` por uma URL PostgREST gigante. O codigo filtra movimentacoes por `account_owner_id`, entao dependentes do mesmo owner devem entrar no relatorio.
+- Forecast 2026-04-23: a separacao em abas no front e apenas organizacional; a regra do RPC rolling e a persistencia dos snapshots continuam iguais no backend.
+- Forecast 2026-04-23: a persistencia do snapshot agora e versionada por `inventory_forecast_id`, mas o rolling aberto continua atualizando o mesmo `inventory_forecast` enquanto `qtd_meses_base < 12`.

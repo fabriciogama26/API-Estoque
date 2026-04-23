@@ -3847,19 +3847,27 @@ export const EstoqueOperations = {
     }
 
     const buildForecastFromTables = async (periodoInicio, periodoFim, forecastId) => {
+      let resumoQuery = supabaseAdmin
+        .from('inventory_forecast')
+        .select(
+          'id, periodo_base_inicio, periodo_base_fim, qtd_meses_base, gasto_total_periodo, media_mensal, fator_tendencia, tipo_tendencia, variacao_percentual, previsao_anual, previsao_anual_entrada, previsao_anual_saida, previsao_anual_saldo, gasto_ano_anterior, metodo_previsao, nivel_confianca, created_at'
+        )
+        .eq('account_owner_id', ownerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (forecastId) {
+        resumoQuery = resumoQuery.eq('id', forecastId)
+      } else if (periodoInicio && periodoFim) {
+        resumoQuery = resumoQuery.eq('periodo_base_inicio', periodoInicio).eq('periodo_base_fim', periodoFim)
+      }
+
       const resumo = await executeMaybeSingle(
-        supabaseAdmin
-          .from('inventory_forecast')
-          .select(
-            'id, periodo_base_inicio, periodo_base_fim, qtd_meses_base, gasto_total_periodo, media_mensal, fator_tendencia, tipo_tendencia, variacao_percentual, previsao_anual, gasto_ano_anterior, metodo_previsao, nivel_confianca, created_at'
-          )
-          .eq('account_owner_id', ownerId)
-          .eq('periodo_base_inicio', periodoInicio)
-          .eq('periodo_base_fim', periodoFim)
-          .order('created_at', { ascending: false })
-          .limit(1),
+        resumoQuery,
         'Falha ao carregar resumo de previsao.'
       )
+
+      const selectedForecastId = resumo?.id ?? forecastId ?? null
 
       let historicoQuery = supabaseAdmin
         .from('agg_gasto_mensal')
@@ -3875,13 +3883,13 @@ export const EstoqueOperations = {
 
       let previsaoQuery = supabaseAdmin
         .from('f_previsao_gasto_mensal')
-        .select('ano_mes, valor_previsto, metodo, cenario')
+        .select('ano_mes, valor_previsto, valor_previsto_entrada, metodo, cenario, contingencia_p75, p90, mediana, coef_var, media_robusta, alerta_volatil')
         .eq('account_owner_id', ownerId)
         .eq('cenario', 'base')
         .order('ano_mes', { ascending: true })
 
-      if (forecastId) {
-        previsaoQuery = previsaoQuery.eq('inventory_forecast_id', forecastId)
+      if (selectedForecastId) {
+        previsaoQuery = previsaoQuery.eq('inventory_forecast_id', selectedForecastId)
       }
 
       if (periodoFim) {
@@ -3909,8 +3917,15 @@ export const EstoqueOperations = {
         ano_mes: row.ano_mes,
         label: formatAnoMesLabel(row.ano_mes),
         valor_previsto: Number(row.valor_previsto || 0),
+        valor_previsto_entrada: Number(row.valor_previsto_entrada || 0),
         metodo: row.metodo || 'media_simples',
         cenario: row.cenario || 'base',
+        contingencia: Number(row.contingencia_p75 || 0),
+        p90: Number(row.p90 || 0),
+        mediana: Number(row.mediana || 0),
+        cv: Number(row.coef_var || 0),
+        mediaRobusta: Number(row.media_robusta || 0),
+        alertaVolatil: !!row.alerta_volatil,
       }))
 
       return {

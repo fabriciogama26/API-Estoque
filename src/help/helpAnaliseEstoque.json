@@ -16,8 +16,8 @@
         "description": "Cada Pareto vem com interpretacao e acao recomendada ao lado. Use o bloco para orientar compras e controle."
       },
       {
-        "title": "Previsao rolling",
-        "description": "O card mostra a previsao de fluxo (entradas, saidas e saldo) com sazonalidade e fator_tendencia robusto."
+        "title": "Area de previsao",
+        "description": "A area de forecast foi separada em abas Operacional, Compra e Auditoria para leitura do rolling, reposicao e validacao."
       },
       {
         "title": "Copiar IDs",
@@ -31,6 +31,9 @@
       "Risco operacional: Classe A = abaixo minimo + giro alto; Classe B = abaixo minimo; Classe C = acima do minimo.",
       "A previsao rolling nao usa filtros de periodo: considera sempre os ultimos 12 meses completos.",
       "O periodo exibido pode ser selecionado no combo com historicos gerados.",
+      "A aba Operacional concentra o rolling 12 meses com historico, saida prevista, entrada prevista e saldo.",
+      "A aba Compra resume itens abaixo do minimo, compra imediata, cobertura curta e excesso/baixo giro.",
+      "A aba Auditoria centraliza o snapshot selecionado e os atalhos de Validacao e Diagnostico.",
       "O botao Validacao da previsao mostra as tabelas de gasto mensal e previsao mensal.",
       "O botao Diagnostico abre um modal com estatisticas mensais (mediana, P75, P90).",
       "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes.",

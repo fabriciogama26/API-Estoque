@@ -498,11 +498,90 @@
   padding-bottom: 1.25rem;
 }
 
+.analysis-forecast-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.analysis-forecast-tab {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(248, 250, 252, 0.9);
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.analysis-forecast-tab:hover,
+.analysis-forecast-tab:focus-visible {
+  border-color: rgba(14, 165, 233, 0.35);
+  background: rgba(240, 249, 255, 0.95);
+  box-shadow: 0 14px 32px rgba(14, 165, 233, 0.12);
+  transform: translateY(-1px);
+}
+
+.analysis-forecast-tab--active {
+  border-color: rgba(14, 165, 233, 0.4);
+  background: linear-gradient(135deg, rgba(224, 242, 254, 0.95), rgba(255, 255, 255, 0.98));
+  color: #0f172a;
+  box-shadow: 0 18px 40px rgba(14, 165, 233, 0.14);
+}
+
+.analysis-forecast-tab__icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+.analysis-forecast-tab span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.analysis-forecast-tab strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.analysis-forecast-tab small {
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
 .analysis-forecast-grid {
   display: grid;
   gap: 1.5rem;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   align-items: stretch;
+}
+
+.analysis-forecast-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.analysis-forecast-grid--equal {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analysis-forecast-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .analysis-forecast-card {
@@ -514,6 +593,10 @@
   flex-direction: column;
   gap: 0.65rem;
   min-height: 320px;
+}
+
+.analysis-forecast-card--list {
+  min-height: 0;
 }
 
 .analysis-forecast-label {
@@ -564,11 +647,45 @@
   min-height: 320px;
 }
 
+.analysis-forecast-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.analysis-forecast-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.analysis-forecast-list strong {
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.analysis-forecast-list span {
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 960px) {
   .analysis-pareto-grid {
     grid-template-columns: 1fr;
   }
   .analysis-forecast-grid {
+    grid-template-columns: 1fr;
+  }
+  .analysis-forecast-grid--equal {
     grid-template-columns: 1fr;
   }
 }

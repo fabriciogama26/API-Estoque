@@ -1,7 +1,16 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
-import { DashboardIcon, TrendIcon, AlertIcon, RevenueIcon, ExpandIcon, InfoIcon } from '../components/icons.jsx'
+import {
+  DashboardIcon,
+  TrendIcon,
+  AlertIcon,
+  RevenueIcon,
+  ExpandIcon,
+  InfoIcon,
+  StockIcon,
+  BarsIcon,
+} from '../components/icons.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { ParetoChart } from '../components/charts/ParetoChart.jsx'
 import { ForecastGastoChart } from '../components/charts/ForecastGastoChart.jsx'
@@ -15,6 +24,66 @@ import { isLocalMode } from '../config/runtime.js'
 import { usePermissions } from '../context/PermissionsContext.jsx'
 
 import '../styles/DashboardPage.css'
+
+const FORECAST_TABS = [
+  {
+    id: 'operacional',
+    label: 'Operacional',
+    icon: TrendIcon,
+    description: 'Rolling mais recente para gasto, entrada, saldo e tendencia.',
+  },
+  {
+    id: 'compra',
+    label: 'Compra',
+    icon: StockIcon,
+    description: 'Reposicao, ruptura, cobertura e prioridades de compra.',
+  },
+  {
+    id: 'auditoria',
+    label: 'Auditoria',
+    icon: BarsIcon,
+    description: 'Snapshot, validacao e diagnostico do forecast selecionado.',
+  },
+]
+
+function formatForecastPeriodoLabel(periodoInicio, periodoFim) {
+  if (!periodoInicio && !periodoFim) {
+    return 'Periodo nao selecionado'
+  }
+  return [periodoInicio, periodoFim].filter(Boolean).join(' a ')
+}
+
+function formatForecastTimestamp(value) {
+  if (!value) {
+    return '-'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return String(value)
+  }
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function getForecastStatusMessage(status, payload) {
+  if (status === 'insufficient') {
+    return `Historico insuficiente (${payload?.monthsAvailable || payload?.monthsWithMovement || 0}/${
+      payload?.requiredMonthsFull || 12
+    } meses).`
+  }
+  if (status === 'missing') {
+    return 'Previsao ainda nao calculada para este periodo.'
+  }
+  if (!status) {
+    return 'Previsao indisponivel.'
+  }
+  return null
+}
 
 function FiltersForm() {
   const { filters, handleChange, handleSubmit, handleClear } = useDashboardEstoqueContext()
@@ -464,7 +533,9 @@ export function AnaliseEstoquePage() {
     paretoRisco,
     paretoFinanceiro,
     saidasResumo,
+    riscoOperacional,
     diasPeriodo,
+    estoqueBase,
   } = useDashboardEstoqueContext()
   const { profile } = usePermissions()
   const [forecastPayload, setForecastPayload] = useState(null)
@@ -478,6 +549,7 @@ export function AnaliseEstoquePage() {
   const [forecastValidationPrevPage, setForecastValidationPrevPage] = useState(1)
   const [forecastCopiedHistorico, setForecastCopiedHistorico] = useState(false)
   const [forecastCopiedPrevisao, setForecastCopiedPrevisao] = useState(false)
+  const [forecastTab, setForecastTab] = useState('operacional')
   const [diagnosticoOpen, setDiagnosticoOpen] = useState(false)
   const [diagnosticoLoading, setDiagnosticoLoading] = useState(false)
   const [diagnosticoError, setDiagnosticoError] = useState(null)
@@ -906,9 +978,18 @@ export function AnaliseEstoquePage() {
   const forecastStatus = forecastPayload?.status || null
   const forecastHasData = forecastStatus === 'ok'
   const forecastBase = forecastPayload?.resumo || null
-  const historicoSerie = forecastPayload?.historico || []
-  const historicoSerieFull = forecastPayload?.historico_full || []
-  const previsaoSerie = forecastPayload?.previsao || []
+  const historicoSerie = useMemo(
+    () => (Array.isArray(forecastPayload?.historico) ? forecastPayload.historico : []),
+    [forecastPayload?.historico],
+  )
+  const historicoSerieFull = useMemo(
+    () => (Array.isArray(forecastPayload?.historico_full) ? forecastPayload.historico_full : []),
+    [forecastPayload?.historico_full],
+  )
+  const previsaoSerie = useMemo(
+    () => (Array.isArray(forecastPayload?.previsao) ? forecastPayload.previsao : []),
+    [forecastPayload?.previsao],
+  )
   const forecastPageSize = 10
   const historicoStart = (forecastValidationPage - 1) * forecastPageSize
   const historicoValidationList = historicoSerieFull.length ? historicoSerieFull : historicoSerie
@@ -965,6 +1046,114 @@ export function AnaliseEstoquePage() {
   const previsaoSaidaTotal = Number(forecastBase?.previsao_anual_saida || 0)
   const previsaoFluxoTotal = previsaoEntradaTotal + previsaoSaidaTotal
   const previsaoSaldoTotal = previsaoEntradaTotal - previsaoSaidaTotal
+  const forecastStatusMessage = getForecastStatusMessage(forecastStatus, forecastPayload)
+  const forecastPeriodoLabel = formatForecastPeriodoLabel(
+    forecastBase?.periodo_base_inicio,
+    forecastBase?.periodo_base_fim,
+  )
+  const forecastCreatedAtLabel = formatForecastTimestamp(forecastBase?.created_at)
+
+  const compraInsights = useMemo(() => {
+    const riscoList = Array.isArray(riscoOperacional) ? riscoOperacional : []
+    const materiaisMonitorados = Array.isArray(estoqueBase?.itens) ? estoqueBase.itens.length : riscoList.length
+    const deficitItems = riscoList
+      .map((item) => {
+        const estoqueAtual = Number(item.estoqueAtual || 0)
+        const estoqueMinimo = Number(item.estoqueMinimo || 0)
+        const deficitQuantidade = Math.max(0, estoqueMinimo - estoqueAtual)
+        const deficitValor = deficitQuantidade * Number(item.valorUnitario || 0)
+        const coberturaMeses =
+          Number(item.giroDiario || 0) > 0 ? estoqueAtual / (Number(item.giroDiario || 0) * 30) : null
+        return {
+          ...item,
+          deficitQuantidade,
+          deficitValor,
+          coberturaMeses,
+        }
+      })
+      .filter((item) => item.deficitQuantidade > 0)
+
+    const compraImediata = [...deficitItems]
+      .filter((item) => (item.classeRisco || item.classe) === 'A')
+      .sort((a, b) => {
+        const scoreDiff = Number(b.score || 0) - Number(a.score || 0)
+        if (scoreDiff !== 0) return scoreDiff
+        return Number(b.deficitValor || 0) - Number(a.deficitValor || 0)
+      })
+
+    const reposicaoPlanejada = [...deficitItems]
+      .filter((item) => (item.classeRisco || item.classe) !== 'A')
+      .sort((a, b) => Number(b.deficitQuantidade || 0) - Number(a.deficitQuantidade || 0))
+
+    const excessoOuBaixoGiro = [...riscoList]
+      .filter((item) => Number(item.estoqueAtual || 0) > Number(item.pressaoVidaUtil || 0) * 1.5)
+      .sort((a, b) => Number(b.valorTotal || 0) - Number(a.valorTotal || 0))
+
+    const semCoberturaCurta = [...riscoList]
+      .map((item) => {
+        const estoqueAtual = Number(item.estoqueAtual || 0)
+        const coberturaMeses =
+          Number(item.giroDiario || 0) > 0 ? estoqueAtual / (Number(item.giroDiario || 0) * 30) : null
+        return {
+          ...item,
+          coberturaMeses,
+        }
+      })
+      .filter((item) => item.coberturaMeses !== null && item.coberturaMeses < 1)
+      .sort((a, b) => Number(a.coberturaMeses || 0) - Number(b.coberturaMeses || 0))
+
+    const valorCompraMinima = deficitItems.reduce((acc, item) => acc + Number(item.deficitValor || 0), 0)
+    const quantidadeCompraMinima = deficitItems.reduce((acc, item) => acc + Number(item.deficitQuantidade || 0), 0)
+
+    return {
+      materiaisMonitorados,
+      itensAbaixoMinimo: deficitItems.length,
+      itensCompraImediata: compraImediata.length,
+      valorCompraMinima,
+      quantidadeCompraMinima,
+      compraImediata: compraImediata.slice(0, 5),
+      reposicaoPlanejada: reposicaoPlanejada.slice(0, 5),
+      excessoOuBaixoGiro: excessoOuBaixoGiro.slice(0, 5),
+      semCoberturaCurta: semCoberturaCurta.slice(0, 5),
+    }
+  }, [estoqueBase, riscoOperacional])
+
+  const auditCards = useMemo(
+    () => [
+      {
+        id: 'snapshot',
+        title: 'Snapshot selecionado',
+        value: forecastPeriodoLabel,
+        helper: `Gerado em ${forecastCreatedAtLabel}`,
+        tone: 'slate',
+      },
+      {
+        id: 'confianca',
+        title: 'Base e confianca',
+        value: `${formatNumber(forecastBase?.qtd_meses_base || 0)} meses`,
+        helper: `Nivel: ${forecastBase?.nivel_confianca || 'nao informado'}`,
+        tone: 'blue',
+      },
+      {
+        id: 'metodo',
+        title: 'Metodo e tendencia',
+        value: forecastBase?.metodo_previsao || '-',
+        helper: `${forecastBase?.tipo_tendencia || 'sem tipo'} | fator ${formatNumber(
+          forecastBase?.fator_tendencia || 1,
+          2,
+        )}`,
+        tone: 'green',
+      },
+      {
+        id: 'variacao',
+        title: 'Variacao vs base anterior',
+        value: formatPercent(forecastBase?.variacao_percentual || 0, 2),
+        helper: `Gasto ano anterior: ${formatCurrency(forecastBase?.gasto_ano_anterior || 0)}`,
+        tone: 'orange',
+      },
+    ],
+    [forecastBase, forecastCreatedAtLabel, forecastPeriodoLabel],
+  )
 
   const buildForecastHistoricoClipboardText = () => {
     const historicoHeader = ['Mes', 'Valor saida', 'Valor entrada', 'Media movel (3m)'].join('\t')
@@ -1118,99 +1307,316 @@ export function AnaliseEstoquePage() {
             </h2>
           </div>
           <div className="dashboard-card__actions">
-            <button
-              type="button"
-              className="dashboard-card__toggle"
-              onClick={() => {
-                setForecastValidationOpen(true)
-                setForecastValidationPage(1)
-                setForecastValidationPrevPage(1)
-              }}
-            >
-              Validacao
-            </button>
-            <button
-              type="button"
-              className="dashboard-card__toggle"
-              onClick={loadDiagnostico}
-              disabled={diagnosticoLoading}
-            >
-              {diagnosticoLoading ? 'Carregando...' : 'Diagnostico'}
-            </button>
-            <button
-              type="button"
-              className="dashboard-card__expand"
-              onClick={() => setForecastExpanded(true)}
-              aria-label="Expandir grafico de previsao"
-            >
-              <ExpandIcon size={16} />
-            </button>
+            {forecastTab === 'operacional' ? (
+              <button
+                type="button"
+                className="dashboard-card__expand"
+                onClick={() => setForecastExpanded(true)}
+                aria-label="Expandir grafico de previsao"
+              >
+                <ExpandIcon size={16} />
+              </button>
+            ) : null}
           </div>
         </header>
-        <div className="analysis-forecast-grid">
-          <div className="analysis-forecast-card">
-          {forecastLoading ? (
-            <p>Carregando previsao...</p>
-            ) : forecastError ? (
-              <p className="analysis-forecast-error">{forecastError}</p>
-            ) : forecastStatus === 'insufficient' ? (
-              <p>
-                Historico insuficiente ({forecastPayload?.monthsAvailable || 0}/
-                {forecastPayload?.requiredMonths || 12} meses).
-              </p>
-            ) : forecastStatus === 'missing' ? (
-              <p>Previsao ainda nao calculada para este periodo.</p>
-            ) : (
-              <>
-                <p className="analysis-forecast-label">Previsao de fluxo (rolling 12 meses)</p>
-                <p className="analysis-forecast-value">
-                  {formatCurrency(previsaoFluxoTotal)} / {formatCurrency(previsaoSaldoTotal)}
-                </p>
-                <p className="analysis-forecast-subtitle">Baseado no consumo medio dos ultimos 12 meses</p>
-                <div className="analysis-forecast-meta">
-                  <span>
-                    Gasto total do periodo: {formatCurrency(forecastBase?.gasto_total_periodo || 0)}
-                  </span>
-                  <span>
-                    Entradas previstas: {formatCurrency(previsaoEntradaTotal)}
-                  </span>
-                  <span>
-                    Saidas previstas: {formatCurrency(previsaoSaidaTotal)}
-                  </span>
-                  <span>
-                    Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}
-                  </span>
-                  <span>
-                    Sazonalidade media do periodo: {formatNumber(sazonalidadeMedia ?? 1, 2)}
-                  </span>
-                  <span>
-                    Confianca do dado: {forecastBase?.qtd_meses_base || 12} meses
-                  </span>
-                </div>
-              </>
-            )}
-            <div className="analysis-forecast-actions">
-              <label className="field">
-                <span>Periodo da previsao</span>
-                <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
-                  <option value="">Selecione um periodo</option>
-                  {forecastPeriodos.map((periodo) => {
-                    const value = String(periodo.id)
-                    const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
-                    return (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    )
-                  })}
-                </select>
-              </label>
+        <div className="analysis-forecast-tabs" role="tablist" aria-label="Abas de previsao">
+          {FORECAST_TABS.map((tab) => {
+            const IconComponent = tab.icon
+            const isActive = forecastTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`analysis-forecast-tab${isActive ? ' analysis-forecast-tab--active' : ''}`}
+                onClick={() => setForecastTab(tab.id)}
+              >
+                <span className="analysis-forecast-tab__icon">
+                  <IconComponent size={16} />
+                </span>
+                <span>
+                  <strong>{tab.label}</strong>
+                  <small>{tab.description}</small>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        {forecastTab === 'operacional' ? (
+          <div className="analysis-forecast-grid" role="tabpanel">
+            <div className="analysis-forecast-card">
+              {forecastLoading ? (
+                <p>Carregando previsao...</p>
+              ) : forecastError ? (
+                <p className="analysis-forecast-error">{forecastError}</p>
+              ) : forecastStatusMessage ? (
+                <p>{forecastStatusMessage}</p>
+              ) : (
+                <>
+                  <p className="analysis-forecast-label">Previsao de fluxo (rolling 12 meses)</p>
+                  <p className="analysis-forecast-value">
+                    {formatCurrency(previsaoFluxoTotal)} / {formatCurrency(previsaoSaldoTotal)}
+                  </p>
+                  <p className="analysis-forecast-subtitle">Baseado no consumo medio dos ultimos 12 meses</p>
+                  <div className="analysis-forecast-meta">
+                    <span>Gasto total do periodo: {formatCurrency(forecastBase?.gasto_total_periodo || 0)}</span>
+                    <span>Entradas previstas: {formatCurrency(previsaoEntradaTotal)}</span>
+                    <span>Saidas previstas: {formatCurrency(previsaoSaidaTotal)}</span>
+                    <span>Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}</span>
+                    <span>Sazonalidade media do periodo: {formatNumber(sazonalidadeMedia ?? 1, 2)}</span>
+                    <span>Confianca do dado: {forecastBase?.qtd_meses_base || 12} meses</span>
+                  </div>
+                </>
+              )}
+              <div className="analysis-forecast-actions">
+                <label className="field">
+                  <span>Periodo da previsao</span>
+                  <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
+                    <option value="">Selecione um periodo</option>
+                    {forecastPeriodos.map((periodo) => {
+                      const value = String(periodo.id)
+                      const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
+                      return (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div className="analysis-forecast-chart">
+              <ForecastGastoChart data={chartForecastData} valueFormatter={formatCurrency} height={320} />
             </div>
           </div>
-          <div className="analysis-forecast-chart">
-            <ForecastGastoChart data={chartForecastData} valueFormatter={formatCurrency} height={320} />
+        ) : null}
+        {forecastTab === 'compra' ? (
+          <div className="analysis-forecast-stack" role="tabpanel">
+            <div className="analysis-forecast-grid analysis-forecast-grid--single">
+              <div className="analysis-forecast-card">
+                <p className="analysis-forecast-label">Planejamento de compra</p>
+                <p className="analysis-forecast-value">
+                  {formatNumber(compraInsights.quantidadeCompraMinima)} un /{' '}
+                  {formatCurrency(compraInsights.valorCompraMinima)}
+                </p>
+                <p className="analysis-forecast-subtitle">
+                  Reposicao minima sugerida com base em estoque atual, risco e consumo recente.
+                </p>
+                <div className="analysis-forecast-meta">
+                  <span>Itens monitorados: {formatNumber(compraInsights.materiaisMonitorados)}</span>
+                  <span>Itens abaixo do minimo: {formatNumber(compraInsights.itensAbaixoMinimo)}</span>
+                  <span>Compra imediata: {formatNumber(compraInsights.itensCompraImediata)}</span>
+                  <span>Saida prevista media/mês: {formatCurrency(previsaoSaidaTotal / 12)}</span>
+                  <span>Entrada prevista media/mês: {formatCurrency(previsaoEntradaTotal / 12)}</span>
+                  <span>Saldo anual previsto: {formatCurrency(previsaoSaldoTotal)}</span>
+                  {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
+                </div>
+                <div className="analysis-forecast-actions">
+                  <label className="field">
+                    <span>Periodo da previsao</span>
+                    <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
+                      <option value="">Selecione um periodo</option>
+                      {forecastPeriodos.map((periodo) => {
+                        const value = String(periodo.id)
+                        const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
+                        return (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="dashboard-highlights dashboard-highlights--secondary">
+              <article className="dashboard-insight-card dashboard-insight-card--orange">
+                <header className="dashboard-insight-card__header">
+                  <p className="dashboard-insight-card__title">Compra imediata</p>
+                  <span className="dashboard-insight-card__avatar">
+                    <AlertIcon size={22} />
+                  </span>
+                </header>
+                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensCompraImediata)}</strong>
+                <span className="dashboard-insight-card__helper">Itens com risco A e estoque abaixo do minimo.</span>
+              </article>
+              <article className="dashboard-insight-card dashboard-insight-card--blue">
+                <header className="dashboard-insight-card__header">
+                  <p className="dashboard-insight-card__title">Reposicao minima</p>
+                  <span className="dashboard-insight-card__avatar">
+                    <StockIcon size={22} />
+                  </span>
+                </header>
+                <strong className="dashboard-insight-card__value">{formatCurrency(compraInsights.valorCompraMinima)}</strong>
+                <span className="dashboard-insight-card__helper">
+                  {formatNumber(compraInsights.quantidadeCompraMinima)} unidades para voltar ao minimo.
+                </span>
+              </article>
+              <article className="dashboard-insight-card dashboard-insight-card--green">
+                <header className="dashboard-insight-card__header">
+                  <p className="dashboard-insight-card__title">Entrada media prevista</p>
+                  <span className="dashboard-insight-card__avatar">
+                    <RevenueIcon size={22} />
+                  </span>
+                </header>
+                <strong className="dashboard-insight-card__value">{formatCurrency(previsaoEntradaTotal / 12)}</strong>
+                <span className="dashboard-insight-card__helper">Media mensal de entrada no rolling selecionado.</span>
+              </article>
+              <article className="dashboard-insight-card dashboard-insight-card--slate">
+                <header className="dashboard-insight-card__header">
+                  <p className="dashboard-insight-card__title">Saida media prevista</p>
+                  <span className="dashboard-insight-card__avatar">
+                    <TrendIcon size={22} />
+                  </span>
+                </header>
+                <strong className="dashboard-insight-card__value">{formatCurrency(previsaoSaidaTotal / 12)}</strong>
+                <span className="dashboard-insight-card__helper">Usada como referencia de cobertura financeira.</span>
+              </article>
+            </div>
+            <div className="analysis-forecast-grid analysis-forecast-grid--equal">
+              <article className="analysis-forecast-card analysis-forecast-card--list">
+                <p className="analysis-forecast-label">Compra imediata</p>
+                <ul className="analysis-forecast-list">
+                  {compraInsights.compraImediata.length ? (
+                    compraInsights.compraImediata.map((item) => (
+                      <li key={`compra-imediata-${item.materialId || item.nome}`}>
+                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <span>
+                          Deficit: {formatNumber(item.deficitQuantidade)} | Estimado: {formatCurrency(item.deficitValor)}
+                        </span>
+                      </li>
+                    ))
+                  ) : (
+                    <li>Nenhum item critico abaixo do minimo.</li>
+                  )}
+                </ul>
+              </article>
+              <article className="analysis-forecast-card analysis-forecast-card--list">
+                <p className="analysis-forecast-label">Reposicao planejada</p>
+                <ul className="analysis-forecast-list">
+                  {compraInsights.reposicaoPlanejada.length ? (
+                    compraInsights.reposicaoPlanejada.map((item) => (
+                      <li key={`reposicao-${item.materialId || item.nome}`}>
+                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <span>
+                          Minimo: {formatNumber(item.estoqueMinimo)} | Atual: {formatNumber(item.estoqueAtual)}
+                        </span>
+                      </li>
+                    ))
+                  ) : (
+                    <li>Nenhum item adicional em reposicao planejada.</li>
+                  )}
+                </ul>
+              </article>
+            </div>
+            <div className="analysis-forecast-grid analysis-forecast-grid--equal">
+              <article className="analysis-forecast-card analysis-forecast-card--list">
+                <p className="analysis-forecast-label">Cobertura curta</p>
+                <ul className="analysis-forecast-list">
+                  {compraInsights.semCoberturaCurta.length ? (
+                    compraInsights.semCoberturaCurta.map((item) => (
+                      <li key={`cobertura-${item.materialId || item.nome}`}>
+                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <span>
+                          Cobertura: {formatNumber(item.coberturaMeses || 0, 1)} mes | Giro/dia:{' '}
+                          {formatNumber(item.giroDiario || 0, 2)}
+                        </span>
+                      </li>
+                    ))
+                  ) : (
+                    <li>Nenhum item com cobertura menor que 1 mes.</li>
+                  )}
+                </ul>
+              </article>
+              <article className="analysis-forecast-card analysis-forecast-card--list">
+                <p className="analysis-forecast-label">Excesso ou baixo giro</p>
+                <ul className="analysis-forecast-list">
+                  {compraInsights.excessoOuBaixoGiro.length ? (
+                    compraInsights.excessoOuBaixoGiro.map((item) => (
+                      <li key={`excesso-${item.materialId || item.nome}`}>
+                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <span>
+                          Atual: {formatNumber(item.estoqueAtual)} | Pressao: {formatNumber(item.pressaoVidaUtil || 0)}
+                        </span>
+                      </li>
+                    ))
+                  ) : (
+                    <li>Nenhum item com excesso relevante neste recorte.</li>
+                  )}
+                </ul>
+              </article>
+            </div>
           </div>
-        </div>
+        ) : null}
+        {forecastTab === 'auditoria' ? (
+          <div className="analysis-forecast-stack" role="tabpanel">
+            <div className="analysis-forecast-grid analysis-forecast-grid--single">
+              <div className="analysis-forecast-card">
+                <p className="analysis-forecast-label">Auditoria do forecast</p>
+                <p className="analysis-forecast-value">{forecastPeriodoLabel}</p>
+                <p className="analysis-forecast-subtitle">
+                  Use esta aba para abrir a validacao das tabelas mensais e o diagnostico estatistico do snapshot.
+                </p>
+                <div className="analysis-forecast-meta">
+                  <span>Gerado em: {forecastCreatedAtLabel}</span>
+                  <span>Metodo: {forecastBase?.metodo_previsao || '-'}</span>
+                  <span>Confianca: {forecastBase?.nivel_confianca || 'nao informada'}</span>
+                  <span>Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}</span>
+                  <span>Variacao: {formatPercent(forecastBase?.variacao_percentual || 0, 2)}</span>
+                  {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
+                </div>
+                <div className="analysis-forecast-actions">
+                  <label className="field">
+                    <span>Periodo da previsao</span>
+                    <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
+                      <option value="">Selecione um periodo</option>
+                      {forecastPeriodos.map((periodo) => {
+                        const value = String(periodo.id)
+                        const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
+                        return (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    onClick={() => {
+                      setForecastValidationOpen(true)
+                      setForecastValidationPage(1)
+                      setForecastValidationPrevPage(1)
+                    }}
+                  >
+                    Abrir validacao
+                  </button>
+                  <button type="button" className="button button--ghost" onClick={loadDiagnostico}>
+                    {diagnosticoLoading ? 'Carregando diagnostico...' : 'Abrir diagnostico'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="dashboard-highlights dashboard-highlights--secondary">
+              {auditCards.map((card) => (
+                <article key={card.id} className={`dashboard-insight-card dashboard-insight-card--${card.tone}`}>
+                  <header className="dashboard-insight-card__header">
+                    <p className="dashboard-insight-card__title">{card.title}</p>
+                    <span className="dashboard-insight-card__avatar">
+                      <BarsIcon size={22} />
+                    </span>
+                  </header>
+                  <strong className="dashboard-insight-card__value">{card.value}</strong>
+                  <span className="dashboard-insight-card__helper">{card.helper}</span>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
       <ChartExpandModal
         open={forecastExpanded}
@@ -1494,5 +1900,3 @@ export function AnaliseEstoqueProviderPage() {
     </DashboardEstoqueProvider>
   )
 }
-
-

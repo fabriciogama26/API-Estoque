@@ -888,6 +888,7 @@ supabase/
     20260418_03_aso_rpc_update_full.sql  # migration SQL
     20260418_04_aso_rpc_register_exam_next.sql  # migration SQL
     20260418_aso_mudanca_funcao_e_baixa_com_tipo.sql  # migration SQL
+    20260423_fix_forecast_snapshot_versioning.sql  # migration SQL
   migrations_rebuild/
     0001_extensions.sql  # migration rebuild SQL
     0002_tables.sql  # migration rebuild SQL
@@ -920,6 +921,7 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Registrar entradas para compor saldo.
 - Registrar saidas e acompanhar historico.
 - Exportar lista de materiais em CSV quando necessario.
+- Consultar `Analise de Estoque` para usar os Paretos e as abas `Operacional`, `Compra` e `Auditoria` do forecast.
 - Consultar dashboards e gerar relatorios mensais quando necessario.
 - Gerar termo de EPI quando aplicavel.
 
