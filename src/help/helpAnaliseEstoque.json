@@ -32,8 +32,8 @@
       "A previsao rolling nao usa filtros de periodo: considera sempre os ultimos 12 meses completos.",
       "O periodo exibido pode ser selecionado no combo com historicos gerados.",
       "A aba Operacional concentra o rolling 12 meses com historico, saida prevista, entrada prevista e saldo.",
-      "A aba Compra resume itens abaixo do minimo, compra imediata, cobertura curta e excesso/baixo giro.",
-      "A aba Auditoria centraliza o snapshot selecionado e os atalhos de Validacao e Diagnostico.",
+      "A aba Compra prioriza a recomendacao do RPC de compra, calculada por estoque atual, estoque minimo, consumo recente e cobertura.",
+      "A aba Auditoria centraliza o snapshot selecionado, mostra previsto x realizado por mes e mantem os atalhos de Validacao e Diagnostico.",
       "O botao Validacao da previsao mostra as tabelas de gasto mensal e previsao mensal.",
       "O botao Diagnostico abre um modal com estatisticas mensais (mediana, P75, P90).",
       "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes.",
@@ -43,7 +43,8 @@
       "Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.",
       "Tooltip da previsao mostra contingencia (P75), P90, mediana e alerta de volatilidade (CV > 1) calculados no RPC.",
       "Previsao inclui entradas e saidas, com saldo anual no card.",
-      "Diagnostico usa agg_gasto_mensal (valor_saida) para estatisticas mensais."
+      "Diagnostico usa agg_gasto_mensal (valor_saida) para estatisticas mensais.",
+      "Acuracia da auditoria usa WAPE/MAPE sobre os meses do snapshot que ja possuem realizado."
       ]
     }
 }

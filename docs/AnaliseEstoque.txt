@@ -72,8 +72,8 @@ Boas praticas
 - Previsao considera entradas, saidas e saldo anual no card e no grafico.
 - Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.
 - Aba Operacional concentra o rolling atual e o grafico expandido.
-- Aba Compra usa os dados atuais de risco operacional e estoque minimo para destacar compra imediata, reposicao planejada, cobertura curta e excesso/baixo giro.
-- Aba Auditoria concentra o snapshot selecionado e os atalhos para validacao e diagnostico.
+- Aba Compra agora prioriza o RPC de compra sugerida, combinando estoque atual, estoque minimo, consumo recente e cobertura.
+- Aba Auditoria concentra o snapshot selecionado, previsto x realizado por mes e os atalhos para validacao e diagnostico.
 - Diagnostico usa agg_gasto_mensal (valor_saida) como base estatistica.
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
 
@@ -155,6 +155,26 @@ Atualizacao 2026-04 (snapshot)
 - Antes: `f_previsao_gasto_mensal` era unica por owner + mes + cenario, e snapshots novos podiam sobrescrever snapshots antigos.
 - Depois: o snapshot fechado fica preservado por `inventory_forecast_id`, e a auditoria consegue ler a previsao mensal da versao correta.
 
+Atualizacao 2026-04 (auditoria e compra)
+----------------------------------------
+- Migration `supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql` criada com dois RPCs novos:
+  - `rpc_previsao_gasto_mensal_auditar(p_owner_id, p_forecast_id)` para comparar previsto x realizado por snapshot.
+  - `rpc_previsao_compra_sugerida(p_owner_id, p_forecast_id)` para calcular compra sugerida por estoque atual, minimo e cobertura.
+- A aba `Auditoria` passou a consumir a auditoria real do snapshot selecionado, com meses auditados, viés, WAPE/MAPE e tabela mensal previsto x realizado.
+- A aba `Compra` passou a priorizar o payload do RPC de compra; se o RPC nao estiver disponivel, o front ainda cai no fallback local anterior.
+- `diagnosticar_estatisticas_mensais` continua existindo para leitura estatistica historica; ele nao foi substituido pela auditoria do snapshot.
+- Arquivos alterados:
+- `supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql`
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/styles/DashboardPage.css`
+- `src/help/helpAnaliseEstoque.json`
+- `docs/AnaliseEstoque.txt`
+- Antes/Depois:
+- Antes: a aba `Auditoria` mostrava apenas resumo do snapshot e abria modais de validacao/diagnostico.
+- Depois: a aba `Auditoria` mostra acuracia do snapshot e comparacao mensal entre previsto e realizado.
+- Antes: a aba `Compra` usava somente heuristica derivada no client.
+- Depois: a aba `Compra` prioriza uma recomendacao calculada no banco por tenant e por snapshot.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -218,6 +238,10 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql
   - Responsavel por: preservar previsoes mensais por `inventory_forecast_id` e evitar sobrescrita entre snapshots.
+- Migration de auditoria e compra do forecast
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql
+  - Responsavel por: calcular auditoria previsto x realizado e planejamento de compra por snapshot.
 - Edge Function forecast-gasto-mensal
   - Tipo: Supabase Edge Function
   - Caminho: supabase/functions/forecast-gasto-mensal/index.ts
