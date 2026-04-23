@@ -920,6 +920,7 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Registrar entradas para compor saldo.
 - Registrar saidas e acompanhar historico.
 - Exportar lista de materiais em CSV quando necessario.
+- Consultar `Analise de Estoque` para usar os Paretos e as abas `Operacional`, `Compra` e `Auditoria` do forecast.
 - Consultar dashboards e gerar relatorios mensais quando necessario.
 - Gerar termo de EPI quando aplicavel.
 

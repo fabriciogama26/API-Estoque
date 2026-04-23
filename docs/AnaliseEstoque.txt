@@ -7,6 +7,7 @@ Visao geral
 - Usa os mesmos filtros do Dashboard de Estoque (periodo e termo).
 - Exibe cartoes de decisao, Paretos e blocos de interpretacao/acao ao lado.
 - Inclui previsao de fluxo anual (entradas, saidas e saldo) baseada no consumo medio dos ultimos 12 meses.
+- A area de previsao foi separada em abas de Operacional, Compra e Auditoria, sem alterar os Paretos.
 
 Arquitetura
 -----------
@@ -20,6 +21,7 @@ Arquitetura
   - `ParetoChart` para os graficos.
   - `ChartExpandModal` para visualizacao expandida.
   - `ForecastGastoChart` para historico mensal e projecao.
+  - Abas de forecast no proprio `AnaliseEstoquePage` para alternar foco entre operacao, compra e auditoria.
  - Tabelas:
    - `agg_gasto_mensal` (agregado mensal real por tenant).
    - `f_previsao_gasto_mensal` (previsao mensal por tenant).
@@ -67,6 +69,9 @@ Boas praticas
 - Tooltip da previsao inclui contingencia (P75), P90, mediana e alerta de volatilidade (CV > 1) calculados no RPC.
 - Previsao considera entradas, saidas e saldo anual no card e no grafico.
 - Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.
+- Aba Operacional concentra o rolling atual e o grafico expandido.
+- Aba Compra usa os dados atuais de risco operacional e estoque minimo para destacar compra imediata, reposicao planejada, cobertura curta e excesso/baixo giro.
+- Aba Auditoria concentra o snapshot selecionado e os atalhos para validacao e diagnostico.
 - Diagnostico usa agg_gasto_mensal (valor_saida) como base estatistica.
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
 
@@ -99,16 +104,40 @@ Atualizacao 2026-02
 - rpc_refresh_gasto_mensal agora ignora saidas canceladas via status_saida (evita erro de UUID e garante agregados corretos).
 - Ajuda contextual criada para a pagina.
 - Requisicao de previsao (`/api/estoque/previsao`) agora inclui `X-Session-Id` para manter o guard de sessao consistente.
+- Area de previsao da tela passou a ter abas `Operacional`, `Compra` e `Auditoria`.
+- Aba `Compra` organiza os dados existentes em blocos de reposicao e prioridade, sem alterar a regra do forecast.
+- Aba `Auditoria` centraliza snapshot selecionado, validacao e diagnostico; os Paretos nao foram alterados.
 - Arquivos alterados:
 - `src/services/api.js`
 - `src/config/permissions.js`
 - `supabase/functions/forecast-gasto-mensal/index.ts`
 - `supabase/migrations/20260226_add_permission_estoque_reprocessar.sql`
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/styles/DashboardPage.css`
+- `src/help/helpAnaliseEstoque.json`
+- `docs/AnaliseEstoque.txt`
 - Antes/Depois:
 - Antes: a previsao era solicitada sem `X-Session-Id`.
 - Depois: a previsao inclui `X-Session-Id` para manter a sessao consistente no backend.
 - Antes: o cron `forecast-gasto-mensal` nao registrava execucao em `edge_functions_error_report`.
 - Depois: o cron `forecast-gasto-mensal` registra resumo da execucao em `edge_functions_error_report`.
+- Antes: o bloco de previsao exibia uma unica area com card, grafico, validacao e diagnostico.
+- Depois: o bloco foi reorganizado em abas de operacao, compra e auditoria, preservando a mesma base de forecast.
+
+Atualizacao 2026-04
+-------------------
+- Area de previsao reorganizada em abas `Operacional`, `Compra` e `Auditoria`.
+- `Operacional` manteve o rolling atual com grafico expandido e seletor de periodo.
+- `Compra` passou a destacar reposicao minima, compra imediata, cobertura curta e excesso/baixo giro a partir dos dados ja carregados pela tela.
+- `Auditoria` passou a concentrar snapshot selecionado, resumo de metodo/tendencia e os atalhos de validacao/diagnostico.
+- Arquivos alterados:
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/styles/DashboardPage.css`
+- `src/help/helpAnaliseEstoque.json`
+- `docs/AnaliseEstoque.txt`
+- Antes/Depois:
+- Antes: a previsao ficava em um unico bloco visual.
+- Depois: a navegacao do forecast foi segmentada por finalidade sem alterar os Paretos.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -124,6 +153,10 @@ Funcoes principais
   - Tipo: componente de grafico
   - Caminho: src/components/charts/ForecastGastoChart.jsx
   - Responsavel por: exibir historico mensal e projecao de gasto anual.
+- Help da tela
+  - Tipo: conteudo JSON
+  - Caminho: src/help/helpAnaliseEstoque.json
+  - Responsavel por: explicar as abas Operacional, Compra e Auditoria.
 - DashboardEstoqueProvider
   - Tipo: provider React
   - Caminho: src/context/DashboardEstoqueContext.jsx
@@ -157,6 +190,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/estoqueApi.js
   - Responsavel por: carregar previsao de gasto anual e atualizar fator de tendencia.
+- DashboardPage.css
+  - Tipo: estilos CSS
+  - Caminho: src/styles/DashboardPage.css
+  - Responsavel por: layout das abas e cards da area de previsao.
 - RPCs de previsao
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260204_create_gasto_forecast_tables.sql
