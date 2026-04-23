@@ -556,6 +556,12 @@ export function AnaliseEstoquePage() {
   const [diagnosticoRows, setDiagnosticoRows] = useState([])
   const [diagnosticoPage, setDiagnosticoPage] = useState(1)
   const [diagnosticoCopied, setDiagnosticoCopied] = useState(false)
+  const [forecastAuditPayload, setForecastAuditPayload] = useState(null)
+  const [forecastAuditLoading, setForecastAuditLoading] = useState(false)
+  const [forecastAuditError, setForecastAuditError] = useState(null)
+  const [forecastCompraPayload, setForecastCompraPayload] = useState(null)
+  const [forecastCompraLoading, setForecastCompraLoading] = useState(false)
+  const [forecastCompraError, setForecastCompraError] = useState(null)
 
   const formatLabelFromDate = (value) => {
     const date = value instanceof Date ? value : new Date(value)
@@ -1052,8 +1058,113 @@ export function AnaliseEstoquePage() {
     forecastBase?.periodo_base_fim,
   )
   const forecastCreatedAtLabel = formatForecastTimestamp(forecastBase?.created_at)
+  const selectedForecastId = forecastBase?.id || null
+
+  useEffect(() => {
+    const shouldUseSupabase = !isLocalMode && isSupabaseConfigured() && supabase && profile?.owner_id
+    if (!shouldUseSupabase || !selectedForecastId) {
+      setForecastAuditPayload(null)
+      setForecastAuditError(null)
+      setForecastAuditLoading(false)
+      setForecastCompraPayload(null)
+      setForecastCompraError(null)
+      setForecastCompraLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    const loadSupportData = async () => {
+      setForecastAuditLoading(true)
+      setForecastCompraLoading(true)
+      setForecastAuditError(null)
+      setForecastCompraError(null)
+
+      const [auditResult, compraResult] = await Promise.allSettled([
+        supabase.rpc('rpc_previsao_gasto_mensal_auditar', {
+          p_owner_id: profile.owner_id,
+          p_forecast_id: selectedForecastId,
+        }),
+        supabase.rpc('rpc_previsao_compra_sugerida', {
+          p_owner_id: profile.owner_id,
+          p_forecast_id: selectedForecastId,
+        }),
+      ])
+
+      if (cancelled) {
+        return
+      }
+
+      if (auditResult.status === 'fulfilled') {
+        if (auditResult.value.error) {
+          setForecastAuditError(auditResult.value.error.message || 'Erro ao carregar auditoria do snapshot.')
+          setForecastAuditPayload(null)
+        } else {
+          setForecastAuditPayload(auditResult.value.data || null)
+        }
+      } else {
+        setForecastAuditError(auditResult.reason?.message || 'Erro ao carregar auditoria do snapshot.')
+        setForecastAuditPayload(null)
+      }
+
+      if (compraResult.status === 'fulfilled') {
+        if (compraResult.value.error) {
+          setForecastCompraError(compraResult.value.error.message || 'Erro ao carregar planejamento de compra.')
+          setForecastCompraPayload(null)
+        } else {
+          setForecastCompraPayload(compraResult.value.data || null)
+        }
+      } else {
+        setForecastCompraError(compraResult.reason?.message || 'Erro ao carregar planejamento de compra.')
+        setForecastCompraPayload(null)
+      }
+
+      setForecastAuditLoading(false)
+      setForecastCompraLoading(false)
+    }
+
+    loadSupportData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.owner_id, selectedForecastId])
 
   const compraInsights = useMemo(() => {
+    if (forecastCompraPayload?.status === 'ok') {
+      const resumo = forecastCompraPayload?.resumo || {}
+      return {
+        materiaisMonitorados: Number(resumo.materiais_monitorados || 0),
+        itensAbaixoMinimo: Number(resumo.itens_abaixo_minimo || 0),
+        itensCompraImediata: Number(resumo.itens_compra_imediata || 0),
+        itensReposicaoPlanejada: Number(resumo.itens_reposicao_planejada || 0),
+        itensCoberturaCurta: Number(resumo.itens_cobertura_curta || 0),
+        itensExcesso: Number(resumo.itens_excesso || 0),
+        valorCompraMinima: Number(resumo.valor_compra_minima || 0),
+        quantidadeCompraMinima: Number(resumo.quantidade_compra_minima || 0),
+        valorCompraSugerida: Number(resumo.valor_compra_sugerida || 0),
+        quantidadeCompraSugerida: Number(resumo.quantidade_compra_sugerida || 0),
+        coberturaMediaMeses:
+          resumo.cobertura_media_meses !== null && resumo.cobertura_media_meses !== undefined
+            ? Number(resumo.cobertura_media_meses)
+            : null,
+        saidaMediaMensalPrevista: Number(resumo.saida_media_mensal_prevista || 0),
+        entradaMediaMensalPrevista: Number(resumo.entrada_media_mensal_prevista || 0),
+        saldoAnualPrevisto: Number(resumo.saldo_anual_previsto || 0),
+        compraImediata: Array.isArray(forecastCompraPayload?.compra_imediata) ? forecastCompraPayload.compra_imediata : [],
+        reposicaoPlanejada: Array.isArray(forecastCompraPayload?.reposicao_planejada)
+          ? forecastCompraPayload.reposicao_planejada
+          : [],
+        excessoOuBaixoGiro: Array.isArray(forecastCompraPayload?.excesso_ou_baixo_giro)
+          ? forecastCompraPayload.excesso_ou_baixo_giro
+          : [],
+        semCoberturaCurta: Array.isArray(forecastCompraPayload?.cobertura_curta)
+          ? forecastCompraPayload.cobertura_curta
+          : [],
+        origem: 'rpc',
+      }
+    }
+
     const riscoList = Array.isArray(riscoOperacional) ? riscoOperacional : []
     const materiaisMonitorados = Array.isArray(estoqueBase?.itens) ? estoqueBase.itens.length : riscoList.length
     const deficitItems = riscoList
@@ -1109,14 +1220,34 @@ export function AnaliseEstoquePage() {
       materiaisMonitorados,
       itensAbaixoMinimo: deficitItems.length,
       itensCompraImediata: compraImediata.length,
+      itensReposicaoPlanejada: reposicaoPlanejada.length,
+      itensCoberturaCurta: semCoberturaCurta.length,
+      itensExcesso: excessoOuBaixoGiro.length,
       valorCompraMinima,
       quantidadeCompraMinima,
+      valorCompraSugerida: valorCompraMinima,
+      quantidadeCompraSugerida: quantidadeCompraMinima,
+      coberturaMediaMeses:
+        semCoberturaCurta.length > 0
+          ? semCoberturaCurta.reduce((acc, item) => acc + Number(item.coberturaMeses || 0), 0) /
+            Math.max(1, semCoberturaCurta.length)
+          : null,
+      saidaMediaMensalPrevista: previsaoSaidaTotal / 12,
+      entradaMediaMensalPrevista: previsaoEntradaTotal / 12,
+      saldoAnualPrevisto: previsaoSaldoTotal,
       compraImediata: compraImediata.slice(0, 5),
       reposicaoPlanejada: reposicaoPlanejada.slice(0, 5),
       excessoOuBaixoGiro: excessoOuBaixoGiro.slice(0, 5),
       semCoberturaCurta: semCoberturaCurta.slice(0, 5),
+      origem: 'fallback',
     }
-  }, [estoqueBase, riscoOperacional])
+  }, [estoqueBase, forecastCompraPayload, previsaoEntradaTotal, previsaoSaidaTotal, previsaoSaldoTotal, riscoOperacional])
+
+  const auditResumo = forecastAuditPayload?.resumo || null
+  const auditSerie = useMemo(
+    () => (Array.isArray(forecastAuditPayload?.serie) ? forecastAuditPayload.serie : []),
+    [forecastAuditPayload?.serie],
+  )
 
   const auditCards = useMemo(
     () => [
@@ -1128,31 +1259,37 @@ export function AnaliseEstoquePage() {
         tone: 'slate',
       },
       {
-        id: 'confianca',
-        title: 'Base e confianca',
+        id: 'base',
+        title: 'Base e metodo',
         value: `${formatNumber(forecastBase?.qtd_meses_base || 0)} meses`,
-        helper: `Nivel: ${forecastBase?.nivel_confianca || 'nao informado'}`,
+        helper: `${forecastBase?.metodo_previsao || '-'} | confianca ${forecastBase?.nivel_confianca || 'nao informada'}`,
         tone: 'blue',
       },
       {
-        id: 'metodo',
-        title: 'Metodo e tendencia',
-        value: forecastBase?.metodo_previsao || '-',
-        helper: `${forecastBase?.tipo_tendencia || 'sem tipo'} | fator ${formatNumber(
-          forecastBase?.fator_tendencia || 1,
-          2,
-        )}`,
+        id: 'auditados',
+        title: 'Meses auditados',
+        value: `${formatNumber(auditResumo?.meses_realizados || 0)} / ${formatNumber(auditResumo?.meses_total || 0)}`,
+        helper: `${formatNumber(auditResumo?.meses_pendentes || 0)} pendentes | tendencia ${forecastBase?.tipo_tendencia || 'sem tipo'}`,
         tone: 'green',
       },
       {
-        id: 'variacao',
-        title: 'Variacao vs base anterior',
-        value: formatPercent(forecastBase?.variacao_percentual || 0, 2),
-        helper: `Gasto ano anterior: ${formatCurrency(forecastBase?.gasto_ano_anterior || 0)}`,
+        id: 'acuracia',
+        title: 'Acuracia do snapshot',
+        value: `${formatNumber(auditResumo?.acuracia_wape || 0, 1)}%`,
+        helper: `WAPE ${formatNumber(auditResumo?.wape_percentual || 0, 1)}% | MAPE ${formatNumber(auditResumo?.mape_percentual || 0, 1)}%`,
+        tone: 'orange',
+      },
+      {
+        id: 'vies',
+        title: 'Vies do forecast',
+        value: formatPercent(auditResumo?.vies_percentual || 0, 2),
+        helper: `Previsto ${formatCurrency(auditResumo?.total_previsto_realizado || 0)} | Realizado ${formatCurrency(
+          auditResumo?.total_realizado || 0,
+        )}`,
         tone: 'orange',
       },
     ],
-    [forecastBase, forecastCreatedAtLabel, forecastPeriodoLabel],
+    [auditResumo, forecastBase, forecastCreatedAtLabel, forecastPeriodoLabel],
   )
 
   const buildForecastHistoricoClipboardText = () => {
@@ -1398,19 +1535,23 @@ export function AnaliseEstoquePage() {
               <div className="analysis-forecast-card">
                 <p className="analysis-forecast-label">Planejamento de compra</p>
                 <p className="analysis-forecast-value">
-                  {formatNumber(compraInsights.quantidadeCompraMinima)} un /{' '}
-                  {formatCurrency(compraInsights.valorCompraMinima)}
+                  {formatNumber(compraInsights.quantidadeCompraSugerida || compraInsights.quantidadeCompraMinima)} un /{' '}
+                  {formatCurrency(compraInsights.valorCompraSugerida || compraInsights.valorCompraMinima)}
                 </p>
                 <p className="analysis-forecast-subtitle">
-                  Reposicao minima sugerida com base em estoque atual, risco e consumo recente.
+                  Reposicao sugerida por estoque atual, minimo configurado e cobertura recente.
                 </p>
                 <div className="analysis-forecast-meta">
                   <span>Itens monitorados: {formatNumber(compraInsights.materiaisMonitorados)}</span>
                   <span>Itens abaixo do minimo: {formatNumber(compraInsights.itensAbaixoMinimo)}</span>
                   <span>Compra imediata: {formatNumber(compraInsights.itensCompraImediata)}</span>
-                  <span>Saida prevista media/mês: {formatCurrency(previsaoSaidaTotal / 12)}</span>
-                  <span>Entrada prevista media/mês: {formatCurrency(previsaoEntradaTotal / 12)}</span>
-                  <span>Saldo anual previsto: {formatCurrency(previsaoSaldoTotal)}</span>
+                  <span>Reposicao planejada: {formatNumber(compraInsights.itensReposicaoPlanejada || 0)}</span>
+                  <span>Cobertura media: {formatNumber(compraInsights.coberturaMediaMeses || 0, 1)} meses</span>
+                  <span>Saida prevista media/mês: {formatCurrency(compraInsights.saidaMediaMensalPrevista || 0)}</span>
+                  <span>Entrada prevista media/mês: {formatCurrency(compraInsights.entradaMediaMensalPrevista || 0)}</span>
+                  <span>Saldo anual previsto: {formatCurrency(compraInsights.saldoAnualPrevisto || 0)}</span>
+                  {forecastCompraLoading ? <span>Atualizando recomendacao de compra...</span> : null}
+                  {forecastCompraError && compraInsights.origem !== 'rpc' ? <span>{forecastCompraError}</span> : null}
                   {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
                 </div>
                 <div className="analysis-forecast-actions">
@@ -1441,7 +1582,7 @@ export function AnaliseEstoquePage() {
                   </span>
                 </header>
                 <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensCompraImediata)}</strong>
-                <span className="dashboard-insight-card__helper">Itens com risco A e estoque abaixo do minimo.</span>
+                <span className="dashboard-insight-card__helper">Itens abaixo do minimo ou com cobertura menor que 1 mes.</span>
               </article>
               <article className="dashboard-insight-card dashboard-insight-card--blue">
                 <header className="dashboard-insight-card__header">
@@ -1450,7 +1591,9 @@ export function AnaliseEstoquePage() {
                     <StockIcon size={22} />
                   </span>
                 </header>
-                <strong className="dashboard-insight-card__value">{formatCurrency(compraInsights.valorCompraMinima)}</strong>
+                <strong className="dashboard-insight-card__value">
+                  {formatCurrency(compraInsights.valorCompraMinima)}
+                </strong>
                 <span className="dashboard-insight-card__helper">
                   {formatNumber(compraInsights.quantidadeCompraMinima)} unidades para voltar ao minimo.
                 </span>
@@ -1462,8 +1605,10 @@ export function AnaliseEstoquePage() {
                     <RevenueIcon size={22} />
                   </span>
                 </header>
-                <strong className="dashboard-insight-card__value">{formatCurrency(previsaoEntradaTotal / 12)}</strong>
-                <span className="dashboard-insight-card__helper">Media mensal de entrada no rolling selecionado.</span>
+                <strong className="dashboard-insight-card__value">
+                  {formatCurrency(compraInsights.entradaMediaMensalPrevista || 0)}
+                </strong>
+                <span className="dashboard-insight-card__helper">Media mensal de entrada do snapshot selecionado.</span>
               </article>
               <article className="dashboard-insight-card dashboard-insight-card--slate">
                 <header className="dashboard-insight-card__header">
@@ -1472,8 +1617,10 @@ export function AnaliseEstoquePage() {
                     <TrendIcon size={22} />
                   </span>
                 </header>
-                <strong className="dashboard-insight-card__value">{formatCurrency(previsaoSaidaTotal / 12)}</strong>
-                <span className="dashboard-insight-card__helper">Usada como referencia de cobertura financeira.</span>
+                <strong className="dashboard-insight-card__value">
+                  {formatCurrency(compraInsights.saidaMediaMensalPrevista || 0)}
+                </strong>
+                <span className="dashboard-insight-card__helper">Usada como referencia para cobertura e reposicao.</span>
               </article>
             </div>
             <div className="analysis-forecast-grid analysis-forecast-grid--equal">
@@ -1485,7 +1632,8 @@ export function AnaliseEstoquePage() {
                       <li key={`compra-imediata-${item.materialId || item.nome}`}>
                         <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
-                          Deficit: {formatNumber(item.deficitQuantidade)} | Estimado: {formatCurrency(item.deficitValor)}
+                          Deficit: {formatNumber(item.compra_minima_qtd ?? item.deficitQuantidade)} | Sugerido:{' '}
+                          {formatCurrency(item.valor_compra_sugerida ?? item.deficitValor)}
                         </span>
                       </li>
                     ))
@@ -1502,7 +1650,9 @@ export function AnaliseEstoquePage() {
                       <li key={`reposicao-${item.materialId || item.nome}`}>
                         <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
-                          Minimo: {formatNumber(item.estoqueMinimo)} | Atual: {formatNumber(item.estoqueAtual)}
+                          Minimo: {formatNumber(item.estoque_minimo ?? item.estoqueMinimo)} | Atual:{' '}
+                          {formatNumber(item.estoque_atual ?? item.estoqueAtual)} | Alvo:{' '}
+                          {formatNumber((item.estoque_alvo ?? item.pressaoVidaUtil) || 0)}
                         </span>
                       </li>
                     ))
@@ -1521,8 +1671,8 @@ export function AnaliseEstoquePage() {
                       <li key={`cobertura-${item.materialId || item.nome}`}>
                         <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
-                          Cobertura: {formatNumber(item.coberturaMeses || 0, 1)} mes | Giro/dia:{' '}
-                          {formatNumber(item.giroDiario || 0, 2)}
+                          Cobertura: {formatNumber((item.cobertura_meses ?? item.coberturaMeses) || 0, 1)} mes | Consumo/mês:{' '}
+                          {formatNumber((item.consumo_medio_mensal ?? item.giroDiario) || 0, 2)}
                         </span>
                       </li>
                     ))
@@ -1539,7 +1689,8 @@ export function AnaliseEstoquePage() {
                       <li key={`excesso-${item.materialId || item.nome}`}>
                         <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
-                          Atual: {formatNumber(item.estoqueAtual)} | Pressao: {formatNumber(item.pressaoVidaUtil || 0)}
+                          Atual: {formatNumber(item.estoque_atual ?? item.estoqueAtual)} | Alvo:{' '}
+                          {formatNumber((item.estoque_alvo ?? item.pressaoVidaUtil) || 0)}
                         </span>
                       </li>
                     ))
@@ -1566,6 +1717,8 @@ export function AnaliseEstoquePage() {
                   <span>Confianca: {forecastBase?.nivel_confianca || 'nao informada'}</span>
                   <span>Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}</span>
                   <span>Variacao: {formatPercent(forecastBase?.variacao_percentual || 0, 2)}</span>
+                  {forecastAuditLoading ? <span>Atualizando auditoria do snapshot...</span> : null}
+                  {forecastAuditError ? <span>{forecastAuditError}</span> : null}
                   {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
                 </div>
                 <div className="analysis-forecast-actions">
@@ -1614,6 +1767,44 @@ export function AnaliseEstoquePage() {
                   <span className="dashboard-insight-card__helper">{card.helper}</span>
                 </article>
               ))}
+            </div>
+            <div className="analysis-forecast-grid analysis-forecast-grid--single">
+              <article className="analysis-forecast-card analysis-forecast-card--list">
+                <p className="analysis-forecast-label">Previsto x realizado</p>
+                <p className="analysis-forecast-subtitle">
+                  Viés positivo = forecast acima do realizado. Meses futuros continuam como pendentes.
+                </p>
+                {auditSerie.length ? (
+                  <div className="table-wrapper">
+                    <table className="data-table analysis-audit-table">
+                      <thead>
+                        <tr>
+                          <th>Mes</th>
+                          <th>Previsto</th>
+                          <th>Realizado</th>
+                          <th>Erro abs.</th>
+                          <th>Erro %</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditSerie.map((item) => (
+                          <tr key={`audit-${item.ano_mes}`}>
+                            <td>{item.label || formatLabelFromDate(item.ano_mes)}</td>
+                            <td>{formatCurrency(item.valor_previsto || 0)}</td>
+                            <td>{item.valor_realizado === null ? '-' : formatCurrency(item.valor_realizado || 0)}</td>
+                            <td>{item.erro_absoluto === null ? '-' : formatCurrency(item.erro_absoluto || 0)}</td>
+                            <td>{item.erro_percentual === null ? '-' : formatPercent(item.erro_percentual || 0, 2)}</td>
+                            <td>{item.status === 'realizado' ? 'Realizado' : 'Pendente'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="analysis-forecast-subtitle">Ainda nao ha meses realizados suficientes para comparar este snapshot.</p>
+                )}
+              </article>
             </div>
           </div>
         ) : null}

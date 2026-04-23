@@ -35,12 +35,14 @@
 - Ajuda contextual e documentacao da tela `Analise de Estoque` foram atualizadas para refletir as abas e os novos blocos de leitura do forecast.
 - Snapshot de forecast passou a preservar as linhas mensais por `inventory_forecast_id`, evitando que um forecast novo sobrescreva a previsao mensal de um snapshot antigo.
 - API de forecast (`api/_shared/operations.js`) passou a ler a serie mensal pelo `forecast_id` selecionado/derivado do resumo.
+- Tela `Analise de Estoque` passou a consumir auditoria real do snapshot (`previsto x realizado`, WAPE/MAPE, vies) e RPC de compra sugerida por estoque/minimo/cobertura.
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260412_create_aso_control.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260412_add_aso_page_permissions.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260412_aso_baixa_e_historico.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql` no projeto Supabase.
+- Aplicar a migration `supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql` no projeto Supabase.
 - Aplicar no projeto Supabase, nesta ordem:
   - `supabase/migrations/20260418_01_aso_mudanca_funcao_schema.sql`
   - `supabase/migrations/20260418_02_aso_rpc_create_full.sql`
@@ -78,3 +80,4 @@
 - Diagnostico 2026-04-18: o motivo provavel da ausencia dos relatorios semanais/mensais da Fabiana nao e o dependente gravar movimentacao; a geracao falha ao listar muitos materiais em `materiais_view` por uma URL PostgREST gigante. O codigo filtra movimentacoes por `account_owner_id`, entao dependentes do mesmo owner devem entrar no relatorio.
 - Forecast 2026-04-23: a separacao em abas no front e apenas organizacional; a regra do RPC rolling e a persistencia dos snapshots continuam iguais no backend.
 - Forecast 2026-04-23: a persistencia do snapshot agora e versionada por `inventory_forecast_id`, mas o rolling aberto continua atualizando o mesmo `inventory_forecast` enquanto `qtd_meses_base < 12`.
+- Forecast 2026-04-23: a auditoria do snapshot mede qualidade do forecast em meses ja realizados; o diagnostico estatistico continua sendo uma leitura complementar da distribuicao historica mensal.

@@ -678,6 +678,10 @@
   line-height: 1.35;
 }
 
+.analysis-forecast-card .table-wrapper {
+  margin-top: 0.25rem;
+}
+
 @media (max-width: 960px) {
   .analysis-pareto-grid {
     grid-template-columns: 1fr;
