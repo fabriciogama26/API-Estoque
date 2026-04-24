@@ -160,11 +160,15 @@ Atualizacao 2026-04 (auditoria e compra)
 - Migration `supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql` criada com dois RPCs novos:
   - `rpc_previsao_gasto_mensal_auditar(p_owner_id, p_forecast_id)` para comparar previsto x realizado por snapshot.
   - `rpc_previsao_compra_sugerida(p_owner_id, p_forecast_id)` para calcular compra sugerida por estoque atual, minimo e cobertura.
+- Os dois RPCs de auditoria/compra rodam como `security definer`, seguindo o padrao do projeto para nao quebrar por RLS em `entradas`, `saidas` e `agg_gasto_mensal`.
+- Migration `supabase/migrations/20260423_fix_forecast_audit_purchase_security_definer.sql` foi adicionada para corrigir ambientes onde a migration anterior ja tenha sido aplicada sem `security definer`.
 - A aba `Auditoria` passou a consumir a auditoria real do snapshot selecionado, com meses auditados, viés, WAPE/MAPE e tabela mensal previsto x realizado.
 - A aba `Compra` passou a priorizar o payload do RPC de compra; se o RPC nao estiver disponivel, o front ainda cai no fallback local anterior.
+- A lista da aba `Compra` passou a reutilizar o resumo/nome ja carregado em `estoqueBase` para evitar exibicao de UUID bruto quando o payload do RPC nao traz um nome amigavel.
 - `diagnosticar_estatisticas_mensais` continua existindo para leitura estatistica historica; ele nao foi substituido pela auditoria do snapshot.
 - Arquivos alterados:
 - `supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql`
+- `supabase/migrations/20260423_fix_forecast_audit_purchase_security_definer.sql`
 - `src/pages/AnaliseEstoquePage.jsx`
 - `src/styles/DashboardPage.css`
 - `src/help/helpAnaliseEstoque.json`

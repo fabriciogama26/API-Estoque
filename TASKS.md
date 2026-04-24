@@ -36,6 +36,7 @@
 - Snapshot de forecast passou a preservar as linhas mensais por `inventory_forecast_id`, evitando que um forecast novo sobrescreva a previsao mensal de um snapshot antigo.
 - API de forecast (`api/_shared/operations.js`) passou a ler a serie mensal pelo `forecast_id` selecionado/derivado do resumo.
 - Tela `Analise de Estoque` passou a consumir auditoria real do snapshot (`previsto x realizado`, WAPE/MAPE, vies) e RPC de compra sugerida por estoque/minimo/cobertura.
+- Aba `Compra` da Analise de Estoque passou a reaproveitar o resumo do `estoqueBase` para nao exibir UUID bruto nas listas quando o RPC retorna apenas `material_id`.
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260412_create_aso_control.sql` no projeto Supabase.
@@ -43,6 +44,7 @@
 - Aplicar a migration `supabase/migrations/20260412_aso_baixa_e_historico.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql` no projeto Supabase.
+- Aplicar a migration `supabase/migrations/20260423_fix_forecast_audit_purchase_security_definer.sql` no projeto Supabase.
 - Aplicar no projeto Supabase, nesta ordem:
   - `supabase/migrations/20260418_01_aso_mudanca_funcao_schema.sql`
   - `supabase/migrations/20260418_02_aso_rpc_create_full.sql`

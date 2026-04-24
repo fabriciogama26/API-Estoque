@@ -8,6 +8,7 @@ create or replace function public.rpc_previsao_gasto_mensal_auditar(
 )
 returns jsonb
 language plpgsql
+security definer
 set search_path = public
 as $$
 declare
@@ -169,6 +170,7 @@ create or replace function public.rpc_previsao_compra_sugerida(
 )
 returns jsonb
 language plpgsql
+security definer
 set search_path = public
 as $$
 declare

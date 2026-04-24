@@ -890,6 +890,7 @@ supabase/
     20260418_aso_mudanca_funcao_e_baixa_com_tipo.sql  # migration SQL
     20260423_fix_forecast_snapshot_versioning.sql  # migration SQL
     20260423_add_forecast_audit_and_purchase_rpcs.sql  # migration SQL
+    20260423_fix_forecast_audit_purchase_security_definer.sql  # migration SQL
   migrations_rebuild/
     0001_extensions.sql  # migration rebuild SQL
     0002_tables.sql  # migration rebuild SQL
