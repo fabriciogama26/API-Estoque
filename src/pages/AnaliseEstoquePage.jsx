@@ -1059,6 +1059,16 @@ export function AnaliseEstoquePage() {
   )
   const forecastCreatedAtLabel = formatForecastTimestamp(forecastBase?.created_at)
   const selectedForecastId = forecastBase?.id || null
+  const materialDisplayMap = useMemo(() => {
+    const map = new Map()
+    const estoqueItens = Array.isArray(estoqueBase?.itens) ? estoqueBase.itens : []
+    estoqueItens.forEach((item) => {
+      const key = String(item.materialId || item.id || '')
+      if (!key) return
+      map.set(key, item.resumo || item.nome || item.descricao || key)
+    })
+    return map
+  }, [estoqueBase])
 
   useEffect(() => {
     const shouldUseSupabase = !isLocalMode && isSupabaseConfigured() && supabase && profile?.owner_id
@@ -1133,6 +1143,20 @@ export function AnaliseEstoquePage() {
   const compraInsights = useMemo(() => {
     if (forecastCompraPayload?.status === 'ok') {
       const resumo = forecastCompraPayload?.resumo || {}
+      const enrichList = (list = []) =>
+        list.map((item) => {
+          const materialKey = String(item.material_id || item.materialId || '')
+          return {
+            ...item,
+            displayNome:
+              materialDisplayMap.get(materialKey) ||
+              item.nome ||
+              item.descricao ||
+              item.materialIdDisplay ||
+              item.materialId ||
+              materialKey,
+          }
+        })
       return {
         materiaisMonitorados: Number(resumo.materiais_monitorados || 0),
         itensAbaixoMinimo: Number(resumo.itens_abaixo_minimo || 0),
@@ -1151,16 +1175,14 @@ export function AnaliseEstoquePage() {
         saidaMediaMensalPrevista: Number(resumo.saida_media_mensal_prevista || 0),
         entradaMediaMensalPrevista: Number(resumo.entrada_media_mensal_prevista || 0),
         saldoAnualPrevisto: Number(resumo.saldo_anual_previsto || 0),
-        compraImediata: Array.isArray(forecastCompraPayload?.compra_imediata) ? forecastCompraPayload.compra_imediata : [],
-        reposicaoPlanejada: Array.isArray(forecastCompraPayload?.reposicao_planejada)
-          ? forecastCompraPayload.reposicao_planejada
-          : [],
-        excessoOuBaixoGiro: Array.isArray(forecastCompraPayload?.excesso_ou_baixo_giro)
-          ? forecastCompraPayload.excesso_ou_baixo_giro
-          : [],
-        semCoberturaCurta: Array.isArray(forecastCompraPayload?.cobertura_curta)
-          ? forecastCompraPayload.cobertura_curta
-          : [],
+        compraImediata: enrichList(Array.isArray(forecastCompraPayload?.compra_imediata) ? forecastCompraPayload.compra_imediata : []),
+        reposicaoPlanejada: enrichList(
+          Array.isArray(forecastCompraPayload?.reposicao_planejada) ? forecastCompraPayload.reposicao_planejada : [],
+        ),
+        excessoOuBaixoGiro: enrichList(
+          Array.isArray(forecastCompraPayload?.excesso_ou_baixo_giro) ? forecastCompraPayload.excesso_ou_baixo_giro : [],
+        ),
+        semCoberturaCurta: enrichList(Array.isArray(forecastCompraPayload?.cobertura_curta) ? forecastCompraPayload.cobertura_curta : []),
         origem: 'rpc',
       }
     }
@@ -1241,7 +1263,7 @@ export function AnaliseEstoquePage() {
       semCoberturaCurta: semCoberturaCurta.slice(0, 5),
       origem: 'fallback',
     }
-  }, [estoqueBase, forecastCompraPayload, previsaoEntradaTotal, previsaoSaidaTotal, previsaoSaldoTotal, riscoOperacional])
+  }, [estoqueBase, forecastCompraPayload, materialDisplayMap, previsaoEntradaTotal, previsaoSaidaTotal, previsaoSaldoTotal, riscoOperacional])
 
   const auditResumo = forecastAuditPayload?.resumo || null
   const auditSerie = useMemo(
@@ -1630,7 +1652,7 @@ export function AnaliseEstoquePage() {
                   {compraInsights.compraImediata.length ? (
                     compraInsights.compraImediata.map((item) => (
                       <li key={`compra-imediata-${item.materialId || item.nome}`}>
-                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
                           Deficit: {formatNumber(item.compra_minima_qtd ?? item.deficitQuantidade)} | Sugerido:{' '}
                           {formatCurrency(item.valor_compra_sugerida ?? item.deficitValor)}
@@ -1648,7 +1670,7 @@ export function AnaliseEstoquePage() {
                   {compraInsights.reposicaoPlanejada.length ? (
                     compraInsights.reposicaoPlanejada.map((item) => (
                       <li key={`reposicao-${item.materialId || item.nome}`}>
-                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
                           Minimo: {formatNumber(item.estoque_minimo ?? item.estoqueMinimo)} | Atual:{' '}
                           {formatNumber(item.estoque_atual ?? item.estoqueAtual)} | Alvo:{' '}
@@ -1669,7 +1691,7 @@ export function AnaliseEstoquePage() {
                   {compraInsights.semCoberturaCurta.length ? (
                     compraInsights.semCoberturaCurta.map((item) => (
                       <li key={`cobertura-${item.materialId || item.nome}`}>
-                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
                           Cobertura: {formatNumber((item.cobertura_meses ?? item.coberturaMeses) || 0, 1)} mes | Consumo/mês:{' '}
                           {formatNumber((item.consumo_medio_mensal ?? item.giroDiario) || 0, 2)}
@@ -1687,7 +1709,7 @@ export function AnaliseEstoquePage() {
                   {compraInsights.excessoOuBaixoGiro.length ? (
                     compraInsights.excessoOuBaixoGiro.map((item) => (
                       <li key={`excesso-${item.materialId || item.nome}`}>
-                        <strong>{item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
+                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
                         <span>
                           Atual: {formatNumber(item.estoque_atual ?? item.estoqueAtual)} | Alvo:{' '}
                           {formatNumber((item.estoque_alvo ?? item.pressaoVidaUtil) || 0)}
