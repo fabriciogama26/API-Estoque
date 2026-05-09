@@ -61,6 +61,54 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 })
 
+const resolveAuthIdentity = async (loginName: string) => {
+  const { data: ownerRow, error: ownerError } = await supabase
+    .from('app_users')
+    .select('id, email, ativo')
+    .eq('login_name', loginName)
+    .maybeSingle()
+
+  if (ownerError) {
+    return { user: null, error: ownerError }
+  }
+
+  if (ownerRow) {
+    return {
+      user: {
+        email: String(ownerRow.email ?? '').trim(),
+        active: ownerRow.ativo !== false,
+        ownerActive: ownerRow.ativo !== false,
+      },
+      error: null,
+    }
+  }
+
+  const { data: dependentRow, error: dependentError } = await supabase
+    .from('app_users_dependentes')
+    .select(
+      `id, email, ativo, owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, ativo)`
+    )
+    .eq('username', loginName)
+    .maybeSingle()
+
+  if (dependentError) {
+    return { user: null, error: dependentError }
+  }
+
+  if (!dependentRow) {
+    return { user: null, error: null }
+  }
+
+  return {
+    user: {
+      email: String(dependentRow.email ?? '').trim(),
+      active: dependentRow.ativo !== false,
+      ownerActive: dependentRow.owner?.ativo !== false,
+    },
+    error: null,
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -114,20 +162,22 @@ serve(async (req) => {
     )
   }
 
-  const { data: userRow, error } = await supabase
-    .from('app_users')
-    .select('email')
-    .eq('login_name', loginName)
-    .maybeSingle()
+  const { user: authIdentity, error } = await resolveAuthIdentity(loginName)
 
   if (error) {
     return respond(500, { error: { message: 'Falha ao consultar login.', code: 'UPSTREAM_ERROR' } })
   }
 
-  const email = String(userRow?.email ?? '').trim()
-  if (userRow && !email) {
+  const email = String(authIdentity?.email ?? '').trim()
+  if (authIdentity && !email) {
     return respond(422, {
       error: { message: 'Login sem email cadastrado. Procure um administrador.', code: 'MISSING_EMAIL' },
+    })
+  }
+
+  if (authIdentity && (authIdentity.active === false || authIdentity.ownerActive === false)) {
+    return respond(403, {
+      error: { message: 'Usuario inativo. Procure um administrador.', code: 'AUTH_INACTIVE' },
     })
   }
 
