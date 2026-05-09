@@ -1,0 +1,495 @@
+# Plano de Correção — Vulnerabilidades de Segurança
+
+Baseado na análise de 2026-05-01. Ordenado por prioridade.
+
+---
+
+## Descoberta importante durante a pesquisa
+
+> [!NOTE]
+> **Saldo/estoque JÁ é validado por triggers no banco** — não precisa de mudança.
+> - `validar_saldo_saida()` — impede saída com quantidade > estoque disponível (trigger BEFORE INSERT/UPDATE em `saidas`)
+> - `validar_cancelamento_entrada()` — impede cancelamento de entrada se gera estoque negativo (trigger BEFORE UPDATE em `entradas`)
+> - RPCs `rpc_entradas_create_full` e `rpc_saidas_create_full` executam via `buildUserClient(authToken)` (client com token do usuário), garantindo RLS
+>
+> **Isso remove o item 3 da lista de "críticos"** da análise anterior. Risco de saldo fica 🟢 Baixo.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **CORS whitelist** — preciso saber quais são os domínios de produção/staging do projeto. Ex: `https://api-estoque-xyz.vercel.app`. Posso extrair de `.env.vercel` ou você pode confirmar.
+
+> [!IMPORTANT]
+> **Rate limit para leitura** — expandir o rate limit para GETs adicionará latência (1 chamada RPC extra por request). Qual nível de agressividade deseja?
+> - **Opção A**: Rate limit apenas para rotas sensíveis (relatório, exportação, dashboard)
+> - **Opção B**: Rate limit global para todas as rotas (incluindo listagens normais)
+
+> [!IMPORTANT]
+> **Audit log** — criar tabela `audit_log` implica em migration nova no Supabase. Confirma que posso criar essa migration? Ela registraria TODAS as ações de create/update/delete com metadados.
+
+---
+
+## Proposed Changes
+
+### 1. 🔴 CORS Whitelist
+
+**Problema**: `cors.js` reflete qualquer `Origin` → aceita requisições cross-origin de qualquer domínio.
+
+**Solução**: Whitelist de origens via variável de ambiente `CORS_ALLOWED_ORIGINS`.
+
+#### [MODIFY] [cors.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/middleware/cors.js)
+
+```diff
++const ALLOWED_ORIGINS = new Set(
++  (process.env.CORS_ALLOWED_ORIGINS || '')
++    .split(',')
++    .map(o => o.trim())
++    .filter(Boolean)
++)
++
++const DEV_PATTERNS = [/^http:\/\/localhost(:\d+)?$/, /^http:\/\/127\.0\.0\.1(:\d+)?$/]
++
++const isAllowedOrigin = (origin) => {
++  if (!origin) return false
++  if (ALLOWED_ORIGINS.has(origin)) return true
++  if (process.env.NODE_ENV !== 'production') {
++    return DEV_PATTERNS.some(re => re.test(origin))
++  }
++  return false
++}
+
+ export async function cors(ctx) {
+   const { req, res } = ctx.raw || {}
+   if (!req || !res) return undefined
+
+-  const origin = req.headers?.origin || '*'
+-  res.setHeader('Access-Control-Allow-Origin', origin)
++  const origin = req.headers?.origin || ''
++  if (isAllowedOrigin(origin)) {
++    res.setHeader('Access-Control-Allow-Origin', origin)
++  }
+   res.setHeader('Vary', 'Origin')
+```
+
+**Variável de ambiente necessária**:
+- `CORS_ALLOWED_ORIGINS` — ex: `https://api-estoque-xyz.vercel.app,https://api-estoque-staging.vercel.app`
+- Configurar em Vercel Settings → Environment Variables
+
+---
+
+### 2. 🔴 Autorização por Permissão na API (Permission Guard)
+
+**Problema**: O middleware autentica o usuário (JWT válido), mas **não verifica se ele tem permissão** para a rota. Qualquer autenticado pode chamar qualquer endpoint.
+
+**Solução**: Novo middleware `permissionGuard` que mapeia rota → permissão e consulta `user_roles` / `user_permission_overrides` do usuário.
+
+#### [NEW] [permissionGuard.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/middleware/permissionGuard.js)
+
+```javascript
+import { supabaseAdmin } from '../supabaseClient.js'
+import { createHttpError } from '../http.js'
+
+// Mapa de rota da API → permission key(s) necessária(s)
+// Rotas não mapeadas aqui são abertas para qualquer autenticado
+const ROUTE_PERMISSIONS = {
+  // Pessoas
+  'POST /api/pessoas':                'cadastros.pessoas',
+  'PUT /api/pessoas':                 'cadastros.pessoas',
+  'GET /api/pessoas':                 'pessoas.read',
+  // ASO
+  'POST /api/aso':                    'pcsmo.controle_aso',
+  'PUT /api/aso':                     'pcsmo.controle_aso',
+  'POST /api/aso/register-exam':      'pcsmo.controle_aso',
+  'GET /api/aso':                     'pcsmo.controle_aso',
+  // Materiais
+  'POST /api/materiais':              'estoque.materiais',
+  'PUT /api/materiais':               'estoque.materiais',
+  // Acidentes
+  'POST /api/acidentes':              'acidentes.write',
+  'PUT /api/acidentes':               'acidentes.write',
+  'GET /api/acidentes':               'acidentes.read',
+  // Entradas
+  'POST /api/entradas':               'estoque.entradas',
+  'PUT /api/entradas':                'estoque.entradas',
+  'GET /api/entradas':                'estoque.entradas',
+  // Saídas
+  'POST /api/saidas':                 'estoque.saidas',
+  'GET /api/saidas':                  'estoque.saidas',
+  // Relatórios
+  'POST /api/estoque/relatorio':      'estoque.relatorio',
+  'GET /api/estoque/relatorios':      'estoque.relatorio',
+  'GET /api/estoque/relatorio/html':  'estoque.relatorio',
+  'POST /api/estoque/relatorio/pdf':  'estoque.relatorio',
+  // Forecast / Análise
+  'GET /api/estoque/previsao':        'dashboard_analise_estoque',
+  'POST /api/estoque/previsao':       'dashboard_analise_estoque',
+  // Configurações (admin)
+  // As RPCs admin são chamadas via Supabase diretamente, não pela API
+}
+
+const EXEMPT_ROUTES = new Set([
+  'auth.login', 'auth.recover', 'health.check',
+])
+
+// Resolve rota normalizada a partir do path e method
+const resolveRouteKey = (method, path) => {
+  // Normaliza paths com ID: /api/pessoas/xxx → /api/pessoas
+  const basePath = path
+    .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '')
+    .replace(/\/history\/.*$/, '')
+    .replace(/\/register-exam\/.*$/, '/register-exam')
+    .replace(/\/price-history\/.*$/, '')
+    .replace(/\/+$/, '')
+
+  return `${method} ${basePath}`
+}
+
+// Cache simples de permissões por user_id (TTL 60s)
+const cache = new Map()
+const CACHE_TTL_MS = 60_000
+
+const getUserPermissions = async (userId, tenantId) => {
+  const cacheKey = `${userId}|${tenantId}`
+  const cached = cache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return cached.permissions
+  }
+
+  // Busca role + overrides do usuário
+  const { data, error } = await supabaseAdmin.rpc(
+    'get_user_effective_permissions',
+    { p_user_id: userId, p_owner_id: tenantId }
+  )
+
+  if (error) {
+    console.warn('[PERM_GUARD] Falha ao buscar permissões:', error.message)
+    // Falha silenciosa → nega acesso (fail-closed)
+    return []
+  }
+
+  const permissions = Array.isArray(data) ? data : (data?.permissions || [])
+  cache.set(cacheKey, { permissions, ts: Date.now() })
+  return permissions
+}
+
+export async function permissionGuard(ctx) {
+  if (!ctx?.raw?.req) return undefined
+  if (EXEMPT_ROUTES.has(ctx.route)) return undefined
+  if (ctx.isCron || ctx.raw.req?.isCron) return undefined
+  if (!ctx.user) return undefined
+
+  const method = ctx.method || (ctx.raw.req.method || '').toUpperCase()
+  const path = (ctx.raw.req.url || '').split('?')[0]
+  const routeKey = resolveRouteKey(method, path)
+
+  const requiredPerm = ROUTE_PERMISSIONS[routeKey]
+  if (!requiredPerm) {
+    // Rota não mapeada → acesso livre para autenticados
+    return undefined
+  }
+
+  // Master tem acesso total
+  const userMeta = ctx.user?.app_metadata || ctx.user?.user_metadata || {}
+  if (userMeta.credential === 'master' || userMeta.role === 'master') {
+    return undefined
+  }
+
+  // Admin tem acesso total (comportamento atual do front)
+  if (userMeta.credential === 'admin' || userMeta.role === 'admin') {
+    return undefined
+  }
+
+  const permissions = await getUserPermissions(ctx.user.id, ctx.tenantId)
+  if (permissions.includes(requiredPerm)) {
+    return undefined
+  }
+
+  throw createHttpError(403, 'Sem permissao para esta operacao.', {
+    code: 'RLS_DENIED',
+  })
+}
+```
+
+#### [NEW] RPC `get_user_effective_permissions` — migration SQL
+
+```sql
+-- Migration: get_user_effective_permissions
+-- Retorna lista flat de permission keys efetivas para o usuário
+
+CREATE OR REPLACE FUNCTION public.get_user_effective_permissions(
+  p_user_id uuid,
+  p_owner_id uuid
+)
+RETURNS text[]
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_credential text;
+  v_role_permissions text[];
+  v_override_permissions text[];
+  v_result text[];
+BEGIN
+  -- Busca credential do user_roles
+  SELECT credential INTO v_credential
+    FROM public.user_roles
+   WHERE auth_user_id = p_user_id
+     AND scope_parent_user_id = p_owner_id
+   LIMIT 1;
+
+  -- Master/admin: retorna vazio (caller trata como "tudo liberado")
+  IF v_credential IN ('master', 'admin') THEN
+    RETURN ARRAY[]::text[];
+  END IF;
+
+  -- Busca permissions da role
+  SELECT COALESCE(permissions, ARRAY[]::text[]) INTO v_role_permissions
+    FROM public.roles
+   WHERE LOWER(nome) = LOWER(COALESCE(v_credential, 'visitante'))
+   LIMIT 1;
+
+  -- Busca overrides do usuário
+  SELECT COALESCE(array_agg(permission_key), ARRAY[]::text[])
+    INTO v_override_permissions
+    FROM public.user_permission_overrides
+   WHERE auth_user_id = p_user_id
+     AND scope_parent_user_id = p_owner_id
+     AND granted = true;
+
+  -- Merge: role + overrides
+  v_result := v_role_permissions || v_override_permissions;
+
+  RETURN v_result;
+END;
+$$;
+```
+
+> [!WARNING]
+> Esta RPC depende da estrutura exata das tabelas `user_roles`, `roles` e `user_permission_overrides`. Preciso confirmar os nomes das colunas atuais antes de criar a migration final. Se as tabelas usarem nomes diferentes, ajusto.
+
+#### [MODIFY] [withAuth.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/withAuth.js)
+
+Adicionar `permissionGuard` no pipeline, após `tenantGuard`:
+
+```diff
+ import { rateLimitAuth, rateLimitApi } from './middleware/rateLimit.js'
+ import { idempotency } from './middleware/idempotency.js'
++import { permissionGuard } from './middleware/permissionGuard.js'
+ import { errorHandler } from './middleware/errorHandler.js'
+
+ export function withAuth(handler) {
+   const pipeline = compose(
+     requestId,
+     cors,
+     auth,
+     rateLimitAuth,
+     tenantResolve,
+     tenantGuard,
++    permissionGuard,
+     rateLimitApi,
+     idempotency,
+     handlerAdapter(handler),
+     errorHandler
+   )
+```
+
+---
+
+### 3. 🟡 Idempotência para ASO
+
+**Problema**: Rotas `create.aso` e `register.aso-exam` não estão na lista de `IDEMPOTENCY_ROUTES` nem no mapeamento de `route.js`.
+
+#### [MODIFY] [route.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/middleware/route.js)
+
+```diff
+ const ROUTES = [
+   { method: 'POST', path: '/api/auth/login', route: 'auth.login' },
+   { method: 'POST', path: '/api/auth/recover', route: 'auth.recover' },
+   { method: 'POST', path: '/api/pessoas', route: 'create.pessoa' },
+   { method: 'POST', path: '/api/materiais', route: 'create.material' },
+   { method: 'POST', path: '/api/acidentes', route: 'create.acidente' },
+   { method: 'POST', path: '/api/entradas', route: 'create.entrada' },
+   { method: 'POST', path: '/api/saidas', route: 'create.saida' },
++  { method: 'POST', path: '/api/aso', route: 'create.aso' },
+   { method: 'GET', path: '/api/health', route: 'health.check' },
+ ]
+```
+
+> [!NOTE]
+> `register-exam` é uma rota com path dinâmico (`/api/aso/register-exam/:id`), o que torna o match exato no `route.js` mais complexo. Opção: registrar como `register.aso-exam` com match por `startsWith`.
+
+#### [MODIFY] [idempotency.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/middleware/idempotency.js)
+
+```diff
+ const IDEMPOTENCY_ROUTES = new Set([
+   'create.pessoa',
+   'create.material',
+   'create.acidente',
+   'create.entrada',
+   'create.saida',
++  'create.aso',
+ ])
+```
+
+#### [MODIFY] [rateLimit.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/middleware/rateLimit.js)
+
+```diff
+ const CREATE_ROUTES = new Set([
+   'create.pessoa',
+   'create.material',
+   'create.acidente',
+   'create.entrada',
+   'create.saida',
++  'create.aso',
+ ])
+```
+
+---
+
+### 4. 🟡 Rate Limit Expandido
+
+**Depende da resposta do usuário** sobre Opção A vs B.
+
+Se Opção A (recomendado), adicionarei rotas de leitura sensíveis:
+
+#### [MODIFY] [rateLimit.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/middleware/rateLimit.js)
+
+```diff
++const READ_SENSITIVE_ROUTES = new Set([
++  'GET /api/estoque/relatorio/html',
++  'POST /api/estoque/relatorio',
++  'POST /api/estoque/relatorio/pdf',
++  'GET /api/estoque/relatorios',
++])
+```
+
+E uma terceira função `rateLimitRead` no pipeline. A implementação exata depende da decisão.
+
+---
+
+### 5. 🟡 Audit Log (tabela + registro de ações)
+
+#### [NEW] Migration SQL — `create_audit_log.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.audit_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_owner_id uuid NOT NULL REFERENCES public.app_users(id),
+  user_id uuid,
+  action text NOT NULL,          -- 'create', 'update', 'delete', 'cancel'
+  entity text NOT NULL,          -- 'pessoa', 'material', 'entrada', 'saida', 'acidente', 'aso'
+  entity_id uuid,
+  ip_hash text,
+  ua_hash text,
+  session_id text,
+  request_id text,
+  payload_hash text,             -- SHA256 do body (sem dados sensíveis)
+  metadata jsonb,                -- dados adicionais (campos alterados, etc.)
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_audit_log_owner ON public.audit_log(account_owner_id);
+CREATE INDEX idx_audit_log_user ON public.audit_log(user_id);
+CREATE INDEX idx_audit_log_entity ON public.audit_log(entity, entity_id);
+CREATE INDEX idx_audit_log_created ON public.audit_log(created_at DESC);
+
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+
+-- Apenas leitura para master
+CREATE POLICY "audit_log_select_master" ON public.audit_log
+  FOR SELECT USING (public.current_actor_is_master());
+
+-- Insert via API (security definer nos RPCs ou via supabaseAdmin)
+CREATE POLICY "audit_log_insert_service" ON public.audit_log
+  FOR INSERT WITH CHECK (true);
+```
+
+#### [NEW] [auditLog.js](file:///d:/Fabricio/Projetos%20SaaS/API-Estoque/api/_shared/auditLog.js)
+
+Módulo utilitário para registrar ações, chamado dentro das operations após cada create/update:
+
+```javascript
+import { createHash } from 'node:crypto'
+import { supabaseAdmin } from './supabaseClient.js'
+
+const hashPayload = (body) => {
+  if (!body) return null
+  return createHash('sha256')
+    .update(JSON.stringify(body))
+    .digest('hex')
+}
+
+export async function logAudit({
+  ownerId, userId, action, entity, entityId,
+  ipHash, uaHash, sessionId, requestId,
+  payload, metadata,
+}) {
+  try {
+    await supabaseAdmin.from('audit_log').insert({
+      account_owner_id: ownerId,
+      user_id: userId,
+      action,
+      entity,
+      entity_id: entityId,
+      ip_hash: ipHash || null,
+      ua_hash: uaHash || null,
+      session_id: sessionId || null,
+      request_id: requestId || null,
+      payload_hash: hashPayload(payload),
+      metadata: metadata || null,
+    })
+  } catch (err) {
+    console.warn('[AUDIT] Falha ao registrar auditoria:', err?.message)
+  }
+}
+```
+
+> [!NOTE]
+> O `logAudit` é fire-and-forget (não bloqueia a response). Integração com `operations.js` será feita passando `ctx` para as operations (refactor incremental).
+
+---
+
+## Resumo de arquivos
+
+| Ação | Arquivo | Componente |
+|---|---|---|
+| MODIFY | `api/_shared/middleware/cors.js` | CORS whitelist |
+| NEW | `api/_shared/middleware/permissionGuard.js` | Autorização por permissão |
+| NEW | `supabase/migrations/YYYYMMDD_get_user_effective_permissions.sql` | RPC de permissões |
+| MODIFY | `api/_shared/withAuth.js` | Pipeline (adicionar permissionGuard) |
+| MODIFY | `api/_shared/middleware/route.js` | Adicionar rota ASO |
+| MODIFY | `api/_shared/middleware/idempotency.js` | Adicionar rota ASO |
+| MODIFY | `api/_shared/middleware/rateLimit.js` | Adicionar rota ASO + expandir |
+| NEW | `supabase/migrations/YYYYMMDD_create_audit_log.sql` | Tabela de auditoria |
+| NEW | `api/_shared/auditLog.js` | Módulo de auditoria |
+| CONFIG | `.env.vercel` / Vercel Dashboard | `CORS_ALLOWED_ORIGINS` |
+
+---
+
+## Verification Plan
+
+### Automated Tests
+1. **CORS**: Requisição com `Origin: https://dominio-malicioso.com` → resposta SEM header `Access-Control-Allow-Origin`
+2. **Permission Guard**: Requisição autenticada com usuário sem permissão `estoque.entradas` para `POST /api/entradas` → 403
+3. **Idempotência ASO**: Duas requisições `POST /api/aso` com mesmo `Idempotency-Key` → segunda retorna replay
+4. **Rate limit ASO**: Sequência rápida de `POST /api/aso` → 429 após exceder limite
+
+### Manual Verification
+1. Confirmar que deploy Vercel adiciona `CORS_ALLOWED_ORIGINS`
+2. Testar com usuário `operador` sem permissão de Pessoas → 403 ao tentar `POST /api/pessoas`
+3. Testar com `master` → acesso total mantido
+4. Verificar tabela `audit_log` no Supabase após operações
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **Quais domínios de produção/staging** devem ir na whitelist CORS?
+> 2. **Rate limit para leitura**: Opção A (só rotas sensíveis) ou B (todas)?
+> 3. **Confirma criação da migration `audit_log`** no Supabase?
+> 4. **Tabelas `user_roles`, `roles` e `user_permission_overrides`**: preciso confirmar os nomes exatos das colunas para a RPC `get_user_effective_permissions`. Posso verificar na pasta `supabasebackup`?
+> 5. **`register-exam`** no ASO: vale fazer match por `startsWith` no `route.js` para cobrir idempotência nessa rota também, ou é suficiente apenas o `create.aso`?
