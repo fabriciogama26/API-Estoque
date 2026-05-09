@@ -61,6 +61,18 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 })
 
+const logRecoverError = (stage: string, error: unknown) => {
+  const err = error as { message?: string; code?: string; status?: number; details?: string; hint?: string }
+  console.error('auth-recover failed', {
+    stage,
+    message: err?.message || String(error),
+    code: err?.code,
+    status: err?.status,
+    details: err?.details,
+    hint: err?.hint,
+  })
+}
+
 const resolveAuthIdentity = async (loginName: string) => {
   const { data: ownerRow, error: ownerError } = await supabase
     .from('app_users')
@@ -69,7 +81,7 @@ const resolveAuthIdentity = async (loginName: string) => {
     .maybeSingle()
 
   if (ownerError) {
-    return { user: null, error: ownerError }
+    return { user: null, error: ownerError, stage: 'owner_lookup' }
   }
 
   if (ownerRow) {
@@ -80,32 +92,42 @@ const resolveAuthIdentity = async (loginName: string) => {
         ownerActive: ownerRow.ativo !== false,
       },
       error: null,
+      stage: null,
     }
   }
 
   const { data: dependentRow, error: dependentError } = await supabase
     .from('app_users_dependentes')
-    .select(
-      `id, email, ativo, owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, ativo)`
-    )
+    .select('id, email, ativo, owner_app_user_id')
     .eq('username', loginName)
     .maybeSingle()
 
   if (dependentError) {
-    return { user: null, error: dependentError }
+    return { user: null, error: dependentError, stage: 'dependent_lookup' }
   }
 
   if (!dependentRow) {
-    return { user: null, error: null }
+    return { user: null, error: null, stage: null }
+  }
+
+  const { data: dependentOwner, error: dependentOwnerError } = await supabase
+    .from('app_users')
+    .select('id, ativo')
+    .eq('id', dependentRow.owner_app_user_id)
+    .maybeSingle()
+
+  if (dependentOwnerError) {
+    return { user: null, error: dependentOwnerError, stage: 'dependent_owner_lookup' }
   }
 
   return {
     user: {
       email: String(dependentRow.email ?? '').trim(),
       active: dependentRow.ativo !== false,
-      ownerActive: dependentRow.owner?.ativo !== false,
+      ownerActive: Boolean(dependentOwner) && dependentOwner.ativo !== false,
     },
     error: null,
+    stage: null,
   }
 }
 
@@ -141,6 +163,7 @@ serve(async (req) => {
   )
 
   if (rateError) {
+    logRecoverError('rate_limit', rateError)
     return respond(500, {
       error: { message: 'Falha ao validar limite de requisicoes.', code: 'UPSTREAM_ERROR' },
     })
@@ -162,9 +185,10 @@ serve(async (req) => {
     )
   }
 
-  const { user: authIdentity, error } = await resolveAuthIdentity(loginName)
+  const { user: authIdentity, error, stage } = await resolveAuthIdentity(loginName)
 
   if (error) {
+    logRecoverError(stage || 'identity_lookup', error)
     return respond(500, { error: { message: 'Falha ao consultar login.', code: 'UPSTREAM_ERROR' } })
   }
 
@@ -188,11 +212,7 @@ serve(async (req) => {
   const options = redirectTo ? { redirectTo } : undefined
   const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, options)
   if (resetError) {
-    console.error('auth-recover resetPasswordForEmail failed', {
-      message: resetError.message,
-      status: resetError.status,
-      code: resetError.code,
-    })
+    logRecoverError('reset_password_for_email', resetError)
     return respond(500, {
       error: {
         message: 'Falha ao enviar email de recuperacao.',
