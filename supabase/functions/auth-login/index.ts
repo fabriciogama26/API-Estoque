@@ -121,8 +121,14 @@ serve(async (req) => {
     return respond(500, { error: { message: 'Falha ao consultar login.', code: 'UPSTREAM_ERROR' } })
   }
 
-  let authEmail = ownerRow?.email || ''
+  let authEmail = String(ownerRow?.email ?? '').trim()
   let ownerActive = ownerRow?.ativo !== false
+
+  if (ownerRow && ownerActive === false) {
+    return respond(403, {
+      error: { message: 'Usuario inativo. Procure um administrador.', code: 'AUTH_INACTIVE' },
+    })
+  }
 
   if (!authEmail) {
     const { data: dependentRow, error: dependentError } = await supabase
@@ -153,7 +159,7 @@ serve(async (req) => {
   }
 
   const { data, error: signInError } = await supabase.auth.signInWithPassword({
-    email: userRow.email,
+    email: authEmail,
     password,
   })
 

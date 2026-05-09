@@ -39,6 +39,8 @@
 - Aba `Compra` da Analise de Estoque passou a reaproveitar o resumo do `estoqueBase` para nao exibir UUID bruto nas listas quando o RPC retorna apenas `material_id`.
 - Documentacao de referencia arquitetural foi adicionada em `docs/Estruturas`, cobrindo arquitetura limpa, autenticacao, nomenclatura, RLS, Realtime e comparativo de sessoes.
 - Plano de correcao de vulnerabilidades de seguranca foi documentado em `docs/Plano de Correção — Vulnerabilidades de Segurança.txt`.
+- Recuperacao de senha de dependentes foi alinhada ao login remoto: `auth-recover` passa a buscar `app_users_dependentes.username` quando nao encontrar titular em `app_users.login_name`.
+- Login publico corrigido para usar o email resolvido (`authEmail`) e bloquear owner/titular inativo antes de autenticar.
 
 ## Pendente
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
@@ -56,6 +58,7 @@
   - `supabase/migrations/20260418_03_aso_rpc_update_full.sql`
   - `supabase/migrations/20260418_04_aso_rpc_register_exam_next.sql`
 - Revisar a regra de `PermissionsContext` para role `admin`: hoje ela libera todas as rotas, entao os toggles de pagina em `Credenciais e Permissoes` nao restringem navegacao para esse perfil.
+- Publicar/deploy das Edge Functions `auth-login` e `auth-recover` no projeto Supabase.
 - Publicar/deploy das Edge Functions `aso-template` e `aso-import` no projeto Supabase.
 - Validar no banco o comportamento de `proximo_vencimento`:
   - admissional e periodico somam 1 ano a partir de `data_exame`
@@ -88,3 +91,4 @@
 - Forecast 2026-04-23: a separacao em abas no front e apenas organizacional; a regra do RPC rolling e a persistencia dos snapshots continuam iguais no backend.
 - Forecast 2026-04-23: a persistencia do snapshot agora e versionada por `inventory_forecast_id`, mas o rolling aberto continua atualizando o mesmo `inventory_forecast` enquanto `qtd_meses_base < 12`.
 - Forecast 2026-04-23: a auditoria do snapshot mede qualidade do forecast em meses ja realizados; o diagnostico estatistico continua sendo uma leitura complementar da distribuicao historica mensal.
+- Auth 2026-05-09: admins recebiam email de recuperacao porque eram resolvidos em `app_users`; dependentes podiam receber sucesso sem envio quando estavam apenas em `app_users_dependentes`, pois `auth-recover` nao tinha o fallback existente no login.

@@ -17,6 +17,46 @@ const resolveRedirectTo = () => {
   return trimmed ? trimmed : null
 }
 
+async function resolveAuthIdentity(loginName) {
+  const { data: ownerRow, error: ownerError } = await supabaseAdmin
+    .from('app_users')
+    .select('id, email, ativo')
+    .eq('login_name', loginName)
+    .maybeSingle()
+
+  if (ownerError) {
+    throw createHttpError(500, 'Falha ao consultar login.', { code: 'UPSTREAM_ERROR' })
+  }
+
+  if (ownerRow) {
+    return {
+      email: String(ownerRow.email ?? '').trim(),
+      active: ownerRow.ativo !== false,
+      ownerActive: ownerRow.ativo !== false,
+    }
+  }
+
+  const { data: dependentRow, error: dependentError } = await supabaseAdmin
+    .from('app_users_dependentes')
+    .select('id, email, ativo, owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, ativo)')
+    .eq('username', loginName)
+    .maybeSingle()
+
+  if (dependentError) {
+    throw createHttpError(500, 'Falha ao consultar login.', { code: 'UPSTREAM_ERROR' })
+  }
+
+  if (!dependentRow) {
+    return null
+  }
+
+  return {
+    email: String(dependentRow.email ?? '').trim(),
+    active: dependentRow.ativo !== false,
+    ownerActive: dependentRow.owner?.ativo !== false,
+  }
+}
+
 export async function loginWithLoginName(payload = {}) {
   const loginName = normalizeLoginName(payload.loginName ?? payload.login_name ?? payload.username)
   const password = payload.password ?? ''
@@ -25,26 +65,18 @@ export async function loginWithLoginName(payload = {}) {
     throw createHttpError(400, 'Informe login e senha.', { code: 'VALIDATION_ERROR' })
   }
 
-  const { data: userRow, error } = await supabaseAdmin
-    .from('app_users')
-    .select('id, email, ativo')
-    .eq('login_name', loginName)
-    .maybeSingle()
+  const authIdentity = await resolveAuthIdentity(loginName)
 
-  if (error) {
-    throw createHttpError(500, 'Falha ao consultar login.', { code: 'UPSTREAM_ERROR' })
-  }
-
-  if (!userRow?.email) {
+  if (!authIdentity?.email) {
     throw createHttpError(401, 'Login ou senha invalidos.', { code: 'AUTH_INVALID' })
   }
 
-  if (userRow.ativo === false) {
+  if (authIdentity.active === false || authIdentity.ownerActive === false) {
     throw createHttpError(403, 'Usuario inativo. Procure um administrador.', { code: 'AUTH_INACTIVE' })
   }
 
   const { data, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-    email: userRow.email,
+    email: authIdentity.email,
     password,
   })
 
@@ -71,21 +103,16 @@ export async function recoverWithLoginName(payload = {}) {
     throw createHttpError(400, 'Informe seu login para recuperar a senha.', { code: 'VALIDATION_ERROR' })
   }
 
-  const { data: userRow, error } = await supabaseAdmin
-    .from('app_users')
-    .select('email')
-    .eq('login_name', loginName)
-    .maybeSingle()
+  const authIdentity = await resolveAuthIdentity(loginName)
 
-  if (error) {
-    throw createHttpError(500, 'Falha ao consultar login.', { code: 'UPSTREAM_ERROR' })
-  }
-
-  const email = String(userRow?.email ?? '').trim()
-  if (userRow && !email) {
+  const email = String(authIdentity?.email ?? '').trim()
+  if (authIdentity && !email) {
     throw createHttpError(422, 'Login sem email cadastrado. Procure um administrador.', {
       code: 'MISSING_EMAIL',
     })
+  }
+  if (authIdentity && (authIdentity.active === false || authIdentity.ownerActive === false)) {
+    throw createHttpError(403, 'Usuario inativo. Procure um administrador.', { code: 'AUTH_INACTIVE' })
   }
   if (!email) {
     return { ok: true }
