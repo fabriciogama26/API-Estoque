@@ -38,7 +38,7 @@ async function resolveAuthIdentity(loginName) {
 
   const { data: dependentRow, error: dependentError } = await supabaseAdmin
     .from('app_users_dependentes')
-    .select('id, email, ativo, owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, ativo)')
+    .select('id, email, ativo, owner_app_user_id')
     .eq('username', loginName)
     .maybeSingle()
 
@@ -50,10 +50,20 @@ async function resolveAuthIdentity(loginName) {
     return null
   }
 
+  const { data: dependentOwner, error: dependentOwnerError } = await supabaseAdmin
+    .from('app_users')
+    .select('id, ativo')
+    .eq('id', dependentRow.owner_app_user_id)
+    .maybeSingle()
+
+  if (dependentOwnerError) {
+    throw createHttpError(500, 'Falha ao consultar login.', { code: 'UPSTREAM_ERROR' })
+  }
+
   return {
     email: String(dependentRow.email ?? '').trim(),
     active: dependentRow.ativo !== false,
-    ownerActive: dependentRow.owner?.ativo !== false,
+    ownerActive: Boolean(dependentOwner) && dependentOwner.ativo !== false,
   }
 }
 

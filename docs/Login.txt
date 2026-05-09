@@ -173,6 +173,8 @@ Atualizacao 2026-05 (Recuperacao dependentes)
 - Recuperacao de senha agora usa o mesmo criterio do login remoto: tenta titular em `app_users.login_name` e, se nao encontrar, tenta dependente em `app_users_dependentes.username`.
 - Dependentes e titulares/owners inativos sao bloqueados com `AUTH_INACTIVE` antes de chamar o envio de reset.
 - Login publico foi corrigido para autenticar com o email resolvido (`authEmail`) e nao com variavel inexistente.
+- Consultas de dependente deixaram de usar relacionamento embutido com owner; o owner e consultado explicitamente para evitar falha de relacionamento ambíguo no PostgREST.
+- Logs de `auth-recover` agora registram a etapa da falha (`rate_limit`, `dependent_lookup`, `dependent_owner_lookup`, `reset_password_for_email`).
 - Arquivos alterados/criados:
 - `supabase/functions/auth-recover/index.ts`
 - `supabase/functions/auth-login/index.ts`

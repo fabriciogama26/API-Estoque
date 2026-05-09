@@ -133,9 +133,7 @@ serve(async (req) => {
   if (!authEmail) {
     const { data: dependentRow, error: dependentError } = await supabase
       .from('app_users_dependentes')
-      .select(
-        `id, email, ativo, owner:app_users!app_users_dependentes_owner_app_user_id_fkey (id, ativo)`
-      )
+      .select('id, email, ativo, owner_app_user_id')
       .eq('username', loginName)
       .maybeSingle()
 
@@ -145,7 +143,23 @@ serve(async (req) => {
 
     if (dependentRow?.email) {
       authEmail = String(dependentRow.email).trim()
-      ownerActive = dependentRow?.owner?.ativo !== false
+      const { data: dependentOwner, error: dependentOwnerError } = await supabase
+        .from('app_users')
+        .select('id, ativo')
+        .eq('id', dependentRow.owner_app_user_id)
+        .maybeSingle()
+
+      if (dependentOwnerError) {
+        console.error('auth-login dependent owner lookup failed', {
+          message: dependentOwnerError.message,
+          code: dependentOwnerError.code,
+          details: dependentOwnerError.details,
+          hint: dependentOwnerError.hint,
+        })
+        return respond(500, { error: { message: 'Falha ao consultar login.', code: 'UPSTREAM_ERROR' } })
+      }
+
+      ownerActive = Boolean(dependentOwner) && dependentOwner.ativo !== false
       if (dependentRow.ativo === false || ownerActive === false) {
         return respond(403, {
           error: { message: 'Usuario inativo. Procure um administrador.', code: 'AUTH_INACTIVE' },

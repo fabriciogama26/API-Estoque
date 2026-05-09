@@ -41,6 +41,7 @@
 - Plano de correcao de vulnerabilidades de seguranca foi documentado em `docs/Plano de Correção — Vulnerabilidades de Segurança.txt`.
 - Recuperacao de senha de dependentes foi alinhada ao login remoto: `auth-recover` passa a buscar `app_users_dependentes.username` quando nao encontrar titular em `app_users.login_name`.
 - Login publico corrigido para usar o email resolvido (`authEmail`) e bloquear owner/titular inativo antes de autenticar.
+- Diagnostico de `auth-recover` foi reforcado com logs por etapa e consulta explicita do owner do dependente, sem relacionamento embutido.
 
 ## Pendente
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
@@ -92,3 +93,4 @@
 - Forecast 2026-04-23: a persistencia do snapshot agora e versionada por `inventory_forecast_id`, mas o rolling aberto continua atualizando o mesmo `inventory_forecast` enquanto `qtd_meses_base < 12`.
 - Forecast 2026-04-23: a auditoria do snapshot mede qualidade do forecast em meses ja realizados; o diagnostico estatistico continua sendo uma leitura complementar da distribuicao historica mensal.
 - Auth 2026-05-09: admins recebiam email de recuperacao porque eram resolvidos em `app_users`; dependentes podiam receber sucesso sem envio quando estavam apenas em `app_users_dependentes`, pois `auth-recover` nao tinha o fallback existente no login.
+- Auth 2026-05-09: se o request log mostrar 500 em `auth-recover`, verificar Function Logs da mesma execucao; o log agora informa `stage` para separar falha de rate limit, lookup do dependente/owner ou envio pelo Supabase Auth.
