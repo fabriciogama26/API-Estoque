@@ -37,8 +37,13 @@
 - API de forecast (`api/_shared/operations.js`) passou a ler a serie mensal pelo `forecast_id` selecionado/derivado do resumo.
 - Tela `Analise de Estoque` passou a consumir auditoria real do snapshot (`previsto x realizado`, WAPE/MAPE, vies) e RPC de compra sugerida por estoque/minimo/cobertura.
 - Aba `Compra` da Analise de Estoque passou a reaproveitar o resumo do `estoqueBase` para nao exibir UUID bruto nas listas quando o RPC retorna apenas `material_id`.
+- Documentacao de referencia arquitetural foi adicionada em `docs/Estruturas`, cobrindo arquitetura limpa, autenticacao, nomenclatura, RLS, Realtime e comparativo de sessoes.
+- Plano de correcao de vulnerabilidades de seguranca foi documentado em `docs/Plano de Correção — Vulnerabilidades de Segurança.txt`.
 
 ## Pendente
+- Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
+- Definir escopo do rate limit de leitura: apenas rotas sensiveis ou global.
+- Confirmar criacao da migration de `audit_log` e validar nomes reais das tabelas/colunas de permissoes antes da RPC `get_user_effective_permissions`.
 - Aplicar a migration `supabase/migrations/20260412_create_aso_control.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260412_add_aso_page_permissions.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260412_aso_baixa_e_historico.sql` no projeto Supabase.
