@@ -50,13 +50,7 @@ export function EstoqueProvider({ children }) {
   }
 
   const handleFilterChange = (event) => {
-    const { name, value, type, checked } = event.target
-    const nextValue = type === 'checkbox' ? checked : value
-    const nextFilters = { ...filtroState.filters, [name]: nextValue }
     filtroState.handleChange(event)
-    if (name === 'movimentacaoPeriodo') {
-      applyFilters(nextFilters)
-    }
   }
 
   const value = {

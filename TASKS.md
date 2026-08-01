@@ -45,6 +45,7 @@
 - Corrigido o fallback JS do Dashboard de Acidentes para somar HHT mensal ativo por periodo/centro, independente de acidente no mesmo centro/mes.
 - Migration `supabase/migrations/20260801_fix_dashboard_acidentes_hht_total.sql` criada para recriar `vw_indicadores_acidentes` com HHT mensal agregado por periodo e `account_owner_id`.
 - Documentacao `docs/DashboardAcidentes.txt` atualizada com o diagnostico do HHT 2026 e o comportamento antes/depois.
+- Tela `Estoque atual` corrigida para buscar por CA/termo sem zerar movimentacoes, sem aplicar `ilike` em colunas UUID de centro e carregar a visao padrao ao abrir a tela.
 
 ## Pendente
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
@@ -99,3 +100,4 @@
 - Auth 2026-05-09: admins recebiam email de recuperacao porque eram resolvidos em `app_users`; dependentes podiam receber sucesso sem envio quando estavam apenas em `app_users_dependentes`, pois `auth-recover` nao tinha o fallback existente no login.
 - Auth 2026-05-09: se o request log mostrar 500 em `auth-recover`, verificar Function Logs da mesma execucao; o log agora informa `stage` para separar falha de rate limit, lookup do dependente/owner ou envio pelo Supabase Auth.
 - Dashboard Acidentes 2026-08-01: para o owner `59191387-669b-4585-8e11-7070d9769d86`, havia 5 HHT ativos em 03/2026 somando 99.120,67 e 24 acidentes ativos em 2026; nenhum grupo `mes + centro_servico_id` dos acidentes tinha HHT correspondente, por isso a regra antiga retornava HHT total 0.
+- Estoque 2026-08-01: `npm run build` passou apos a correcao do filtro; `npm run lint` continua bloqueado por pendencias gerais preexistentes no projeto. A tela voltou a aplicar filtros somente pelo botao "Aplicar filtros" e a carga inicial deixou de depender da trava global `hasRunInitialLoad`.

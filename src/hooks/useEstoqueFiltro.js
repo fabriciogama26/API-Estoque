@@ -135,9 +135,6 @@ export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null) {
     const { name, value, type, checked } = event.target
     const nextValue = type === 'checkbox' ? checked : value
     setFilters((prev) => ({ ...prev, [name]: nextValue }))
-    if (type === 'checkbox') {
-      setAppliedFilters((prev) => ({ ...prev, [name]: nextValue }))
-    }
   }
 
   useEffect(() => {

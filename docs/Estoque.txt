@@ -28,7 +28,7 @@ Filtros
 - Periodo inicial/final (mes/ano) so e aplicado quando "Movimentacao do periodo" esta ativo.
 - Com "Movimentacao do periodo" desligado, o estoque mostra o saldo fisico acumulado (posicao atual).
 - Com "Movimentacao do periodo" ativo, a lista mostra apenas materiais com movimentacao no intervalo (saldo pode ficar negativo).
-- Termo de busca (nome do material, fabricante, centro).
+- Termo de busca (nome do material, fabricante, CA, ID, grupo, cor e caracteristicas).
 - Centro de estoque/servico.
 - Quantidade (>= valor) para filtrar por saldo minimo exibido.
 - Checkboxes:
@@ -94,6 +94,31 @@ Boas praticas
 Melhoria possivel
 -----------------
 - Criar um RPC no Supabase para calcular o saldo do Estoque atual (com corte por data inicio/fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
+
+Atualizacao 2026-08
+-------------------
+- Arquivos alterados:
+  - src/services/api.js
+  - docs/Estoque.txt
+  - TASKS.md
+- Funcoes/hooks tocadas:
+  - useEstoque
+  - useEstoqueFiltro.handleChange
+  - EstoqueContext.handleFilterChange
+  - api.estoque.current
+  - carregarSaidas
+  - buscarCatalogoIdsPorTermo
+  - buscarCentrosEstoqueIdsPorTermo
+  - buscarCentrosCustoIdsPorTermo
+  - buscarCentrosServicoIdsPorTermo
+- Comportamento antes/depois:
+  - Antes: a tela enviava `termo` e `centroCusto` para as consultas brutas de entradas/saidas; buscar por CA podia remover as movimentacoes antes do filtro local e fazer o material sumir.
+  - Antes: filtros textuais de centro em saidas podiam usar `ilike` em colunas UUID (`centro_custo`, `centro_servico`, `centro_estoque`), gerando erro `operator does not exist: uuid ~~* unknown`.
+  - Antes: a carga inicial podia ser pulada ao reabrir a tela porque havia uma trava global (`hasRunInitialLoad`) fora do hook.
+  - Depois: `api.estoque.current` consulta movimentacoes apenas por periodo/data/materialId e aplica busca/centro/quantidade/alertas no filtro local da tela.
+  - Depois: filtros textuais de centro em saidas tentam resolver IDs pelo catalogo antes da query e usam fallback local por nome, sem `ilike` em UUID.
+  - Depois: a tela sempre executa a carga inicial ao montar, sem depender de estado global entre aberturas.
+  - Depois: filtros continuam sendo aplicados somente ao clicar em "Aplicar filtros"; editar campos apenas prepara o rascunho do filtro.
 
 Atualizacao 2026-01
 -------------------
