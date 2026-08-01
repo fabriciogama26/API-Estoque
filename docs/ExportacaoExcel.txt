@@ -1,0 +1,102 @@
+Exportacao para Excel (CSV)
+===========================
+
+Visao geral
+-----------
+- O botao "Exportar Excel (CSV)" existe em 7 telas: Acidentes, ASO, Entradas, Saidas, Pessoas, Materiais e Estoque Atual.
+- Nao ha geracao de arquivo .xlsx real (nao ha lib `xlsx`/`exceljs`/SheetJS no projeto). O botao gera um CSV (texto separado por `;`) e forca o download com extensao `.csv`; o rotulo "Excel" e apenas indicativo de que o Excel consegue abrir o arquivo.
+- Cada tela usa a mesma logica geral, duplicada por modulo (nao ha um util generico compartilhado):
+  1. Um `sanitizeCsvValue` local trata `null/undefined`, escapa aspas (`"` -> `""`), remove quebras de linha e envolve em aspas quando o valor contem `;`, `"` ou `\n`.
+  2. Um `buildXCsv(lista, contexto?)` monta o cabecalho + linhas (`;` como separador de campo, `\n` como separador de linha).
+  3. Um `downloadXCsv(lista, contexto?, options)` cria o `Blob`, monta um link `<a download>` temporario, dispara `click()` e revoga a URL do objeto.
+- O `handleExportCsv` de cada pagina sempre usa a lista ja filtrada/ordenada em memoria (useMemo), nao a lista bruta nem uma pagina especifica de paginacao — ou seja, exporta todos os registros que atendem aos filtros aplicados na tela, independente de paginacao visual.
+- Nao existem testes automatizados (unit/integration) cobrindo os builders/downloads de CSV em nenhuma das 7 telas.
+
+Arquitetura por tela
+--------------------
+- Acidentes
+  - Botao: `src/pages/Acidentes.jsx:247` (handler `handleExportCsv`, linha 65).
+  - Fonte de dados: `acidentesFiltrados` (`src/hooks/useAcidenteFiltro.js:38`).
+  - Builder/download: `src/utils/acidentesExport.js` (`buildAcidentesCsv` / `downloadAcidentesCsv`).
+  - Nome do arquivo: `acidentes-AAAA-MM-DD.csv` (data via `toISOString().slice(0,10)`, portanto em UTC).
+  - Colunas: Nome, Matricula, Status (Ativo/Cancelado conforme `ativo`), Data, Centro de servico, Local, CAT, CID, Registrado por, Cadastrado em.
+- ASO
+  - Botao: `src/pages/AsoPage.jsx:125` (handler `handleExportCsv`, linha 69).
+  - Fonte de dados: `asos` (estado carregado da tela, ja filtrado pelo backend).
+  - Builder/download: `src/utils/asoExport.js` (`buildAsoCsv` / `downloadAsoCsv`).
+  - Nome do arquivo: `controle-de-aso-AAAA-MM-DD.csv` (UTC).
+  - Colunas: ID, Funcionario, Matricula, Tipo de exame, Data do exame, Proximo vencimento, Dias para vencer, Status, Centro de servico, Setor, Cargo, Observacao, Cadastrado em, Atualizado em.
+- Entradas
+  - Botao: `src/pages/EntradasPage.jsx:343` (handler `handleExportCsv`, linha 164).
+  - Fonte de dados: `filteredEntradas` (`src/hooks/useEntradasController.js:642`), mais `materiaisMap`/`centrosCustoMap` para resolver nomes.
+  - Builder/download: `src/utils/entradasExport.js` (`buildEntradasCsv` / `downloadEntradasCsv`).
+  - Nome do arquivo: `entradas-AAAA-MM-DD.csv` (UTC).
+  - Colunas: ID, Centro de estoque, Material, Descricao, Quantidade, Status, Registrado por, Cadastrado em.
+- Saidas
+  - Botao: `src/pages/SaidasPage.jsx:422` (handler `handleExportCsv`, linha 134).
+  - Fonte de dados: `saidasFiltradas` (`src/hooks/useSaidasController.js:757`), com mapas montados na hora (`pessoasMap`, `materiaisMap`, `centrosEstoqueMap`) a partir de `pessoas`/`materiais`/`centrosEstoqueOptions` do estado da pagina.
+  - Builder/download: `src/utils/saidasExport.js` (`buildSaidasCsv` / `downloadSaidasCsv`).
+  - Nome do arquivo: `saidas-AAAA-MM-DD.csv` (UTC).
+  - Colunas: ID, Pessoa, Matricula, Material, Quantidade, Centro de estoque, Centro de custo, Centro de servico, Data entrega, Data troca, Status, Registrado por, Cadastrado em.
+- Pessoas
+  - Botao: `src/pages/Pessoas.jsx:127` (handler `handleExportCsv`, linha 75).
+  - Fonte de dados: `pessoasOrdenadas` (`src/hooks/usePessoasController.js:502`, ordenado por nome).
+  - Builder/download: `src/utils/pessoasUtils.js` (`buildPessoasCsv` / `downloadPessoasCsv`).
+  - Nome do arquivo: `pessoas-AAAA-MM-DD.csv` (UTC).
+  - Colunas: ID, Nome, Matricula, Centro de servico, Setor, Cargo, Tipo de execucao, Data admissao, Data demissao, Status (ATIVO/INATIVO), Usuario cadastro, Usuario edicao, Criado em, Atualizado em.
+- Materiais
+  - Botao: `src/pages/Materiais.jsx:161` (handler `handleExportCsv`, linha 83).
+  - Fonte de dados: `materiaisOrdenados` (`src/hooks/useMateriaisController.js:655`, sobre `materiaisFiltrados`).
+  - Builder/download: `src/utils/MateriaisUtils.js` (`buildMateriaisCsv` / `downloadMateriaisCsv`).
+  - Nome do arquivo: `materiais-AAAA-MM-DD.csv` (data local, montada manualmente com `getFullYear/getMonth/getDate`, ao contrario das demais telas que usam `toISOString`).
+  - Colunas: ID, CA, Grupo, Material, Descricao, Valor unitario, Validade (dias), Fabricante, Registrado por, Cadastrado em.
+- Estoque Atual
+  - Botao: `src/pages/EstoquePage.jsx:115` (handler `handleExportCsv`, linha 53).
+  - Fonte de dados: `itensFiltradosBase` (`src/hooks/useEstoqueFiltro.js:28`), que aplica os filtros sobre `estoqueBase` (saldo fisico acumulado), e nao sobre `estoque` (que pode estar em modo "Movimentacao do periodo"). Ou seja, o CSV sempre exporta a posicao acumulada, mesmo com o toggle de periodo ligado na tela.
+  - Builder/download: `src/utils/estoqueUtils.js` (`buildEstoqueCsv` / `downloadEstoqueCsv`).
+  - Nome do arquivo: `estoque-atual-AAAA-MM-DD.csv` (data local, mesma abordagem manual de Materiais).
+  - Colunas: Material ID, Material, Fabricante, CA, Cor, Validade (dias), Centros de estoque, Quantidade em estoque, Total de entradas, Total de saidas, Estoque minimo, Deficit, Valor unitario, Valor total, Valor para reposicao, Ultima atualizacao, Ultima saida (data).
+
+Formato do arquivo gerado
+-------------------------
+- Separador de campo: `;` (ponto e virgula) em todas as telas — compativel com o separador padrao do Excel em locale pt-BR.
+- Separador de linha: `\n`.
+- MIME type do Blob: `text/csv;charset=utf-8;` em todas as telas.
+- Escape de valores: aspas duplicadas (`""`) e valor entre aspas quando contem `;`, `"` ou quebra de linha; quebras de linha internas viram espaco.
+- Numeros: quando existe `formatCsvNumber` (Materiais e Estoque), o separador decimal e ponto (`.`), nao virgula. Como o Excel pt-BR normalmente espera virgula como separador decimal, colunas numericas (ex.: "Valor unitario", "Valor total") podem abrir como texto em vez de numero, dependendo do locale do Excel do usuario.
+- Datas: formatadas via `toLocaleString('pt-BR')`/`toLocaleDateString('pt-BR')` ou helpers especificos de cada dominio (`formatDisplayDateTime`, `formatDateWithOptionalTime` etc.), portanto ja chegam como texto no formato dd/mm/aaaa (hh:mm quando aplicavel).
+
+Inconsistencias identificadas (verificacao de codigo)
+------------------------------------------------------
+- BOM UTF-8 (`﻿`) ausente em 3 das 7 telas:
+  - Com BOM: `acidentesExport.js`, `asoExport.js`, `entradasExport.js`, `saidasExport.js` (prefixam o conteudo do Blob com `﻿`).
+  - Sem BOM: `MateriaisUtils.js`, `pessoasUtils.js`, `estoqueUtils.js` (`downloadMateriaisCsv`, `downloadPessoasCsv`, `downloadEstoqueCsv` criam o Blob direto de `csvContent`, sem `﻿`).
+  - Efeito pratico: ao abrir o CSV de Materiais, Pessoas ou Estoque Atual direto no Excel (duplo clique), caracteres acentuados (ex.: "Validade", "Descricao", "Ultima saida") tendem a aparecer corrompidos (mojibake), pois o Excel sem BOM assume a codificacao ANSI/locale em vez de UTF-8. Nas outras 4 telas (Acidentes, ASO, Entradas, Saidas) o BOM evita esse problema.
+- Linha de dica `sep=;` (forca o Excel a reconhecer o delimitador na abertura direta) presente apenas em ASO, Entradas e Saidas (`buildAsoCsv`, `buildEntradasCsv`, `buildSaidasCsv` retornam `['sep=;', headers..., ...rows]`). Ausente em Acidentes, Materiais, Pessoas e Estoque Atual.
+- Padrao de nome de arquivo/data diferente entre telas:
+  - Acidentes, ASO, Entradas, Saidas usam `new Date().toISOString().slice(0, 10)` (data em UTC — pode divergir do dia local do usuario perto da meia-noite).
+  - Materiais e Estoque Atual montam a data manualmente a partir de `getFullYear/getMonth/getDate` (data local).
+  - Pessoas usa o mesmo padrao UTC de Acidentes/ASO/Entradas/Saidas.
+- Cada tela reimplementa seu proprio `sanitizeCsvValue`/`formatCsvNumber`/`formatCsvDate` (7 copias quase identicas espalhadas por `src/utils/*`), sem um modulo `csvUtils` compartilhado — risco de divergencia caso a regra de escaping precise mudar no futuro (ja ha divergencia no BOM e no `sep=;` acima).
+
+Boas praticas
+-------------
+- Ao adicionar uma nova tela com exportacao, seguir o padrao com BOM (`﻿`) + linha `sep=;` para evitar os problemas de acentuacao/delimitador ja mapeados acima.
+- Exportar sempre a partir da lista ja filtrada em memoria (`useMemo`), nunca da lista bruta, para manter consistencia com o que o usuario ve na tela.
+- Ao exportar valores monetarios/numericos, considerar formatar com virgula (`toLocaleString('pt-BR')`) em vez de ponto, para abrir corretamente como numero no Excel pt-BR.
+
+Melhoria possivel
+-----------------
+- Corrigir a ausencia de BOM em `MateriaisUtils.js`, `pessoasUtils.js` e `estoqueUtils.js` (adicionar `﻿` no Blob), alinhando com as demais 4 telas.
+- Adicionar a linha `sep=;` em `acidentesExport.js`, `MateriaisUtils.js`, `pessoasUtils.js` e `estoqueUtils.js` para garantir abertura direta no Excel com o delimitador correto em qualquer locale.
+- Extrair um `src/utils/csvExport.js` compartilhado (sanitize, montagem do Blob/link, download) para eliminar a duplicacao entre as 7 implementacoes e evitar que futuras correcoes fiquem parciais (como a atual divergencia de BOM/sep=;).
+- Considerar gerar um `.xlsx` real (ex.: via SheetJS) se for necessario preservar tipos de coluna (numero/data) sem depender do locale do Excel do usuario.
+
+Atualizacao 2026-07
+--------------------
+- Documento criado apos auditoria de codigo das 7 telas com botao "Exportar Excel (CSV)" (Acidentes, ASO, Entradas, Saidas, Pessoas, Materiais, Estoque Atual).
+- Nenhuma alteracao de codigo foi feita nesta auditoria; achados registrados na secao "Inconsistencias identificadas" acima para correcao futura.
+- Arquivos revisados:
+  - src/pages/Acidentes.jsx, src/pages/AsoPage.jsx, src/pages/EntradasPage.jsx, src/pages/SaidasPage.jsx, src/pages/Pessoas.jsx, src/pages/Materiais.jsx, src/pages/EstoquePage.jsx
+  - src/utils/acidentesExport.js, src/utils/asoExport.js, src/utils/entradasExport.js, src/utils/saidasExport.js, src/utils/MateriaisUtils.js, src/utils/pessoasUtils.js, src/utils/estoqueUtils.js
+  - src/hooks/useAcidenteFiltro.js, src/hooks/useEntradasController.js, src/hooks/useSaidasController.js, src/hooks/usePessoasController.js, src/hooks/useMateriaisController.js, src/hooks/useEstoqueFiltro.js

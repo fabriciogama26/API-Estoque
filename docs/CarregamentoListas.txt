@@ -1,0 +1,144 @@
+Carregamento de Listas nas Telas
+=================================
+
+Visao geral
+-----------
+- Documenta, para as mesmas 7 telas de `docs/ExportacaoExcel.txt` (Acidentes, ASO, Entradas, Saidas, Pessoas, Materiais, Estoque Atual), como a lista principal chega na tela: Pagina -> Context -> Hook/Controller -> Servico (`src/services/*Service.js`) -> `dataClient` (`api.js` remoto ou `localApi.js` local) -> tabela/RPC do Supabase -> estado em memoria -> renderizacao.
+- `src/services/dataClient.js` escolhe `api` = `src/services/api.js` (Supabase) quando `isLocalMode` (`src/config/runtime.js`) e falso, ou `src/services/localApi.js` (in-memory/localStorage) quando `VITE_DATA_MODE=local` em dev. Ver `docs/data-mode-guide.txt` para detalhes do toggle.
+- Duas pecas centrais em `api.js`:
+  - `execute(builder, msg)` (`src/services/api.js:1887`) roda uma unica chamada Supabase e trata erro padrao.
+  - `executePaged(buildQuery, msg, opts)` (`src/services/api.js:1896-1914`) percorre `.range(from, from+pageSize-1)` com `pageSize=1000` e `maxPages=50` ate esgotar os dados — usado apenas por `pessoas.list`/busca. Isso busca **o resultado inteiro do filtro** em blocos de 1000, nao e paginacao de tela.
+- Nenhuma das 7 telas usa `.range()`/`.limit()` do Supabase para limitar a lista exibida ao usuario. A paginacao que o usuario ve (quando existe) e sempre um `slice()` em memoria sobre a lista ja carregada por completo.
+- Multi-tenant: `entradas`, `saidas`, `materiais*`, `pessoas` dependem de RLS via `current_account_owner_id()` (ver `docs/rls-multi-tenant-map.txt`). Pessoas e a unica tela que soma um filtro extra no app (`resolvePessoasOwnerScope`, ver abaixo) alem da RLS.
+
+Resumo comparativo
+------------------
+- Paginacao de tela: Entradas e Saidas usam `TABLE_PAGE_SIZE = 20` (`src/config/pagination.js:1`) via slice em memoria; Pessoas e Materiais nao paginam (renderizam a lista inteira); Estoque pagina Alertas (6) e Itens (10) separadamente, tambem via slice em memoria.
+- Filtragem: Acidentes e Materiais sao 100% client-side (carregam tudo uma vez, filtram em `useMemo`/funcao local); Entradas, Saidas e Estoque sao hibridas (uma parte dos filtros vai para o servidor, mas a lista carregada e refiltrada de novo no cliente); Pessoas e hibrida "invertida": o servidor filtra apenas na recarga forcada, e toda interacao de filtro subsequente reaproveita o cache local sem nova chamada.
+- Cache entre chamadas: so existe em Pessoas (`pessoasOptionsRef`, reaproveita a mesma lista carregada entre varias combinacoes de filtro) e em Estoque (`lastLoadKeyRef`/`lastBaseKeyRef`, cache de deduplicacao — so evita repetir a mesma chamada identica). Acidentes, ASO, Entradas, Saidas e Materiais sempre refazem a chamada ao servidor em "Aplicar"/"Atualizar".
+
+Acidentes
+---------
+- Pagina: `src/pages/Acidentes.jsx`.
+- Hook de dados: `src/hooks/useAcidentes.js` — estado `acidentes`, `isLoading`, `error`.
+  - Carga inicial: `useEffect(() => { reload() }, [reload])` (linhas 22-24) chama `reload()` uma vez ao montar.
+  - `reload()` (linhas 9-20) chama `listAcidentes()` (sem parametros) e substitui `acidentes` por completo.
+- Hook de filtro: `src/hooks/useAcidenteFiltro.js` (`acidentesFiltrados`, linha 38) — filtra em memoria a lista ja carregada; nao ha chamada ao servidor por filtro.
+- Servico: `src/services/acidentesService.js` -> `listAcidentes() => api.acidentes.list()`/`dataClient`.
+- Paginacao: nenhuma — lista completa renderizada.
+- Padrao mais simples das 7 telas: uma unica carga de tudo no mount, filtro e exportacao sempre client-side sobre essa carga.
+
+ASO
+---
+- Pagina: `src/pages/AsoPage.jsx`.
+- Hook: `src/hooks/useAsoController.js` — estados `asos` (lista filtrada exibida) e `allAsos` (lista completa, sem filtro, usada so para checagem de conflitos/duplicidade ao salvar).
+  - Carga inicial: `useEffect(() => { loadDependencies(); refreshAsoData(ASO_FILTER_DEFAULT) }, [...])` (linhas 133-136).
+  - `refreshAsoData(params)` (linhas 126-131) roda `Promise.all([loadAsosData(params), loadAllAsosData()])` — duas chamadas paralelas ao mesmo `listAsos`, uma com filtros e outra sem (`{}`).
+  - `loadAsosData(params)` (linhas 100-115) chama `listAsos(params)` e substitui `asos`.
+  - Filtro "Aplicar" (`handleFilterSubmit`, linhas 229-232) chama `loadAsosData(filters)` diretamente — filtro e sempre resolvido no servidor, sem refiltro em memoria.
+- Servico: `src/services/asoService.js` -> `listAsos(params) => api.aso.list(params)` (delega ao Supabase com os filtros no payload).
+- Auxiliares carregados junto: `listAsoTiposExame()` e `listPessoasReferences()` (`loadDependencies`, linhas 85-98) para popular selects de tipo de exame/centro/setor/cargo.
+- Paginacao: nenhuma.
+- Particularidade: mantem 2 copias da lista (filtrada e completa) para poder validar duplicidade/conflito de exame sem depender do filtro atual da tela.
+
+Entradas
+--------
+- Pagina: `src/pages/EntradasPage.jsx`, dentro de `EntradasProvider` -> `useEntradasContext()` -> `useEntradasController()` (`src/hooks/useEntradasController.js`).
+- Estado: `entradas` (lista bruta) + catalogos auxiliares `materiais`, `centrosCusto`, `statusOptions`.
+- Carga inicial: `useEffect` disparado por `userScopeKey` (troca de usuario/tenant) chama `load(initialEntradaFilters, { resetPage: true, refreshCatalogs: true })`.
+- `load(params, opts)`: roda em paralelo os catalogos (se vazios ou `refreshCatalogs`) e `listEntradas(buildEntradasQuery(params))`; resultado substitui `entradas`.
+- Gatilhos de recarga: botao "Atualizar" (`load(filters, { refreshCatalogs: true })`), "Aplicar filtros" (`load(filters, { resetPage: true })`), "Limpar" (volta aos filtros default + recarrega catalogos), e apos criar/editar/cancelar entrada ou importacao em massa.
+- Paginacao: apenas client-side — `paginatedEntradas` faz `slice` de `filteredEntradas` por `TABLE_PAGE_SIZE` (20); `<TablePagination>` usa `filteredEntradas.length`. Nao ha `.range()` no lado do servidor.
+- Filtragem hibrida (servidor + cliente, ambas aplicadas):
+  - Servidor: `buildEntradasQuery(filters)` (`src/utils/entradasUtils.js`) envia `centroCusto`, `registradoPor`, `status`, `dataInicio`, `dataFim`, `termo` para `carregarEntradas()` (`src/services/api.js`), que monta `.eq/in` no material/centro/status/usuario e range de datas via `buildDateFilters`. O filtro `termo`, porem, e aplicado **depois** da consulta, em JS, contra um mapa de `materiais_view` ja carregado (nao vira `.ilike()` na tabela `entradas`).
+  - Cliente: `filteredEntradas` (`useMemo`) reaplica `centroCusto`/`status`/`registradoPor`/`termo` sobre a lista `entradas` ja em memoria, usando o valor **atual** do formulario de filtro (nao apenas o ultimo aplicado) — por isso digitar no campo de busca refiltra a lista instantaneamente antes mesmo de clicar em "Aplicar filtros", que so dispara uma nova busca no servidor.
+- Servico: `src/services/entradasService.js` -> `listEntradas`, `listMateriais`, `listCentrosEstoque`, `listStatusEntrada`, `searchMateriais`, `createEntrada`/`updateEntrada`/`cancelEntrada`, `getEntradaHistory`.
+- Backend (`api.js`): `entradas.list` -> `carregarEntradas()` -> `supabase.from('entradas').select('*').order('dataEntrada', {ascending:false})` + filtros acima. `materiais.list()` -> `supabase.from('materiais_view').select(...).order('nome')`. `centrosEstoque.list()`/`centrosCusto.list()` -> RPC `rpc_catalog_list` (SECURITY DEFINER). `statusEntrada.list()` -> `supabase.from('status_entrada').select('id, status').eq('ativo', true)`.
+- Auxiliares para exibicao: `materiaisMap` (nome/descricao do material por linha) e `centrosCustoMap`/`resolveCentroCustoLabel` (nome do centro), ambos montados a partir das listas ja carregadas; as opcoes de filtro (`registeredOptions`, `centroCustoFilterOptions`) sao derivadas da propria lista `entradas` carregada, sem busca adicional.
+
+Saidas
+------
+- Pagina: `src/pages/SaidasPage.jsx`, dentro de `SaidasProvider` -> `useSaidasContext()` -> `useSaidasController()` (`src/hooks/useSaidasController.js`).
+- Estado: `saidas` + auxiliares `pessoas`, `materiais`, `centrosEstoqueOptions`, `centrosCustoOptions`, `centrosServicoOptions`, `statusOptions`.
+- Carga inicial: `useEffect` disparado por `userScopeKey` chama `load(initialSaidaFilters, { resetPage: true })`.
+- `load(params, opts)`: roda em paralelo `listPessoas()`, `listMateriais()`, `listSaidas(buildSaidasQuery(params))` e catalogos de centro (se ainda nao carregados); depois complementa pessoas referenciadas nas saidas mas fora do filtro "ativo" padrao via `listPessoasByIds` (para nao perder o nome de pessoas inativas que ja tiveram saida).
+- Gatilhos de recarga: "Atualizar", "Aplicar filtros", "Limpar", apos criar/editar/cancelar saida e apos confirmar troca.
+- Paginacao: client-side, mesmo padrao de Entradas — `paginatedSaidas` faz `slice` de `saidasFiltradas` por `TABLE_PAGE_SIZE` (20).
+- Filtragem hibrida (servidor + cliente):
+  - Servidor: `buildSaidasQuery` envia `centroCusto`, `centroServico`, `registradoPor`, `status`, `dataInicio`, `dataFim`, `termo` para `carregarSaidas()`, que filtra `materialId`, `pessoaId`, `status`, `usuarioResponsavel`, `centro_estoque`, `centro_custo`, `centro_servico` e range de datas; `termo` tambem e resolvido em JS apos a busca (contra `pessoas`/`materiais_view` ja carregados).
+  - **Somente client-side, sem equivalente no servidor**: os filtros `trocaOnly` (apenas saidas com troca) e `trocaPrazo` (prazo da troca) existem so no estado local e sao aplicados no `useMemo` `saidasFiltradas`, junto com uma reaplicacao de `status`/`registradoPor`/`termo` sobre o valor atual do formulario (mesmo comportamento de "preview instantaneo" de Entradas).
+- Servico: `src/services/saidasService.js` -> `listSaidas`, `listPessoas` (`api.pessoas.list({status:'ativo'})`), `listPessoasByIds`, `listMateriais` (prioriza `api.entradas.materialOptions()`/`entradas_material_view`, cai para `api.materiais.list()`), `getMaterialEstoque`, `searchMateriais`/`searchPessoas`, `listCentrosCusto`/`listCentrosServico`/`listCentrosEstoque`.
+- Backend: `saidas.list` -> `carregarSaidas()` -> `supabase.from('saidas').select('*, status_rel:status_saida ( id, status )').order('dataEntrega', {ascending:false})`.
+- Auxiliares: `pessoasMap`/`materiaisMap` (nome, matricula, resumo do material por linha, tambem usados no filtro de `termo`); opcoes de filtro de centro/registrador/status sao derivadas da propria lista `saidas` ja carregada.
+
+Pessoas
+-------
+- Pagina: `src/pages/Pessoas.jsx`, dentro de `PessoasProvider` -> `usePessoasContext()` -> `usePessoasController()` (`src/hooks/usePessoasController.js`).
+- Estado: `pessoas` (lista final, filtrada, exibida) e `pessoasOptions`/`pessoasOptionsRef` (cache da ultima carga completa do servidor).
+- Carga inicial: `useEffect` por `userScopeKey`/id do usuario limpa o cache e chama `loadPessoas(PESSOAS_FILTER_DEFAULT, true)` (forca busca no servidor); outro `useEffect` busca `getPessoasResumo()` uma unica vez.
+- `loadPessoas(params, refreshOptions)` tem um **branch de cache** central (linhas 114-165 de `usePessoasController.js`):
+  - Se `refreshOptions` for falso **e** ja existir cache (`pessoasOptionsRef.current` nao vazio), a funcao **nao chama o servidor**: reenriquece os itens do cache com os mapas de referencia atuais (centro/setor/cargo/tipo de execucao) e aplica `filterPessoas(enrichedPessoas, params)` so em memoria, terminando com `return` antes de qualquer rede.
+  - Somente quando `refreshOptions === true` (ou cache vazio) o codigo chama `listPessoas(params)` de fato, atualiza `pessoasOptionsRef`/`pessoasOptions` e depois reaplica `filterPessoas` do mesmo jeito.
+- Gatilhos de recarga:
+  - "Atualizar" -> `loadPessoas(filters, true)` — forca ida ao servidor.
+  - "Aplicar filtros" -> `loadPessoas(filters)` **sem** o segundo argumento — cai no branch de cache, ou seja, filtrar por centro de servico/setor/cargo/tipo de execucao/periodo/termo ao clicar em "Aplicar" normalmente **nao gera nenhuma chamada ao Supabase**, so refiltra o que ja esta em memoria.
+  - "Limpar" -> mesmo comportamento de cache.
+  - Apos criar/editar/cancelar/importar pessoa -> `loadPessoas(filters, true)` (forca, pois os dados realmente mudaram).
+- Paginacao: nenhuma — `pessoasOrdenadas` (`sortPessoasByNome` sobre `pessoas`) e renderizada por completo.
+- Detalhe de codigo morto: `buildPessoasQuery` (`src/utils/pessoasUtils.js`) e um stub que sempre retorna `{}` com o comentario "filtros aplicados apenas no frontend" — e importado mas nunca chamado; o objeto `filters` bruto e passado direto para `listPessoas`.
+- Quando o servidor e de fato consultado (carga forcada): `api.pessoas.list(params)` resolve nomes de centro/setor/cargo/tipo de execucao para id via RPC `rpc_catalog_resolve`, monta a query sobre a RPC `rpc('rpc_pessoas_completa')` com `.eq` nesses ids + `.eq('ativo', ...)` + range de `criadoEm` + busca por `termo`, e busca tudo via `executePaged` (blocos de 1000 linhas).
+- Escopo de tenant especifico desta tela: `resolvePessoasOwnerScope()` (`src/services/api.js`) adiciona um `.in('centro_servico_id', ownerScope.centroServicoIds)` para contas nao-master, alem da RLS — nenhuma das outras 4 telas com escopo (Entradas/Saidas/Materiais/Estoque) tem essa camada extra no app.
+- Auxiliares: `referencias` (centros de servico/setores/cargos/tipos de execucao) via `listPessoasReferences()`, com fallback extraido da propria lista de pessoas quando as referencias voltam vazias para usuarios dependentes.
+
+Materiais
+---------
+- Pagina: `src/pages/Materiais.jsx`, dentro de `MateriaisProvider` -> `useMateriaisContext()` -> `useMateriaisController()` (`src/hooks/useMateriaisController.js`).
+- Estado: `materiais`/`materiaisBase` (lista completa) e `materiaisFiltrados` (lista exibida).
+- Carga inicial: `useEffect(() => { loadMateriais() }, [loadMateriais])` — carga simples no mount, sem depender de `userScopeKey` (unica das 7 telas sem esse guard explicito de troca de tenant). Um segundo `useEffect` carrega em paralelo os catalogos de grupo/fabricante/caracteristica/cor/calcado/tamanho.
+- `loadMateriais()`: chama `listMateriaisDetalhado()` **sem nenhum parametro** (sempre busca tudo), guarda em `materiais`/`materiaisBase` e ja aplica `filterMateriais(lista, MATERIAIS_FILTER_DEFAULT, {...})` para popular `materiaisFiltrados` com os defaults.
+- Gatilhos de recarga: botao "Atualizar" (`handleRefresh` -> `loadMateriais()`) e apos criar/editar material — sempre uma recarga completa (sem atualizacao incremental do item alterado).
+- Filtragem: 100% client-side, mesmo padrao de Acidentes — "Aplicar filtros" chama `filterMateriais(materiaisBase, filters, {...})` sobre a lista ja carregada, sem nenhuma chamada de rede; "Limpar" refiltra `materiaisBase` com os defaults.
+- Paginacao: nenhuma — `materiaisOrdenados` e renderizado por completo; o hook ainda expoe um `setCurrentPage: () => {}` (no-op), evidenciando que a paginacao nunca foi de fato conectada nesta tela.
+- Servico: `src/services/materiaisService.js` -> `listMateriaisDetalhado`, `getMaterial`, `createMaterial`/`updateMaterial`, `priceHistory`, `listGrupos`/`listFabricantes`/`listCaracteristicas`/`listCores`/`listCalcados`/`listTamanhos`/`listItensDoGrupo`.
+- Backend: `materiais.list()` e `materiais.listDetalhado()` sao a mesma implementacao (`carregarMateriais`/`carregarMateriaisDetalhados`) -> `supabase.from('materiais_view').select(MATERIAL_SELECT_COLUMNS).order('nome')`; nenhum aceita filtro/`.range()` do servidor. Catalogos (`grupos_material`, `caracteristica_epi`, `cor`, `medidas_calcado`, `medidas_vestimentas`, `grupos_material_itens`, `fabricantes`) sao tabelas simples com `.select().order()`. Autocomplete de material (`materiais.search`) usa `.or(<ilike>)` sobre `materiais_view` (ou `entradas_material_view` quando ha centro de estoque), com `.limit()` — mas isso e so para busca pontual, nao para a lista principal da tela.
+- Auxiliares: catalogos de grupo/fabricante/caracteristica/cor/calcado/tamanho carregados em paralelo no mount; `materialItems` recarrega em cascata sempre que `form.grupoMaterialId` muda (select dependente).
+
+Estoque Atual
+-------------
+- Pagina: `src/pages/EstoquePage.jsx`, dentro de `EstoqueProvider` -> `useEstoqueContext()`. Diferente das demais telas, o Context (`src/context/EstoqueContext.jsx`) compoe **dois hooks** em vez de um controller unico: `useEstoque()` (busca/cache de dados) e `useEstoqueFiltro()` (filtro/paginacao client-side).
+- `useEstoque()` (`src/hooks/useEstoque.js`):
+  - Estado: `estoque` (visao atual, pode estar em modo "movimentacao do periodo") e `estoqueBase` (saldo fisico acumulado).
+  - Carga inicial: guarda de modulo `hasRunInitialLoad` + `initRef` dentro de um `useEffect` de mount garantem `load({...initialFilters}, {force:true})` uma unica vez, mesmo com o duplo-invoke do StrictMode.
+  - Cache de chave de filtros (a mesma citada em `docs/Estoque.txt`): `baseKey`/`viewKey` sao `JSON.stringify` dos parametros (removendo campos de periodo do `baseKey` via `normalizeBaseParams`). Se `!force` e as chaves batem com a ultima chamada, `load()` retorna sem chamar o servidor. Mesmo quando a `viewKey` muda (ex.: so o periodo mudou), o `baseData` e reaproveitado de `estoqueBaseRef.current` se `baseKey` nao mudou — ou seja, ligar/desligar "Movimentacao do periodo" ou trocar so as datas nao refaz a busca de materiais/entradas/saidas completa, so a parte de "view". Ha ainda um `JSON.stringify` comparando o resultado novo com o atual antes de chamar `setEstoque`, evitando re-render quando o payload e identico.
+  - Este cache e de **deduplicacao** (evita repetir a mesma chamada), diferente do cache de Pessoas, que **reaproveita a mesma lista completa entre filtros diferentes** sem nunca mais rebuscar ate uma acao forcar.
+- Gatilhos de recarga: "Atualizar" e "Aplicar filtros" chamam `EstoqueContext.applyFilters()`, que sempre usa `{force:true}` (ou seja, a UI sempre ignora o cache de deduplicacao ao clicar nos botoes — o cache so evita chamadas redundantes automaticas, como remounts do StrictMode); o checkbox "Movimentacao do periodo" tambem dispara `applyFilters()` na hora; salvar estoque minimo (`handleMinStockSave`) tambem forca `load({...filters}, {force:true})`.
+- `api.estoque.current(params)` nao e uma tabela/RPC dedicada: busca `carregarMateriais()`, `carregarEntradas(params)` e `carregarSaidas(params)` em paralelo e combina tudo em JS via `montarEstoqueAtual(materiais, entradas, saidas, periodo, {...})` (`src/lib/estoque.js`), calculando `quantidade = totalEntradas - totalSaidas` por material e montando os campos de alerta/deficit.
+- Filtragem hibrida: como `params` e repassado para `carregarEntradas`/`carregarSaidas`, filtros de `centroCusto`/`termo`/periodo ja restringem as linhas buscadas no Supabase (o que muda quais materiais aparecem com movimentacao no agregado). Depois, `filterEstoqueItens` (`src/utils/estoqueUtils.js`, usado dentro de `useEstoqueFiltro.js`) refiltra o array `itens` resultante **inteiramente no cliente**: `termo`, `centroCusto` (de novo), `quantidadeMax`, `estoqueMinimo`, `apenasAlertas`, `apenasSaidas`, `apenasZerado` — nenhum desses ultimos tem equivalente no servidor.
+- Paginacao: client-side, duas independentes — Alertas (`ALERTAS_PAGE_SIZE = 6`) e Itens (`ITENS_PAGE_SIZE = 10`), ambas via `slice` em `useEstoqueFiltro.js`; `EstoquePage.jsx` tambem fixa `pageSize={10}` em `<EstoqueList>`.
+- Servico: `src/services/estoqueApi.js` -> `listEstoqueAtual(params) => api.estoque.current(params)`; tambem expoe `fetchEstoqueForecast`/`updateEstoqueForecast` (usados pela tela de Analise de Estoque, nao por esta).
+- Auxiliares: `centrosCustoDisponiveis` (opcoes de filtro) sao mineradas do proprio array `itens` ja calculado (`estoque.itens.flatMap(item => item.centrosCusto)`), sem busca separada. Salvar estoque minimo reusa `materiaisService.js` -> `api.materiais.update(id, payload)`.
+
+Boas praticas
+-------------
+- Ao criar uma nova tela com lista, decidir explicitamente se o filtro sera resolvido no servidor (como ASO) ou no cliente sobre uma carga unica (como Acidentes/Materiais); evitar o padrao hibrido "filtra nos dois lados" de Entradas/Saidas quando nao for estritamente necessario, pois ele exige manter duas implementacoes de filtro sincronizadas.
+- Se o dataset puder crescer bastante (Materiais, Estoque), considerar paginacao real no servidor (`.range()`) em vez de sempre carregar tudo e paginar so na tela.
+- Reaproveitar o padrao de cache de Estoque (`lastLoadKeyRef`/`lastBaseKeyRef`) para evitar chamadas duplicadas em telas que recebem multiplos `useEffect` reagindo aos mesmos filtros.
+- Ao adicionar cache de lista completa (como em Pessoas), garantir que toda acao que muda os dados no backend (criar/editar/excluir/importar) force `refreshOptions`/`force: true`, senao a tela pode continuar mostrando dado desatualizado do cache.
+
+Melhoria possivel
+-----------------
+- Remover ou implementar de fato `buildPessoasQuery` (`src/utils/pessoasUtils.js`), hoje um stub morto que sempre retorna `{}`.
+- Conectar a paginacao em Materiais (o `setCurrentPage: () => {}` hoje e um no-op) caso a lista de materiais cresca o suficiente para justificar.
+- Unificar a filtragem "dupla" de Entradas e Saidas (servidor + cliente) em uma unica fonte de verdade, para reduzir o risco de os dois filtros divergirem com o tempo.
+
+Atualizacao 2026-07
+--------------------
+- Documento criado apos auditoria de codigo do pipeline de carregamento de lista das 7 telas com CRUD principal (Acidentes, ASO, Entradas, Saidas, Pessoas, Materiais, Estoque Atual).
+- Nenhuma alteracao de codigo foi feita nesta auditoria.
+- Arquivos revisados:
+  - src/services/dataClient.js, src/config/runtime.js, src/services/api.js, src/services/localApi.js, src/config/pagination.js
+  - src/hooks/useAcidentes.js, src/hooks/useAcidenteFiltro.js, src/hooks/useAsoController.js
+  - src/hooks/useEntradasController.js, src/hooks/useSaidasController.js, src/hooks/usePessoasController.js, src/hooks/useMateriaisController.js
+  - src/hooks/useEstoque.js, src/hooks/useEstoqueFiltro.js, src/context/EstoqueContext.jsx
+  - src/pages/Acidentes.jsx, src/pages/AsoPage.jsx, src/pages/EntradasPage.jsx, src/pages/SaidasPage.jsx, src/pages/Pessoas.jsx, src/pages/Materiais.jsx, src/pages/EstoquePage.jsx
+  - src/services/acidentesService.js, src/services/asoService.js, src/services/entradasService.js, src/services/saidasService.js, src/services/pessoasService.js, src/services/materiaisService.js, src/services/estoqueApi.js

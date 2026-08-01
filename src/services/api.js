@@ -7139,7 +7139,7 @@ export const api = {
         const dadosHht = await execute(
           supabase
             .from('hht_mensal_view')
-            .select('mes_ref, centro_servico_nome, hht_final, status_nome'),
+            .select('mes_ref, centro_servico_id, centro_servico_nome, hht_final, status_nome'),
           'Falha ao listar HHT mensal para dashboard.'
         )
         const lista = Array.isArray(dadosHht) ? dadosHht : []
