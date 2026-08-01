@@ -834,6 +834,135 @@
   font-weight: 600;
 }
 
+.analysis-budget-stock-note {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  margin-top: 0.9rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  background: rgba(240, 249, 255, 0.78);
+  color: #0f4f6f;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.analysis-budget-stock-note svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.analysis-budget-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 1.4fr);
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.15rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.analysis-budget-comparison__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.analysis-budget-comparison__metrics div {
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.7rem;
+  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.analysis-budget-comparison__metrics dt {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.analysis-budget-comparison__metrics dd {
+  margin: 0.25rem 0 0;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.analysis-budget-component-label {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.analysis-budget-composition-table {
+  overflow: visible;
+  padding-top: 0.3rem;
+}
+
+.analysis-budget-composition-table .data-table {
+  min-width: 0;
+}
+
+.analysis-budget-composition-table td {
+  overflow: visible;
+}
+
+.analysis-budget-component-tooltip {
+  width: 1.25rem;
+  height: 1.25rem;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.analysis-budget-component-tooltip::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 0.55rem);
+  top: 50%;
+  width: 260px;
+  max-width: min(260px, 70vw);
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.45rem;
+  background: #0f172a;
+  color: #fff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translateY(-50%);
+  transition: opacity 0.2s ease;
+  white-space: normal;
+  z-index: 80;
+}
+
+.analysis-budget-component-tooltip::after {
+  content: "";
+  position: absolute;
+  left: calc(100% + 0.2rem);
+  top: 50%;
+  width: 0;
+  height: 0;
+  border: 0.35rem solid transparent;
+  border-right-color: #0f172a;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.2s ease;
+  z-index: 81;
+}
+
+.analysis-budget-component-tooltip:hover::before,
+.analysis-budget-component-tooltip:focus-visible::before,
+.analysis-budget-component-tooltip:hover::after,
+.analysis-budget-component-tooltip:focus-visible::after {
+  opacity: 1;
+}
+
 .analysis-budget-validation-summary {
   margin-top: 0.9rem;
 }
@@ -1028,6 +1157,12 @@
     align-items: stretch;
   }
   .analysis-budget-scenarios {
+    grid-template-columns: 1fr;
+  }
+  .analysis-budget-comparison {
+    grid-template-columns: 1fr;
+  }
+  .analysis-budget-comparison__metrics {
     grid-template-columns: 1fr;
   }
   .analysis-forecast-card__heading,

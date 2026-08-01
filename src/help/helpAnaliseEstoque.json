@@ -36,6 +36,8 @@
       "A aba Compra prioriza a recomendacao do RPC de compra, calculada por estoque atual, estoque minimo, consumo recente e cobertura.",
       "A aba Previsao de Orcamento mostra o Orcamento de compras - proximos 12 meses, calculado separadamente da reposicao atual.",
       "A Previsao de Orcamento mostra a verba recomendada do cenario-base, cenarios comparativos, composicao reconciliada e cronograma financeiro.",
+      "Na Previsao de Orcamento, o estoque utilizavel reduz a necessidade de novas compras; esse valor nao representa dinheiro em caixa.",
+      "A comparacao com os 12 meses anteriores mostra compras realizadas, verba recomendada e reducao ou aumento previsto.",
       "Na composicao do orcamento, use Lista consolidada de materiais para abrir o modal Maiores componentes da verba projetada.",
       "O modal de orcamento responde: o que mais exigira dinheiro no proximo periodo? Ele compara gasto historico 12m, quantidade prevista, estoque utilizavel, quantidade a comprar, preco futuro e impacto no orcamento.",
       "A quantidade geral da Compra e exibida por materiais recomendados, sem somar unidades, pares, metros ou litros em um unico total.",

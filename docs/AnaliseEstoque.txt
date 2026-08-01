@@ -277,6 +277,9 @@ Atualizacao 2026-08 (orcamento anual de compra)
 - O front normaliza `owner_id` e `forecast_id` antes de chamar as RPCs; `forecast_id` vazio/invalido vira `null`, permitindo que o banco use o snapshot mais recente sem erro 22P02.
 - A tela passou a carregar o orcamento anual em paralelo com auditoria e reposicao atual.
 - A tela passou a exibir a aba `Previsao de Orcamento` com bloco `Orcamento de compras - proximos 12 meses`, cenario-base recomendado, cenarios comparativos, composicao do orcamento, cronograma financeiro e modal de componentes da verba.
+- O card `Verba recomendada - cenario-base` passou a explicar que o estoque utilizavel existente reduz a necessidade de novas compras.
+- A aba passou a mostrar comparacao entre compras realizadas na base historica e verba recomendada, destacando a reducao/aumento previsto.
+- A linha `Estoque utilizavel considerado` da composicao passou a exibir icone informativo com tooltip no padrao do forecast, informando que o valor reduz novas compras, mas nao significa saldo financeiro disponivel.
 - A composicao do orcamento passou a mostrar `Ajuste por necessidade individual`, porque o calculo aplica necessidade material a material e o excesso de um item nao compensa a falta de outro.
 - O antigo bloco `Materiais que mais impactam` saiu da tela principal e passou para o modal `Maiores componentes da verba projetada`, aberto pelo botao `Lista consolidada de materiais`.
 - O modal de componentes da verba tem visoes separadas para maiores valores do orcamento, maiores riscos de falta e maiores oportunidades de reducao.
