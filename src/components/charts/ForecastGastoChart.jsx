@@ -10,6 +10,18 @@ function ForecastTooltip({ active, payload, label, valueFormatter }) {
     return null
   }
   const payloadData = payload?.[0]?.payload || {}
+  const formatCurrencyStat = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return 'Nao calculavel'
+    }
+    return valueFormatter ? valueFormatter(value) : value
+  }
+  const formatCv = (value, samples) => {
+    if (value === null || value === undefined || Number(samples || 0) < 2) {
+      return 'Nao calculavel'
+    }
+    return value.toFixed ? value.toFixed(2) : value
+  }
   return (
     <div className="chart-tooltip">
       <span className="chart-tooltip__label">{label}</span>
@@ -21,13 +33,18 @@ function ForecastTooltip({ active, payload, label, valueFormatter }) {
         ))}
         {payloadData?.contingencia ? (
           <li>
-            <strong>Contingencia (P75):</strong>{' '}
+            <strong>Contingencia 25%:</strong>{' '}
             {valueFormatter ? valueFormatter(payloadData.contingencia) : payloadData.contingencia}
           </li>
         ) : null}
-        {payloadData?.p90 ? (
+        {payloadData?.p75 !== undefined ? (
           <li>
-            <strong>P90:</strong> {valueFormatter ? valueFormatter(payloadData.p90) : payloadData.p90}
+            <strong>P75 estatistico:</strong> {formatCurrencyStat(payloadData.p75)}
+          </li>
+        ) : null}
+        {payloadData?.p90 !== undefined ? (
+          <li>
+            <strong>P90 estatistico:</strong> {formatCurrencyStat(payloadData.p90)}
           </li>
         ) : null}
         {payloadData?.mediana ? (
@@ -36,9 +53,9 @@ function ForecastTooltip({ active, payload, label, valueFormatter }) {
             {valueFormatter ? valueFormatter(payloadData.mediana) : payloadData.mediana}
           </li>
         ) : null}
-        {payloadData?.cv ? (
+        {payloadData?.cv !== undefined ? (
           <li>
-            <strong>CV:</strong> {payloadData.cv.toFixed ? payloadData.cv.toFixed(2) : payloadData.cv}
+            <strong>CV:</strong> {formatCv(payloadData.cv, payloadData.amostras)}
           </li>
         ) : null}
         {payloadData?.alertaVolatil ? (
