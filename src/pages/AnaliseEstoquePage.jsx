@@ -2023,6 +2023,12 @@ export function AnaliseEstoquePage() {
     const pedidosEmAberto = Number(composicao.pedidos_em_aberto || 0)
     const reajustePrecos = Number(composicao.reajuste_precos || 0)
     const contingencia = Number(composicao.contingencia || 0)
+    const comprasHistoricasValor = (historicoSerieFull.length ? historicoSerieFull : historicoSerie).reduce(
+      (acc, item) => acc + Number(item.valor_entrada || 0),
+      0,
+    )
+    const reducaoHistoricaValor = comprasHistoricasValor - verbaRecomendada
+    const reducaoHistoricaPercentual = comprasHistoricasValor > 0 ? (reducaoHistoricaValor / comprasHistoricasValor) * 100 : null
     const necessidadeGlobal = consumoPrevisto + estoqueFinalDesejado + demandaExtraordinaria - estoqueUtilizavel - pedidosEmAberto
     const ajusteIndividual = necessidadeLiquida - necessidadeGlobal
     const composicaoRows = [
@@ -2046,9 +2052,12 @@ export function AnaliseEstoquePage() {
       },
       {
         id: 'estoque-utilizavel',
-        label: 'Estoque utilizavel',
+        label: 'Estoque utilizavel considerado',
         value: estoqueUtilizavel,
         effect: 'subtract',
+        effectLabel: 'Reduz novas compras',
+        note:
+          'Valor do estoque existente que pode ser usado para atender a demanda prevista. Esse estoque reduz a necessidade de novas compras, mas nao significa saldo financeiro disponivel.',
       },
       {
         id: 'pedidos-abertos',
@@ -2114,6 +2123,10 @@ export function AnaliseEstoquePage() {
       necessidadeLiquida,
       valorComReajuste,
       contingenciaValor: Number(resumo.contingencia_valor || 0),
+      estoqueUtilizavel,
+      comprasHistoricasValor,
+      reducaoHistoricaValor,
+      reducaoHistoricaPercentual,
       materiaisMonitorados: Number(resumo.materiais_monitorados || 0),
       materiaisOrcados: Number(resumo.materiais_orcados || 0),
       materiaisRisco: Number(resumo.materiais_risco || 0),
@@ -2129,7 +2142,7 @@ export function AnaliseEstoquePage() {
       validacaoMateriais,
       parametros,
     }
-  }, [forecastOrcamentoPayload, materialInfoMap])
+  }, [forecastOrcamentoPayload, historicoSerie, historicoSerieFull, materialInfoMap])
 
   const compraDetailItems = compraDetailModal?.items || []
   const compraDetailStart = (compraDetailPage - 1) * forecastPageSize
@@ -2829,6 +2842,12 @@ export function AnaliseEstoquePage() {
                 </header>
                 <strong className="dashboard-insight-card__value">{formatCurrency(compraOrcamentoInsights.verbaRecomendada)}</strong>
                 <span className="dashboard-insight-card__helper">Valor estimado para atender o consumo projetado, manter cobertura e considerar reajuste e contingencia.</span>
+                <div className="analysis-budget-stock-note">
+                  <InfoIcon size={16} aria-hidden="true" />
+                  <span>
+                    A verba recomendada considera o estoque ja disponivel. Como {formatCurrency(compraOrcamentoInsights.estoqueUtilizavel)} do estoque atual pode atender parte da demanda futura, a necessidade de novas compras fica menor.
+                  </span>
+                </div>
               </article>
               {compraOrcamentoInsights.cenarioEconomico ? (
                 <article className="dashboard-insight-card dashboard-insight-card--green analysis-budget-scenario-card">
@@ -2859,6 +2878,35 @@ export function AnaliseEstoquePage() {
                 </article>
               ) : null}
             </div>
+            {compraOrcamentoInsights.comprasHistoricasValor > 0 ? (
+              <div className="analysis-budget-comparison">
+                <div>
+                  <p className="analysis-forecast-label">Comparacao com os 12 meses anteriores</p>
+                  <p className="analysis-forecast-subtitle">
+                    Motivo principal: uso do estoque acumulado para atender parte da demanda futura.
+                  </p>
+                </div>
+                <dl className="analysis-budget-comparison__metrics">
+                  <div>
+                    <dt>Compras realizadas</dt>
+                    <dd>{formatCurrency(compraOrcamentoInsights.comprasHistoricasValor)}</dd>
+                  </div>
+                  <div>
+                    <dt>Verba recomendada</dt>
+                    <dd>{formatCurrency(compraOrcamentoInsights.verbaRecomendada)}</dd>
+                  </div>
+                  <div>
+                    <dt>{compraOrcamentoInsights.reducaoHistoricaValor >= 0 ? 'Reducao prevista' : 'Aumento previsto'}</dt>
+                    <dd>
+                      {formatCurrency(Math.abs(compraOrcamentoInsights.reducaoHistoricaValor))}
+                      {compraOrcamentoInsights.reducaoHistoricaPercentual !== null
+                        ? ` (${formatPercent(Math.abs(compraOrcamentoInsights.reducaoHistoricaPercentual), 1)})`
+                        : ''}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
             <div className="analysis-forecast-grid analysis-forecast-grid--equal">
               <article className="analysis-forecast-card analysis-forecast-card--list">
                 <div className="analysis-forecast-card__heading">
@@ -2878,7 +2926,7 @@ export function AnaliseEstoquePage() {
                     <span>Lista consolidada de materiais</span>
                   </button>
                 </div>
-                <div className="table-wrapper">
+                <div className="table-wrapper analysis-budget-composition-table">
                   <table className="data-table analysis-audit-table">
                     <thead>
                       <tr>
@@ -2890,9 +2938,23 @@ export function AnaliseEstoquePage() {
                     <tbody>
                       {compraOrcamentoInsights.composicaoRows.map((row) => (
                         <tr key={row.id}>
-                          <td>{row.label}</td>
                           <td>
-                            {row.effect === 'subtract' ? 'reduz' : row.effect === 'total' ? 'resultado' : row.effect === 'subtotal' ? 'subtotal' : 'soma'}
+                            <span className="analysis-budget-component-label">
+                              {row.label}
+                              {row.note ? (
+                                <button
+                                  type="button"
+                                  className="summary-tooltip analysis-budget-component-tooltip"
+                                  aria-label={`Informacao sobre ${row.label}`}
+                                  data-tooltip={row.note}
+                                >
+                                  <InfoIcon size={13} aria-hidden="true" />
+                                </button>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td>
+                            {row.effectLabel || (row.effect === 'subtract' ? 'reduz' : row.effect === 'total' ? 'resultado' : row.effect === 'subtotal' ? 'subtotal' : 'soma')}
                           </td>
                           <td className={row.effect === 'subtract' ? 'analysis-budget-value--subtract' : undefined}>
                             {row.effect === 'subtract'
