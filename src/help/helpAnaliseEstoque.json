@@ -39,6 +39,8 @@
       "A leitura de cobertura da Compra usa faixas por dias/meses para evitar que excesso em alguns materiais esconda ruptura em outros.",
       "Nas tabelas da Compra, use Detalhar para abrir o modal com os materiais daquela decisao ou faixa de cobertura.",
       "No modal de detalhes da Compra, use Exportar Excel (CSV) para extrair a lista aberta.",
+      "O modal de detalhes da Compra usa cards por material para evitar sobreposicao de colunas.",
+      "Se aparecer Material sem nome cadastrado, use a coluna ID material ou Copiar ID para localizar o cadastro tecnico; o CSV leva o ID completo.",
       "A aba Compra concentra o detalhe por material no modal para manter a tela principal mais curta.",
       "A aba Auditoria centraliza o snapshot selecionado, mostra previsto x realizado por mes e mantem os atalhos de Validacao e Diagnostico.",
       "O botao Validacao da previsao mostra as tabelas de gasto mensal e previsao mensal.",

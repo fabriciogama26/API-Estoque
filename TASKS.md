@@ -55,6 +55,9 @@
 - Aba `Compra` recebeu cards de decisao operacional, reconciliacao do total monitorado, faixas de cobertura e modal detalhado com nome amigavel, estoque, consumo, cobertura, quantidade, preco, valor e motivo.
 - Aba `Compra` removeu os blocos grandes de listas e passou a concentrar o detalhe por material no drill-down das tabelas.
 - Modal de detalhes da aba `Compra` passou a exportar a categoria/faixa aberta em CSV.
+- Modal de detalhes da aba `Compra` passou a exibir `ID material` e acao `Copiar ID` para rastrear itens sem nome amigavel.
+- Modal de detalhes da aba `Compra` corrigiu sobreposicao visual de IDs longos, exibindo ID encurtado no card e filtrando UUIDs da classificacao.
+- Modal de detalhes da aba `Compra` substituiu a tabela larga por cards responsivos para organizar os campos e remover scroll horizontal.
 
 ## Pendente
 - Criar calculo independente de `Orcamento de compras - proximos 12 meses`, com RPC/snapshot proprio para consumo previsto, estoque utilizavel, pedidos em aberto, estoque de seguranca, reajuste, demanda extraordinaria e contingencia.

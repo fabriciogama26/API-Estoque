@@ -130,6 +130,18 @@ function getCompraMaterialKey(item = {}) {
   return String(item.materialKey || item.material_id || item.materialId || item.id || item.nome || item.displayNome || '')
 }
 
+function formatCompraMaterialId(value) {
+  const materialId = String(value || '').trim()
+  if (!materialId) return '-'
+  if (materialId.length <= 18) return materialId
+  return `${materialId.slice(0, 8)}...${materialId.slice(-6)}`
+}
+
+function formatCompraClassification(item = {}) {
+  const parts = [item.grupoMaterial, item.unidade, item.fabricante].filter((value) => value && !isUuidOnly(value))
+  return parts.length ? parts.join(' | ') : '-'
+}
+
 function getCompraEstoqueAtual(item = {}) {
   return Number(item.estoque_atual ?? item.estoqueAtual ?? 0)
 }
@@ -212,6 +224,7 @@ function buildCompraDetailCsv(items = [], context = {}) {
   const headers = [
     'Categoria do detalhe',
     'Snapshot',
+    'Material ID',
     'Material',
     'Classificacao',
     'Estoque atual',
@@ -227,8 +240,9 @@ function buildCompraDetailCsv(items = [], context = {}) {
     const values = [
       context.label || '',
       context.snapshot || '',
+      getCompraMaterialKey(item),
       resolveCompraMaterialName(item),
-      [item.grupoMaterial, item.unidade, item.fabricante].filter(Boolean).join(' | '),
+      formatCompraClassification(item),
       formatCompraCsvNumber(getCompraEstoqueAtual(item)),
       formatCompraCsvNumber(getCompraEstoqueMinimo(item)),
       formatCompraCsvNumber(getCompraConsumoMensal(item), 2),
@@ -818,6 +832,7 @@ export function AnaliseEstoquePage() {
   const [forecastCompraError, setForecastCompraError] = useState(null)
   const [compraDetailModal, setCompraDetailModal] = useState(null)
   const [compraDetailPage, setCompraDetailPage] = useState(1)
+  const [compraCopiedMaterialId, setCompraCopiedMaterialId] = useState(null)
 
   const formatLabelFromDate = (value) => {
     const date = value instanceof Date ? value : new Date(value)
@@ -1882,6 +1897,14 @@ export function AnaliseEstoquePage() {
     })
   }
 
+  const handleCopyCompraMaterialId = async (materialId) => {
+    if (!materialId) return
+    const ok = await copyTextToClipboard(materialId)
+    if (!ok) return
+    setCompraCopiedMaterialId(materialId)
+    window.setTimeout(() => setCompraCopiedMaterialId(null), 1500)
+  }
+
   const handlePeriodoChange = async (event) => {
     const value = event.target.value
     setForecastPeriodoSelecionado(value)
@@ -2406,39 +2429,68 @@ export function AnaliseEstoquePage() {
             </div>
             {compraDetailItems.length ? (
               <>
-                <div className="table-wrapper">
-                  <table className="data-table analysis-audit-table analysis-compra-detail-table">
-                    <thead>
-                      <tr>
-                        <th>Material</th>
-                        <th>Classificacao</th>
-                        <th>Estoque</th>
-                        <th>Minimo</th>
-                        <th>Consumo/mês</th>
-                        <th>Cobertura</th>
-                        <th>Qtd sugerida</th>
-                        <th>Preco</th>
-                        <th>Valor</th>
-                        <th>Motivo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compraDetailPageItems.map((item, index) => (
-                        <tr key={`compra-detail-${getCompraItemId(item)}-${index}`}>
-                          <td>{resolveCompraMaterialName(item)}</td>
-                          <td>{[item.grupoMaterial, item.unidade, item.fabricante].filter(Boolean).join(' | ') || '-'}</td>
-                          <td>{formatNumber(getCompraEstoqueAtual(item))}</td>
-                          <td>{formatNumber(getCompraEstoqueMinimo(item))}</td>
-                          <td>{formatNumber(getCompraConsumoMensal(item), 2)}</td>
-                          <td>{formatCoberturaDias(item)}</td>
-                          <td>{formatNumber(item.compra_sugerida_qtd ?? item.compra_minima_qtd ?? item.deficitQuantidade ?? 0)}</td>
-                          <td>{formatCurrency(getCompraValorUnitario(item))}</td>
-                          <td>{formatCurrency(item.valor_compra_sugerida ?? item.deficitValor ?? 0)}</td>
-                          <td>{getCompraMotivo(item)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="analysis-compra-detail-list">
+                  {compraDetailPageItems.map((item, index) => {
+                    const materialId = getCompraMaterialKey(item)
+                    const copied = compraCopiedMaterialId === materialId
+                    return (
+                      <article className="analysis-compra-detail-card" key={`compra-detail-${getCompraItemId(item)}-${index}`}>
+                        <header className="analysis-compra-detail-card__header">
+                          <div className="analysis-compra-detail-card__title">
+                            <strong>{resolveCompraMaterialName(item)}</strong>
+                            <span>{formatCompraClassification(item)}</span>
+                          </div>
+                          <div className="analysis-compra-detail-card__actions">
+                            <span className="analysis-compra-detail-card__id" title={materialId || undefined}>
+                              ID {formatCompraMaterialId(materialId)}
+                            </span>
+                            <button
+                              type="button"
+                              className="button button--ghost button--compact"
+                              onClick={() => handleCopyCompraMaterialId(materialId)}
+                              disabled={!materialId}
+                            >
+                              {copied ? 'Copiado' : 'Copiar ID'}
+                            </button>
+                          </div>
+                        </header>
+                        <dl className="analysis-compra-detail-card__metrics">
+                          <div>
+                            <dt>Estoque</dt>
+                            <dd>{formatNumber(getCompraEstoqueAtual(item))}</dd>
+                          </div>
+                          <div>
+                            <dt>Minimo</dt>
+                            <dd>{formatNumber(getCompraEstoqueMinimo(item))}</dd>
+                          </div>
+                          <div>
+                            <dt>Consumo/mês</dt>
+                            <dd>{formatNumber(getCompraConsumoMensal(item), 2)}</dd>
+                          </div>
+                          <div>
+                            <dt>Cobertura</dt>
+                            <dd>{formatCoberturaDias(item)}</dd>
+                          </div>
+                          <div>
+                            <dt>Qtd sugerida</dt>
+                            <dd>{formatNumber(item.compra_sugerida_qtd ?? item.compra_minima_qtd ?? item.deficitQuantidade ?? 0)}</dd>
+                          </div>
+                          <div>
+                            <dt>Preco</dt>
+                            <dd>{formatCurrency(getCompraValorUnitario(item))}</dd>
+                          </div>
+                          <div>
+                            <dt>Valor</dt>
+                            <dd>{formatCurrency(item.valor_compra_sugerida ?? item.deficitValor ?? 0)}</dd>
+                          </div>
+                          <div className="analysis-compra-detail-card__reason">
+                            <dt>Motivo</dt>
+                            <dd>{getCompraMotivo(item)}</dd>
+                          </div>
+                        </dl>
+                      </article>
+                    )
+                  })}
                 </div>
                 <TablePagination
                   totalItems={compraDetailItems.length}

@@ -79,6 +79,8 @@ Boas praticas
 - Aba Compra separa condicoes de decisao: abaixo do minimo e cobertura curta explicam o risco, enquanto a reconciliacao fecha compra imediata, compra programada, manter estoque, reduzir compra, sem consumo e sem preco.
 - Linhas de reconciliacao e cobertura da Aba Compra abrem modal com os materiais disponiveis daquela decisao/faixa.
 - Modal de detalhe da Aba Compra permite exportar a lista aberta para CSV.
+- Quando o material nao tiver nome amigavel, o modal exibe a coluna `ID material` e botao `Copiar ID` para localizar o cadastro tecnico.
+- Para evitar sobreposicao no modal, o detalhe de materiais usa cards responsivos; `ID material` e exibido encurtado, com ID completo no botao `Copiar ID` e no CSV.
 - Orcamento anual de compras deve ser tratado como calculo independente da reposicao atual, com RPC/snapshot proprio para consumo previsto, estoque utilizavel, pedidos em aberto, reajuste e contingencia.
 - Aba Auditoria concentra o snapshot selecionado, previsto x realizado por mes e os atalhos para validacao e diagnostico.
 - Diagnostico usa agg_gasto_mensal (valor_saida) como base estatistica.
@@ -228,8 +230,11 @@ Atualizacao 2026-08 (compra operacional)
   - excesso ou baixo giro
 - Foi adicionada reconciliacao de decisoes para explicar o total monitorado e evitar conflito entre `abaixo do minimo` e `compra imediata`.
 - Foi adicionada leitura de cobertura por faixas: mediana, menos de 30 dias, 30 a 60 dias, 60 a 90 dias, acima de 12 meses, sem consumo recente e criticos sem cobertura.
-- As linhas de reconciliacao e cobertura passaram a abrir modal com tabela paginada dos materiais disponiveis na categoria.
+- As linhas de reconciliacao e cobertura passaram a abrir modal com cards paginados dos materiais disponiveis na categoria.
 - O modal de materiais ganhou botao `Exportar Excel (CSV)`, exportando a categoria/faixa aberta com separador `;`.
+- O modal de materiais passou a exibir `ID material`, com botao `Copiar ID`, para identificar itens exibidos como `Material sem nome cadastrado`.
+- O modal de materiais deixou de usar tabela larga e passou a usar cards com campos agrupados, eliminando scroll horizontal e sobreposicao de texto.
+- A coluna `Classificacao` passou a ignorar valores que sejam UUID tecnico, evitando mistura visual com o identificador do material.
 - Os blocos grandes de listas foram removidos da tela; o detalhe por material fica concentrado no modal aberto pelas linhas de decisao/cobertura.
 - O modal de materiais mostra nome amigavel, categoria/unidade/fabricante, estoque atual, minimo, consumo medio, cobertura em dias, quantidade sugerida, preco, valor e motivo.
 - UUID tecnico deixou de ser exibido como nome principal quando nao houver descricao amigavel; nesses casos a tela mostra `Material sem nome cadastrado`.
@@ -244,7 +249,7 @@ Atualizacao 2026-08 (compra operacional)
 - Antes: a aba Compra misturava compra operacional com medias previstas e apresentava quantidade agregada em `un`.
 - Depois: a aba Compra comunica reposicao atual, mostra valor financeiro, reconciliacao de decisoes e detalhe operacional por material no modal.
 - Antes: itens podiam aparecer somente como UUID quando o RPC nao retornava nome amigavel.
-- Depois: a tela busca nome no estoque base e usa fallback explicito sem expor o identificador tecnico como nome.
+- Depois: a tela busca nome no estoque base, usa fallback explicito e mostra o identificador tecnico em coluna propria para rastreio.
 - Antes: reconciliacao e cobertura eram apenas tabelas estaticas.
 - Depois: cada linha com materiais disponiveis abre modal paginado para drill-down e exportacao CSV.
 - Antes: a aba ainda ocupava muita altura com quatro blocos de listas.
