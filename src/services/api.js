@@ -3347,17 +3347,17 @@ async function carregarCentrosCusto() {
   })
 }
 
-async function buscarCentrosEstoqueIdsPorTermo(valor) {
+async function buscarCatalogoIdsPorTermo({ table, nameColumn, errorMessage }, valor) {
   const termo = trim(valor)
   if (!termo) {
     return []
   }
   try {
     const registros = await loadCatalogList({
-      table: 'centros_estoque',
-      nameColumn: 'almox',
+      table,
+      nameColumn,
       ownerScoped: true,
-      errorMessage: 'Falha ao consultar centros de estoque.',
+      errorMessage,
     })
     const like = normalizeSearchTerm(termo)
     return (registros ?? [])
@@ -3365,9 +3365,42 @@ async function buscarCentrosEstoqueIdsPorTermo(valor) {
       .map((item) => item?.id)
       .filter(Boolean)
   } catch (error) {
-    reportClientError('Falha ao filtrar centros de estoque por nome.', error, { termo })
+    reportClientError(`Falha ao filtrar ${table} por nome.`, error, { termo })
     return []
   }
+}
+
+async function buscarCentrosEstoqueIdsPorTermo(valor) {
+  return buscarCatalogoIdsPorTermo(
+    {
+      table: 'centros_estoque',
+      nameColumn: 'almox',
+      errorMessage: 'Falha ao consultar centros de estoque.',
+    },
+    valor
+  )
+}
+
+async function buscarCentrosCustoIdsPorTermo(valor) {
+  return buscarCatalogoIdsPorTermo(
+    {
+      table: 'centros_custo',
+      nameColumn: 'nome',
+      errorMessage: 'Falha ao consultar centros de custo.',
+    },
+    valor
+  )
+}
+
+async function buscarCentrosServicoIdsPorTermo(valor) {
+  return buscarCatalogoIdsPorTermo(
+    {
+      table: 'centros_servico',
+      nameColumn: 'nome',
+      errorMessage: 'Falha ao consultar centros de servico.',
+    },
+    valor
+  )
 }
 
 async function carregarCentrosEstoqueCatalogo() {
@@ -3946,26 +3979,48 @@ async function carregarSaidas(params = {}) {
   }
 
   const centroEstoqueFiltro = trim(params.centroEstoque || params.centro_estoque)
+  let centroEstoqueFiltroTerm = ''
   if (centroEstoqueFiltro) {
     if (isUuidValue(centroEstoqueFiltro)) {
       query = query.eq('centro_estoque', centroEstoqueFiltro)
     } else {
-      query = query.ilike('centro_estoque', `%${centroEstoqueFiltro}%`)
+      const centroIds = await buscarCentrosEstoqueIdsPorTermo(centroEstoqueFiltro)
+      if (centroIds.length) {
+        query = query.in('centro_estoque', centroIds)
+      } else {
+        centroEstoqueFiltroTerm = normalizeSearchTerm(centroEstoqueFiltro)
+      }
     }
   }
 
   const centroCustoFiltro = trim(params.centroCusto)
+  let centroCustoFiltroTerm = ''
   if (centroCustoFiltro) {
-    query = isUuidValue(centroCustoFiltro)
-      ? query.eq('centro_custo', centroCustoFiltro)
-      : query.ilike('centro_custo', `%${centroCustoFiltro}%`)
+    if (isUuidValue(centroCustoFiltro)) {
+      query = query.eq('centro_custo', centroCustoFiltro)
+    } else {
+      const centroIds = await buscarCentrosCustoIdsPorTermo(centroCustoFiltro)
+      if (centroIds.length) {
+        query = query.in('centro_custo', centroIds)
+      } else {
+        centroCustoFiltroTerm = normalizeSearchTerm(centroCustoFiltro)
+      }
+    }
   }
 
   const centroServicoFiltro = trim(params.centroServico)
+  let centroServicoFiltroTerm = ''
   if (centroServicoFiltro) {
-    query = isUuidValue(centroServicoFiltro)
-      ? query.eq('centro_servico', centroServicoFiltro)
-      : query.ilike('centro_servico', `%${centroServicoFiltro}%`)
+    if (isUuidValue(centroServicoFiltro)) {
+      query = query.eq('centro_servico', centroServicoFiltro)
+    } else {
+      const centroIds = await buscarCentrosServicoIdsPorTermo(centroServicoFiltro)
+      if (centroIds.length) {
+        query = query.in('centro_servico', centroIds)
+      } else {
+        centroServicoFiltroTerm = normalizeSearchTerm(centroServicoFiltro)
+      }
+    }
   }
 
   const dataInicioIso = toStartOfDayUtcIso(params.dataInicio)
@@ -3985,6 +4040,22 @@ async function carregarSaidas(params = {}) {
   registros = await preencherStatusSaida(registros)
   registros = await preencherCentrosCustoSaidas(registros)
   registros = await preencherCentrosServicoSaidas(registros)
+
+  if (centroEstoqueFiltroTerm) {
+    registros = registros.filter((saida) =>
+      normalizeSearchTerm(saida?.centroEstoque).includes(centroEstoqueFiltroTerm)
+    )
+  }
+  if (centroCustoFiltroTerm) {
+    registros = registros.filter((saida) =>
+      normalizeSearchTerm(saida?.centroCusto).includes(centroCustoFiltroTerm)
+    )
+  }
+  if (centroServicoFiltroTerm) {
+    registros = registros.filter((saida) =>
+      normalizeSearchTerm(saida?.centroServico).includes(centroServicoFiltroTerm)
+    )
+  }
 
   const termo = trim(params.termo).toLowerCase()
   if (termo) {
@@ -6212,22 +6283,26 @@ export const api = {
         params?.movimentacaoPeriodo === true ||
         params?.movimentacaoPeriodo === 'true' ||
         params?.modo === 'periodo'
-      const limparPeriodo = (rawParams) => {
-        const { periodoInicio, periodoFim, ano, mes, dataInicio, dataFim, movimentacaoPeriodo, modo, ...rest } =
-          rawParams || {}
-        return rest
-      }
       const periodoRange = usarMovimentacao ? resolvePeriodoRange(periodo) : null
       const hasExplicitDate = Boolean(params.dataInicio || params.dataFim)
-      const queryParams = usarMovimentacao
-        ? !hasExplicitDate && periodoRange?.start && periodoRange?.end
-          ? {
-              ...params,
-              dataInicio: periodoRange.start.toISOString(),
-              dataFim: periodoRange.end.toISOString(),
-            }
-          : params
-        : limparPeriodo(params)
+      const queryParams = {}
+      if (params?.materialId) {
+        queryParams.materialId = params.materialId
+      }
+      if (usarMovimentacao) {
+        if (hasExplicitDate) {
+          if (params.dataInicio) queryParams.dataInicio = params.dataInicio
+          if (params.dataFim) queryParams.dataFim = params.dataFim
+        } else if (periodoRange?.start && periodoRange?.end) {
+          queryParams.dataInicio = periodoRange.start.toISOString()
+          queryParams.dataFim = periodoRange.end.toISOString()
+        } else {
+          if (params.periodoInicio) queryParams.periodoInicio = params.periodoInicio
+          if (params.periodoFim) queryParams.periodoFim = params.periodoFim
+          if (params.ano) queryParams.ano = params.ano
+          if (params.mes) queryParams.mes = params.mes
+        }
+      }
       const [materiais, entradas, saidas] = await Promise.all([
         carregarMateriais(),
         carregarEntradas(queryParams),

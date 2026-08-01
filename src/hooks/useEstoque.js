@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { listEstoqueAtual } from '../services/estoqueApi.js'
 import { updateMaterial } from '../services/materiaisService.js'
 
-let hasRunInitialLoad = false
-
 export function useEstoque(initialFilters, userResolver, onError) {
   const [estoque, setEstoque] = useState({ itens: [], alertas: [] })
   const [estoqueBase, setEstoqueBase] = useState({ itens: [], alertas: [] })
@@ -94,11 +92,10 @@ export function useEstoque(initialFilters, userResolver, onError) {
   )
 
   useEffect(() => {
-    if (initRef.current || hasRunInitialLoad) {
+    if (initRef.current) {
       return
     }
     initRef.current = true
-    hasRunInitialLoad = true
     load({ ...initialFilters }, { force: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
