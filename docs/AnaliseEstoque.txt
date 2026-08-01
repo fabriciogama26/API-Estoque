@@ -83,7 +83,10 @@ Boas praticas
 - Para evitar sobreposicao no modal, o detalhe de materiais usa cards responsivos; `ID material` e exibido encurtado, com ID completo no botao `Copiar ID` e no CSV.
 - Aba Previsao de Orcamento trata o orcamento anual de compras como calculo independente da reposicao atual, usando `rpc_orcamento_compra_12m_calcular`.
 - Aba Previsao de Orcamento exibe verba recomendada no cenario-base, cenarios comparativos, composicao reconciliada, cronograma financeiro mensal e modal de maiores componentes da verba projetada.
-- Aba Auditoria concentra o snapshot selecionado, previsto x realizado por mes e os atalhos para validacao e diagnostico.
+- Aba Auditoria concentra o snapshot selecionado, previsto x realizado por mes e os atalhos para validacao, diagnostico e validacao do orcamento.
+- A validacao do orcamento de compras abre em modal pela acao `Validar orcamento`, com realizado 12m, janelas 180d/90d, padrao de demanda, previsao bruta, limite aplicado, previsao final, fator de crescimento, precos e impacto financeiro por material.
+- O orcamento anual nao deve anualizar itens intermitentes somente pelos meses com movimento; meses com movimento classificam a demanda, mas nao eliminam meses zerados da base de 12 meses.
+- A regra de orcamento segmenta demanda em sem historico, intermitente, irregular e recorrente, aplicando travas de crescimento para evitar que uma saida eventual vire consumo mensal recorrente.
 - Diagnostico usa agg_gasto_mensal (valor_saida) como base estatistica.
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
 
@@ -308,6 +311,31 @@ Atualizacao 2026-08 (orcamento anual de compra)
 - Antes: o bloco de materiais duplicava o mesmo item entre valor, risco e reajuste na tela principal.
 - Depois: o detalhe fica em modal com visoes separadas e a tela principal mantem apenas o botao para abrir a lista consolidada.
 
+Atualizacao 2026-08 (auditoria do orcamento)
+--------------------------------------------
+- Migration `supabase/migrations/20260801_purchase_budget_validation_audit.sql` adicionada para recriar `rpc_orcamento_compra_12m_calcular` com validacao detalhada do orcamento.
+- A RPC deixou de calcular consumo anual por `saida_12m / meses_com_movimento * 12`, regra que inflava materiais intermitentes.
+- A previsao de consumo passou a classificar o material em `sem_historico`, `intermitente`, `irregular` ou `recorrente`.
+- Materiais intermitentes usam a saida real dos 12 meses com fator limitado entre 0,80 e 1,20.
+- Materiais irregulares e recorrentes usam combinacao ponderada de saida 12m, janela 180d anualizada e janela 90d anualizada, com travas automaticas de 1,50x e 2,00x.
+- O payload `validacao_orcamento` retorna resumo financeiro e lista de materiais com realizado 12m, meses com movimento, padrao de demanda, saidas 180d/90d, previsao bruta, limite aplicado, previsao final, fator de crescimento, estoque, precos, impacto, metodo, status, forecast sem/com trava e valor reduzido pela trava.
+- A aba `Auditoria` passou a abrir a validacao do orcamento em modal, acionado pelo botao `Validar orcamento` no painel tecnico do snapshot.
+- O modal mostra cards de aumento por quantidade, aumento por preco, estoque de seguranca, contingencia e reducao causada pela trava.
+- A tabela do modal tem filtros para todos, requer justificativa, revisao, intermitente, sem historico, preco acima do historico e minimo/cobertura.
+- O modal permite copiar a tabela filtrada para a area de transferencia e exportar a mesma visao em CSV.
+- Arquivos alterados:
+- `supabase/migrations/20260801_purchase_budget_validation_audit.sql`
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/styles/DashboardPage.css`
+- `src/help/helpAnaliseEstoque.json`
+- `docs/AnaliseEstoque.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: uma saida eventual em um unico mes podia virar previsao de 12 unidades no ano seguinte.
+- Depois: meses com movimento classificam o padrao de demanda, mas a base anual nao ignora meses zerados.
+- Antes: a aba Auditoria validava o snapshot operacional, mas nao explicava a inflacao da verba anual por material.
+- Depois: a aba Auditoria abre modal com fator de crescimento, metodo, trava aplicada e impacto financeiro por material orcado.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -356,6 +384,10 @@ Funcoes utilitarias relacionadas
   - Tipo: utilitarios locais
   - Caminho: src/pages/AnaliseEstoquePage.jsx
   - Responsavel por: evitar UUID como nome visivel, calcular faixas de cobertura e explicar o motivo da recomendacao de compra.
+- formatOrcamentoValidationStatus / formatDemandPattern
+  - Tipo: utilitarios locais
+  - Caminho: src/pages/AnaliseEstoquePage.jsx
+  - Responsavel por: traduzir status de validacao e padrao de demanda do orcamento anual na aba Auditoria.
 
 Servicos e integracoes externas
 -------------------------------
@@ -411,6 +443,10 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260801_fix_purchase_budget_material_uuid_text.sql
   - Responsavel por: recriar a RPC de orcamento convertendo `nome`, `fabricante` e `grupoMaterial` para texto antes de montar o payload JSON.
+- Migration de validacao do orcamento anual
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260801_purchase_budget_validation_audit.sql
+  - Responsavel por: corrigir a previsao de demanda intermitente, adicionar travas por padrao de consumo e expor `validacao_orcamento` para a aba Auditoria.
 - Edge Function forecast-gasto-mensal
   - Tipo: Supabase Edge Function
   - Caminho: supabase/functions/forecast-gasto-mensal/index.ts

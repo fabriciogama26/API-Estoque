@@ -493,6 +493,18 @@
   margin-bottom: 0.5rem;
 }
 
+.analysis-audit-actions--inline {
+  margin-bottom: 0;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.analysis-audit-actions--inline .button {
+  width: auto;
+}
+
 .analysis-audit-table td,
 .analysis-audit-table th {
   font-size: 0.85rem;
@@ -500,6 +512,17 @@
 
 .analysis-audit-table td {
   white-space: nowrap;
+}
+
+.analysis-budget-validation-table th:first-child,
+.analysis-budget-validation-table td:first-child {
+  min-width: 16rem;
+  max-width: 22rem;
+  white-space: normal;
+}
+
+.analysis-budget-validation-table th {
+  vertical-align: top;
 }
 
 .analysis-table-row--clickable {
@@ -747,6 +770,17 @@
   justify-content: space-between;
 }
 
+.analysis-forecast-badge {
+  border: 1px solid rgba(14, 165, 233, 0.24);
+  background: rgba(14, 165, 233, 0.08);
+  color: #0369a1;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .analysis-forecast-label {
   font-size: 0.85rem;
   font-weight: 600;
@@ -798,6 +832,34 @@
 .analysis-budget-value--subtract {
   color: #047857;
   font-weight: 600;
+}
+
+.analysis-budget-validation-summary {
+  margin-top: 0.9rem;
+}
+
+.analysis-budget-validation-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.analysis-budget-validation-filter-group {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.analysis-budget-validation-toolbar__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
 }
 
 .analysis-budget-scenarios {
@@ -972,6 +1034,13 @@
   .analysis-budget-impact-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+  .analysis-budget-validation-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .analysis-audit-actions--inline {
+    justify-content: flex-start;
   }
   .analysis-forecast-meta--compact {
     grid-template-columns: 1fr;

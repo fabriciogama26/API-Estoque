@@ -148,6 +148,27 @@ function formatCompraMaterialId(value) {
   return `${materialId.slice(0, 8)}...${materialId.slice(-6)}`
 }
 
+function formatOrcamentoValidationStatus(status) {
+  const labels = {
+    normal: 'Normal',
+    atencao: 'Atencao',
+    revisao: 'Revisao',
+    justificar: 'Requer justificativa',
+    sem_historico: 'Sem historico',
+  }
+  return labels[status] || status || '-'
+}
+
+function formatDemandPattern(pattern) {
+  const labels = {
+    sem_historico: 'Sem historico',
+    intermitente: 'Intermitente',
+    irregular: 'Irregular',
+    recorrente: 'Recorrente',
+  }
+  return labels[pattern] || pattern || '-'
+}
+
 function formatCompraClassification(item = {}) {
   const parts = [item.grupoMaterial, item.unidade, item.fabricante].filter((value) => value && !isUuidOnly(value))
   return parts.length ? parts.join(' | ') : '-'
@@ -347,6 +368,121 @@ function downloadBudgetImpactCsv(items = [], context = {}) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+const BUDGET_VALIDATION_EXPORT_HEADERS = [
+  'Filtro',
+  'Snapshot',
+  'Material ID',
+  'Material',
+  'Realizado 12m',
+  'Meses com movimento',
+  'Padrao de demanda',
+  'Saida 180d',
+  'Saida 90d',
+  'Previsao bruta',
+  'Limite aplicado',
+  'Previsao final',
+  'Fator de crescimento',
+  'Fator bruto',
+  'Estoque atual',
+  'Estoque final desejado',
+  'Necessidade liquida',
+  'Preco historico',
+  'Preco futuro',
+  'Impacto financeiro',
+  'Metodo utilizado',
+  'Status',
+  'Forecast sem trava',
+  'Forecast com trava',
+  'Valor reduzido pela trava',
+  'Justificativa manual',
+  'Usuario aprovador',
+]
+
+function buildBudgetValidationCsv(items = [], context = {}) {
+  const rows = (Array.isArray(items) ? items : []).map((item) => {
+    const values = [
+      context.label || '',
+      context.snapshot || '',
+      getCompraMaterialKey(item),
+      resolveCompraMaterialName(item),
+      formatCompraCsvNumber(item.realizado_12m ?? 0, 2),
+      formatCompraCsvNumber(item.meses_com_movimento ?? 0),
+      formatDemandPattern(item.padrao_demanda),
+      formatCompraCsvNumber(item.saida_180d ?? 0, 2),
+      formatCompraCsvNumber(item.saida_90d ?? 0, 2),
+      formatCompraCsvNumber(item.previsao_bruta ?? 0, 2),
+      formatCompraCsvNumber(item.limite_aplicado ?? 0, 2),
+      formatCompraCsvNumber(item.previsao_final ?? 0, 2),
+      item.fator_crescimento === null || item.fator_crescimento === undefined ? '' : formatCompraCsvNumber(item.fator_crescimento, 2),
+      item.fator_crescimento_bruto === null || item.fator_crescimento_bruto === undefined ? '' : formatCompraCsvNumber(item.fator_crescimento_bruto, 2),
+      formatCompraCsvNumber(item.estoque_atual ?? 0, 2),
+      formatCompraCsvNumber(item.estoque_final_desejado ?? 0, 2),
+      formatCompraCsvNumber(item.necessidade_liquida ?? 0, 2),
+      formatCompraCsvNumber(item.preco_historico ?? 0, 2),
+      formatCompraCsvNumber(item.preco_futuro ?? 0, 2),
+      formatCompraCsvNumber(item.impacto_financeiro ?? 0, 2),
+      item.metodo_utilizado || '',
+      formatOrcamentoValidationStatus(item.status),
+      formatCompraCsvNumber(item.forecast_sem_trava ?? 0, 2),
+      formatCompraCsvNumber(item.forecast_com_trava ?? 0, 2),
+      formatCompraCsvNumber(item.valor_reduzido_pela_trava ?? 0, 2),
+      item.justificativa_manual || '',
+      item.usuario_aprovador || '',
+    ]
+    return values.map(sanitizeCompraCsvValue).join(';')
+  })
+  return [BUDGET_VALIDATION_EXPORT_HEADERS.join(';'), ...rows].join('\n')
+}
+
+function downloadBudgetValidationCsv(items = [], context = {}) {
+  const label = slugCompraCsvName(context.label || 'validacao-orcamento')
+  const date = new Date().toISOString().slice(0, 10)
+  const filename = `analise-estoque-validacao-orcamento-${label}-${date}.csv`
+  const csvContent = buildBudgetValidationCsv(items, context)
+  const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function buildBudgetValidationClipboardText(items = [], context = {}) {
+  const rows = (Array.isArray(items) ? items : []).map((item) => [
+    context.label || '',
+    context.snapshot || '',
+    getCompraMaterialKey(item),
+    resolveCompraMaterialName(item),
+    formatNumber(item.realizado_12m || 0, 2),
+    formatNumber(item.meses_com_movimento || 0),
+    formatDemandPattern(item.padrao_demanda),
+    formatNumber(item.saida_180d || 0, 2),
+    formatNumber(item.saida_90d || 0, 2),
+    formatNumber(item.previsao_bruta || 0, 2),
+    formatNumber(item.limite_aplicado || 0, 2),
+    formatNumber(item.previsao_final || 0, 2),
+    item.fator_crescimento === null || item.fator_crescimento === undefined ? '-' : `${formatNumber(item.fator_crescimento, 2)}x`,
+    item.fator_crescimento_bruto === null || item.fator_crescimento_bruto === undefined ? '-' : `${formatNumber(item.fator_crescimento_bruto, 2)}x`,
+    formatNumber(item.estoque_atual || 0, 2),
+    formatNumber(item.estoque_final_desejado || 0, 2),
+    formatNumber(item.necessidade_liquida || 0, 2),
+    formatCurrency(item.preco_historico || 0),
+    formatCurrency(item.preco_futuro || 0),
+    formatCurrency(item.impacto_financeiro || 0),
+    item.metodo_utilizado || '-',
+    formatOrcamentoValidationStatus(item.status),
+    formatNumber(item.forecast_sem_trava || 0, 2),
+    formatNumber(item.forecast_com_trava || 0, 2),
+    formatCurrency(item.valor_reduzido_pela_trava || 0),
+    item.justificativa_manual || '-',
+    item.usuario_aprovador || '-',
+  ].join('\t'))
+  return [BUDGET_VALIDATION_EXPORT_HEADERS.join('\t'), ...rows].join('\n')
 }
 
 function computeCompraCoverageStats(items = []) {
@@ -914,6 +1050,10 @@ export function AnaliseEstoquePage() {
   const [compraCopiedMaterialId, setCompraCopiedMaterialId] = useState(null)
   const [orcamentoImpactModalOpen, setOrcamentoImpactModalOpen] = useState(false)
   const [orcamentoImpactView, setOrcamentoImpactView] = useState('valor')
+  const [orcamentoValidationModalOpen, setOrcamentoValidationModalOpen] = useState(false)
+  const [orcamentoValidationFilter, setOrcamentoValidationFilter] = useState('todos')
+  const [orcamentoValidationPage, setOrcamentoValidationPage] = useState(1)
+  const [orcamentoValidationCopied, setOrcamentoValidationCopied] = useState(false)
 
   const formatLabelFromDate = (value) => {
     const date = value instanceof Date ? value : new Date(value)
@@ -1371,6 +1511,7 @@ export function AnaliseEstoquePage() {
   const diagnosticoCopyLabel = diagnosticoCopied ? 'Tabela copiada' : 'Copiar tabela'
   const forecastCopyLabelHistorico = forecastCopiedHistorico ? 'Tabela copiada' : 'Copiar tabela'
   const forecastCopyLabelPrevisao = forecastCopiedPrevisao ? 'Tabela copiada' : 'Copiar tabela'
+  const orcamentoValidationCopyLabel = orcamentoValidationCopied ? 'Tabela copiada' : 'Copiar tabela'
 
   const chartForecastData = useMemo(() => {
     if (!forecastHasData) {
@@ -1858,6 +1999,7 @@ export function AnaliseEstoquePage() {
     const composicao = payloadOk ? forecastOrcamentoPayload?.composicao || {} : {}
     const parametros = payloadOk ? forecastOrcamentoPayload?.parametros || {} : {}
     const impacto = payloadOk ? forecastOrcamentoPayload?.materiais_impacto || {} : {}
+    const validacao = payloadOk ? forecastOrcamentoPayload?.validacao_orcamento || {} : {}
     const enrichBudgetItem = (item = {}) => {
       const materialInfo = materialInfoMap.get(String(item.material_id || item.materialId || '')) || {}
       return {
@@ -1960,6 +2102,7 @@ export function AnaliseEstoquePage() {
       tipoImpacto: 'Oportunidade de reducao',
       valorImpacto: Number(item.potencial_reducao_valor || 0),
     }))
+    const validacaoMateriais = (Array.isArray(validacao.materiais) ? validacao.materiais : []).map(enrichBudgetItem)
     const cenarios = Array.isArray(forecastOrcamentoPayload?.cenarios) ? forecastOrcamentoPayload.cenarios : []
     const cenarioEconomico = cenarios.find((cenario) => cenario.id === 'economico') || null
     const cenarioConservador = cenarios.find((cenario) => cenario.id === 'conservador') || null
@@ -1982,6 +2125,8 @@ export function AnaliseEstoquePage() {
       topValor,
       topRisco,
       topReducao,
+      validacaoResumo: validacao.resumo || {},
+      validacaoMateriais,
       parametros,
     }
   }, [forecastOrcamentoPayload, materialInfoMap])
@@ -2011,6 +2156,51 @@ export function AnaliseEstoquePage() {
   ]
   const activeOrcamentoImpactView = orcamentoImpactViews.find((view) => view.id === orcamentoImpactView) || orcamentoImpactViews[0]
   const activeOrcamentoImpactItems = activeOrcamentoImpactView?.items || []
+  const orcamentoValidationFilters = [
+    { id: 'todos', label: 'Todos' },
+    { id: 'justificar', label: 'Requer justificativa' },
+    { id: 'revisao', label: 'Revisao' },
+    { id: 'intermitente', label: 'Intermitente' },
+    { id: 'sem_historico', label: 'Sem historico' },
+    { id: 'preco_alto', label: 'Preco > historico' },
+    { id: 'minimo', label: 'Minimo/cobertura' },
+  ]
+  const activeOrcamentoValidationFilter =
+    orcamentoValidationFilters.find((filter) => filter.id === orcamentoValidationFilter) || orcamentoValidationFilters[0]
+  const orcamentoValidationItems = compraOrcamentoInsights.validacaoMateriais
+  const orcamentoValidationResumo = compraOrcamentoInsights.validacaoResumo || {}
+  const filteredOrcamentoValidationItems = useMemo(() => {
+    const items = orcamentoValidationItems
+    switch (orcamentoValidationFilter) {
+      case 'justificar':
+        return items.filter((item) => item.status === 'justificar' || Number(item.fator_crescimento_bruto || 0) > 2)
+      case 'revisao':
+        return items.filter((item) => item.status === 'revisao' || Number(item.fator_crescimento_bruto || 0) > 1.5)
+      case 'intermitente':
+        return items.filter((item) => item.padrao_demanda === 'intermitente')
+      case 'sem_historico':
+        return items.filter((item) => item.status === 'sem_historico' || item.padrao_demanda === 'sem_historico')
+      case 'preco_alto':
+        return items.filter((item) => {
+          const historico = Number(item.preco_historico || 0)
+          const futuro = Number(item.preco_futuro || 0)
+          return historico > 0 && futuro / historico > 1.5
+        })
+      case 'minimo':
+        return items.filter((item) => Boolean(item.demanda_gerada_por_estoque_minimo))
+      default:
+        return items
+    }
+  }, [orcamentoValidationFilter, orcamentoValidationItems])
+  const orcamentoValidationStart = (orcamentoValidationPage - 1) * forecastPageSize
+  const orcamentoValidationPageItems = filteredOrcamentoValidationItems.slice(
+    orcamentoValidationStart,
+    orcamentoValidationStart + forecastPageSize,
+  )
+
+  useEffect(() => {
+    setOrcamentoValidationPage(1)
+  }, [orcamentoValidationFilter, forecastOrcamentoPayload])
 
   const auditResumo = forecastAuditPayload?.resumo || null
   const auditSerie = useMemo(
@@ -2176,6 +2366,26 @@ export function AnaliseEstoquePage() {
       label: activeOrcamentoImpactView.label,
       snapshot: forecastHorizonLabel,
     })
+  }
+
+  const handleExportOrcamentoValidationCsv = () => {
+    if (!filteredOrcamentoValidationItems.length) return
+    downloadBudgetValidationCsv(filteredOrcamentoValidationItems, {
+      label: activeOrcamentoValidationFilter.label,
+      snapshot: forecastHorizonLabel,
+    })
+  }
+
+  const handleCopyOrcamentoValidationTable = async () => {
+    if (!filteredOrcamentoValidationItems.length) return
+    const ok = await copyTextToClipboard(buildBudgetValidationClipboardText(filteredOrcamentoValidationItems, {
+      label: activeOrcamentoValidationFilter.label,
+      snapshot: forecastHorizonLabel,
+    }))
+    setOrcamentoValidationCopied(ok)
+    if (ok) {
+      window.setTimeout(() => setOrcamentoValidationCopied(false), 1500)
+    }
   }
 
   const handleCopyCompraMaterialId = async (materialId) => {
@@ -2734,20 +2944,24 @@ export function AnaliseEstoquePage() {
         {forecastTab === 'auditoria' ? (
           <div className="analysis-forecast-stack" role="tabpanel">
             <div className="analysis-forecast-grid analysis-forecast-grid--single">
-              <div className="analysis-forecast-card">
-                <p className="analysis-forecast-label">Auditoria do forecast</p>
-                <p className="analysis-forecast-value">{forecastPeriodoLabel}</p>
-                <p className="analysis-forecast-subtitle">
-                  Use esta aba para abrir a validacao das tabelas mensais e o diagnostico estatistico do snapshot.
-                </p>
-                <div className="analysis-forecast-meta">
+              <div className="analysis-forecast-card analysis-forecast-card--technical">
+                <div className="analysis-forecast-card__heading">
+                  <div>
+                    <p className="analysis-forecast-label">Auditoria do forecast</p>
+                    <p className="analysis-forecast-value">{forecastPeriodoLabel}</p>
+                  </div>
+                  <span className="analysis-forecast-badge">Snapshot selecionado</span>
+                </div>
+                <div className="analysis-forecast-meta analysis-forecast-meta--grid analysis-forecast-meta--compact">
                   <span>Gerado em: {forecastCreatedAtLabel}</span>
                   <span>Metodo: {forecastBase?.metodo_previsao || '-'}</span>
                   <span>Confianca: {forecastBase?.nivel_confianca || 'nao informada'}</span>
                   <span>Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}</span>
                   <span>Variacao: {formatPercent(forecastBase?.variacao_percentual || 0, 2)}</span>
                   {forecastAuditLoading ? <span>Atualizando auditoria do snapshot...</span> : null}
+                  {forecastOrcamentoLoading ? <span>Atualizando validacao do orcamento...</span> : null}
                   {forecastAuditError ? <span>{forecastAuditError}</span> : null}
+                  {forecastOrcamentoError ? <span>{forecastOrcamentoError}</span> : null}
                   {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
                 </div>
                 <div className="analysis-forecast-actions">
@@ -2776,6 +2990,17 @@ export function AnaliseEstoquePage() {
                     }}
                   >
                     Abrir validacao
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    onClick={() => {
+                      setOrcamentoValidationModalOpen(true)
+                      setOrcamentoValidationPage(1)
+                    }}
+                    disabled={!orcamentoValidationItems.length}
+                  >
+                    Validar orcamento
                   </button>
                   <button type="button" className="button button--ghost" onClick={loadDiagnostico}>
                     {diagnosticoLoading ? 'Carregando diagnostico...' : 'Abrir diagnostico'}
@@ -2838,6 +3063,138 @@ export function AnaliseEstoquePage() {
           </div>
         ) : null}
       </section>
+      <ChartExpandModal
+        open={orcamentoValidationModalOpen}
+        title="Validacao do orcamento de compras"
+        onClose={() => setOrcamentoValidationModalOpen(false)}
+      >
+        <div className="analysis-audit-summary analysis-audit-summary--question">
+          <p>Quais materiais estao inflando a verba projetada e precisam de revisao?</p>
+          <span>
+            Compare realizado 12m, janelas recentes, previsao bruta, limite aplicado e impacto financeiro para auditar a verba anual.
+          </span>
+        </div>
+        <div className="analysis-forecast-meta analysis-forecast-meta--grid analysis-forecast-meta--compact analysis-budget-validation-summary">
+          <span>Materiais que explicam 80% do aumento: {formatNumber(orcamentoValidationResumo.materiais_80_aumento || 0)}</span>
+          <span>Requer justificativa: {formatNumber(orcamentoValidationResumo.materiais_justificar || 0)}</span>
+          <span>Em revisao: {formatNumber(orcamentoValidationResumo.materiais_revisao || 0)}</span>
+          <span>Aumento por quantidade: {formatCurrency(orcamentoValidationResumo.aumento_quantidade_valor || 0)}</span>
+          <span>Aumento por preco: {formatCurrency(orcamentoValidationResumo.aumento_preco_valor || 0)}</span>
+          <span>Estoque de seguranca: {formatCurrency(orcamentoValidationResumo.estoque_seguranca_valor || 0)}</span>
+          <span>Contingencia: {formatCurrency(orcamentoValidationResumo.contingencia_valor || 0)}</span>
+          <span>Reduzido pela trava: {formatCurrency(orcamentoValidationResumo.valor_reduzido_pela_trava || 0)}</span>
+        </div>
+        <div className="analysis-budget-validation-toolbar">
+          <div className="analysis-budget-validation-filter-group">
+            <span className="analysis-budget-validation-toolbar__label">Filtros</span>
+            <div className="analysis-budget-impact-tabs" role="tablist" aria-label="Filtros de validacao do orcamento">
+              {orcamentoValidationFilters.map((filter) => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  className={`analysis-budget-impact-tab ${orcamentoValidationFilter === filter.id ? 'analysis-budget-impact-tab--active' : ''}`}
+                  onClick={() => setOrcamentoValidationFilter(filter.id)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="analysis-audit-actions analysis-audit-actions--inline">
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleCopyOrcamentoValidationTable}
+              disabled={!filteredOrcamentoValidationItems.length}
+            >
+              {orcamentoValidationCopyLabel}
+            </button>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleExportOrcamentoValidationCsv}
+              disabled={!filteredOrcamentoValidationItems.length}
+            >
+              <SaveIcon size={16} aria-hidden="true" />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+          </div>
+        </div>
+        {orcamentoValidationPageItems.length ? (
+          <>
+            <div className="table-wrapper">
+              <table className="data-table analysis-audit-table analysis-budget-validation-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Realizado 12m</th>
+                    <th>Meses mov.</th>
+                    <th>Padrao</th>
+                    <th>Saida 180d</th>
+                    <th>Saida 90d</th>
+                    <th>Previsao bruta</th>
+                    <th>Limite aplicado</th>
+                    <th>Previsao final</th>
+                    <th>Fator</th>
+                    <th>Estoque atual</th>
+                    <th>Estoque final</th>
+                    <th>Necessidade</th>
+                    <th>Preco historico</th>
+                    <th>Preco futuro</th>
+                    <th>Impacto</th>
+                    <th>Metodo</th>
+                    <th>Status</th>
+                    <th>Sem trava</th>
+                    <th>Com trava</th>
+                    <th>Reducao trava</th>
+                    <th>Justificativa</th>
+                    <th>Aprovador</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orcamentoValidationPageItems.map((item, index) => (
+                    <tr key={`orcamento-validation-modal-${getCompraMaterialKey(item)}-${index}`}>
+                      <td>{resolveCompraMaterialName(item)}</td>
+                      <td>{formatNumber(item.realizado_12m || 0, 2)}</td>
+                      <td>{formatNumber(item.meses_com_movimento || 0)}</td>
+                      <td>{formatDemandPattern(item.padrao_demanda)}</td>
+                      <td>{formatNumber(item.saida_180d || 0, 2)}</td>
+                      <td>{formatNumber(item.saida_90d || 0, 2)}</td>
+                      <td>{formatNumber(item.previsao_bruta || 0, 2)}</td>
+                      <td>{formatNumber(item.limite_aplicado || 0, 2)}</td>
+                      <td>{formatNumber(item.previsao_final || 0, 2)}</td>
+                      <td>{item.fator_crescimento === null || item.fator_crescimento === undefined ? '-' : `${formatNumber(item.fator_crescimento, 2)}x`}</td>
+                      <td>{formatNumber(item.estoque_atual || 0, 2)}</td>
+                      <td>{formatNumber(item.estoque_final_desejado || 0, 2)}</td>
+                      <td>{formatNumber(item.necessidade_liquida || 0, 2)}</td>
+                      <td>{formatCurrency(item.preco_historico || 0)}</td>
+                      <td>{formatCurrency(item.preco_futuro || 0)}</td>
+                      <td>{formatCurrency(item.impacto_financeiro || 0)}</td>
+                      <td>{item.metodo_utilizado || '-'}</td>
+                      <td>{formatOrcamentoValidationStatus(item.status)}</td>
+                      <td>{formatNumber(item.forecast_sem_trava || 0, 2)}</td>
+                      <td>{formatNumber(item.forecast_com_trava || 0, 2)}</td>
+                      <td>{formatCurrency(item.valor_reduzido_pela_trava || 0)}</td>
+                      <td>{item.justificativa_manual || '-'}</td>
+                      <td>{item.usuario_aprovador || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <TablePagination
+              totalItems={filteredOrcamentoValidationItems.length}
+              pageSize={forecastPageSize}
+              currentPage={orcamentoValidationPage}
+              onPageChange={setOrcamentoValidationPage}
+            />
+          </>
+        ) : (
+          <p className="analysis-forecast-subtitle">
+            {forecastOrcamentoError || 'Nenhum material encontrado para o filtro de validacao do orcamento.'}
+          </p>
+        )}
+      </ChartExpandModal>
       <ChartExpandModal
         open={!!compraDetailModal}
         title={compraDetailModal ? `Materiais - ${compraDetailModal.label}` : 'Materiais'}
