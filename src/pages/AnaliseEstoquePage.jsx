@@ -40,6 +40,12 @@ const FORECAST_TABS = [
     description: 'Reposicao atual, ruptura, cobertura e prioridades de compra.',
   },
   {
+    id: 'orcamento',
+    label: 'Previsao de Orcamento',
+    icon: RevenueIcon,
+    description: 'Verba anual, cenarios, composicao e cronograma financeiro.',
+  },
+  {
     id: 'auditoria',
     label: 'Auditoria',
     icon: BarsIcon,
@@ -106,6 +112,11 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 function isUuidOnly(value) {
   return UUID_PATTERN.test(String(value || '').trim())
+}
+
+function normalizeUuidOrNull(value) {
+  const normalized = String(value || '').trim()
+  return UUID_PATTERN.test(normalized) ? normalized : null
 }
 
 function resolveCompraMaterialName(item = {}) {
@@ -262,6 +273,71 @@ function downloadCompraDetailCsv(items = [], context = {}) {
   const date = new Date().toISOString().slice(0, 10)
   const filename = `analise-estoque-compra-${label}-${date}.csv`
   const csvContent = buildCompraDetailCsv(items, context)
+  const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function getBudgetImpactValue(item = {}) {
+  return Number(item.verba_recomendada ?? item.valorImpacto ?? item.impacto_orcamento ?? 0)
+}
+
+function getBudgetFuturePrice(item = {}) {
+  const explicit = item.preco_futuro ?? item.preco_unitario_futuro
+  if (explicit !== null && explicit !== undefined) {
+    return Number(explicit || 0)
+  }
+  const precoAtual = Number(item.preco_atual ?? item.valor_unitario ?? item.valorUnitario ?? 0)
+  const reajuste = Number(item.reajuste_material ?? item.reajuste_percentual ?? 0)
+  return precoAtual * (1 + reajuste)
+}
+
+function getBudgetHistoricValue(item = {}) {
+  return Number(item.gasto_historico_12m ?? item.valor_saida_base ?? item.gasto_historico ?? 0)
+}
+
+function buildBudgetImpactCsv(items = [], context = {}) {
+  const headers = [
+    'Visao',
+    'Snapshot',
+    'Material ID',
+    'Material',
+    'Gasto historico 12m',
+    'Quantidade prevista',
+    'Estoque utilizavel',
+    'Quantidade a comprar',
+    'Preco futuro',
+    'Impacto no orcamento',
+  ]
+  const rows = (Array.isArray(items) ? items : []).map((item) => {
+    const values = [
+      context.label || '',
+      context.snapshot || '',
+      getCompraMaterialKey(item),
+      resolveCompraMaterialName(item),
+      formatCompraCsvNumber(getBudgetHistoricValue(item), 2),
+      formatCompraCsvNumber(item.consumo_previsto_qtd ?? 0, 2),
+      formatCompraCsvNumber(item.estoque_utilizavel_qtd ?? 0, 2),
+      formatCompraCsvNumber(item.quantidade_necessaria_qtd ?? item.potencial_reducao_qtd ?? 0, 2),
+      formatCompraCsvNumber(getBudgetFuturePrice(item), 2),
+      formatCompraCsvNumber(getBudgetImpactValue(item), 2),
+    ]
+    return values.map(sanitizeCompraCsvValue).join(';')
+  })
+  return [headers.join(';'), ...rows].join('\n')
+}
+
+function downloadBudgetImpactCsv(items = [], context = {}) {
+  const label = slugCompraCsvName(context.label)
+  const date = new Date().toISOString().slice(0, 10)
+  const filename = `analise-estoque-orcamento-${label}-${date}.csv`
+  const csvContent = buildBudgetImpactCsv(items, context)
   const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -830,9 +906,14 @@ export function AnaliseEstoquePage() {
   const [forecastCompraPayload, setForecastCompraPayload] = useState(null)
   const [forecastCompraLoading, setForecastCompraLoading] = useState(false)
   const [forecastCompraError, setForecastCompraError] = useState(null)
+  const [forecastOrcamentoPayload, setForecastOrcamentoPayload] = useState(null)
+  const [forecastOrcamentoLoading, setForecastOrcamentoLoading] = useState(false)
+  const [forecastOrcamentoError, setForecastOrcamentoError] = useState(null)
   const [compraDetailModal, setCompraDetailModal] = useState(null)
   const [compraDetailPage, setCompraDetailPage] = useState(1)
   const [compraCopiedMaterialId, setCompraCopiedMaterialId] = useState(null)
+  const [orcamentoImpactModalOpen, setOrcamentoImpactModalOpen] = useState(false)
+  const [orcamentoImpactView, setOrcamentoImpactView] = useState('valor')
 
   const formatLabelFromDate = (value) => {
     const date = value instanceof Date ? value : new Date(value)
@@ -1350,6 +1431,8 @@ export function AnaliseEstoquePage() {
   )
   const forecastCreatedAtLabel = formatForecastTimestamp(forecastBase?.created_at)
   const selectedForecastId = forecastBase?.id || null
+  const selectedForecastRpcId = normalizeUuidOrNull(selectedForecastId)
+  const ownerRpcId = normalizeUuidOrNull(profile?.owner_id)
   const materialInfoMap = useMemo(() => {
     const map = new Map()
     const estoqueItens = Array.isArray(estoqueBase?.itens) ? estoqueBase.itens : []
@@ -1370,14 +1453,17 @@ export function AnaliseEstoquePage() {
   }, [estoqueBase])
 
   useEffect(() => {
-    const shouldUseSupabase = !isLocalMode && isSupabaseConfigured() && supabase && profile?.owner_id
-    if (!shouldUseSupabase || !selectedForecastId) {
+    const shouldUseSupabase = !isLocalMode && isSupabaseConfigured() && supabase && ownerRpcId && forecastHasData
+    if (!shouldUseSupabase) {
       setForecastAuditPayload(null)
       setForecastAuditError(null)
       setForecastAuditLoading(false)
       setForecastCompraPayload(null)
       setForecastCompraError(null)
       setForecastCompraLoading(false)
+      setForecastOrcamentoPayload(null)
+      setForecastOrcamentoError(null)
+      setForecastOrcamentoLoading(false)
       return
     }
 
@@ -1386,17 +1472,30 @@ export function AnaliseEstoquePage() {
     const loadSupportData = async () => {
       setForecastAuditLoading(true)
       setForecastCompraLoading(true)
+      setForecastOrcamentoLoading(true)
       setForecastAuditError(null)
       setForecastCompraError(null)
+      setForecastOrcamentoError(null)
 
-      const [auditResult, compraResult] = await Promise.allSettled([
+      const [auditResult, compraResult, orcamentoResult] = await Promise.allSettled([
         supabase.rpc('rpc_previsao_gasto_mensal_auditar', {
-          p_owner_id: profile.owner_id,
-          p_forecast_id: selectedForecastId,
+          p_owner_id: ownerRpcId,
+          p_forecast_id: selectedForecastRpcId,
         }),
         supabase.rpc('rpc_previsao_compra_sugerida', {
-          p_owner_id: profile.owner_id,
-          p_forecast_id: selectedForecastId,
+          p_owner_id: ownerRpcId,
+          p_forecast_id: selectedForecastRpcId,
+        }),
+        supabase.rpc('rpc_orcamento_compra_12m_calcular', {
+          p_owner_id: ownerRpcId,
+          p_forecast_id: selectedForecastRpcId,
+          p_parametros: {
+            horizonte_meses: 12,
+            cobertura_final_meses: 2,
+            reajuste_padrao: 0.06,
+            contingencia: 0.08,
+            crescimento_operacional: 0,
+          },
         }),
       ])
 
@@ -1428,8 +1527,21 @@ export function AnaliseEstoquePage() {
         setForecastCompraPayload(null)
       }
 
+      if (orcamentoResult.status === 'fulfilled') {
+        if (orcamentoResult.value.error) {
+          setForecastOrcamentoError(orcamentoResult.value.error.message || 'Erro ao carregar orcamento anual de compra.')
+          setForecastOrcamentoPayload(null)
+        } else {
+          setForecastOrcamentoPayload(orcamentoResult.value.data || null)
+        }
+      } else {
+        setForecastOrcamentoError(orcamentoResult.reason?.message || 'Erro ao carregar orcamento anual de compra.')
+        setForecastOrcamentoPayload(null)
+      }
+
       setForecastAuditLoading(false)
       setForecastCompraLoading(false)
+      setForecastOrcamentoLoading(false)
     }
 
     loadSupportData()
@@ -1437,7 +1549,7 @@ export function AnaliseEstoquePage() {
     return () => {
       cancelled = true
     }
-  }, [profile?.owner_id, selectedForecastId])
+  }, [forecastHasData, ownerRpcId, selectedForecastRpcId])
 
   const compraInsights = useMemo(() => {
     const riscoList = Array.isArray(riscoOperacional) ? riscoOperacional : []
@@ -1740,9 +1852,165 @@ export function AnaliseEstoquePage() {
     [compraInsights],
   )
 
+  const compraOrcamentoInsights = useMemo(() => {
+    const payloadOk = forecastOrcamentoPayload?.status === 'ok'
+    const resumo = payloadOk ? forecastOrcamentoPayload?.resumo || {} : {}
+    const composicao = payloadOk ? forecastOrcamentoPayload?.composicao || {} : {}
+    const parametros = payloadOk ? forecastOrcamentoPayload?.parametros || {} : {}
+    const impacto = payloadOk ? forecastOrcamentoPayload?.materiais_impacto || {} : {}
+    const enrichBudgetItem = (item = {}) => {
+      const materialInfo = materialInfoMap.get(String(item.material_id || item.materialId || '')) || {}
+      return {
+        ...item,
+        displayNome: resolveCompraMaterialName({
+          ...item,
+          displayNome: materialInfo.displayNome,
+        }),
+        grupoMaterial: item.grupoMaterial || item.grupo_material || materialInfo.grupoMaterial || '',
+        fabricante: item.fabricante || materialInfo.fabricante || '',
+        valor_unitario: Number(item.preco_atual ?? item.valor_unitario ?? materialInfo.valorUnitario ?? 0),
+      }
+    }
+    const verbaRecomendada = Number(resumo.verba_recomendada || 0)
+    const necessidadeLiquida = Number(resumo.necessidade_liquida_valor || 0)
+    const valorComReajuste = Number(resumo.valor_com_reajuste || 0)
+    const consumoPrevisto = Number(composicao.consumo_previsto || 0)
+    const estoqueFinalDesejado = Number(composicao.estoque_final_desejado || 0)
+    const demandaExtraordinaria = Number(composicao.demanda_extraordinaria || 0)
+    const estoqueUtilizavel = Number(composicao.estoque_utilizavel || 0)
+    const pedidosEmAberto = Number(composicao.pedidos_em_aberto || 0)
+    const reajustePrecos = Number(composicao.reajuste_precos || 0)
+    const contingencia = Number(composicao.contingencia || 0)
+    const necessidadeGlobal = consumoPrevisto + estoqueFinalDesejado + demandaExtraordinaria - estoqueUtilizavel - pedidosEmAberto
+    const ajusteIndividual = necessidadeLiquida - necessidadeGlobal
+    const composicaoRows = [
+      {
+        id: 'consumo',
+        label: 'Consumo previsto',
+        value: consumoPrevisto,
+        effect: 'add',
+      },
+      {
+        id: 'estoque-final',
+        label: 'Estoque final desejado',
+        value: estoqueFinalDesejado,
+        effect: 'add',
+      },
+      {
+        id: 'demanda-extra',
+        label: 'Demanda extraordinaria',
+        value: demandaExtraordinaria,
+        effect: 'add',
+      },
+      {
+        id: 'estoque-utilizavel',
+        label: 'Estoque utilizavel',
+        value: estoqueUtilizavel,
+        effect: 'subtract',
+      },
+      {
+        id: 'pedidos-abertos',
+        label: 'Pedidos em aberto',
+        value: pedidosEmAberto,
+        effect: 'subtract',
+      },
+      {
+        id: 'ajuste-individual',
+        label: 'Ajuste por necessidade individual',
+        value: ajusteIndividual,
+        effect: ajusteIndividual < 0 ? 'subtract' : 'add',
+      },
+      {
+        id: 'necessidade-liquida',
+        label: 'Necessidade liquida calculada por material',
+        value: necessidadeLiquida,
+        effect: 'subtotal',
+      },
+      {
+        id: 'reajuste',
+        label: 'Reajuste de precos',
+        value: reajustePrecos,
+        effect: 'add',
+      },
+      {
+        id: 'contingencia',
+        label: 'Contingencia',
+        value: contingencia,
+        effect: 'add',
+      },
+      {
+        id: 'verba',
+        label: 'Verba recomendada - cenario-base',
+        value: Number(composicao.verba_recomendada || verbaRecomendada),
+        effect: 'total',
+      },
+    ]
+    const topValor = (Array.isArray(impacto.top_valor) ? impacto.top_valor : []).slice(0, 10).map((item) => ({
+      ...enrichBudgetItem(item),
+      tipoImpacto: 'Impacto financeiro',
+      valorImpacto: Number(item.verba_recomendada || 0),
+    }))
+    const topRisco = (Array.isArray(impacto.top_risco) ? impacto.top_risco : []).slice(0, 10).map((item) => ({
+      ...enrichBudgetItem(item),
+      tipoImpacto: 'Risco de falta',
+      valorImpacto: Number(item.verba_recomendada || 0),
+    }))
+    const topReducao = (Array.isArray(impacto.reducao_orcamento) ? impacto.reducao_orcamento : []).slice(0, 10).map((item) => ({
+      ...enrichBudgetItem(item),
+      tipoImpacto: 'Oportunidade de reducao',
+      valorImpacto: Number(item.potencial_reducao_valor || 0),
+    }))
+    const cenarios = Array.isArray(forecastOrcamentoPayload?.cenarios) ? forecastOrcamentoPayload.cenarios : []
+    const cenarioEconomico = cenarios.find((cenario) => cenario.id === 'economico') || null
+    const cenarioConservador = cenarios.find((cenario) => cenario.id === 'conservador') || null
+
+    return {
+      disponivel: payloadOk,
+      status: forecastOrcamentoPayload?.status || null,
+      verbaRecomendada,
+      necessidadeLiquida,
+      valorComReajuste,
+      contingenciaValor: Number(resumo.contingencia_valor || 0),
+      materiaisMonitorados: Number(resumo.materiais_monitorados || 0),
+      materiaisOrcados: Number(resumo.materiais_orcados || 0),
+      materiaisRisco: Number(resumo.materiais_risco || 0),
+      composicaoRows,
+      cenarios,
+      cenarioEconomico,
+      cenarioConservador,
+      cronograma: Array.isArray(forecastOrcamentoPayload?.cronograma) ? forecastOrcamentoPayload.cronograma : [],
+      topValor,
+      topRisco,
+      topReducao,
+      parametros,
+    }
+  }, [forecastOrcamentoPayload, materialInfoMap])
+
   const compraDetailItems = compraDetailModal?.items || []
   const compraDetailStart = (compraDetailPage - 1) * forecastPageSize
   const compraDetailPageItems = compraDetailItems.slice(compraDetailStart, compraDetailStart + forecastPageSize)
+  const orcamentoImpactViews = [
+    {
+      id: 'valor',
+      label: 'Maiores valores do orcamento',
+      items: compraOrcamentoInsights.topValor,
+      question: 'O que mais exigira dinheiro no proximo periodo?',
+    },
+    {
+      id: 'risco',
+      label: 'Maiores riscos de falta',
+      items: compraOrcamentoInsights.topRisco,
+      question: 'Quais materiais combinam maior necessidade futura com menor cobertura?',
+    },
+    {
+      id: 'reducao',
+      label: 'Maiores oportunidades de reducao',
+      items: compraOrcamentoInsights.topReducao,
+      question: 'Quais materiais podem reduzir a verba projetada por excesso ou baixa necessidade?',
+    },
+  ]
+  const activeOrcamentoImpactView = orcamentoImpactViews.find((view) => view.id === orcamentoImpactView) || orcamentoImpactViews[0]
+  const activeOrcamentoImpactItems = activeOrcamentoImpactView?.items || []
 
   const auditResumo = forecastAuditPayload?.resumo || null
   const auditSerie = useMemo(
@@ -1894,6 +2162,19 @@ export function AnaliseEstoquePage() {
     downloadCompraDetailCsv(compraDetailModal.items, {
       label: compraDetailModal.label,
       snapshot: forecastPeriodoLabel,
+    })
+  }
+
+  const handleOpenOrcamentoImpactModal = () => {
+    setOrcamentoImpactView('valor')
+    setOrcamentoImpactModalOpen(true)
+  }
+
+  const handleExportOrcamentoImpactCsv = () => {
+    if (!activeOrcamentoImpactItems.length) return
+    downloadBudgetImpactCsv(activeOrcamentoImpactItems, {
+      label: activeOrcamentoImpactView.label,
+      snapshot: forecastHorizonLabel,
     })
   }
 
@@ -2297,6 +2578,159 @@ export function AnaliseEstoquePage() {
             </div>
           </div>
         ) : null}
+        {forecastTab === 'orcamento' ? (
+          <div className="analysis-forecast-stack" role="tabpanel">
+            <div className="analysis-forecast-grid analysis-forecast-grid--single">
+              <div className="analysis-forecast-card analysis-forecast-card--technical">
+                <div className="analysis-forecast-summary-row">
+                  <div className="analysis-forecast-summary-main">
+                    <p className="analysis-forecast-label">Orcamento de compras - proximos 12 meses</p>
+                    <p className="analysis-forecast-subtitle">
+                      Calculo independente da reposicao atual, com consumo previsto, estoque utilizavel, pedidos em aberto, reajuste e contingencia.
+                    </p>
+                  </div>
+                  <div className="analysis-forecast-budget-status">
+                    <span>{forecastOrcamentoLoading ? 'Atualizando orcamento anual...' : 'Snapshot financeiro'}</span>
+                    <strong>{forecastHorizonLabel}</strong>
+                  </div>
+                </div>
+                <div className="analysis-forecast-meta analysis-forecast-meta--grid analysis-forecast-meta--compact">
+                  <span>Base historica: {forecastPeriodoLabel}</span>
+                  <span>Periodo orcamentario: {forecastHorizonLabel}</span>
+                  <span>Materiais monitorados: {formatNumber(compraOrcamentoInsights.materiaisMonitorados)}</span>
+                  <span>Materiais incluidos no orcamento: {formatNumber(compraOrcamentoInsights.materiaisOrcados)}</span>
+                  <span>Materiais em risco: {formatNumber(compraOrcamentoInsights.materiaisRisco)}</span>
+                  <span>Reajuste aplicado: {formatPercent(Number(compraOrcamentoInsights.parametros?.reajuste_padrao || 0) * 100, 2)}</span>
+                  <span>Contingencia aplicada: {formatPercent(Number(compraOrcamentoInsights.parametros?.contingencia || 0) * 100, 2)}</span>
+                  <span>Cobertura final: {formatNumber(compraOrcamentoInsights.parametros?.cobertura_final_meses || 0, 1)} meses</span>
+                  <span>Gerado em: {formatForecastTimestamp(forecastOrcamentoPayload?.snapshot?.gerado_em)}</span>
+                  {forecastOrcamentoError ? <span>{forecastOrcamentoError}</span> : null}
+                  {compraOrcamentoInsights.status === 'missing' ? <span>Calcule a previsao antes de gerar o orcamento anual.</span> : null}
+                </div>
+              </div>
+            </div>
+            <div className="dashboard-highlights dashboard-highlights--secondary analysis-budget-scenarios">
+              <article className="dashboard-insight-card dashboard-insight-card--blue analysis-budget-scenario-card analysis-budget-scenario-card--base">
+                <header className="dashboard-insight-card__header">
+                  <p className="dashboard-insight-card__title">Verba recomendada - cenario-base</p>
+                  <span className="dashboard-insight-card__avatar">
+                    <StockIcon size={22} />
+                  </span>
+                </header>
+                <strong className="dashboard-insight-card__value">{formatCurrency(compraOrcamentoInsights.verbaRecomendada)}</strong>
+                <span className="dashboard-insight-card__helper">Valor estimado para atender o consumo projetado, manter cobertura e considerar reajuste e contingencia.</span>
+              </article>
+              {compraOrcamentoInsights.cenarioEconomico ? (
+                <article className="dashboard-insight-card dashboard-insight-card--green analysis-budget-scenario-card">
+                  <header className="dashboard-insight-card__header">
+                    <p className="dashboard-insight-card__title">Cenario economico</p>
+                    <span className="dashboard-insight-card__avatar">
+                      <RevenueIcon size={22} />
+                    </span>
+                  </header>
+                  <strong className="dashboard-insight-card__value">{formatCurrency(compraOrcamentoInsights.cenarioEconomico.verba || 0)}</strong>
+                  <span className="dashboard-insight-card__helper">
+                    {formatCurrency(Number(compraOrcamentoInsights.cenarioEconomico.verba || 0) - compraOrcamentoInsights.verbaRecomendada)} em relacao ao cenario-base.
+                  </span>
+                </article>
+              ) : null}
+              {compraOrcamentoInsights.cenarioConservador ? (
+                <article className="dashboard-insight-card dashboard-insight-card--orange analysis-budget-scenario-card">
+                  <header className="dashboard-insight-card__header">
+                    <p className="dashboard-insight-card__title">Cenario conservador</p>
+                    <span className="dashboard-insight-card__avatar">
+                      <AlertIcon size={22} />
+                    </span>
+                  </header>
+                  <strong className="dashboard-insight-card__value">{formatCurrency(compraOrcamentoInsights.cenarioConservador.verba || 0)}</strong>
+                  <span className="dashboard-insight-card__helper">
+                    +{formatCurrency(Math.abs(Number(compraOrcamentoInsights.cenarioConservador.verba || 0) - compraOrcamentoInsights.verbaRecomendada))} em relacao ao cenario-base.
+                  </span>
+                </article>
+              ) : null}
+            </div>
+            <div className="analysis-forecast-grid analysis-forecast-grid--equal">
+              <article className="analysis-forecast-card analysis-forecast-card--list">
+                <div className="analysis-forecast-card__heading">
+                  <div>
+                    <p className="analysis-forecast-label">Composicao do orcamento</p>
+                    <p className="analysis-forecast-subtitle">
+                      Explica a verba partindo da necessidade calculada material a material; excesso de um item nao compensa falta de outro.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="button button--ghost"
+                    onClick={handleOpenOrcamentoImpactModal}
+                    disabled={!compraOrcamentoInsights.topValor.length}
+                  >
+                    <BarsIcon size={16} aria-hidden="true" />
+                    <span>Lista consolidada de materiais</span>
+                  </button>
+                </div>
+                <div className="table-wrapper">
+                  <table className="data-table analysis-audit-table">
+                    <thead>
+                      <tr>
+                        <th>Componente</th>
+                        <th>Efeito</th>
+                        <th>Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compraOrcamentoInsights.composicaoRows.map((row) => (
+                        <tr key={row.id}>
+                          <td>{row.label}</td>
+                          <td>
+                            {row.effect === 'subtract' ? 'reduz' : row.effect === 'total' ? 'resultado' : row.effect === 'subtotal' ? 'subtotal' : 'soma'}
+                          </td>
+                          <td className={row.effect === 'subtract' ? 'analysis-budget-value--subtract' : undefined}>
+                            {row.effect === 'subtract'
+                              ? `-${formatCurrency(Math.abs(row.value))}`
+                              : row.id === 'ajuste-individual' && row.value > 0
+                                ? `+${formatCurrency(row.value)}`
+                                : formatCurrency(row.value)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+              <article className="analysis-forecast-card analysis-forecast-card--list">
+                <p className="analysis-forecast-label">Cronograma financeiro</p>
+                <p className="analysis-forecast-subtitle">
+                  Distribuicao mensal do desembolso usando a curva prevista do snapshot quando disponivel.
+                </p>
+                <div className="table-wrapper">
+                  <table className="data-table analysis-audit-table">
+                    <thead>
+                      <tr>
+                        <th>Mes</th>
+                        <th>Compra prevista</th>
+                        <th>Acumulado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compraOrcamentoInsights.cronograma.map((row) => (
+                        <tr key={row.ano_mes}>
+                          <td>{row.label || formatLabelFromDate(row.ano_mes)}</td>
+                          <td>{formatCurrency(row.compra_prevista || 0)}</td>
+                          <td>{formatCurrency(row.acumulado || 0)}</td>
+                        </tr>
+                      ))}
+                      {!compraOrcamentoInsights.cronograma.length ? (
+                        <tr>
+                          <td colSpan={3}>Cronograma indisponivel para este snapshot.</td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </div>
+        ) : null}
         {forecastTab === 'auditoria' ? (
           <div className="analysis-forecast-stack" role="tabpanel">
             <div className="analysis-forecast-grid analysis-forecast-grid--single">
@@ -2504,6 +2938,78 @@ export function AnaliseEstoquePage() {
             )}
           </>
         ) : null}
+      </ChartExpandModal>
+      <ChartExpandModal
+        open={orcamentoImpactModalOpen}
+        title="Maiores componentes da verba projetada"
+        onClose={() => setOrcamentoImpactModalOpen(false)}
+      >
+        <div className="analysis-audit-summary analysis-audit-summary--question">
+          <p>{activeOrcamentoImpactView.question}</p>
+          <span>
+            Compare o gasto historico de 12 meses com a verba projetada para enxergar quais materiais puxam o proximo orcamento.
+          </span>
+        </div>
+        <div className="analysis-budget-impact-toolbar">
+          <div className="analysis-budget-impact-tabs" role="tablist" aria-label="Visoes dos componentes da verba">
+            {orcamentoImpactViews.map((view) => (
+              <button
+                key={view.id}
+                type="button"
+                className={`analysis-budget-impact-tab ${orcamentoImpactView === view.id ? 'analysis-budget-impact-tab--active' : ''}`}
+                onClick={() => setOrcamentoImpactView(view.id)}
+              >
+                {view.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleExportOrcamentoImpactCsv}
+            disabled={!activeOrcamentoImpactItems.length}
+          >
+            <SaveIcon size={16} aria-hidden="true" />
+            <span>Exportar Excel (CSV)</span>
+          </button>
+        </div>
+        <div className="table-wrapper">
+          <table className="data-table analysis-audit-table">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th>Gasto historico 12m</th>
+                <th>Quantidade prevista</th>
+                <th>Estoque utilizavel</th>
+                <th>Quantidade a comprar</th>
+                <th>Preco futuro</th>
+                <th>Impacto no orcamento</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeOrcamentoImpactItems.map((item, index) => (
+                <tr key={`orcamento-impact-modal-${orcamentoImpactView}-${getCompraMaterialKey(item)}-${index}`}>
+                  <td>
+                    <strong>{resolveCompraMaterialName(item)}</strong>
+                    <br />
+                    <span>{formatCompraMaterialId(getCompraMaterialKey(item))}</span>
+                  </td>
+                  <td>{formatCurrency(getBudgetHistoricValue(item))}</td>
+                  <td>{formatNumber(item.consumo_previsto_qtd ?? 0, 2)}</td>
+                  <td>{formatNumber(item.estoque_utilizavel_qtd ?? 0, 2)}</td>
+                  <td>{formatNumber(item.quantidade_necessaria_qtd ?? item.potencial_reducao_qtd ?? 0, 2)}</td>
+                  <td>{formatCurrency(getBudgetFuturePrice(item))}</td>
+                  <td>{formatCurrency(getBudgetImpactValue(item))}</td>
+                </tr>
+              ))}
+              {!activeOrcamentoImpactItems.length ? (
+                <tr>
+                  <td colSpan={7}>Nenhum material disponivel para esta visao.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </ChartExpandModal>
       <ChartExpandModal
         open={forecastExpanded}

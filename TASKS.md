@@ -31,7 +31,7 @@
 - Diagnostico SQL confirmou que o vazamento real estava em `public.rpc_catalog_list(text)`, nao no cache do frontend.
 - Migration `supabase/migrations/20260308_fix_rpc_catalog_list_owner_scope.sql` criada para impedir fallback global em catalogos owner-scoped.
 - `resolveUsuarioId()` foi corrigido para devolver o ator real da sessao; dependentes deixam de gravar o owner em campos de auditoria/"cadastrado por".
-- Tela `Analise de Estoque` passou a separar o bloco de forecast em abas `Operacional`, `Compra` e `Auditoria`, mantendo os Paretos sem alteracao.
+- Tela `Analise de Estoque` passou a separar o bloco de forecast em abas `Operacional`, `Compra`, `Previsao de Orcamento` e `Auditoria`, mantendo os Paretos sem alteracao.
 - Ajuda contextual e documentacao da tela `Analise de Estoque` foram atualizadas para refletir as abas e os novos blocos de leitura do forecast.
 - Snapshot de forecast passou a preservar as linhas mensais por `inventory_forecast_id`, evitando que um forecast novo sobrescreva a previsao mensal de um snapshot antigo.
 - API de forecast (`api/_shared/operations.js`) passou a ler a serie mensal pelo `forecast_id` selecionado/derivado do resumo.
@@ -58,9 +58,25 @@
 - Modal de detalhes da aba `Compra` passou a exibir `ID material` e acao `Copiar ID` para rastrear itens sem nome amigavel.
 - Modal de detalhes da aba `Compra` corrigiu sobreposicao visual de IDs longos, exibindo ID encurtado no card e filtrando UUIDs da classificacao.
 - Modal de detalhes da aba `Compra` substituiu a tabela larga por cards responsivos para organizar os campos e remover scroll horizontal.
+- Calculo independente de `Orcamento de compras - proximos 12 meses` foi iniciado com migration versionada, agregado mensal por material e RPC propria por tenant/snapshot.
+- Aba `Previsao de Orcamento` foi criada para exibir o orcamento anual separado da reposicao atual, com cenarios economico/base/conservador, composicao da verba, cronograma financeiro e materiais de impacto.
+- Aba `Previsao de Orcamento` foi reorganizada para remover valores duplicados do cabecalho, destacar apenas a verba recomendada do cenario-base e usar cenarios economico/conservador como comparativos.
+- Composicao do orcamento passou a mostrar o ajuste por necessidade individual, reconciliando a diferenca entre soma global dos componentes e necessidade liquida calculada material a material.
+- Materiais de impacto do orcamento sairam da tela principal e passaram para o modal `Maiores componentes da verba projetada`, com visoes separadas por valor, risco e reducao.
+- RPC de orcamento anual passou a filtrar `materialId` valido e comparar `status` como texto para evitar `invalid input syntax for type uuid: ""`.
+- Migration incremental `20260801_fix_purchase_budget_uuid_empty.sql` foi criada para recriar as RPCs em bancos onde a primeira migration de orcamento anual ja estava aplicada.
+- Front da Analise de Estoque passou a normalizar `owner_id` e `forecast_id` antes de chamar RPCs, enviando `null` quando o snapshot nao trouxer UUID valido.
+- Migration incremental `20260801_fix_purchase_budget_rpc_text_params.sql` foi criada para substituir a assinatura publica UUID da RPC de orcamento anual por parametros `text`, converter UUID internamente e forcar reload do schema PostgREST.
+- Migration incremental `20260801_fix_purchase_budget_status_cancelado_safe.sql` foi criada para remover joins diretos com `status_entrada/status_saida` dos agregados de orcamento e resolver status cancelado por helper com UUID validado.
+- Migration incremental `20260801_fix_purchase_budget_material_uuid_text.sql` foi criada para converter campos UUID de cadastro do material para texto antes de `coalesce`, evitando cast implicito de string vazia para UUID na CTE `materiais_base`.
 
 ## Pendente
-- Criar calculo independente de `Orcamento de compras - proximos 12 meses`, com RPC/snapshot proprio para consumo previsto, estoque utilizavel, pedidos em aberto, estoque de seguranca, reajuste, demanda extraordinaria e contingencia.
+- Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.
+- Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_uuid_empty.sql` no projeto Supabase se a aba ainda mostrar `invalid input syntax for type uuid: ""`.
+- Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_rpc_text_params.sql` no projeto Supabase se o erro `invalid input syntax for type uuid: ""` persistir mesmo com `p_owner_id` e `p_forecast_id` validos no payload.
+- Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_status_cancelado_safe.sql` no projeto Supabase se o contexto do erro 22P02 apontar para o `RETURN` da RPC de orcamento anual.
+- Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_material_uuid_text.sql` no projeto Supabase se a base de dados estiver completa e o erro 22P02 persistir na CTE `materiais_base`.
+- Validar com dados reais se os parametros padrao do orcamento anual devem ser ajustados: cobertura final de 2 meses, reajuste de 6%, contingencia de 8% e crescimento operacional de 0%.
 - Aplicar a migration `supabase/migrations/20260801_forecast_stats_metadata.sql` no projeto Supabase para ativar os metadados estatisticos do forecast.
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
 - Definir escopo do rate limit de leitura: apenas rotas sensiveis ou global.

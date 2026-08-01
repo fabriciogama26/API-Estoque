@@ -17,7 +17,7 @@
       },
       {
         "title": "Area de previsao",
-        "description": "A area de forecast foi separada em abas Operacional, Compra e Auditoria para leitura do rolling, reposicao e validacao."
+        "description": "A area de forecast foi separada em abas Operacional, Compra, Previsao de Orcamento e Auditoria para leitura do rolling, reposicao, verba anual e validacao."
       },
       {
         "title": "Copiar IDs",
@@ -34,6 +34,10 @@
       "A aba Operacional concentra o rolling 12 meses com historico, saida prevista, entrada prevista e saldo.",
       "A aba Compra mostra a necessidade de reposicao atual; ela nao representa o orcamento anual dos proximos 12 meses.",
       "A aba Compra prioriza a recomendacao do RPC de compra, calculada por estoque atual, estoque minimo, consumo recente e cobertura.",
+      "A aba Previsao de Orcamento mostra o Orcamento de compras - proximos 12 meses, calculado separadamente da reposicao atual.",
+      "A Previsao de Orcamento mostra a verba recomendada do cenario-base, cenarios comparativos, composicao reconciliada e cronograma financeiro.",
+      "Na composicao do orcamento, use Lista consolidada de materiais para abrir o modal Maiores componentes da verba projetada.",
+      "O modal de orcamento responde: o que mais exigira dinheiro no proximo periodo? Ele compara gasto historico 12m, quantidade prevista, estoque utilizavel, quantidade a comprar, preco futuro e impacto no orcamento.",
       "A quantidade geral da Compra e exibida por materiais recomendados, sem somar unidades, pares, metros ou litros em um unico total.",
       "A reconciliacao da Compra separa decisao operacional de condicoes de risco como abaixo do minimo e cobertura curta.",
       "A leitura de cobertura da Compra usa faixas por dias/meses para evitar que excesso em alguns materiais esconda ruptura em outros.",
