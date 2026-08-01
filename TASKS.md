@@ -69,6 +69,9 @@
 - Migration incremental `20260801_fix_purchase_budget_rpc_text_params.sql` foi criada para substituir a assinatura publica UUID da RPC de orcamento anual por parametros `text`, converter UUID internamente e forcar reload do schema PostgREST.
 - Migration incremental `20260801_fix_purchase_budget_status_cancelado_safe.sql` foi criada para remover joins diretos com `status_entrada/status_saida` dos agregados de orcamento e resolver status cancelado por helper com UUID validado.
 - Migration incremental `20260801_fix_purchase_budget_material_uuid_text.sql` foi criada para converter campos UUID de cadastro do material para texto antes de `coalesce`, evitando cast implicito de string vazia para UUID na CTE `materiais_base`.
+- Migration incremental `20260801_purchase_budget_validation_audit.sql` foi criada para corrigir a anualizacao de demanda intermitente no orcamento e expor `validacao_orcamento`.
+- Aba `Auditoria` da Analise de Estoque passou a abrir a validacao do orcamento em modal, com resumo financeiro, filtros de qualidade e tabela por material com forecast bruto, travado, fator de crescimento, precos e impacto.
+- Modal de validacao do orcamento passou a permitir copiar a tabela filtrada e exportar a mesma visao em CSV.
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.
@@ -76,6 +79,7 @@
 - Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_rpc_text_params.sql` no projeto Supabase se o erro `invalid input syntax for type uuid: ""` persistir mesmo com `p_owner_id` e `p_forecast_id` validos no payload.
 - Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_status_cancelado_safe.sql` no projeto Supabase se o contexto do erro 22P02 apontar para o `RETURN` da RPC de orcamento anual.
 - Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_material_uuid_text.sql` no projeto Supabase se a base de dados estiver completa e o erro 22P02 persistir na CTE `materiais_base`.
+- Aplicar a migration `supabase/migrations/20260801_purchase_budget_validation_audit.sql` no projeto Supabase para ativar a validacao do orcamento na aba Auditoria e corrigir a superestimacao de demanda intermitente.
 - Validar com dados reais se os parametros padrao do orcamento anual devem ser ajustados: cobertura final de 2 meses, reajuste de 6%, contingencia de 8% e crescimento operacional de 0%.
 - Aplicar a migration `supabase/migrations/20260801_forecast_stats_metadata.sql` no projeto Supabase para ativar os metadados estatisticos do forecast.
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
