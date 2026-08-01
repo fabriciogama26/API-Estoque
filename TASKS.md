@@ -73,7 +73,9 @@
 - Aba `Auditoria` da Analise de Estoque passou a abrir a validacao do orcamento em modal, com resumo financeiro, filtros de qualidade e tabela por material com forecast bruto, travado, fator de crescimento, precos e impacto.
 - Modal de validacao do orcamento passou a permitir copiar a tabela filtrada e exportar a mesma visao em CSV.
 - Aba `Previsao de Orcamento` passou a explicar no card principal e na composicao que o estoque utilizavel reduz novas compras, sem representar caixa disponivel.
-- Aba `Previsao de Orcamento` passou a comparar compras realizadas na base historica com a verba recomendada do cenario-base.
+- Aba `Previsao de Orcamento` passou a comparar entradas consideradas na base do snapshot com a verba recomendada do cenario-base.
+- Comparativo historico da aba `Previsao de Orcamento` corrigido para usar apenas a serie historica filtrada do snapshot selecionado, sem somar `historico_full`.
+- Indicador `Entradas consideradas` recebeu tooltip explicando que vem do agregado mensal usado no snapshot e pode diferir do Dashboard atual se houver dados posteriores.
 - Explicacao do `Estoque utilizavel considerado` na composicao do orcamento passou a usar icone informativo com tooltip no padrao do forecast, com ajuste para evitar corte visual.
 
 ## Pendente

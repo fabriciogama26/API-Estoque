@@ -278,7 +278,9 @@ Atualizacao 2026-08 (orcamento anual de compra)
 - A tela passou a carregar o orcamento anual em paralelo com auditoria e reposicao atual.
 - A tela passou a exibir a aba `Previsao de Orcamento` com bloco `Orcamento de compras - proximos 12 meses`, cenario-base recomendado, cenarios comparativos, composicao do orcamento, cronograma financeiro e modal de componentes da verba.
 - O card `Verba recomendada - cenario-base` passou a explicar que o estoque utilizavel existente reduz a necessidade de novas compras.
-- A aba passou a mostrar comparacao entre compras realizadas na base historica e verba recomendada, destacando a reducao/aumento previsto.
+- A aba passou a mostrar comparacao entre entradas consideradas na base do snapshot e verba recomendada, destacando a reducao/aumento previsto.
+- A comparacao historica da aba `Previsao de Orcamento` passou a somar somente `historicoSerie` do snapshot selecionado, evitando inflar `Entradas consideradas` com meses fora da base.
+- O indicador `Entradas consideradas` recebeu tooltip informando que a origem e o agregado mensal usado pelo snapshot, podendo diferir do Dashboard atual caso o agregado ou o snapshot ainda nao tenham sido atualizados.
 - A linha `Estoque utilizavel considerado` da composicao passou a exibir icone informativo com tooltip no padrao do forecast, informando que o valor reduz novas compras, mas nao significa saldo financeiro disponivel.
 - A composicao do orcamento passou a mostrar `Ajuste por necessidade individual`, porque o calculo aplica necessidade material a material e o excesso de um item nao compensa a falta de outro.
 - O antigo bloco `Materiais que mais impactam` saiu da tela principal e passou para o modal `Maiores componentes da verba projetada`, aberto pelo botao `Lista consolidada de materiais`.

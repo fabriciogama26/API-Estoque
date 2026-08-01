@@ -2023,12 +2023,13 @@ export function AnaliseEstoquePage() {
     const pedidosEmAberto = Number(composicao.pedidos_em_aberto || 0)
     const reajustePrecos = Number(composicao.reajuste_precos || 0)
     const contingencia = Number(composicao.contingencia || 0)
-    const comprasHistoricasValor = (historicoSerieFull.length ? historicoSerieFull : historicoSerie).reduce(
+    const entradasSnapshotValor = historicoSerie.reduce(
       (acc, item) => acc + Number(item.valor_entrada || 0),
       0,
     )
-    const reducaoHistoricaValor = comprasHistoricasValor - verbaRecomendada
-    const reducaoHistoricaPercentual = comprasHistoricasValor > 0 ? (reducaoHistoricaValor / comprasHistoricasValor) * 100 : null
+    const variacaoEntradasSnapshotValor = entradasSnapshotValor - verbaRecomendada
+    const variacaoEntradasSnapshotPercentual =
+      entradasSnapshotValor > 0 ? (variacaoEntradasSnapshotValor / entradasSnapshotValor) * 100 : null
     const necessidadeGlobal = consumoPrevisto + estoqueFinalDesejado + demandaExtraordinaria - estoqueUtilizavel - pedidosEmAberto
     const ajusteIndividual = necessidadeLiquida - necessidadeGlobal
     const composicaoRows = [
@@ -2124,9 +2125,9 @@ export function AnaliseEstoquePage() {
       valorComReajuste,
       contingenciaValor: Number(resumo.contingencia_valor || 0),
       estoqueUtilizavel,
-      comprasHistoricasValor,
-      reducaoHistoricaValor,
-      reducaoHistoricaPercentual,
+      entradasSnapshotValor,
+      variacaoEntradasSnapshotValor,
+      variacaoEntradasSnapshotPercentual,
       materiaisMonitorados: Number(resumo.materiais_monitorados || 0),
       materiaisOrcados: Number(resumo.materiais_orcados || 0),
       materiaisRisco: Number(resumo.materiais_risco || 0),
@@ -2142,7 +2143,7 @@ export function AnaliseEstoquePage() {
       validacaoMateriais,
       parametros,
     }
-  }, [forecastOrcamentoPayload, historicoSerie, historicoSerieFull, materialInfoMap])
+  }, [forecastOrcamentoPayload, historicoSerie, materialInfoMap])
 
   const compraDetailItems = compraDetailModal?.items || []
   const compraDetailStart = (compraDetailPage - 1) * forecastPageSize
@@ -2878,29 +2879,45 @@ export function AnaliseEstoquePage() {
                 </article>
               ) : null}
             </div>
-            {compraOrcamentoInsights.comprasHistoricasValor > 0 ? (
+            {compraOrcamentoInsights.entradasSnapshotValor > 0 ? (
               <div className="analysis-budget-comparison">
                 <div>
-                  <p className="analysis-forecast-label">Comparacao com os 12 meses anteriores</p>
+                  <p className="analysis-forecast-label">Comparacao com a base do snapshot</p>
                   <p className="analysis-forecast-subtitle">
-                    Motivo principal: uso do estoque acumulado para atender parte da demanda futura.
+                    A verba recomendada esta{' '}
+                    {compraOrcamentoInsights.variacaoEntradasSnapshotPercentual !== null
+                      ? formatPercent(Math.abs(compraOrcamentoInsights.variacaoEntradasSnapshotPercentual), 1)
+                      : 'em comparacao'}{' '}
+                    {compraOrcamentoInsights.variacaoEntradasSnapshotValor >= 0 ? 'abaixo' : 'acima'} das entradas consideradas na base historica, principalmente porque {formatCurrency(compraOrcamentoInsights.estoqueUtilizavel)} do estoque atual pode atender parte da demanda futura.
                   </p>
                 </div>
                 <dl className="analysis-budget-comparison__metrics">
                   <div>
-                    <dt>Compras realizadas</dt>
-                    <dd>{formatCurrency(compraOrcamentoInsights.comprasHistoricasValor)}</dd>
+                    <dt>
+                      <span className="analysis-budget-component-label">
+                        Entradas consideradas
+                        <button
+                          type="button"
+                          className="summary-tooltip analysis-budget-component-tooltip"
+                          aria-label="Informacao sobre entradas consideradas"
+                          data-tooltip="Soma das entradas registradas no agregado mensal utilizado na base historica deste snapshot. Pode diferir do Dashboard atual se o agregado ou o snapshot nao foram atualizados depois de inclusoes, edicoes ou cancelamentos."
+                        >
+                          <InfoIcon size={13} aria-hidden="true" />
+                        </button>
+                      </span>
+                    </dt>
+                    <dd>{formatCurrency(compraOrcamentoInsights.entradasSnapshotValor)}</dd>
                   </div>
                   <div>
                     <dt>Verba recomendada</dt>
                     <dd>{formatCurrency(compraOrcamentoInsights.verbaRecomendada)}</dd>
                   </div>
                   <div>
-                    <dt>{compraOrcamentoInsights.reducaoHistoricaValor >= 0 ? 'Reducao prevista' : 'Aumento previsto'}</dt>
+                    <dt>{compraOrcamentoInsights.variacaoEntradasSnapshotValor >= 0 ? 'Reducao prevista' : 'Aumento previsto'}</dt>
                     <dd>
-                      {formatCurrency(Math.abs(compraOrcamentoInsights.reducaoHistoricaValor))}
-                      {compraOrcamentoInsights.reducaoHistoricaPercentual !== null
-                        ? ` (${formatPercent(Math.abs(compraOrcamentoInsights.reducaoHistoricaPercentual), 1)})`
+                      {formatCurrency(Math.abs(compraOrcamentoInsights.variacaoEntradasSnapshotValor))}
+                      {compraOrcamentoInsights.variacaoEntradasSnapshotPercentual !== null
+                        ? ` (${formatPercent(Math.abs(compraOrcamentoInsights.variacaoEntradasSnapshotPercentual), 1)})`
                         : ''}
                     </dd>
                   </div>
