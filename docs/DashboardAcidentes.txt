@@ -146,3 +146,11 @@ Atualizacao 2026-02
 - Cores das barras padronizadas com o grafico de top materiais (#22d3ee) em Parte lesionada, Lesoes e Acidentes por cargo.
 - ChartAgentes (src/components/charts/ChartAgentes.jsx): grafico voltou para rosca com paleta baseada no azul do Top materiais.
 - ChartAgentes (src/components/charts/ChartAgentes.jsx): paleta alinhada com o grafico Top categorias (estoque).
+
+Atualizacao 2026-08
+-------------------
+- Diagnostico: havia 5 registros ativos de HHT em 03/2026 para o owner da Fabiana, totalizando 99.120,67, mas os 24 acidentes de 2026 estavam em meses/centros sem correspondencia exata; a regra anterior somava HHT apenas quando existia acidente no mesmo mes e centro.
+- Antes: `src/lib/acidentesDashboard.js` calculava `hht_total` reduzindo a lista filtrada de acidentes e chamando `resolveHhtAcidente`, o que retornava 0 quando o acidente nao tinha HHT legado e nao casava com `hht_mensal`.
+- Depois: `src/lib/acidentesDashboard.js` soma os registros ativos de `hht_mensal` dentro do periodo/centro filtrado, independente de haver acidente no mesmo centro/mes; o fallback remoto passa a buscar `centro_servico_id` em `hht_mensal_view`.
+- Banco: criada a migration `supabase/migrations/20260801_fix_dashboard_acidentes_hht_total.sql` para recriar `vw_indicadores_acidentes` com HHT mensal agregado por periodo/tenant, usando `security_invoker = on` e coluna `account_owner_id`.
+- Multi-tenant: a view passa a agrupar por `account_owner_id` e depende de RLS nas tabelas base; usuarios comuns continuam restritos ao proprio tenant.

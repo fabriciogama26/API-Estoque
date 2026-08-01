@@ -42,6 +42,9 @@
 - Recuperacao de senha de dependentes foi alinhada ao login remoto: `auth-recover` passa a buscar `app_users_dependentes.username` quando nao encontrar titular em `app_users.login_name`.
 - Login publico corrigido para usar o email resolvido (`authEmail`) e bloquear owner/titular inativo antes de autenticar.
 - Diagnostico de `auth-recover` foi reforcado com logs por etapa e consulta explicita do owner do dependente, sem relacionamento embutido.
+- Corrigido o fallback JS do Dashboard de Acidentes para somar HHT mensal ativo por periodo/centro, independente de acidente no mesmo centro/mes.
+- Migration `supabase/migrations/20260801_fix_dashboard_acidentes_hht_total.sql` criada para recriar `vw_indicadores_acidentes` com HHT mensal agregado por periodo e `account_owner_id`.
+- Documentacao `docs/DashboardAcidentes.txt` atualizada com o diagnostico do HHT 2026 e o comportamento antes/depois.
 
 ## Pendente
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
@@ -53,6 +56,7 @@
 - Aplicar a migration `supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql` no projeto Supabase.
 - Aplicar a migration `supabase/migrations/20260423_fix_forecast_audit_purchase_security_definer.sql` no projeto Supabase.
+- Aplicar a migration `supabase/migrations/20260801_fix_dashboard_acidentes_hht_total.sql` no projeto Supabase para ativar a correcao da view `vw_indicadores_acidentes`.
 - Aplicar no projeto Supabase, nesta ordem:
   - `supabase/migrations/20260418_01_aso_mudanca_funcao_schema.sql`
   - `supabase/migrations/20260418_02_aso_rpc_create_full.sql`
@@ -94,3 +98,4 @@
 - Forecast 2026-04-23: a auditoria do snapshot mede qualidade do forecast em meses ja realizados; o diagnostico estatistico continua sendo uma leitura complementar da distribuicao historica mensal.
 - Auth 2026-05-09: admins recebiam email de recuperacao porque eram resolvidos em `app_users`; dependentes podiam receber sucesso sem envio quando estavam apenas em `app_users_dependentes`, pois `auth-recover` nao tinha o fallback existente no login.
 - Auth 2026-05-09: se o request log mostrar 500 em `auth-recover`, verificar Function Logs da mesma execucao; o log agora informa `stage` para separar falha de rate limit, lookup do dependente/owner ou envio pelo Supabase Auth.
+- Dashboard Acidentes 2026-08-01: para o owner `59191387-669b-4585-8e11-7070d9769d86`, havia 5 HHT ativos em 03/2026 somando 99.120,67 e 24 acidentes ativos em 2026; nenhum grupo `mes + centro_servico_id` dos acidentes tinha HHT correspondente, por isso a regra antiga retornava HHT total 0.
