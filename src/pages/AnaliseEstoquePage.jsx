@@ -70,6 +70,58 @@ function formatForecastTimestamp(value) {
   })
 }
 
+const FORECAST_PREVISAO_SELECT_BASE =
+  'ano_mes, valor_previsto, valor_previsto_entrada, metodo, cenario, contingencia_p75, p90, mediana, coef_var, media_robusta, alerta_volatil'
+
+const FORECAST_PREVISAO_SELECT_WITH_STATS = `${FORECAST_PREVISAO_SELECT_BASE}, amostras_mes, p75_estatistico, p90_estatistico, contingencia_25`
+
+function isMissingForecastStatsColumn(error) {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`
+  return /amostras_mes|p75_estatistico|p90_estatistico|contingencia_25/i.test(message)
+}
+
+function formatForecastStatCurrency(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return 'Nao calculavel'
+  }
+  return formatCurrency(value)
+}
+
+function formatForecastStatBySamples(value, samples, minSamples) {
+  if (Number(samples || 0) < minSamples) {
+    return 'Nao calculavel'
+  }
+  return formatForecastStatCurrency(value)
+}
+
+function formatForecastCv(value, samples) {
+  if (value === null || value === undefined || Number(samples || 0) < 2) {
+    return 'Nao calculavel'
+  }
+  return formatNumber(value, 2)
+}
+
+function addMonthsDate(value, months) {
+  if (!value) {
+    return null
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  date.setUTCMonth(date.getUTCMonth() + months, 1)
+  return date
+}
+
+function formatForecastHorizonLabel(periodoFim) {
+  const inicio = addMonthsDate(periodoFim, 1)
+  const fim = addMonthsDate(periodoFim, 12)
+  if (!inicio || !fim) {
+    return 'Horizonte nao informado'
+  }
+  return `${formatForecastPeriodoLabel(inicio.toISOString().split('T')[0], fim.toISOString().split('T')[0])}`
+}
+
 function getForecastStatusMessage(status, payload) {
   if (status === 'insufficient') {
     return `Historico insuficiente (${payload?.monthsAvailable || payload?.monthsWithMovement || 0}/${
@@ -652,15 +704,21 @@ export function AnaliseEstoquePage() {
       throw historicoAllError
     }
 
-    let previsaoQuery = supabase
-      .from('f_previsao_gasto_mensal')
-      .select('ano_mes, valor_previsto, valor_previsto_entrada, metodo, cenario, contingencia_p75, p90, mediana, coef_var, media_robusta, alerta_volatil')
-      .eq('account_owner_id', ownerId)
-      .eq('cenario', 'base')
-      .eq('inventory_forecast_id', selectedPeriodo.id)
-      .order('ano_mes', { ascending: true })
+    const buildPrevisaoQuery = (selectFields) =>
+      supabase
+        .from('f_previsao_gasto_mensal')
+        .select(selectFields)
+        .eq('account_owner_id', ownerId)
+        .eq('cenario', 'base')
+        .eq('inventory_forecast_id', selectedPeriodo.id)
+        .order('ano_mes', { ascending: true })
 
-    const { data: previsaoRows, error: previsaoError } = await previsaoQuery
+    let { data: previsaoRows, error: previsaoError } = await buildPrevisaoQuery(FORECAST_PREVISAO_SELECT_WITH_STATS)
+    if (previsaoError && isMissingForecastStatsColumn(previsaoError)) {
+      const fallbackResult = await buildPrevisaoQuery(FORECAST_PREVISAO_SELECT_BASE)
+      previsaoRows = fallbackResult.data
+      previsaoError = fallbackResult.error
+    }
     if (previsaoError) {
       throw previsaoError
     }
@@ -700,10 +758,13 @@ export function AnaliseEstoquePage() {
       valor_previsto_entrada: Number(row.valor_previsto_entrada || 0),
       metodo: row.metodo || 'regressao_linear',
       cenario: row.cenario || 'base',
-      contingencia: Number(row.contingencia_p75 || 0),
-      p90: Number(row.p90 || 0),
+      amostras: Number(row.amostras_mes || 0),
+      contingencia: Number(row.contingencia_25 ?? row.contingencia_p75 ?? 0),
+      p75: row.p75_estatistico === null || row.p75_estatistico === undefined ? null : Number(row.p75_estatistico),
+      p90: row.p90_estatistico === null || row.p90_estatistico === undefined ? null : Number(row.p90_estatistico),
+      p90Legado: Number(row.p90 || 0),
       mediana: Number(row.mediana || 0),
-      cv: Number(row.coef_var || 0),
+      cv: row.coef_var === null || row.coef_var === undefined ? null : Number(row.coef_var),
       mediaRobusta: Number(row.media_robusta || 0),
       alertaVolatil: !!row.alerta_volatil,
     }))
@@ -1025,10 +1086,12 @@ export function AnaliseEstoquePage() {
       previsao: Number(item.valor_previsto || 0),
       previsaoEntrada: Number(item.valor_previsto_entrada || 0),
       contingencia: Number(item.contingencia || 0),
-      p90: Number(item.p90 || 0),
+      p75: item.p75 === null || item.p75 === undefined ? null : Number(item.p75),
+      p90: item.p90 === null || item.p90 === undefined ? null : Number(item.p90),
       mediana: Number(item.mediana || 0),
-      cv: Number(item.cv || 0),
+      cv: item.cv === null || item.cv === undefined ? null : Number(item.cv),
       mediaRobusta: Number(item.mediaRobusta || 0),
+      amostras: Number(item.amostras || 0),
       alertaVolatil: !!item.alertaVolatil,
     }))
     return [...historicoData, ...previsaoData]
@@ -1052,6 +1115,15 @@ export function AnaliseEstoquePage() {
   const previsaoSaidaTotal = Number(forecastBase?.previsao_anual_saida || 0)
   const previsaoFluxoTotal = previsaoEntradaTotal + previsaoSaidaTotal
   const previsaoSaldoTotal = previsaoEntradaTotal - previsaoSaidaTotal
+  const previsaoSaldoTone = previsaoSaldoTotal < 0 ? 'red' : 'green'
+  const forecastHorizonLabel = formatForecastHorizonLabel(forecastBase?.periodo_base_fim)
+  const forecastSampleCounts = previsaoSerie.map((item) => Number(item.amostras || 0)).filter((value) => value > 0)
+  const minSamplesMes = forecastSampleCounts.length ? Math.min(...forecastSampleCounts) : 0
+  const maxSamplesMes = forecastSampleCounts.length ? Math.max(...forecastSampleCounts) : 0
+  const anosPorMesSazonalLabel = minSamplesMes ? `${minSamplesMes} a ${maxSamplesMes}` : 'nao informado'
+  const confiancaSazonal =
+    minSamplesMes >= 4 ? 'alta' : minSamplesMes >= 3 ? 'media' : minSamplesMes > 0 ? 'baixa' : 'nao informada'
+  const confiancaTendencia = forecastBase?.nivel_confianca || 'nao informada'
   const forecastStatusMessage = getForecastStatusMessage(forecastStatus, forecastPayload)
   const forecastPeriodoLabel = formatForecastPeriodoLabel(
     forecastBase?.periodo_base_inicio,
@@ -1333,11 +1405,13 @@ export function AnaliseEstoquePage() {
       'Mes',
       'Valor previsto',
       'Entrada prevista',
-      'Contingencia (P75)',
-      'P90',
+      'Contingencia 25%',
+      'P75 estatistico',
+      'P90 estatistico',
       'Mediana',
       'CV',
       'Media robusta',
+      'Amostras do mes',
       'Metodo',
       'Cenario',
     ].join('\t')
@@ -1346,10 +1420,12 @@ export function AnaliseEstoquePage() {
       formatCurrency(item.valor_previsto || 0),
       formatCurrency(item.valor_previsto_entrada || 0),
       formatCurrency(item.contingencia || 0),
-      formatCurrency(item.p90 || 0),
+      formatForecastStatCurrency(item.p75),
+      formatForecastStatCurrency(item.p90),
       formatCurrency(item.mediana || 0),
-      formatNumber(item.cv || 0, 2),
+      formatForecastCv(item.cv, item.amostras),
       formatCurrency(item.mediaRobusta || 0),
+      formatNumber(item.amostras || 0),
       item.metodo || '-',
       item.cenario || '-',
     ].join('\t'))
@@ -1373,14 +1449,14 @@ export function AnaliseEstoquePage() {
   }
 
   const buildDiagnosticoClipboardText = () => {
-    const header = ['Mes', 'Registros', 'Valores', 'Mediana', 'P75', 'P90', 'Recomendacao'].join('\t')
+    const header = ['Mes', 'Registros', 'Valores', 'Mediana', 'P75 estatistico', 'P90 estatistico', 'Recomendacao'].join('\t')
     const rows = diagnosticoRows.map((row) => [
       row.mes_nome || '-',
       formatNumber(row.registros || 0),
       row.valores || '-',
-      formatCurrency(row.mediana_calc || 0),
-      formatCurrency(row.p75_calc || 0),
-      formatCurrency(row.p90_calc || 0),
+      formatForecastStatBySamples(row.mediana_calc, row.registros, 3),
+      formatForecastStatBySamples(row.p75_calc, row.registros, 4),
+      formatForecastStatBySamples(row.p90_calc, row.registros, 5),
       row.recomendacao || '-',
     ].join('\t'))
     return [header, ...rows].join('\n')
@@ -1503,52 +1579,108 @@ export function AnaliseEstoquePage() {
           })}
         </div>
         {forecastTab === 'operacional' ? (
-          <div className="analysis-forecast-grid" role="tabpanel">
-            <div className="analysis-forecast-card">
+          <div className="analysis-forecast-stack" role="tabpanel">
+            <div className="analysis-forecast-grid analysis-forecast-grid--single">
               {forecastLoading ? (
-                <p>Carregando previsao...</p>
+                <div className="analysis-forecast-card">
+                  <p>Carregando previsao...</p>
+                </div>
               ) : forecastError ? (
-                <p className="analysis-forecast-error">{forecastError}</p>
+                <div className="analysis-forecast-card">
+                  <p className="analysis-forecast-error">{forecastError}</p>
+                </div>
               ) : forecastStatusMessage ? (
-                <p>{forecastStatusMessage}</p>
+                <div className="analysis-forecast-card">
+                  <p>{forecastStatusMessage}</p>
+                </div>
               ) : (
                 <>
-                  <p className="analysis-forecast-label">Previsao de fluxo (rolling 12 meses)</p>
-                  <p className="analysis-forecast-value">
-                    {formatCurrency(previsaoFluxoTotal)} / {formatCurrency(previsaoSaldoTotal)}
-                  </p>
-                  <p className="analysis-forecast-subtitle">Baseado no consumo medio dos ultimos 12 meses</p>
-                  <div className="analysis-forecast-meta">
-                    <span>Gasto total do periodo: {formatCurrency(forecastBase?.gasto_total_periodo || 0)}</span>
-                    <span>Entradas previstas: {formatCurrency(previsaoEntradaTotal)}</span>
-                    <span>Saidas previstas: {formatCurrency(previsaoSaidaTotal)}</span>
-                    <span>Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}</span>
-                    <span>Sazonalidade media do periodo: {formatNumber(sazonalidadeMedia ?? 1, 2)}</span>
-                    <span>Confianca do dado: {forecastBase?.qtd_meses_base || 12} meses</span>
+                  <div className="dashboard-highlights analysis-forecast-highlights">
+                    <article className="dashboard-insight-card dashboard-insight-card--orange">
+                      <header className="dashboard-insight-card__header">
+                        <p className="dashboard-insight-card__title">Saidas previstas</p>
+                        <span className="dashboard-insight-card__avatar">
+                          <TrendIcon size={22} />
+                        </span>
+                      </header>
+                      <strong className="dashboard-insight-card__value">{formatCurrency(previsaoSaidaTotal)}</strong>
+                      <span className="dashboard-insight-card__helper">Total de saidas projetadas no horizonte.</span>
+                    </article>
+                    <article className="dashboard-insight-card dashboard-insight-card--green">
+                      <header className="dashboard-insight-card__header">
+                        <p className="dashboard-insight-card__title">Entradas previstas</p>
+                        <span className="dashboard-insight-card__avatar">
+                          <RevenueIcon size={22} />
+                        </span>
+                      </header>
+                      <strong className="dashboard-insight-card__value">{formatCurrency(previsaoEntradaTotal)}</strong>
+                      <span className="dashboard-insight-card__helper">Total de entradas previstas pela serie historica.</span>
+                    </article>
+                    <article className={`dashboard-insight-card dashboard-insight-card--${previsaoSaldoTone}`}>
+                      <header className="dashboard-insight-card__header">
+                        <p className="dashboard-insight-card__title">Saldo liquido projetado</p>
+                        <span className="dashboard-insight-card__avatar">
+                          <StockIcon size={22} />
+                        </span>
+                      </header>
+                      <strong className="dashboard-insight-card__value">{formatCurrency(previsaoSaldoTotal)}</strong>
+                      <span className="dashboard-insight-card__helper">Entradas previstas menos saidas previstas.</span>
+                    </article>
+                    <article className="dashboard-insight-card dashboard-insight-card--slate">
+                      <header className="dashboard-insight-card__header">
+                        <p className="dashboard-insight-card__title">Fluxo bruto movimentado</p>
+                        <span className="dashboard-insight-card__avatar">
+                          <BarsIcon size={22} />
+                        </span>
+                      </header>
+                      <strong className="dashboard-insight-card__value">{formatCurrency(previsaoFluxoTotal)}</strong>
+                      <span className="dashboard-insight-card__helper">Soma gerencial de entradas e saidas.</span>
+                    </article>
                   </div>
                 </>
               )}
-              <div className="analysis-forecast-actions">
-                <label className="field">
-                  <span>Periodo da previsao</span>
-                  <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
-                    <option value="">Selecione um periodo</option>
-                    {forecastPeriodos.map((periodo) => {
-                      const value = String(periodo.id)
-                      const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
-                      return (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      )
-                    })}
-                  </select>
-                </label>
+            </div>
+            {forecastHasData && !forecastLoading && !forecastError && !forecastStatusMessage ? (
+              <div className="analysis-forecast-grid analysis-forecast-grid--operational">
+                <div className="analysis-forecast-card analysis-forecast-card--technical">
+                  <p className="analysis-forecast-label">Base e metodo</p>
+                  <p className="analysis-forecast-subtitle">
+                    Previsao indicativa baseada no historico mensal agregado, separada dos filtros superiores.
+                  </p>
+                  <div className="analysis-forecast-meta analysis-forecast-meta--grid">
+                    <span>Base historica usada: {forecastPeriodoLabel}</span>
+                    <span>Horizonte previsto: {forecastHorizonLabel}</span>
+                    <span>Gasto total da base: {formatCurrency(forecastBase?.gasto_total_periodo || 0)}</span>
+                    <span>Fator de tendencia: {formatNumber(forecastBase?.fator_tendencia || 1, 2)}</span>
+                    <span>Sazonalidade media normalizada: {formatNumber(sazonalidadeMedia ?? 1, 2)}</span>
+                    <span>Cobertura historica: {forecastBase?.qtd_meses_base || 0} meses</span>
+                    <span>Anos por mes sazonal: {anosPorMesSazonalLabel}</span>
+                    <span>Confianca da tendencia: {confiancaTendencia}</span>
+                    <span>Confianca sazonal: {confiancaSazonal}</span>
+                  </div>
+                  <div className="analysis-forecast-actions">
+                    <label className="field">
+                      <span>Periodo da previsao</span>
+                      <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
+                        <option value="">Selecione um periodo</option>
+                        {forecastPeriodos.map((periodo) => {
+                          const value = String(periodo.id)
+                          const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
+                          return (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <div className="analysis-forecast-chart">
+                  <ForecastGastoChart data={chartForecastData} valueFormatter={formatCurrency} height={320} />
+                </div>
               </div>
-            </div>
-            <div className="analysis-forecast-chart">
-              <ForecastGastoChart data={chartForecastData} valueFormatter={formatCurrency} height={320} />
-            </div>
+            ) : null}
           </div>
         ) : null}
         {forecastTab === 'compra' ? (
@@ -1847,7 +1979,7 @@ export function AnaliseEstoquePage() {
           <button type="button" className="summary-tooltip" aria-label="Formulas da previsao">
             <InfoIcon size={14} />
             <span>
-              Fator de tendencia = media(ultimos 3 meses) / media(6 meses atras).
+              Fator de tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m).
               Sazonalidade (mes) = media_movel_3m(mes) / media_movel_3m(geral).
               Previsao mensal = media_mensal * fator_sazonal(mes) * fator de tendencia.
             </span>
@@ -1914,11 +2046,13 @@ export function AnaliseEstoquePage() {
                 <th>Mes</th>
                 <th>Valor previsto</th>
                 <th>Entrada prevista</th>
-                <th>Contingencia (P75)</th>
-                <th>P90</th>
+                <th>Contingencia 25%</th>
+                <th>P75 estatistico</th>
+                <th>P90 estatistico</th>
                 <th>Mediana</th>
                 <th>CV</th>
                 <th>Media robusta</th>
+                <th>Amostras</th>
                 <th>Metodo</th>
                 <th>Cenario</th>
               </tr>
@@ -1930,10 +2064,12 @@ export function AnaliseEstoquePage() {
                   <td>{formatCurrency(item.valor_previsto || 0)}</td>
                   <td>{formatCurrency(item.valor_previsto_entrada || 0)}</td>
                   <td>{formatCurrency(item.contingencia || 0)}</td>
-                  <td>{formatCurrency(item.p90 || 0)}</td>
+                  <td>{formatForecastStatCurrency(item.p75)}</td>
+                  <td>{formatForecastStatCurrency(item.p90)}</td>
                   <td>{formatCurrency(item.mediana || 0)}</td>
-                  <td>{formatNumber(item.cv || 0, 2)}</td>
+                  <td>{formatForecastCv(item.cv, item.amostras)}</td>
                   <td>{formatCurrency(item.mediaRobusta || 0)}</td>
+                  <td>{formatNumber(item.amostras || 0)}</td>
                   <td>{item.metodo || '-'}</td>
                   <td>{item.cenario || '-'}</td>
                 </tr>
@@ -1972,8 +2108,8 @@ export function AnaliseEstoquePage() {
                 <th>Registros</th>
                 <th>Valores</th>
                 <th>Mediana</th>
-                <th>P75</th>
-                <th>P90</th>
+                <th>P75 estatistico</th>
+                <th>P90 estatistico</th>
                 <th>Recomendacao</th>
               </tr>
             </thead>
@@ -1983,9 +2119,9 @@ export function AnaliseEstoquePage() {
                   <td>{row.mes_nome}</td>
                   <td>{formatNumber(row.registros || 0)}</td>
                   <td>{row.valores || '-'}</td>
-                  <td>{formatCurrency(row.mediana_calc || 0)}</td>
-                  <td>{formatCurrency(row.p75_calc || 0)}</td>
-                  <td>{formatCurrency(row.p90_calc || 0)}</td>
+                  <td>{formatForecastStatBySamples(row.mediana_calc, row.registros, 3)}</td>
+                  <td>{formatForecastStatBySamples(row.p75_calc, row.registros, 4)}</td>
+                  <td>{formatForecastStatBySamples(row.p90_calc, row.registros, 5)}</td>
                   <td>{row.recomendacao || '-'}</td>
                 </tr>
               ))}

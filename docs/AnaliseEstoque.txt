@@ -68,9 +68,11 @@ Boas praticas
 - Snapshots de forecast agora preservam as linhas mensais por `inventory_forecast_id`; um snapshot novo nao sobrescreve outro snapshot de auditoria.
 - O rolling operacional continua reaproveitando o mesmo `inventory_forecast` enquanto a previsao estiver aberta (`qtd_meses_base < 12`).
 - O card exibe a sazonalidade media do periodo com base na media movel de 3 meses.
-- Tooltip da previsao inclui contingencia (P75), P90, mediana e alerta de volatilidade (CV > 1) calculados no RPC.
-- Previsao considera entradas, saidas e saldo anual no card e no grafico.
+- Tooltip da previsao separa contingencia de 25%, P75/P90 estatisticos, mediana e alerta de volatilidade (CV > 1).
+- Valores estatisticos sem amostra suficiente aparecem como "Nao calculavel", e nao como R$ 0,00.
+- Previsao considera entradas, saidas, saldo liquido projetado e fluxo bruto movimentado em indicadores separados.
 - Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.
+- A base historica usada e o horizonte previsto ficam explicitos no card, porque o forecast nao segue os filtros superiores.
 - Aba Operacional concentra o rolling atual e o grafico expandido.
 - Aba Compra agora prioriza o RPC de compra sugerida, combinando estoque atual, estoque minimo, consumo recente e cobertura.
 - Aba Auditoria concentra o snapshot selecionado, previsto x realizado por mes e os atalhos para validacao e diagnostico.
@@ -179,6 +181,37 @@ Atualizacao 2026-04 (auditoria e compra)
 - Antes: a aba `Compra` usava somente heuristica derivada no client.
 - Depois: a aba `Compra` prioriza uma recomendacao calculada no banco por tenant e por snapshot.
 
+Atualizacao 2026-08 (clareza e estatisticas do forecast)
+--------------------------------------------------------
+- Card operacional da previsao deixou de exibir `fluxo / saldo` em uma unica linha e passou a separar:
+  - saidas previstas
+  - entradas previstas
+  - saldo liquido projetado
+  - fluxo bruto movimentado
+- Aba Operacional passou a usar cards coloridos no mesmo padrao visual da aba Compra.
+- O antigo bloco cinza foi reduzido para um painel tecnico de `Base e metodo`, com metadados em chips e seletor de periodo.
+- Card operacional passou a exibir base historica usada e horizonte previsto, deixando claro que os filtros superiores nao recalculam o forecast.
+- Texto de confianca foi separado entre cobertura historica, anos por mes sazonal, confianca da tendencia e confianca sazonal.
+- Tooltip/formula da validacao foi corrigido para refletir o fator de tendencia ponderado usado no banco.
+- Migration `supabase/migrations/20260801_forecast_stats_metadata.sql` adicionada para:
+  - criar `amostras_mes`, `p75_estatistico`, `p90_estatistico` e `contingencia_25` em `f_previsao_gasto_mensal`
+  - preencher metadados estatisticos por trigger
+  - atualizar `diagnosticar_estatisticas_mensais` para retornar `null` quando P75/P90 nao forem calculaveis
+- API e tela mantem fallback para o select antigo enquanto a migration nao estiver aplicada no Supabase.
+- Arquivos alterados:
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/components/charts/ForecastGastoChart.jsx`
+- `src/styles/DashboardPage.css`
+- `src/help/helpAnaliseEstoque.json`
+- `api/_shared/operations.js`
+- `supabase/migrations/20260801_forecast_stats_metadata.sql`
+- `docs/AnaliseEstoque.txt`
+- Antes/Depois:
+- Antes: valores estatisticos insuficientes podiam aparecer como R$ 0,00 ou como P75/P90 mesmo sendo apenas fallback.
+- Depois: contingencia operacional fica separada dos percentis, e P75/P90 insuficientes aparecem como "Nao calculavel".
+- Antes: o usuario podia interpretar que o filtro superior controlava a previsao.
+- Depois: card informa explicitamente base historica e horizonte previsto.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -192,7 +225,7 @@ Funcoes principais
 - ForecastGastoChart
   - Tipo: componente de grafico
   - Caminho: src/components/charts/ForecastGastoChart.jsx
-  - Responsavel por: exibir historico mensal e projecao de gasto anual.
+  - Responsavel por: exibir historico mensal, projecao anual e tooltip com estatisticas calculaveis.
 - Help da tela
   - Tipo: conteudo JSON
   - Caminho: src/help/helpAnaliseEstoque.json
@@ -238,6 +271,10 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260204_create_gasto_forecast_tables.sql
   - Responsavel por: gerar agregados mensais e previsoes por tenant.
+- Metadados estatisticos do forecast
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260801_forecast_stats_metadata.sql
+  - Responsavel por: separar contingencia operacional de P75/P90 estatisticos e registrar amostras mensais.
 - Migration de versionamento do snapshot
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260423_fix_forecast_snapshot_versioning.sql

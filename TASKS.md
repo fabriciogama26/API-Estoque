@@ -46,8 +46,14 @@
 - Migration `supabase/migrations/20260801_fix_dashboard_acidentes_hht_total.sql` criada para recriar `vw_indicadores_acidentes` com HHT mensal agregado por periodo e `account_owner_id`.
 - Documentacao `docs/DashboardAcidentes.txt` atualizada com o diagnostico do HHT 2026 e o comportamento antes/depois.
 - Tela `Estoque atual` corrigida para buscar por CA/termo sem zerar movimentacoes, sem aplicar `ilike` em colunas UUID de centro e carregar a visao padrao ao abrir a tela.
+- Tela `Analise de Estoque` teve a previsao operacional reorganizada em indicadores separados de saida, entrada, saldo liquido e fluxo bruto.
+- Aba Operacional da `Analise de Estoque` passou a usar cards coloridos no padrao da aba Compra e painel tecnico menor para base/metodo.
+- Tooltip/formula do forecast foi corrigido para refletir o fator de tendencia ponderado usado no banco.
+- Migration `supabase/migrations/20260801_forecast_stats_metadata.sql` criada para separar contingencia de 25% de P75/P90 estatisticos e marcar amostra insuficiente.
+- Documentacao e ajuda da tela `Analise de Estoque` foram atualizadas com a leitura nova do forecast.
 
 ## Pendente
+- Aplicar a migration `supabase/migrations/20260801_forecast_stats_metadata.sql` no projeto Supabase para ativar os metadados estatisticos do forecast.
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
 - Definir escopo do rate limit de leitura: apenas rotas sensiveis ou global.
 - Confirmar criacao da migration de `audit_log` e validar nomes reais das tabelas/colunas de permissoes antes da RPC `get_user_effective_permissions`.

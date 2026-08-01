@@ -47,6 +47,14 @@ const MATERIAL_COR_RELATION_TABLE = 'material_grupo_cor'
 const MATERIAL_CARACTERISTICA_RELATION_TABLE = 'material_grupo_caracteristica_epi'
 const CENTRO_ESTOQUE_TABLE = 'centros_estoque'
 const REPORT_TYPE_MENSAL = 'mensal'
+const FORECAST_PREVISAO_SELECT_BASE =
+  'ano_mes, valor_previsto, valor_previsto_entrada, metodo, cenario, contingencia_p75, p90, mediana, coef_var, media_robusta, alerta_volatil'
+const FORECAST_PREVISAO_SELECT_WITH_STATS = `${FORECAST_PREVISAO_SELECT_BASE}, amostras_mes, p75_estatistico, p90_estatistico, contingencia_25`
+
+function isMissingForecastStatsColumn(error) {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`
+  return /amostras_mes|p75_estatistico|p90_estatistico|contingencia_25/i.test(message)
+}
 
 const CARACTERISTICA_ID_KEYS = [
   'caracteristicasIds',
@@ -3881,28 +3889,40 @@ export const EstoqueOperations = {
 
       const historicoRows = await execute(historicoQuery, 'Falha ao carregar historico de previsao.')
 
-      let previsaoQuery = supabaseAdmin
-        .from('f_previsao_gasto_mensal')
-        .select('ano_mes, valor_previsto, valor_previsto_entrada, metodo, cenario, contingencia_p75, p90, mediana, coef_var, media_robusta, alerta_volatil')
-        .eq('account_owner_id', ownerId)
-        .eq('cenario', 'base')
-        .order('ano_mes', { ascending: true })
+      const buildPrevisaoQuery = (selectFields) => {
+        let query = supabaseAdmin
+          .from('f_previsao_gasto_mensal')
+          .select(selectFields)
+          .eq('account_owner_id', ownerId)
+          .eq('cenario', 'base')
+          .order('ano_mes', { ascending: true })
 
-      if (selectedForecastId) {
-        previsaoQuery = previsaoQuery.eq('inventory_forecast_id', selectedForecastId)
+        if (selectedForecastId) {
+          query = query.eq('inventory_forecast_id', selectedForecastId)
+        }
+
+        if (periodoFim) {
+          const inicioPrev = new Date(periodoFim)
+          inicioPrev.setUTCMonth(inicioPrev.getUTCMonth() + 1, 1)
+          const fimPrev = new Date(inicioPrev)
+          fimPrev.setUTCMonth(fimPrev.getUTCMonth() + 11, 1)
+          query = query
+            .gte('ano_mes', inicioPrev.toISOString().split('T')[0])
+            .lte('ano_mes', fimPrev.toISOString().split('T')[0])
+        }
+
+        return query
       }
 
-      if (periodoFim) {
-        const inicioPrev = new Date(periodoFim)
-        inicioPrev.setUTCMonth(inicioPrev.getUTCMonth() + 1, 1)
-        const fimPrev = new Date(inicioPrev)
-        fimPrev.setUTCMonth(fimPrev.getUTCMonth() + 11, 1)
-        previsaoQuery = previsaoQuery
-          .gte('ano_mes', inicioPrev.toISOString().split('T')[0])
-          .lte('ano_mes', fimPrev.toISOString().split('T')[0])
+      let { data: previsaoRows, error: previsaoError } = await buildPrevisaoQuery(FORECAST_PREVISAO_SELECT_WITH_STATS)
+      if (previsaoError && isMissingForecastStatsColumn(previsaoError)) {
+        const fallbackResult = await buildPrevisaoQuery(FORECAST_PREVISAO_SELECT_BASE)
+        previsaoRows = fallbackResult.data
+        previsaoError = fallbackResult.error
       }
-
-      const previsaoRows = await execute(previsaoQuery, 'Falha ao carregar serie de previsao.')
+      if (previsaoError) {
+        throw mapSupabaseError(previsaoError, 'Falha ao carregar serie de previsao.')
+      }
 
       const historicoValores = historicoRows.map((row) => Number(row.valor_saida || 0))
       const historico = historicoRows.map((row, index) => ({
@@ -3920,10 +3940,13 @@ export const EstoqueOperations = {
         valor_previsto_entrada: Number(row.valor_previsto_entrada || 0),
         metodo: row.metodo || 'media_simples',
         cenario: row.cenario || 'base',
-        contingencia: Number(row.contingencia_p75 || 0),
-        p90: Number(row.p90 || 0),
+        amostras: Number(row.amostras_mes || 0),
+        contingencia: Number(row.contingencia_25 ?? row.contingencia_p75 ?? 0),
+        p75: row.p75_estatistico === null || row.p75_estatistico === undefined ? null : Number(row.p75_estatistico),
+        p90: row.p90_estatistico === null || row.p90_estatistico === undefined ? null : Number(row.p90_estatistico),
+        p90Legado: Number(row.p90 || 0),
         mediana: Number(row.mediana || 0),
-        cv: Number(row.coef_var || 0),
+        cv: row.coef_var === null || row.coef_var === undefined ? null : Number(row.coef_var),
         mediaRobusta: Number(row.media_robusta || 0),
         alertaVolatil: !!row.alerta_volatil,
       }))
