@@ -7,7 +7,7 @@ Visao geral
 - Usa os mesmos filtros do Dashboard de Estoque (periodo e termo).
 - Exibe cartoes de decisao, Paretos e blocos de interpretacao/acao ao lado.
 - Inclui previsao de fluxo anual (entradas, saidas e saldo) baseada no consumo medio dos ultimos 12 meses.
-- A area de previsao foi separada em abas de Operacional, Compra e Auditoria, sem alterar os Paretos.
+- A area de previsao foi separada em abas de Operacional, Compra, Previsao de Orcamento e Auditoria, sem alterar os Paretos.
 
 Arquitetura
 -----------
@@ -79,7 +79,10 @@ Boas praticas
 - Aba Compra separa condicoes de decisao: abaixo do minimo e cobertura curta explicam o risco, enquanto a reconciliacao fecha compra imediata, compra programada, manter estoque, reduzir compra, sem consumo e sem preco.
 - Linhas de reconciliacao e cobertura da Aba Compra abrem modal com os materiais disponiveis daquela decisao/faixa.
 - Modal de detalhe da Aba Compra permite exportar a lista aberta para CSV.
-- Orcamento anual de compras deve ser tratado como calculo independente da reposicao atual, com RPC/snapshot proprio para consumo previsto, estoque utilizavel, pedidos em aberto, reajuste e contingencia.
+- Quando o material nao tiver nome amigavel, o modal exibe a coluna `ID material` e botao `Copiar ID` para localizar o cadastro tecnico.
+- Para evitar sobreposicao no modal, o detalhe de materiais usa cards responsivos; `ID material` e exibido encurtado, com ID completo no botao `Copiar ID` e no CSV.
+- Aba Previsao de Orcamento trata o orcamento anual de compras como calculo independente da reposicao atual, usando `rpc_orcamento_compra_12m_calcular`.
+- Aba Previsao de Orcamento exibe verba recomendada no cenario-base, cenarios comparativos, composicao reconciliada, cronograma financeiro mensal e modal de maiores componentes da verba projetada.
 - Aba Auditoria concentra o snapshot selecionado, previsto x realizado por mes e os atalhos para validacao e diagnostico.
 - Diagnostico usa agg_gasto_mensal (valor_saida) como base estatistica.
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
@@ -113,7 +116,7 @@ Atualizacao 2026-02
 - rpc_refresh_gasto_mensal agora ignora saidas canceladas via status_saida (evita erro de UUID e garante agregados corretos).
 - Ajuda contextual criada para a pagina.
 - Requisicao de previsao (`/api/estoque/previsao`) agora inclui `X-Session-Id` para manter o guard de sessao consistente.
-- Area de previsao da tela passou a ter abas `Operacional`, `Compra` e `Auditoria`.
+- Area de previsao da tela passou a ter abas `Operacional`, `Compra`, `Previsao de Orcamento` e `Auditoria`.
 - Aba `Compra` organiza os dados existentes em blocos de reposicao e prioridade, sem alterar a regra do forecast.
 - Aba `Auditoria` centraliza snapshot selecionado, validacao e diagnostico; os Paretos nao foram alterados.
 - Arquivos alterados:
@@ -135,7 +138,7 @@ Atualizacao 2026-02
 
 Atualizacao 2026-04
 -------------------
-- Area de previsao reorganizada em abas `Operacional`, `Compra` e `Auditoria`.
+- Area de previsao reorganizada em abas `Operacional`, `Compra`, `Previsao de Orcamento` e `Auditoria`.
 - `Operacional` manteve o rolling atual com grafico expandido e seletor de periodo.
 - `Compra` passou a destacar reposicao minima, compra imediata, cobertura curta e excesso/baixo giro a partir dos dados ja carregados pela tela.
 - `Auditoria` passou a concentrar snapshot selecionado, resumo de metodo/tendencia e os atalhos de validacao/diagnostico.
@@ -228,13 +231,16 @@ Atualizacao 2026-08 (compra operacional)
   - excesso ou baixo giro
 - Foi adicionada reconciliacao de decisoes para explicar o total monitorado e evitar conflito entre `abaixo do minimo` e `compra imediata`.
 - Foi adicionada leitura de cobertura por faixas: mediana, menos de 30 dias, 30 a 60 dias, 60 a 90 dias, acima de 12 meses, sem consumo recente e criticos sem cobertura.
-- As linhas de reconciliacao e cobertura passaram a abrir modal com tabela paginada dos materiais disponiveis na categoria.
+- As linhas de reconciliacao e cobertura passaram a abrir modal com cards paginados dos materiais disponiveis na categoria.
 - O modal de materiais ganhou botao `Exportar Excel (CSV)`, exportando a categoria/faixa aberta com separador `;`.
+- O modal de materiais passou a exibir `ID material`, com botao `Copiar ID`, para identificar itens exibidos como `Material sem nome cadastrado`.
+- O modal de materiais deixou de usar tabela larga e passou a usar cards com campos agrupados, eliminando scroll horizontal e sobreposicao de texto.
+- A coluna `Classificacao` passou a ignorar valores que sejam UUID tecnico, evitando mistura visual com o identificador do material.
 - Os blocos grandes de listas foram removidos da tela; o detalhe por material fica concentrado no modal aberto pelas linhas de decisao/cobertura.
 - O modal de materiais mostra nome amigavel, categoria/unidade/fabricante, estoque atual, minimo, consumo medio, cobertura em dias, quantidade sugerida, preco, valor e motivo.
 - UUID tecnico deixou de ser exibido como nome principal quando nao houver descricao amigavel; nesses casos a tela mostra `Material sem nome cadastrado`.
 - A aba continua usando o RPC `rpc_previsao_compra_sugerida` quando disponivel e fallback local quando o RPC nao responder.
-- O orcamento recomendado para os proximos 12 meses ainda nao foi implementado nesta etapa; deve entrar como calculo separado para nao misturar verba anual com reposicao atual.
+- O orcamento recomendado para os proximos 12 meses e calculado separadamente da reposicao atual para nao misturar verba anual com correcao operacional imediata.
 - Arquivos alterados:
 - `src/pages/AnaliseEstoquePage.jsx`
 - `src/help/helpAnaliseEstoque.json`
@@ -244,11 +250,63 @@ Atualizacao 2026-08 (compra operacional)
 - Antes: a aba Compra misturava compra operacional com medias previstas e apresentava quantidade agregada em `un`.
 - Depois: a aba Compra comunica reposicao atual, mostra valor financeiro, reconciliacao de decisoes e detalhe operacional por material no modal.
 - Antes: itens podiam aparecer somente como UUID quando o RPC nao retornava nome amigavel.
-- Depois: a tela busca nome no estoque base e usa fallback explicito sem expor o identificador tecnico como nome.
+- Depois: a tela busca nome no estoque base, usa fallback explicito e mostra o identificador tecnico em coluna propria para rastreio.
 - Antes: reconciliacao e cobertura eram apenas tabelas estaticas.
 - Depois: cada linha com materiais disponiveis abre modal paginado para drill-down e exportacao CSV.
 - Antes: a aba ainda ocupava muita altura com quatro blocos de listas.
 - Depois: os blocos foram removidos e o painel `Necessidade de reposicao atual` ficou compacto, no padrao do painel tecnico da aba Operacional.
+
+Atualizacao 2026-08 (orcamento anual de compra)
+-----------------------------------------------
+- Migration `supabase/migrations/20260801_purchase_budget_12m.sql` adicionada para criar `agg_consumo_material_mensal`, `rpc_refresh_consumo_material_mensal` e `rpc_orcamento_compra_12m_calcular`.
+- Migration `supabase/migrations/20260801_fix_purchase_budget_uuid_empty.sql` adicionada para recriar as RPCs em ambientes onde a primeira migration ja estava aplicada antes do tratamento de UUID vazio.
+- Migration `supabase/migrations/20260801_fix_purchase_budget_rpc_text_params.sql` adicionada para remover a assinatura publica antiga `uuid, uuid, jsonb` da RPC de orcamento, recriar a chamada como `text, text, jsonb`, converter UUID internamente e executar `notify pgrst, 'reload schema'`.
+- Migration `supabase/migrations/20260801_fix_purchase_budget_status_cancelado_safe.sql` adicionada para remover joins diretos com `status_entrada/status_saida` dentro dos agregados de orcamento e resolver status cancelado por `stock_status_is_cancelado`.
+- Migration `supabase/migrations/20260801_fix_purchase_budget_material_uuid_text.sql` adicionada para converter campos UUID de cadastro do material para texto antes de `coalesce`, evitando cast implicito de `''` para UUID na CTE `materiais_base`.
+- `agg_consumo_material_mensal` consolida entradas e saidas por material/mes e `account_owner_id`, com RLS por owner e permissoes de estoque/dashboard.
+- `rpc_refresh_consumo_material_mensal` atualiza o agregado do periodo base do forecast, ignorando movimentos cancelados.
+- `rpc_orcamento_compra_12m_calcular` calcula verba anual separada da reposicao atual, considerando consumo previsto, estoque utilizavel, pedidos em aberto, estoque final desejado, reajuste, demanda extraordinaria e contingencia.
+- A RPC valida `p_owner_id` contra `public.my_owner_id()` e permite excecao apenas para `public.is_master()`, evitando leitura cruzada entre tenants.
+- A RPC normaliza `materialId` e `status` como texto antes de comparar com UUID, ignorando linhas legadas sem UUID valido para evitar erro `invalid input syntax for type uuid: ""`.
+- Quando o payload da tela contem UUIDs validos e o erro `invalid input syntax for type uuid: ""` persiste, o problema esperado e a funcao publicada no banco/schema cache, nao o material exibido como `Material sem nome cadastrado`.
+- Quando o contexto do erro aponta para o `RETURN` da RPC, a causa esperada e a resolucao de status cancelado dentro da CTE principal; por isso a checagem passou a ser feita por helper que valida UUID antes de consultar a tabela de status.
+- Quando snapshot, previsao mensal, materiais, precos e movimentos existem, o erro 22P02 nao indica falta de dados; ele indica cast invalido, como `coalesce(uuid, '')` em campos de cadastro do material.
+- O front normaliza `owner_id` e `forecast_id` antes de chamar as RPCs; `forecast_id` vazio/invalido vira `null`, permitindo que o banco use o snapshot mais recente sem erro 22P02.
+- A tela passou a carregar o orcamento anual em paralelo com auditoria e reposicao atual.
+- A tela passou a exibir a aba `Previsao de Orcamento` com bloco `Orcamento de compras - proximos 12 meses`, cenario-base recomendado, cenarios comparativos, composicao do orcamento, cronograma financeiro e modal de componentes da verba.
+- A composicao do orcamento passou a mostrar `Ajuste por necessidade individual`, porque o calculo aplica necessidade material a material e o excesso de um item nao compensa a falta de outro.
+- O antigo bloco `Materiais que mais impactam` saiu da tela principal e passou para o modal `Maiores componentes da verba projetada`, aberto pelo botao `Lista consolidada de materiais`.
+- O modal de componentes da verba tem visoes separadas para maiores valores do orcamento, maiores riscos de falta e maiores oportunidades de reducao.
+- A visao principal do modal mostra os 10 principais materiais por impacto financeiro, com gasto historico 12m, quantidade prevista, estoque utilizavel, quantidade a comprar, preco futuro e impacto no orcamento.
+- O orcamento anual saiu da aba `Compra`, mantendo `Compra` focada somente em reposicao atual, ruptura e cobertura.
+- Arquivos alterados:
+- `supabase/migrations/20260801_purchase_budget_12m.sql`
+- `supabase/migrations/20260801_fix_purchase_budget_uuid_empty.sql`
+- `supabase/migrations/20260801_fix_purchase_budget_rpc_text_params.sql`
+- `supabase/migrations/20260801_fix_purchase_budget_status_cancelado_safe.sql`
+- `supabase/migrations/20260801_fix_purchase_budget_material_uuid_text.sql`
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/styles/DashboardPage.css`
+- `src/help/helpAnaliseEstoque.json`
+- `docs/AnaliseEstoque.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: a aba Compra respondia apenas quanto comprar agora para corrigir estoque minimo/cobertura.
+- Depois: a aba Compra continua operacional e a aba Previsao de Orcamento responde quanto reservar para os proximos 12 meses.
+- Antes: o orcamento anual estava documentado como pendente.
+- Depois: o calculo existe em RPC propria e a UI apresenta cenario-base recomendado, cenarios comparativos, composicao reconciliada, cronograma e impacto por material no modal.
+- Antes: `materialId` ou `status` vazios em entradas/saidas podiam quebrar a RPC e deixar a aba Previsao de Orcamento zerada.
+- Depois: a RPC filtra UUID valido antes de converter e compara status por texto normalizado.
+- Antes: se `forecast_id` chegasse vazio ao PostgREST, a chamada falhava antes de entrar na RPC.
+- Depois: a tela envia somente UUID valido ou `null` para parametros UUID das RPCs de suporte do forecast.
+- Antes: mesmo com payload valido, o PostgREST podia continuar expondo a assinatura UUID antiga de `rpc_orcamento_compra_12m_calcular`.
+- Depois: a migration incremental derruba a assinatura antiga, recria a RPC com parametros texto e recarrega o schema do PostgREST.
+- Antes: a CTE do orcamento resolvia status cancelado por join direto com tabelas de status.
+- Depois: a CTE chama `stock_status_is_cancelado`, que trata status vazio/textual e so compara UUID depois de validar o formato.
+- Antes: `materiais_base` usava `coalesce(m.fabricante, '')`, permitindo cast implicito de string vazia para UUID.
+- Depois: campos de cadastro UUID do material sao convertidos para texto antes do `coalesce`.
+- Antes: o bloco de materiais duplicava o mesmo item entre valor, risco e reajuste na tela principal.
+- Depois: o detalhe fica em modal com visoes separadas e a tela principal mantem apenas o botao para abrir a lista consolidada.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
@@ -268,10 +326,14 @@ Funcoes principais
   - Tipo: memo derivado
   - Caminho: src/pages/AnaliseEstoquePage.jsx
   - Responsavel por: consolidar os dados da aba Compra, priorizando RPC e mantendo fallback local para reposicao atual.
+- compraOrcamentoInsights
+  - Tipo: memo derivado
+  - Caminho: src/pages/AnaliseEstoquePage.jsx
+  - Responsavel por: consolidar o orcamento anual de compras retornado pela RPC, incluindo cenario-base, cenarios comparativos, composicao reconciliada, cronograma e listas do modal de componentes da verba.
 - Help da tela
   - Tipo: conteudo JSON
   - Caminho: src/help/helpAnaliseEstoque.json
-  - Responsavel por: explicar as abas Operacional, Compra e Auditoria.
+  - Responsavel por: explicar as abas Operacional, Compra, Previsao de Orcamento e Auditoria.
 - DashboardEstoqueProvider
   - Tipo: provider React
   - Caminho: src/context/DashboardEstoqueContext.jsx
@@ -329,6 +391,26 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260423_add_forecast_audit_and_purchase_rpcs.sql
   - Responsavel por: calcular auditoria previsto x realizado e planejamento de compra por snapshot.
+- Migration de orcamento anual de compras
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260801_purchase_budget_12m.sql
+  - Responsavel por: agregar consumo mensal por material e calcular verba anual recomendada por tenant/snapshot.
+- Migration de correcao de UUID vazio no orcamento anual
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260801_fix_purchase_budget_uuid_empty.sql
+  - Responsavel por: recriar as RPCs de orcamento usando `safe_uuid_or_null` para impedir cast de string vazia para UUID.
+- Migration de correcao da assinatura da RPC de orcamento anual
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260801_fix_purchase_budget_rpc_text_params.sql
+  - Responsavel por: substituir a assinatura publica UUID por parametros texto, validar UUID internamente e recarregar o schema PostgREST.
+- Migration de correcao do status cancelado no orcamento anual
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260801_fix_purchase_budget_status_cancelado_safe.sql
+  - Responsavel por: recriar as RPCs de orcamento sem joins diretos de status nos agregados e validar UUID de status antes de consultar `status_entrada/status_saida`.
+- Migration de correcao dos campos UUID do material no orcamento anual
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260801_fix_purchase_budget_material_uuid_text.sql
+  - Responsavel por: recriar a RPC de orcamento convertendo `nome`, `fabricante` e `grupoMaterial` para texto antes de montar o payload JSON.
 - Edge Function forecast-gasto-mensal
   - Tipo: Supabase Edge Function
   - Caminho: supabase/functions/forecast-gasto-mensal/index.ts
