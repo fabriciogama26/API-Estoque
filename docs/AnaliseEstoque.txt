@@ -74,7 +74,12 @@ Boas praticas
 - Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.
 - A base historica usada e o horizonte previsto ficam explicitos no card, porque o forecast nao segue os filtros superiores.
 - Aba Operacional concentra o rolling atual e o grafico expandido.
-- Aba Compra agora prioriza o RPC de compra sugerida, combinando estoque atual, estoque minimo, consumo recente e cobertura.
+- Aba Compra agora prioriza o RPC de compra sugerida como necessidade de reposicao atual, combinando estoque atual, estoque minimo, consumo recente e cobertura.
+- Aba Compra nao soma quantidades gerais entre unidades diferentes; o resumo principal mostra valor e quantidade de materiais com compra recomendada.
+- Aba Compra separa condicoes de decisao: abaixo do minimo e cobertura curta explicam o risco, enquanto a reconciliacao fecha compra imediata, compra programada, manter estoque, reduzir compra, sem consumo e sem preco.
+- Linhas de reconciliacao e cobertura da Aba Compra abrem modal com os materiais disponiveis daquela decisao/faixa.
+- Modal de detalhe da Aba Compra permite exportar a lista aberta para CSV.
+- Orcamento anual de compras deve ser tratado como calculo independente da reposicao atual, com RPC/snapshot proprio para consumo previsto, estoque utilizavel, pedidos em aberto, reajuste e contingencia.
 - Aba Auditoria concentra o snapshot selecionado, previsto x realizado por mes e os atalhos para validacao e diagnostico.
 - Diagnostico usa agg_gasto_mensal (valor_saida) como base estatistica.
 - Respeitar `account_owner_id` em todas as consultas (multi-tenant).
@@ -212,6 +217,39 @@ Atualizacao 2026-08 (clareza e estatisticas do forecast)
 - Antes: o usuario podia interpretar que o filtro superior controlava a previsao.
 - Depois: card informa explicitamente base historica e horizonte previsto.
 
+Atualizacao 2026-08 (compra operacional)
+----------------------------------------
+- Aba Compra foi renomeada visualmente de `Planejamento de compra` para `Necessidade de reposicao atual`.
+- O valor principal passou a exibir apenas o total financeiro da reposicao atual, sem somar unidades de materiais diferentes.
+- Cards superiores da Compra passaram a responder decisoes operacionais:
+  - compra imediata
+  - compra programada
+  - risco de ruptura
+  - excesso ou baixo giro
+- Foi adicionada reconciliacao de decisoes para explicar o total monitorado e evitar conflito entre `abaixo do minimo` e `compra imediata`.
+- Foi adicionada leitura de cobertura por faixas: mediana, menos de 30 dias, 30 a 60 dias, 60 a 90 dias, acima de 12 meses, sem consumo recente e criticos sem cobertura.
+- As linhas de reconciliacao e cobertura passaram a abrir modal com tabela paginada dos materiais disponiveis na categoria.
+- O modal de materiais ganhou botao `Exportar Excel (CSV)`, exportando a categoria/faixa aberta com separador `;`.
+- Os blocos grandes de listas foram removidos da tela; o detalhe por material fica concentrado no modal aberto pelas linhas de decisao/cobertura.
+- O modal de materiais mostra nome amigavel, categoria/unidade/fabricante, estoque atual, minimo, consumo medio, cobertura em dias, quantidade sugerida, preco, valor e motivo.
+- UUID tecnico deixou de ser exibido como nome principal quando nao houver descricao amigavel; nesses casos a tela mostra `Material sem nome cadastrado`.
+- A aba continua usando o RPC `rpc_previsao_compra_sugerida` quando disponivel e fallback local quando o RPC nao responder.
+- O orcamento recomendado para os proximos 12 meses ainda nao foi implementado nesta etapa; deve entrar como calculo separado para nao misturar verba anual com reposicao atual.
+- Arquivos alterados:
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/help/helpAnaliseEstoque.json`
+- `docs/AnaliseEstoque.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: a aba Compra misturava compra operacional com medias previstas e apresentava quantidade agregada em `un`.
+- Depois: a aba Compra comunica reposicao atual, mostra valor financeiro, reconciliacao de decisoes e detalhe operacional por material no modal.
+- Antes: itens podiam aparecer somente como UUID quando o RPC nao retornava nome amigavel.
+- Depois: a tela busca nome no estoque base e usa fallback explicito sem expor o identificador tecnico como nome.
+- Antes: reconciliacao e cobertura eram apenas tabelas estaticas.
+- Depois: cada linha com materiais disponiveis abre modal paginado para drill-down e exportacao CSV.
+- Antes: a aba ainda ocupava muita altura com quatro blocos de listas.
+- Depois: os blocos foram removidos e o painel `Necessidade de reposicao atual` ficou compacto, no padrao do painel tecnico da aba Operacional.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -226,6 +264,10 @@ Funcoes principais
   - Tipo: componente de grafico
   - Caminho: src/components/charts/ForecastGastoChart.jsx
   - Responsavel por: exibir historico mensal, projecao anual e tooltip com estatisticas calculaveis.
+- compraInsights
+  - Tipo: memo derivado
+  - Caminho: src/pages/AnaliseEstoquePage.jsx
+  - Responsavel por: consolidar os dados da aba Compra, priorizando RPC e mantendo fallback local para reposicao atual.
 - Help da tela
   - Tipo: conteudo JSON
   - Caminho: src/help/helpAnaliseEstoque.json
@@ -248,6 +290,10 @@ Funcoes utilitarias relacionadas
   - Tipo: utilitarios
   - Caminho: src/utils/inventoryReportUtils.js
   - Responsavel por: percentis e formatacoes exibidas nos cartoes.
+- resolveCompraMaterialName / computeCompraCoverageStats / formatCoberturaDias / getCompraMotivo
+  - Tipo: utilitarios locais
+  - Caminho: src/pages/AnaliseEstoquePage.jsx
+  - Responsavel por: evitar UUID como nome visivel, calcular faixas de cobertura e explicar o motivo da recomendacao de compra.
 
 Servicos e integracoes externas
 -------------------------------

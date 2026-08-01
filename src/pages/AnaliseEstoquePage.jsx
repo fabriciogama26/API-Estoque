@@ -10,6 +10,7 @@ import {
   InfoIcon,
   StockIcon,
   BarsIcon,
+  SaveIcon,
 } from '../components/icons.jsx'
 import { HelpButton } from '../components/Help/HelpButton.jsx'
 import { ParetoChart } from '../components/charts/ParetoChart.jsx'
@@ -36,7 +37,7 @@ const FORECAST_TABS = [
     id: 'compra',
     label: 'Compra',
     icon: StockIcon,
-    description: 'Reposicao, ruptura, cobertura e prioridades de compra.',
+    description: 'Reposicao atual, ruptura, cobertura e prioridades de compra.',
   },
   {
     id: 'auditoria',
@@ -99,6 +100,207 @@ function formatForecastCv(value, samples) {
     return 'Nao calculavel'
   }
   return formatNumber(value, 2)
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuidOnly(value) {
+  return UUID_PATTERN.test(String(value || '').trim())
+}
+
+function resolveCompraMaterialName(item = {}) {
+  const candidates = [
+    item.displayNome,
+    item.nome,
+    item.descricao,
+    item.resumo,
+    item.materialIdDisplay,
+    item.materialId,
+    item.material_id,
+  ]
+  const display = candidates.find((value) => value && !isUuidOnly(value))
+  return display || 'Material sem nome cadastrado'
+}
+
+function getCompraItemId(item = {}) {
+  return String(item.material_id || item.materialId || item.id || item.nome || item.displayNome || '')
+}
+
+function getCompraMaterialKey(item = {}) {
+  return String(item.materialKey || item.material_id || item.materialId || item.id || item.nome || item.displayNome || '')
+}
+
+function getCompraEstoqueAtual(item = {}) {
+  return Number(item.estoque_atual ?? item.estoqueAtual ?? 0)
+}
+
+function getCompraEstoqueMinimo(item = {}) {
+  return Number(item.estoque_minimo ?? item.estoqueMinimo ?? 0)
+}
+
+function getCompraValorUnitario(item = {}) {
+  return Number(item.valor_unitario ?? item.valorUnitario ?? 0)
+}
+
+function getCompraConsumoMensal(item = {}) {
+  if (item.consumo_medio_mensal !== null && item.consumo_medio_mensal !== undefined) {
+    return Number(item.consumo_medio_mensal || 0)
+  }
+  if (item.giroDiario !== null && item.giroDiario !== undefined) {
+    return Number(item.giroDiario || 0) * 30
+  }
+  return 0
+}
+
+function getCoberturaDias(item = {}) {
+  const coberturaMeses = item.cobertura_meses ?? item.coberturaMeses
+  if (coberturaMeses === null || coberturaMeses === undefined) {
+    return null
+  }
+  return Number(coberturaMeses) * 30
+}
+
+function formatCoberturaDias(item = {}) {
+  const dias = getCoberturaDias(item)
+  if (dias === null || Number.isNaN(dias)) {
+    return 'sem consumo recente'
+  }
+  return `${formatNumber(Math.max(0, dias), 0)} dias`
+}
+
+function getCompraMotivo(item = {}) {
+  const estoqueAtual = getCompraEstoqueAtual(item)
+  const estoqueMinimo = getCompraEstoqueMinimo(item)
+  const coberturaDias = getCoberturaDias(item)
+  const motivos = []
+  if (estoqueAtual < estoqueMinimo) motivos.push('abaixo do minimo')
+  if (coberturaDias !== null && coberturaDias < 30) motivos.push('risco de ruptura')
+  if (getCompraConsumoMensal(item) <= 0) motivos.push('sem consumo recente')
+  if (getCompraValorUnitario(item) <= 0) motivos.push('sem preco valido')
+  if (motivos.length) return motivos.join(' e ')
+  return 'reposicao por cobertura/estoque alvo'
+}
+
+function sanitizeCompraCsvValue(value) {
+  const raw = value === null || value === undefined ? '' : String(value)
+  const sanitized = raw.replace(/\r?\n|\r/g, ' ').trim()
+  if (/[;"\n]/.test(sanitized)) {
+    return `"${sanitized.replace(/"/g, '""')}"`
+  }
+  return sanitized
+}
+
+function formatCompraCsvNumber(value, decimals = null) {
+  const number = Number(value ?? 0)
+  if (!Number.isFinite(number)) {
+    return ''
+  }
+  const normalized = decimals === null ? String(number) : number.toFixed(decimals)
+  return normalized.replace('.', ',')
+}
+
+function slugCompraCsvName(value) {
+  return String(value || 'materiais')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'materiais'
+}
+
+function buildCompraDetailCsv(items = [], context = {}) {
+  const headers = [
+    'Categoria do detalhe',
+    'Snapshot',
+    'Material',
+    'Classificacao',
+    'Estoque atual',
+    'Estoque minimo',
+    'Consumo mensal',
+    'Cobertura',
+    'Quantidade sugerida',
+    'Preco unitario',
+    'Valor sugerido',
+    'Motivo',
+  ]
+  const rows = (Array.isArray(items) ? items : []).map((item) => {
+    const values = [
+      context.label || '',
+      context.snapshot || '',
+      resolveCompraMaterialName(item),
+      [item.grupoMaterial, item.unidade, item.fabricante].filter(Boolean).join(' | '),
+      formatCompraCsvNumber(getCompraEstoqueAtual(item)),
+      formatCompraCsvNumber(getCompraEstoqueMinimo(item)),
+      formatCompraCsvNumber(getCompraConsumoMensal(item), 2),
+      formatCoberturaDias(item),
+      formatCompraCsvNumber(item.compra_sugerida_qtd ?? item.compra_minima_qtd ?? item.deficitQuantidade ?? 0),
+      formatCompraCsvNumber(getCompraValorUnitario(item), 2),
+      formatCompraCsvNumber(item.valor_compra_sugerida ?? item.deficitValor ?? 0, 2),
+      getCompraMotivo(item),
+    ]
+    return values.map(sanitizeCompraCsvValue).join(';')
+  })
+  return [headers.join(';'), ...rows].join('\n')
+}
+
+function downloadCompraDetailCsv(items = [], context = {}) {
+  const label = slugCompraCsvName(context.label)
+  const date = new Date().toISOString().slice(0, 10)
+  const filename = `analise-estoque-compra-${label}-${date}.csv`
+  const csvContent = buildCompraDetailCsv(items, context)
+  const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function computeCompraCoverageStats(items = []) {
+  const coberturaValores = []
+  const stats = {
+    mediana: null,
+    menos30: 0,
+    entre30e60: 0,
+    entre60e90: 0,
+    acima12m: 0,
+    semConsumo: 0,
+    criticosSemCobertura: 0,
+  }
+
+  items.forEach((item) => {
+    const coberturaMeses =
+      item.cobertura_meses ?? item.coberturaMeses ??
+      (Number(item.giroDiario || 0) > 0
+        ? Number(item.estoqueAtual || item.estoque_atual || 0) / (Number(item.giroDiario || 0) * 30)
+        : null)
+
+    if (coberturaMeses === null || coberturaMeses === undefined || Number.isNaN(Number(coberturaMeses))) {
+      stats.semConsumo += 1
+      return
+    }
+
+    const cobertura = Number(coberturaMeses)
+    coberturaValores.push(cobertura)
+    if (cobertura < 1) stats.menos30 += 1
+    if (cobertura >= 1 && cobertura < 2) stats.entre30e60 += 1
+    if (cobertura >= 2 && cobertura < 3) stats.entre60e90 += 1
+    if (cobertura > 12) stats.acima12m += 1
+    if ((item.classeRisco || item.classe) === 'A' && cobertura < 1) {
+      stats.criticosSemCobertura += 1
+    }
+  })
+
+  if (coberturaValores.length) {
+    const sorted = [...coberturaValores].sort((a, b) => a - b)
+    const middle = Math.floor(sorted.length / 2)
+    stats.mediana = sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+  }
+
+  return stats
 }
 
 function addMonthsDate(value, months) {
@@ -614,6 +816,8 @@ export function AnaliseEstoquePage() {
   const [forecastCompraPayload, setForecastCompraPayload] = useState(null)
   const [forecastCompraLoading, setForecastCompraLoading] = useState(false)
   const [forecastCompraError, setForecastCompraError] = useState(null)
+  const [compraDetailModal, setCompraDetailModal] = useState(null)
+  const [compraDetailPage, setCompraDetailPage] = useState(1)
 
   const formatLabelFromDate = (value) => {
     const date = value instanceof Date ? value : new Date(value)
@@ -1131,13 +1335,21 @@ export function AnaliseEstoquePage() {
   )
   const forecastCreatedAtLabel = formatForecastTimestamp(forecastBase?.created_at)
   const selectedForecastId = forecastBase?.id || null
-  const materialDisplayMap = useMemo(() => {
+  const materialInfoMap = useMemo(() => {
     const map = new Map()
     const estoqueItens = Array.isArray(estoqueBase?.itens) ? estoqueBase.itens : []
     estoqueItens.forEach((item) => {
       const key = String(item.materialId || item.id || '')
       if (!key) return
-      map.set(key, item.resumo || item.nome || item.descricao || key)
+      map.set(key, {
+        displayNome: item.resumo || item.nome || item.descricao || '',
+        grupoMaterial: item.grupoMaterial || item.grupoMaterialNome || item.categoria || '',
+        unidade: item.unidade || item.unidadeMedida || item.unidade_medida || '',
+        fabricante: item.fabricante || item.marca || '',
+        valorUnitario: Number(item.valorUnitario || 0),
+        estoqueAtual: Number(item.estoqueAtual ?? item.quantidade ?? 0),
+        estoqueMinimo: Number(item.estoqueMinimo || 0),
+      })
     })
     return map
   }, [estoqueBase])
@@ -1213,29 +1425,102 @@ export function AnaliseEstoquePage() {
   }, [profile?.owner_id, selectedForecastId])
 
   const compraInsights = useMemo(() => {
+    const riscoList = Array.isArray(riscoOperacional) ? riscoOperacional : []
+    const enrichCompraItem = (item = {}) => {
+      const materialKey = getCompraMaterialKey(item)
+      const materialInfo = materialInfoMap.get(materialKey) || {}
+      const estoqueAtual = Number(item.estoque_atual ?? item.estoqueAtual ?? materialInfo.estoqueAtual ?? 0)
+      const consumoMensal = getCompraConsumoMensal(item)
+      const coberturaMeses =
+        item.cobertura_meses ?? item.coberturaMeses ?? (consumoMensal > 0 ? estoqueAtual / consumoMensal : null)
+
+      return {
+        ...item,
+        materialKey,
+        displayNome: resolveCompraMaterialName({
+          ...item,
+          displayNome: item.displayNome || materialInfo.displayNome,
+        }),
+        grupoMaterial: item.grupoMaterial || item.grupo_material || materialInfo.grupoMaterial || '',
+        unidade: item.unidade || materialInfo.unidade || '',
+        fabricante: item.fabricante || materialInfo.fabricante || '',
+        valor_unitario: Number(item.valor_unitario ?? materialInfo.valorUnitario ?? 0),
+        estoque_atual: estoqueAtual,
+        estoque_minimo: Number(item.estoque_minimo ?? item.estoqueMinimo ?? materialInfo.estoqueMinimo ?? 0),
+        consumo_medio_mensal: consumoMensal,
+        cobertura_meses: coberturaMeses,
+      }
+    }
+    const monitorados = riscoList.map(enrichCompraItem)
+    const coberturaStats = computeCompraCoverageStats(monitorados)
+    const buildCoverageGroups = (items) => {
+      const withCoverage = items
+        .filter((item) => getCoberturaDias(item) !== null)
+        .sort((a, b) => Number(a.cobertura_meses ?? a.coberturaMeses ?? 999) - Number(b.cobertura_meses ?? b.coberturaMeses ?? 999))
+      return {
+        mediana: withCoverage,
+        menos30: withCoverage.filter((item) => Number(item.cobertura_meses ?? item.coberturaMeses ?? 0) < 1),
+        entre30e60: withCoverage.filter((item) => {
+          const cobertura = Number(item.cobertura_meses ?? item.coberturaMeses ?? 0)
+          return cobertura >= 1 && cobertura < 2
+        }),
+        entre60e90: withCoverage.filter((item) => {
+          const cobertura = Number(item.cobertura_meses ?? item.coberturaMeses ?? 0)
+          return cobertura >= 2 && cobertura < 3
+        }),
+        acima12m: withCoverage.filter((item) => Number(item.cobertura_meses ?? item.coberturaMeses ?? 0) > 12),
+        semConsumo: items.filter((item) => getCompraConsumoMensal(item) <= 0),
+        criticosSemCobertura: withCoverage.filter((item) => (item.classeRisco || item.classe) === 'A' && Number(item.cobertura_meses ?? item.coberturaMeses ?? 0) < 1),
+      }
+    }
+    const coberturaGrupos = buildCoverageGroups(monitorados)
+    const semPrecoList = monitorados.filter((item) => getCompraValorUnitario(item) <= 0)
+    const semConsumoList = coberturaGrupos.semConsumo
+    const resolveManterList = (...excludedLists) => {
+      const excluded = new Set(
+        excludedLists.flatMap((list) => list.map((item) => getCompraMaterialKey(item)).filter(Boolean)),
+      )
+      return monitorados.filter((item) => {
+        const key = getCompraMaterialKey(item)
+        return key && !excluded.has(key) && getCompraConsumoMensal(item) > 0 && getCompraValorUnitario(item) > 0
+      })
+    }
+
     if (forecastCompraPayload?.status === 'ok') {
       const resumo = forecastCompraPayload?.resumo || {}
-      const enrichList = (list = []) =>
-        list.map((item) => {
-          const materialKey = String(item.material_id || item.materialId || '')
-          return {
-            ...item,
-            displayNome:
-              materialDisplayMap.get(materialKey) ||
-              item.nome ||
-              item.descricao ||
-              item.materialIdDisplay ||
-              item.materialId ||
-              materialKey,
-          }
-        })
+      const compraImediata = (Array.isArray(forecastCompraPayload?.compra_imediata) ? forecastCompraPayload.compra_imediata : []).map(enrichCompraItem)
+      const reposicaoPlanejada = (
+        Array.isArray(forecastCompraPayload?.reposicao_planejada) ? forecastCompraPayload.reposicao_planejada : []
+      ).map(enrichCompraItem)
+      const excessoOuBaixoGiro = (
+        Array.isArray(forecastCompraPayload?.excesso_ou_baixo_giro) ? forecastCompraPayload.excesso_ou_baixo_giro : []
+      ).map(enrichCompraItem)
+      const semCoberturaCurta = (
+        Array.isArray(forecastCompraPayload?.cobertura_curta) ? forecastCompraPayload.cobertura_curta : []
+      ).map(enrichCompraItem)
+      const manterEstoque = resolveManterList(compraImediata, reposicaoPlanejada, excessoOuBaixoGiro, semConsumoList, semPrecoList)
+      const materiaisMonitorados = Number(resumo.materiais_monitorados || 0)
+      const itensCompraImediata = Number(resumo.itens_compra_imediata || 0)
+      const itensReposicaoPlanejada = Number(resumo.itens_reposicao_planejada || 0)
+      const itensExcesso = Number(resumo.itens_excesso || 0)
+      const itensSemConsumo = semConsumoList.length
+      const itensSemPreco = semPrecoList.length
+      const itensManter = Math.max(
+        0,
+        materiaisMonitorados - itensCompraImediata - itensReposicaoPlanejada - itensExcesso - itensSemConsumo - itensSemPreco,
+      )
+
       return {
-        materiaisMonitorados: Number(resumo.materiais_monitorados || 0),
+        materiaisMonitorados,
         itensAbaixoMinimo: Number(resumo.itens_abaixo_minimo || 0),
-        itensCompraImediata: Number(resumo.itens_compra_imediata || 0),
-        itensReposicaoPlanejada: Number(resumo.itens_reposicao_planejada || 0),
+        itensCompraImediata,
+        itensReposicaoPlanejada,
         itensCoberturaCurta: Number(resumo.itens_cobertura_curta || 0),
-        itensExcesso: Number(resumo.itens_excesso || 0),
+        itensExcesso,
+        itensSemConsumo,
+        itensSemPreco,
+        itensManter,
+        itensCompraRecomendada: itensCompraImediata + itensReposicaoPlanejada,
         valorCompraMinima: Number(resumo.valor_compra_minima || 0),
         quantidadeCompraMinima: Number(resumo.quantidade_compra_minima || 0),
         valorCompraSugerida: Number(resumo.valor_compra_sugerida || 0),
@@ -1247,33 +1532,30 @@ export function AnaliseEstoquePage() {
         saidaMediaMensalPrevista: Number(resumo.saida_media_mensal_prevista || 0),
         entradaMediaMensalPrevista: Number(resumo.entrada_media_mensal_prevista || 0),
         saldoAnualPrevisto: Number(resumo.saldo_anual_previsto || 0),
-        compraImediata: enrichList(Array.isArray(forecastCompraPayload?.compra_imediata) ? forecastCompraPayload.compra_imediata : []),
-        reposicaoPlanejada: enrichList(
-          Array.isArray(forecastCompraPayload?.reposicao_planejada) ? forecastCompraPayload.reposicao_planejada : [],
-        ),
-        excessoOuBaixoGiro: enrichList(
-          Array.isArray(forecastCompraPayload?.excesso_ou_baixo_giro) ? forecastCompraPayload.excesso_ou_baixo_giro : [],
-        ),
-        semCoberturaCurta: enrichList(Array.isArray(forecastCompraPayload?.cobertura_curta) ? forecastCompraPayload.cobertura_curta : []),
+        coberturaStats,
+        coberturaGrupos,
+        compraImediata,
+        reposicaoPlanejada,
+        excessoOuBaixoGiro,
+        semCoberturaCurta,
+        manterEstoque,
+        semConsumo: semConsumoList,
+        semPreco: semPrecoList,
+        todosMonitorados: monitorados,
         origem: 'rpc',
       }
     }
 
-    const riscoList = Array.isArray(riscoOperacional) ? riscoOperacional : []
     const materiaisMonitorados = Array.isArray(estoqueBase?.itens) ? estoqueBase.itens.length : riscoList.length
-    const deficitItems = riscoList
+    const deficitItems = monitorados
       .map((item) => {
-        const estoqueAtual = Number(item.estoqueAtual || 0)
-        const estoqueMinimo = Number(item.estoqueMinimo || 0)
+        const estoqueAtual = getCompraEstoqueAtual(item)
+        const estoqueMinimo = getCompraEstoqueMinimo(item)
         const deficitQuantidade = Math.max(0, estoqueMinimo - estoqueAtual)
-        const deficitValor = deficitQuantidade * Number(item.valorUnitario || 0)
-        const coberturaMeses =
-          Number(item.giroDiario || 0) > 0 ? estoqueAtual / (Number(item.giroDiario || 0) * 30) : null
         return {
           ...item,
           deficitQuantidade,
-          deficitValor,
-          coberturaMeses,
+          deficitValor: deficitQuantidade * getCompraValorUnitario(item),
         }
       })
       .filter((item) => item.deficitQuantidade > 0)
@@ -1290,25 +1572,22 @@ export function AnaliseEstoquePage() {
       .filter((item) => (item.classeRisco || item.classe) !== 'A')
       .sort((a, b) => Number(b.deficitQuantidade || 0) - Number(a.deficitQuantidade || 0))
 
-    const excessoOuBaixoGiro = [...riscoList]
-      .filter((item) => Number(item.estoqueAtual || 0) > Number(item.pressaoVidaUtil || 0) * 1.5)
+    const excessoOuBaixoGiro = [...monitorados]
+      .filter((item) => getCompraEstoqueAtual(item) > Number(item.estoque_alvo ?? item.pressaoVidaUtil ?? 0) * 1.5)
       .sort((a, b) => Number(b.valorTotal || 0) - Number(a.valorTotal || 0))
 
-    const semCoberturaCurta = [...riscoList]
-      .map((item) => {
-        const estoqueAtual = Number(item.estoqueAtual || 0)
-        const coberturaMeses =
-          Number(item.giroDiario || 0) > 0 ? estoqueAtual / (Number(item.giroDiario || 0) * 30) : null
-        return {
-          ...item,
-          coberturaMeses,
-        }
-      })
-      .filter((item) => item.coberturaMeses !== null && item.coberturaMeses < 1)
-      .sort((a, b) => Number(a.coberturaMeses || 0) - Number(b.coberturaMeses || 0))
+    const semCoberturaCurta = coberturaGrupos.menos30
 
     const valorCompraMinima = deficitItems.reduce((acc, item) => acc + Number(item.deficitValor || 0), 0)
     const quantidadeCompraMinima = deficitItems.reduce((acc, item) => acc + Number(item.deficitQuantidade || 0), 0)
+    const itensSemPreco = semPrecoList.length
+    const itensSemConsumo = semConsumoList.length
+    const itensExcesso = excessoOuBaixoGiro.length
+    const manterEstoque = resolveManterList(compraImediata, reposicaoPlanejada, excessoOuBaixoGiro, semConsumoList, semPrecoList)
+    const itensManter = Math.max(
+      0,
+      materiaisMonitorados - compraImediata.length - reposicaoPlanejada.length - itensExcesso - itensSemConsumo - itensSemPreco,
+    )
 
     return {
       materiaisMonitorados,
@@ -1316,7 +1595,11 @@ export function AnaliseEstoquePage() {
       itensCompraImediata: compraImediata.length,
       itensReposicaoPlanejada: reposicaoPlanejada.length,
       itensCoberturaCurta: semCoberturaCurta.length,
-      itensExcesso: excessoOuBaixoGiro.length,
+      itensExcesso,
+      itensSemConsumo,
+      itensSemPreco,
+      itensManter,
+      itensCompraRecomendada: compraImediata.length + reposicaoPlanejada.length,
       valorCompraMinima,
       quantidadeCompraMinima,
       valorCompraSugerida: valorCompraMinima,
@@ -1329,13 +1612,122 @@ export function AnaliseEstoquePage() {
       saidaMediaMensalPrevista: previsaoSaidaTotal / 12,
       entradaMediaMensalPrevista: previsaoEntradaTotal / 12,
       saldoAnualPrevisto: previsaoSaldoTotal,
-      compraImediata: compraImediata.slice(0, 5),
-      reposicaoPlanejada: reposicaoPlanejada.slice(0, 5),
-      excessoOuBaixoGiro: excessoOuBaixoGiro.slice(0, 5),
-      semCoberturaCurta: semCoberturaCurta.slice(0, 5),
+      coberturaStats,
+      coberturaGrupos,
+      compraImediata,
+      reposicaoPlanejada,
+      excessoOuBaixoGiro,
+      semCoberturaCurta,
+      manterEstoque,
+      semConsumo: semConsumoList,
+      semPreco: semPrecoList,
+      todosMonitorados: monitorados,
       origem: 'fallback',
     }
-  }, [estoqueBase, forecastCompraPayload, materialDisplayMap, previsaoEntradaTotal, previsaoSaidaTotal, previsaoSaldoTotal, riscoOperacional])
+  }, [estoqueBase, forecastCompraPayload, materialInfoMap, previsaoEntradaTotal, previsaoSaidaTotal, previsaoSaldoTotal, riscoOperacional])
+
+  const compraDecisionRows = useMemo(
+    () => [
+      {
+        id: 'compra-imediata',
+        label: 'Compra imediata',
+        value: formatNumber(compraInsights.itensCompraImediata || 0),
+        items: compraInsights.compraImediata || [],
+      },
+      {
+        id: 'compra-programada',
+        label: 'Compra programada',
+        value: formatNumber(compraInsights.itensReposicaoPlanejada || 0),
+        items: compraInsights.reposicaoPlanejada || [],
+      },
+      {
+        id: 'manter-estoque',
+        label: 'Manter estoque',
+        value: formatNumber(compraInsights.itensManter || 0),
+        items: compraInsights.manterEstoque || [],
+      },
+      {
+        id: 'reduzir-compra',
+        label: 'Reduzir ou suspender compra',
+        value: formatNumber(compraInsights.itensExcesso || 0),
+        items: compraInsights.excessoOuBaixoGiro || [],
+      },
+      {
+        id: 'sem-consumo',
+        label: 'Sem consumo suficiente',
+        value: formatNumber(compraInsights.itensSemConsumo || 0),
+        items: compraInsights.semConsumo || [],
+      },
+      {
+        id: 'sem-preco',
+        label: 'Sem preco valido',
+        value: formatNumber(compraInsights.itensSemPreco || 0),
+        items: compraInsights.semPreco || [],
+      },
+      {
+        id: 'total-monitorado',
+        label: 'Total monitorado',
+        value: formatNumber(compraInsights.materiaisMonitorados || 0),
+        items: compraInsights.todosMonitorados || [],
+      },
+    ],
+    [compraInsights],
+  )
+
+  const compraCoverageRows = useMemo(
+    () => [
+      {
+        id: 'cobertura-mediana',
+        label: 'Cobertura mediana',
+        value:
+          compraInsights.coberturaStats?.mediana === null
+            ? 'sem consumo suficiente'
+            : `${formatNumber(compraInsights.coberturaStats?.mediana || 0, 1)} meses`,
+        items: compraInsights.coberturaGrupos?.mediana || [],
+      },
+      {
+        id: 'cobertura-menos-30',
+        label: 'Menos de 30 dias',
+        value: formatNumber(compraInsights.coberturaStats?.menos30 || 0),
+        items: compraInsights.coberturaGrupos?.menos30 || [],
+      },
+      {
+        id: 'cobertura-30-60',
+        label: '30 a 60 dias',
+        value: formatNumber(compraInsights.coberturaStats?.entre30e60 || 0),
+        items: compraInsights.coberturaGrupos?.entre30e60 || [],
+      },
+      {
+        id: 'cobertura-60-90',
+        label: '60 a 90 dias',
+        value: formatNumber(compraInsights.coberturaStats?.entre60e90 || 0),
+        items: compraInsights.coberturaGrupos?.entre60e90 || [],
+      },
+      {
+        id: 'cobertura-acima-12',
+        label: 'Acima de 12 meses',
+        value: formatNumber(compraInsights.coberturaStats?.acima12m || 0),
+        items: compraInsights.coberturaGrupos?.acima12m || [],
+      },
+      {
+        id: 'cobertura-sem-consumo',
+        label: 'Sem consumo recente',
+        value: formatNumber(compraInsights.coberturaStats?.semConsumo || 0),
+        items: compraInsights.coberturaGrupos?.semConsumo || [],
+      },
+      {
+        id: 'cobertura-criticos',
+        label: 'Criticos sem cobertura',
+        value: formatNumber(compraInsights.coberturaStats?.criticosSemCobertura || 0),
+        items: compraInsights.coberturaGrupos?.criticosSemCobertura || [],
+      },
+    ],
+    [compraInsights],
+  )
+
+  const compraDetailItems = compraDetailModal?.items || []
+  const compraDetailStart = (compraDetailPage - 1) * forecastPageSize
+  const compraDetailPageItems = compraDetailItems.slice(compraDetailStart, compraDetailStart + forecastPageSize)
 
   const auditResumo = forecastAuditPayload?.resumo || null
   const auditSerie = useMemo(
@@ -1468,6 +1860,26 @@ export function AnaliseEstoquePage() {
     if (ok) {
       window.setTimeout(() => setDiagnosticoCopied(false), 1500)
     }
+  }
+
+  const handleOpenCompraDetail = (row) => {
+    if (!row?.items?.length) return
+    setCompraDetailModal(row)
+    setCompraDetailPage(1)
+  }
+
+  const handleCompraDetailKeyDown = (event, row) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    handleOpenCompraDetail(row)
+  }
+
+  const handleExportCompraDetailCsv = () => {
+    if (!compraDetailModal?.items?.length) return
+    downloadCompraDetailCsv(compraDetailModal.items, {
+      label: compraDetailModal.label,
+      snapshot: forecastPeriodoLabel,
+    })
   }
 
   const handlePeriodoChange = async (event) => {
@@ -1686,31 +2098,17 @@ export function AnaliseEstoquePage() {
         {forecastTab === 'compra' ? (
           <div className="analysis-forecast-stack" role="tabpanel">
             <div className="analysis-forecast-grid analysis-forecast-grid--single">
-              <div className="analysis-forecast-card">
-                <p className="analysis-forecast-label">Planejamento de compra</p>
-                <p className="analysis-forecast-value">
-                  {formatNumber(compraInsights.quantidadeCompraSugerida || compraInsights.quantidadeCompraMinima)} un /{' '}
-                  {formatCurrency(compraInsights.valorCompraSugerida || compraInsights.valorCompraMinima)}
-                </p>
-                <p className="analysis-forecast-subtitle">
-                  Reposicao sugerida por estoque atual, minimo configurado e cobertura recente.
-                </p>
-                <div className="analysis-forecast-meta">
-                  <span>Itens monitorados: {formatNumber(compraInsights.materiaisMonitorados)}</span>
-                  <span>Itens abaixo do minimo: {formatNumber(compraInsights.itensAbaixoMinimo)}</span>
-                  <span>Compra imediata: {formatNumber(compraInsights.itensCompraImediata)}</span>
-                  <span>Reposicao planejada: {formatNumber(compraInsights.itensReposicaoPlanejada || 0)}</span>
-                  <span>Cobertura media: {formatNumber(compraInsights.coberturaMediaMeses || 0, 1)} meses</span>
-                  <span>Saida prevista media/mês: {formatCurrency(compraInsights.saidaMediaMensalPrevista || 0)}</span>
-                  <span>Entrada prevista media/mês: {formatCurrency(compraInsights.entradaMediaMensalPrevista || 0)}</span>
-                  <span>Saldo anual previsto: {formatCurrency(compraInsights.saldoAnualPrevisto || 0)}</span>
-                  {forecastCompraLoading ? <span>Atualizando recomendacao de compra...</span> : null}
-                  {forecastCompraError && compraInsights.origem !== 'rpc' ? <span>{forecastCompraError}</span> : null}
-                  {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
-                </div>
-                <div className="analysis-forecast-actions">
+              <div className="analysis-forecast-card analysis-forecast-card--technical">
+                <div className="analysis-forecast-summary-row">
+                  <div className="analysis-forecast-summary-main">
+                    <p className="analysis-forecast-label">Necessidade de reposicao atual</p>
+                    <p className="analysis-forecast-value">{formatCurrency(compraInsights.valorCompraSugerida || compraInsights.valorCompraMinima)}</p>
+                    <p className="analysis-forecast-subtitle">
+                      {formatNumber(compraInsights.itensCompraRecomendada || 0)} materiais com compra recomendada.
+                    </p>
+                  </div>
                   <label className="field">
-                    <span>Periodo da previsao</span>
+                    <span>Snapshot de reposicao</span>
                     <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
                       <option value="">Selecione um periodo</option>
                       {forecastPeriodos.map((periodo) => {
@@ -1725,6 +2123,19 @@ export function AnaliseEstoquePage() {
                     </select>
                   </label>
                 </div>
+                <div className="analysis-forecast-meta analysis-forecast-meta--grid analysis-forecast-meta--compact">
+                  <span>Base historica usada: {forecastPeriodoLabel}</span>
+                  <span>Horizonte projetado: {forecastHorizonLabel}</span>
+                  <span>Snapshot: {forecastCreatedAtLabel}</span>
+                  <span>Itens monitorados: {formatNumber(compraInsights.materiaisMonitorados)}</span>
+                  <span>Abaixo do minimo: {formatNumber(compraInsights.itensAbaixoMinimo)}</span>
+                  <span>Cobertura mediana: {compraInsights.coberturaStats?.mediana === null ? 'sem consumo suficiente' : `${formatNumber(compraInsights.coberturaStats?.mediana || 0, 1)} meses`}</span>
+                  <span>Menos de 30 dias: {formatNumber(compraInsights.coberturaStats?.menos30 || 0)} materiais</span>
+                  <span>Acima de 12 meses: {formatNumber(compraInsights.coberturaStats?.acima12m || 0)} materiais</span>
+                  {forecastCompraLoading ? <span>Atualizando recomendacao de compra...</span> : null}
+                  {forecastCompraError && compraInsights.origem !== 'rpc' ? <span>{forecastCompraError}</span> : null}
+                  {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
+                </div>
               </div>
             </div>
             <div className="dashboard-highlights dashboard-highlights--secondary">
@@ -1736,122 +2147,129 @@ export function AnaliseEstoquePage() {
                   </span>
                 </header>
                 <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensCompraImediata)}</strong>
-                <span className="dashboard-insight-card__helper">Itens abaixo do minimo ou com cobertura menor que 1 mes.</span>
+                <span className="dashboard-insight-card__helper">Materiais abaixo do minimo ou com cobertura menor que 30 dias.</span>
               </article>
               <article className="dashboard-insight-card dashboard-insight-card--blue">
                 <header className="dashboard-insight-card__header">
-                  <p className="dashboard-insight-card__title">Reposicao minima</p>
+                  <p className="dashboard-insight-card__title">Compra programada</p>
                   <span className="dashboard-insight-card__avatar">
                     <StockIcon size={22} />
                   </span>
                 </header>
-                <strong className="dashboard-insight-card__value">
-                  {formatCurrency(compraInsights.valorCompraMinima)}
-                </strong>
+                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensReposicaoPlanejada || 0)}</strong>
                 <span className="dashboard-insight-card__helper">
-                  {formatNumber(compraInsights.quantidadeCompraMinima)} unidades para voltar ao minimo.
+                  Materiais para recomposicao fora da urgencia imediata.
                 </span>
               </article>
-              <article className="dashboard-insight-card dashboard-insight-card--green">
+              <article className="dashboard-insight-card dashboard-insight-card--red">
                 <header className="dashboard-insight-card__header">
-                  <p className="dashboard-insight-card__title">Entrada media prevista</p>
+                  <p className="dashboard-insight-card__title">Risco de ruptura</p>
                   <span className="dashboard-insight-card__avatar">
-                    <RevenueIcon size={22} />
+                    <AlertIcon size={22} />
                   </span>
                 </header>
-                <strong className="dashboard-insight-card__value">
-                  {formatCurrency(compraInsights.entradaMediaMensalPrevista || 0)}
-                </strong>
-                <span className="dashboard-insight-card__helper">Media mensal de entrada do snapshot selecionado.</span>
+                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensCoberturaCurta || 0)}</strong>
+                <span className="dashboard-insight-card__helper">Materiais com cobertura inferior a 30 dias.</span>
               </article>
               <article className="dashboard-insight-card dashboard-insight-card--slate">
                 <header className="dashboard-insight-card__header">
-                  <p className="dashboard-insight-card__title">Saida media prevista</p>
+                  <p className="dashboard-insight-card__title">Excesso ou baixo giro</p>
                   <span className="dashboard-insight-card__avatar">
-                    <TrendIcon size={22} />
+                    <BarsIcon size={22} />
                   </span>
                 </header>
-                <strong className="dashboard-insight-card__value">
-                  {formatCurrency(compraInsights.saidaMediaMensalPrevista || 0)}
-                </strong>
-                <span className="dashboard-insight-card__helper">Usada como referencia para cobertura e reposicao.</span>
+                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensExcesso || 0)}</strong>
+                <span className="dashboard-insight-card__helper">Materiais com estoque alto frente ao consumo recente.</span>
               </article>
             </div>
             <div className="analysis-forecast-grid analysis-forecast-grid--equal">
               <article className="analysis-forecast-card analysis-forecast-card--list">
-                <p className="analysis-forecast-label">Compra imediata</p>
-                <ul className="analysis-forecast-list">
-                  {compraInsights.compraImediata.length ? (
-                    compraInsights.compraImediata.map((item) => (
-                      <li key={`compra-imediata-${item.materialId || item.nome}`}>
-                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
-                        <span>
-                          Deficit: {formatNumber(item.compra_minima_qtd ?? item.deficitQuantidade)} | Sugerido:{' '}
-                          {formatCurrency(item.valor_compra_sugerida ?? item.deficitValor)}
-                        </span>
-                      </li>
-                    ))
-                  ) : (
-                    <li>Nenhum item critico abaixo do minimo.</li>
-                  )}
-                </ul>
+                <p className="analysis-forecast-label">Reconciliacao das decisoes</p>
+                <p className="analysis-forecast-subtitle">
+                  Abaixo do minimo e cobertura curta sao condicoes; a tabela abaixo fecha as decisoes do total monitorado.
+                </p>
+                <div className="table-wrapper">
+                  <table className="data-table analysis-audit-table">
+                    <thead>
+                      <tr>
+                        <th>Decisao</th>
+                        <th>Materiais</th>
+                        <th>Detalhe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compraDecisionRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className={row.items.length ? 'analysis-table-row--clickable' : undefined}
+                          tabIndex={row.items.length ? 0 : undefined}
+                          onClick={() => handleOpenCompraDetail(row)}
+                          onKeyDown={(event) => handleCompraDetailKeyDown(event, row)}
+                        >
+                          <td>{row.label}</td>
+                          <td>{row.value}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="button button--ghost button--compact"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleOpenCompraDetail(row)
+                              }}
+                              disabled={!row.items.length}
+                            >
+                              Detalhar
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </article>
               <article className="analysis-forecast-card analysis-forecast-card--list">
-                <p className="analysis-forecast-label">Reposicao planejada</p>
-                <ul className="analysis-forecast-list">
-                  {compraInsights.reposicaoPlanejada.length ? (
-                    compraInsights.reposicaoPlanejada.map((item) => (
-                      <li key={`reposicao-${item.materialId || item.nome}`}>
-                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
-                        <span>
-                          Minimo: {formatNumber(item.estoque_minimo ?? item.estoqueMinimo)} | Atual:{' '}
-                          {formatNumber(item.estoque_atual ?? item.estoqueAtual)} | Alvo:{' '}
-                          {formatNumber((item.estoque_alvo ?? item.pressaoVidaUtil) || 0)}
-                        </span>
-                      </li>
-                    ))
-                  ) : (
-                    <li>Nenhum item adicional em reposicao planejada.</li>
-                  )}
-                </ul>
-              </article>
-            </div>
-            <div className="analysis-forecast-grid analysis-forecast-grid--equal">
-              <article className="analysis-forecast-card analysis-forecast-card--list">
-                <p className="analysis-forecast-label">Cobertura curta</p>
-                <ul className="analysis-forecast-list">
-                  {compraInsights.semCoberturaCurta.length ? (
-                    compraInsights.semCoberturaCurta.map((item) => (
-                      <li key={`cobertura-${item.materialId || item.nome}`}>
-                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
-                        <span>
-                          Cobertura: {formatNumber((item.cobertura_meses ?? item.coberturaMeses) || 0, 1)} mes | Consumo/mês:{' '}
-                          {formatNumber((item.consumo_medio_mensal ?? item.giroDiario) || 0, 2)}
-                        </span>
-                      </li>
-                    ))
-                  ) : (
-                    <li>Nenhum item com cobertura menor que 1 mes.</li>
-                  )}
-                </ul>
-              </article>
-              <article className="analysis-forecast-card analysis-forecast-card--list">
-                <p className="analysis-forecast-label">Excesso ou baixo giro</p>
-                <ul className="analysis-forecast-list">
-                  {compraInsights.excessoOuBaixoGiro.length ? (
-                    compraInsights.excessoOuBaixoGiro.map((item) => (
-                      <li key={`excesso-${item.materialId || item.nome}`}>
-                        <strong>{item.displayNome || item.nome || item.descricao || item.materialIdDisplay || item.materialId}</strong>
-                        <span>
-                          Atual: {formatNumber(item.estoque_atual ?? item.estoqueAtual)} | Alvo:{' '}
-                          {formatNumber((item.estoque_alvo ?? item.pressaoVidaUtil) || 0)}
-                        </span>
-                      </li>
-                    ))
-                  ) : (
-                    <li>Nenhum item com excesso relevante neste recorte.</li>
-                  )}
-                </ul>
+                <p className="analysis-forecast-label">Cobertura do estoque</p>
+                <p className="analysis-forecast-subtitle">
+                  Leitura por faixa para evitar que estoque parado esconda ruptura em materiais criticos.
+                </p>
+                <div className="table-wrapper">
+                  <table className="data-table analysis-audit-table">
+                    <thead>
+                      <tr>
+                        <th>Faixa</th>
+                        <th>Materiais</th>
+                        <th>Detalhe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compraCoverageRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className={row.items.length ? 'analysis-table-row--clickable' : undefined}
+                          tabIndex={row.items.length ? 0 : undefined}
+                          onClick={() => handleOpenCompraDetail(row)}
+                          onKeyDown={(event) => handleCompraDetailKeyDown(event, row)}
+                        >
+                          <td>{row.label}</td>
+                          <td>{row.value}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="button button--ghost button--compact"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleOpenCompraDetail(row)
+                              }}
+                              disabled={!row.items.length}
+                            >
+                              Detalhar
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </article>
             </div>
           </div>
@@ -1963,6 +2381,78 @@ export function AnaliseEstoquePage() {
           </div>
         ) : null}
       </section>
+      <ChartExpandModal
+        open={!!compraDetailModal}
+        title={compraDetailModal ? `Materiais - ${compraDetailModal.label}` : 'Materiais'}
+        onClose={() => setCompraDetailModal(null)}
+      >
+        {compraDetailModal ? (
+          <>
+            <div className="analysis-audit-summary">
+              <p>
+                {formatNumber(compraDetailItems.length)} materiais disponiveis para detalhamento neste snapshot.
+              </p>
+            </div>
+            <div className="analysis-audit-actions">
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleExportCompraDetailCsv}
+                disabled={!compraDetailItems.length}
+              >
+                <SaveIcon size={16} aria-hidden="true" />
+                <span>Exportar Excel (CSV)</span>
+              </button>
+            </div>
+            {compraDetailItems.length ? (
+              <>
+                <div className="table-wrapper">
+                  <table className="data-table analysis-audit-table analysis-compra-detail-table">
+                    <thead>
+                      <tr>
+                        <th>Material</th>
+                        <th>Classificacao</th>
+                        <th>Estoque</th>
+                        <th>Minimo</th>
+                        <th>Consumo/mês</th>
+                        <th>Cobertura</th>
+                        <th>Qtd sugerida</th>
+                        <th>Preco</th>
+                        <th>Valor</th>
+                        <th>Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compraDetailPageItems.map((item, index) => (
+                        <tr key={`compra-detail-${getCompraItemId(item)}-${index}`}>
+                          <td>{resolveCompraMaterialName(item)}</td>
+                          <td>{[item.grupoMaterial, item.unidade, item.fabricante].filter(Boolean).join(' | ') || '-'}</td>
+                          <td>{formatNumber(getCompraEstoqueAtual(item))}</td>
+                          <td>{formatNumber(getCompraEstoqueMinimo(item))}</td>
+                          <td>{formatNumber(getCompraConsumoMensal(item), 2)}</td>
+                          <td>{formatCoberturaDias(item)}</td>
+                          <td>{formatNumber(item.compra_sugerida_qtd ?? item.compra_minima_qtd ?? item.deficitQuantidade ?? 0)}</td>
+                          <td>{formatCurrency(getCompraValorUnitario(item))}</td>
+                          <td>{formatCurrency(item.valor_compra_sugerida ?? item.deficitValor ?? 0)}</td>
+                          <td>{getCompraMotivo(item)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <TablePagination
+                  totalItems={compraDetailItems.length}
+                  pageSize={forecastPageSize}
+                  currentPage={compraDetailPage}
+                  onPageChange={setCompraDetailPage}
+                />
+              </>
+            ) : (
+              <p className="analysis-forecast-subtitle">Nenhum material disponivel para esta linha.</p>
+            )}
+          </>
+        ) : null}
+      </ChartExpandModal>
       <ChartExpandModal
         open={forecastExpanded}
         title="Previsao de gasto (rolling 12 meses)"

@@ -51,8 +51,13 @@
 - Tooltip/formula do forecast foi corrigido para refletir o fator de tendencia ponderado usado no banco.
 - Migration `supabase/migrations/20260801_forecast_stats_metadata.sql` criada para separar contingencia de 25% de P75/P90 estatisticos e marcar amostra insuficiente.
 - Documentacao e ajuda da tela `Analise de Estoque` foram atualizadas com a leitura nova do forecast.
+- Aba `Compra` da `Analise de Estoque` passou a comunicar `Necessidade de reposicao atual`, removendo a soma geral de unidades diferentes do resumo principal.
+- Aba `Compra` recebeu cards de decisao operacional, reconciliacao do total monitorado, faixas de cobertura e modal detalhado com nome amigavel, estoque, consumo, cobertura, quantidade, preco, valor e motivo.
+- Aba `Compra` removeu os blocos grandes de listas e passou a concentrar o detalhe por material no drill-down das tabelas.
+- Modal de detalhes da aba `Compra` passou a exportar a categoria/faixa aberta em CSV.
 
 ## Pendente
+- Criar calculo independente de `Orcamento de compras - proximos 12 meses`, com RPC/snapshot proprio para consumo previsto, estoque utilizavel, pedidos em aberto, estoque de seguranca, reajuste, demanda extraordinaria e contingencia.
 - Aplicar a migration `supabase/migrations/20260801_forecast_stats_metadata.sql` no projeto Supabase para ativar os metadados estatisticos do forecast.
 - Confirmar dominios de producao/staging para configurar whitelist CORS via `CORS_ALLOWED_ORIGINS`.
 - Definir escopo do rate limit de leitura: apenas rotas sensiveis ou global.
