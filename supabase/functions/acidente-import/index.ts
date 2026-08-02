@@ -703,6 +703,7 @@ Deno.serve(async (req) => {
     const { data: locaisRaw, error: locaisErr } = await supabaseAdmin
       .from("acidente_locais")
       .select("id, nome, ativo")
+      .eq("account_owner_id", owner)
     if (locaisErr) {
       await logError(500, locaisErr.message, { error: locaisErr.message }, importUserId, locaisErr.code)
       return respond(locaisErr.message, { status: 500, headers: corsHeaders })

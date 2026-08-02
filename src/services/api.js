@@ -721,6 +721,13 @@ const BASIC_REGISTRATION_TABLE_CONFIG = {
     order: ['nome'],
     ownerScoped: true,
   },
+  acidente_locais: {
+    nameColumn: 'nome',
+    select:
+      'id,nome,ativo,criado_em,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['nome'],
+    ownerScoped: true,
+  },
 }
 
 const resolveBasicRegistrationConfig = (table) => {

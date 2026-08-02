@@ -40,6 +40,11 @@ const TABLES = [
     relationField: 'centroServicoId',
     relationLabel: 'Centro de servico',
   },
+  {
+    key: 'acidente_locais',
+    label: 'Locais de acidente',
+    nameLabel: 'Local de acidente',
+  },
 ]
 
 const DEFAULT_FILTERS = { termo: '', ativo: 'ativos' }

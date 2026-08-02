@@ -58,7 +58,7 @@ Regras de importacao
 - matricula obrigatoria e deve existir na tabela pessoas (mesma familia).
 - data e hora obrigatorias (dd/MM/yyyy + HH:mm).
 - dias_perdidos e dias_debitados obrigatorios (inteiros).
-- centro_servico e local obrigatorios (devem existir nos catalogos).
+- centro_servico e local obrigatorios (devem existir nos catalogos do tenant atual).
 - agentes obrigatorio (ao menos 1).
 - tipos e/ou lesoes obrigatorios (ao menos 1).
 - partes obrigatorio (ao menos 1).

@@ -137,6 +137,7 @@ function getDefaultState() {
       centros_servico: [],
       centros_estoque: [],
       setores: [],
+      acidente_locais: [],
     },
     basicRegistrationHistory: [],
     pessoas: [],

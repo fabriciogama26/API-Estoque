@@ -197,6 +197,7 @@ const BASIC_REGISTRATION_TABLE_CONFIG = {
   centros_servico: { nameColumn: 'nome', order: ['nome'] },
   centros_estoque: { nameColumn: 'almox', order: ['almox'] },
   setores: { nameColumn: 'nome', order: ['nome'] },
+  acidente_locais: { nameColumn: 'nome', order: ['nome'] },
 }
 
 const resolveBasicRegistrationConfig = (table) => {
@@ -3210,6 +3211,18 @@ const localApi = {
     async locals() {
       return readState((state) => {
         const set = new Set(locaisAcidentePadrao)
+        const locaisCadastro = Array.isArray(state.basicRegistration?.acidente_locais)
+          ? state.basicRegistration.acidente_locais
+          : []
+        locaisCadastro.forEach((local) => {
+          if (local?.ativo === false) {
+            return
+          }
+          const valor = trim(local?.nome)
+          if (valor) {
+            set.add(valor)
+          }
+        })
         const lista = Array.isArray(state.acidentes) ? state.acidentes : []
         lista.forEach((acidente) => {
           if (acidente && acidente.local) {

@@ -41,6 +41,10 @@ const TABLES: Record<
     headers: ["setor", "centro_servico", "ativo"],
     example: ["SETOR A", "SERVICO A", "true"],
   },
+  acidente_locais: {
+    headers: ["local", "ativo"],
+    example: ["SALA A", "true"],
+  },
 }
 
 Deno.serve(async (req) => {

@@ -8,6 +8,7 @@ const TABLE_COLUMNS = {
   centros_servico: ['centro_servico', 'centro_custo', 'ativo'],
   centros_estoque: ['centro_estoque', 'centro_custo', 'ativo'],
   setores: ['setor', 'centro_servico', 'ativo'],
+  acidente_locais: ['local', 'ativo'],
 }
 
 export function CadastroBaseImportModal({
