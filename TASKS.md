@@ -77,6 +77,7 @@
 - Comparativo historico da aba `Previsao de Orcamento` corrigido para usar apenas a serie historica filtrada do snapshot selecionado, sem somar `historico_full`.
 - Indicador `Entradas consideradas` recebeu tooltip explicando que vem do agregado mensal usado no snapshot e pode diferir do Dashboard atual se houver dados posteriores.
 - Explicacao do `Estoque utilizavel considerado` na composicao do orcamento passou a usar icone informativo com tooltip no padrao do forecast, com ajuste para evitar corte visual.
+- Dashboard de Acidentes passou a ignorar a view agregada quando ha filtro dimensional ativo, permitindo que `Centro de servico` e demais selects filtrem cards, HHT e graficos via calculo JS com `vw_acidentes` + `hht_mensal_view`.
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.

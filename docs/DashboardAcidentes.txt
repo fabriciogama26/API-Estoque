@@ -15,6 +15,7 @@ Fluxo de carregamento
 2. Modo remoto (padrao):
    - Consulta a view `vw_indicadores_acidentes` (taxas calculadas em SQL usando `hht_mensal` por centro/mes e apenas acidentes `ativo=true`).
    - Normaliza colunas para o formato interno (`resumo`, `tendencia`, `tipos`, `partes_lesionadas`, `cargos`, `agentes`, `lesoes`) e monta o label do periodo com base nos filtros.
+   - Quando houver filtro dimensional preenchido (centro de servico, tipo, lesao, parte lesionada, agente, cargo ou unidade), ignora a view agregada e usa o calculo JS com `vw_acidentes` + `hht_mensal_view`, porque a view SQL anual nao recebe esses filtros.
 3. Fallback local:
    - Se a view falhar, usa `localApi.acidentes.dashboard`/`montarDashboardAcidentes` (JS) com HHT mensal carregado de `hht_mensal_view`.
    - API retorna objeto com: `resumo`, `tendencia`, `tipos`, `partesLesionadas`, `cargos`, `agentes`, `options`.
@@ -154,3 +155,16 @@ Atualizacao 2026-08
 - Depois: `src/lib/acidentesDashboard.js` soma os registros ativos de `hht_mensal` dentro do periodo/centro filtrado, independente de haver acidente no mesmo centro/mes; o fallback remoto passa a buscar `centro_servico_id` em `hht_mensal_view`.
 - Banco: criada a migration `supabase/migrations/20260801_fix_dashboard_acidentes_hht_total.sql` para recriar `vw_indicadores_acidentes` com HHT mensal agregado por periodo/tenant, usando `security_invoker = on` e coluna `account_owner_id`.
 - Multi-tenant: a view passa a agrupar por `account_owner_id` e depende de RLS nas tabelas base; usuarios comuns continuam restritos ao proprio tenant.
+
+Atualizacao 2026-08 (Filtros)
+-----------------------------
+- Arquivos alterados:
+  - src/services/api.js
+  - docs/DashboardAcidentes.txt
+  - TASKS.md
+- Funcoes tocadas:
+  - api.acidentes.dashboard
+  - hasDashboardDimensionFilters
+- Antes/Depois:
+  - Antes, quando `Centro de servico` era selecionado, o modo remoto ainda retornava a primeira linha agregada de `vw_indicadores_acidentes`, que so recebia filtro por ano/periodo.
+  - Depois, filtros dimensionais desviam para `montarDashboardAcidentes`, que filtra por centro/tipo/lesao/parte/agente/cargo e usa `hht_mensal_view` respeitando o centro selecionado.
