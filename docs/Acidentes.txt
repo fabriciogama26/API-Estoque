@@ -103,7 +103,7 @@ Cadastro em massa (novo)
 Carregamento de dados
 ---------------------
 - Pessoas, locais, agentes, tipos, lesoes e partes sao carregados em paralelo, cada catalogo com seu proprio `isLoading` e `error`.
-- Catalogos de acidentes (agentes/partes/lesoes/tipos/locais) sao publicos, sem filtro por owner.
+- Catalogos de acidentes de agentes/partes/lesoes/tipos continuam publicos; locais de acidente sao owner-scoped por `account_owner_id` e administrados em Cadastro Base.
 - Campo Matricula usa busca com debounce (searchPessoas quando disponivel, fallback local), exibe feedback de carregamento/erro no dropdown e so abre sugestoes quando nao ha matricula ja selecionada.
 - Busca de pessoas retorna apenas ativos por padrao (includeInactive=true para sobrescrever).
 - A lista principal `useAcidentes` atualiza apos:
@@ -172,6 +172,27 @@ Atualizacao 2026-02
 Atualizacao 2026-03 (Seguranca)
 -------------------------------
 - Catalogo de centros de servico usado no formulario agora respeita `account_owner_id` no frontend.
+
+Atualizacao 2026-08 (Locais por tenant)
+---------------------------------------
+- Arquivos alterados:
+  - src/services/api.js
+  - src/services/localApi.js
+  - src/services/localDataStore.js
+  - supabase/functions/acidente-import/index.ts
+  - supabase/migrations/20260802_acidente_locais_owner_scope.sql
+  - docs/Acidentes.txt
+  - docs/CadastroBase.txt
+  - TASKS.md
+- Funcoes/hooks/constantes tocadas:
+  - api.acidentes.locals
+  - localApi.acidentes.locals
+  - validate_accident_location_owner
+  - rpc_catalog_list
+- Antes/Depois:
+  - Antes, o campo Local lia `acidente_locais` como catalogo global.
+  - Depois, o campo Local lê apenas locais ativos do tenant atual; `accidents.location_name` e validado por trigger para impedir FK de outro owner.
+  - A importacao em massa de acidentes consulta `acidente_locais` com `account_owner_id = owner` antes de validar o campo `local`.
 
 Atualizacao 2026-03
 -------------------

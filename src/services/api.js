@@ -721,6 +721,13 @@ const BASIC_REGISTRATION_TABLE_CONFIG = {
     order: ['nome'],
     ownerScoped: true,
   },
+  acidente_locais: {
+    nameColumn: 'nome',
+    select:
+      'id,nome,ativo,criado_em,updated_at,created_by_user_id,created_by_user_name,updated_by_user_id,updated_by_user_name,account_owner_id,created_by_user:created_by_user_id(id,display_name,username,email)',
+    order: ['nome'],
+    ownerScoped: true,
+  },
 }
 
 const resolveBasicRegistrationConfig = (table) => {
@@ -4229,6 +4236,16 @@ const mapDashboardFromView = (registro, periodoInicio, periodoFim) => {
   }
 }
 
+const hasDashboardDimensionFilters = (params = {}) =>
+  ['centroServico', 'tipo', 'lesao', 'parteLesionada', 'agente', 'cargo', 'unidade'].some((key) => {
+    const value = trim(params?.[key] ?? '')
+    if (!value) {
+      return false
+    }
+    const normalized = value.toLowerCase()
+    return normalized !== 'todos' && normalized !== 'todas'
+  })
+
 
 async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
@@ -7191,21 +7208,24 @@ export const api = {
       const inicio = sanitizeMonthRef(params?.periodoInicio) || null
       const fim = sanitizeMonthRef(params?.periodoFim) || null
       const anoFiltro = Number.isFinite(Number(params?.ano)) ? Number(params.ano) : null
+      const useFilteredCalculation = hasDashboardDimensionFilters(params)
 
-      try {
-        let query = supabase.from('vw_indicadores_acidentes').select('*')
-        if (anoFiltro !== null) {
-          query = query.eq('ano', anoFiltro)
+      if (!useFilteredCalculation) {
+        try {
+          let query = supabase.from('vw_indicadores_acidentes').select('*')
+          if (anoFiltro !== null) {
+            query = query.eq('ano', anoFiltro)
+          }
+          const dadosView = await execute(query, 'Falha ao carregar indicadores de acidentes (SQL).')
+          const lista = Array.isArray(dadosView) ? dadosView : []
+          if (lista.length > 0) {
+            return mapDashboardFromView(lista[0], inicio, fim)
+          }
+        } catch (error) {
+          reportClientError('Falha ao carregar dashboard de acidentes via view SQL; usando calculo local.', error, {
+            area: 'dashboard_acidentes_sql',
+          })
         }
-        const dadosView = await execute(query, 'Falha ao carregar indicadores de acidentes (SQL).')
-        const lista = Array.isArray(dadosView) ? dadosView : []
-        if (lista.length > 0) {
-          return mapDashboardFromView(lista[0], inicio, fim)
-        }
-      } catch (error) {
-        reportClientError('Falha ao carregar dashboard de acidentes via view SQL; usando calculo local.', error, {
-          area: 'dashboard_acidentes_sql',
-        })
       }
 
       const acidentes = await carregarAcidentes()

@@ -77,9 +77,13 @@
 - Comparativo historico da aba `Previsao de Orcamento` corrigido para usar apenas a serie historica filtrada do snapshot selecionado, sem somar `historico_full`.
 - Indicador `Entradas consideradas` recebeu tooltip explicando que vem do agregado mensal usado no snapshot e pode diferir do Dashboard atual se houver dados posteriores.
 - Explicacao do `Estoque utilizavel considerado` na composicao do orcamento passou a usar icone informativo com tooltip no padrao do forecast, com ajuste para evitar corte visual.
+- Dashboard de Acidentes passou a ignorar a view agregada quando ha filtro dimensional ativo, permitindo que `Centro de servico` e demais selects filtrem cards, HHT e graficos via calculo JS com `vw_acidentes` + `hht_mensal_view`.
+- Catalogo `acidente_locais` passou a ser owner-scoped com `account_owner_id`, RLS por tenant, remapeamento de acidentes existentes e administracao pela tela Cadastro Base como "Locais de acidente".
+- Migration de `acidente_locais` ajustada para bancos onde a coluna legada `ordem` nao existe.
 
 ## Pendente
 - Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.
+- Aplicar a migration `supabase/migrations/20260802_acidente_locais_owner_scope.sql` no projeto Supabase para ativar locais de acidente por tenant no Cadastro Base.
 - Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_uuid_empty.sql` no projeto Supabase se a aba ainda mostrar `invalid input syntax for type uuid: ""`.
 - Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_rpc_text_params.sql` no projeto Supabase se o erro `invalid input syntax for type uuid: ""` persistir mesmo com `p_owner_id` e `p_forecast_id` validos no payload.
 - Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_status_cancelado_safe.sql` no projeto Supabase se o contexto do erro 22P02 apontar para o `RETURN` da RPC de orcamento anual.

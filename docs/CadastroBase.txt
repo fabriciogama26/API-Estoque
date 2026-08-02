@@ -3,7 +3,7 @@ Tela: Cadastro Base
 
 Visao geral
 -----------
-- Cadastro unificado das tabelas de apoio: fabricantes, cargos, centros de custo, centros de servico, centros de estoque e setores.
+- Cadastro unificado das tabelas de apoio: fabricantes, cargos, centros de custo, centros de servico, centros de estoque, setores e locais de acidente.
 - Uma unica tela com seletor de tabela, formulario dinamico, filtros e lista.
 - Inativacao (ativo=false) em vez de exclusao.
 
@@ -28,6 +28,7 @@ Cadastro
     - Centro de servico: exige centro de custo.
     - Centro de estoque: exige centro de custo.
     - Setor: exige centro de servico (e centro de custo indiretamente).
+    - Local de acidente: sem dependencia; preenche o campo Local no cadastro de Acidentes.
 - Bloqueios:
   - Se dependencias estiverem vazias, o formulario bloqueia salvamento.
   - Para Cargos, a digitacao exige Caps Lock ativo (desktop). Colar so permite texto em maiusculo.
@@ -117,6 +118,7 @@ Constantes e configuracoes
 - Tabelas suportadas (labels, dependencias, caps lock)
   - Tipo: configuracao no controller
   - Caminho: src/hooks/useCadastroBaseController.js
+  - Inclui `acidente_locais` para administrar o campo Local da tela de Acidentes.
 
 Funcoes utilitarias relacionadas
 --------------------------------
@@ -159,3 +161,26 @@ Atualizacao 2026-03 (Auditoria)
 -------------------------------
 - O cadastro base deixou de gravar o owner do tenant como `created_by_user_id`/`updated_by_user_id` quando um dependente salva um registro.
 - `resolveUsuarioId()` agora devolve o ator real da sessao; imports continuam usando o owner via `resolveImportsOwnerId()`.
+
+Atualizacao 2026-08 (Locais de acidente)
+----------------------------------------
+- Arquivos alterados:
+  - src/hooks/useCadastroBaseController.js
+  - src/components/CadastroBase/CadastroBaseImportModal.jsx
+  - src/services/api.js
+  - src/services/localApi.js
+  - src/services/localDataStore.js
+  - supabase/functions/cadastro-base-template/index.ts
+  - supabase/functions/cadastro-base-import/index.ts
+  - supabase/functions/acidente-import/index.ts
+  - supabase/migrations/20260802_acidente_locais_owner_scope.sql
+- Funcoes/hooks/constantes tocadas:
+  - TABLES (Cadastro Base)
+  - BASIC_REGISTRATION_TABLE_CONFIG
+  - api.basicRegistration
+  - localApi.basicRegistration
+  - api.acidentes.locals / importacao de acidentes
+- Antes/Depois:
+  - Antes, `acidente_locais` era catalogo global usado apenas por Acidentes e nao aparecia no Cadastro Base.
+  - Depois, `acidente_locais` passa a ter `account_owner_id`, RLS por tenant, historico via `basic_registration_history` e opcao "Locais de acidente" no Cadastro Base.
+  - Imports de Cadastro Base aceitam a tabela `acidente_locais`; imports de Acidentes validam locais apenas no owner do arquivo.

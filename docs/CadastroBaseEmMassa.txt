@@ -3,7 +3,7 @@ Cadastro Base em massa
 
 Objetivo
 --------
-Cadastrar itens em massa nas tabelas base (fabricantes, cargos, centros, setores) via XLSX.
+Cadastrar itens em massa nas tabelas base (fabricantes, cargos, centros, setores e locais de acidente) via XLSX.
 
 Fluxo geral
 -----------
@@ -24,6 +24,7 @@ Colunas obrigatorias por tabela:
 - centros_servico: centro_servico, centro_custo
 - centros_estoque: centro_estoque, centro_custo
 - setores: setor, centro_servico
+- acidente_locais: local
 
 Colunas opcionais:
 - ativo (true/false) para todas as tabelas

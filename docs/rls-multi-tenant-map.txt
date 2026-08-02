@@ -40,16 +40,20 @@ Politicas RLS tenant (limpeza e padrao)
     planos_users
 - supabase/migrations/20250205_catalog_public_select_only.sql
   - catalogos sem account_owner_id: SELECT publico apenas
-    - acidente_agentes, acidente_tipos, acidente_partes, acidente_lesoes, acidente_locais
+    - acidente_agentes, acidente_tipos, acidente_partes, acidente_lesoes
   - remove todas policies DELETE no banco
 
 Catalogos tenant (com account_owner_id)
 ---------------------------------------
-- centros_servico, setores, cargos, centros_custo, centros_estoque, fabricantes
+- centros_servico, setores, cargos, centros_custo, centros_estoque, fabricantes, acidente_locais
 - supabase/migrations/20250206_catalog_select_no_ativo.sql
   - remove filtro ativo da policy SELECT
 - supabase/migrations/20250209_fix_catalog_select_owner.sql
   - garante SELECT com owner + master (sem ativo)
+- supabase/migrations/20260802_acidente_locais_owner_scope.sql
+  - transforma acidente_locais em catalogo por tenant
+  - remapeia accidents.location_name para local do mesmo owner
+  - adiciona trigger de consistencia para impedir FK de outro tenant
 
 RPCs de catalogo (evitar SELECT direto no front)
 ------------------------------------------------

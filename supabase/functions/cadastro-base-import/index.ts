@@ -137,6 +137,11 @@ const TABLES: Record<string, TableConfig> = {
       targets: ["centro_servico", "centro servico"],
     },
   },
+  acidente_locais: {
+    table: "acidente_locais",
+    nameColumn: "nome",
+    nameTargets: ["local", "local_acidente", "local acidente", "nome"],
+  },
 }
 
 const normalizeHeader = (value: unknown) =>
