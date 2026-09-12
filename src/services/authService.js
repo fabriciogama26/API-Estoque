@@ -13,6 +13,10 @@ function translateAuthErrorMessage(message) {
     return 'A nova senha deve ser diferente da senha anterior.'
   }
 
+  if (normalized === 'Password update requires reauthentication' || normalized.toLowerCase().includes('requires reauthentication')) {
+    return 'Nao foi possivel trocar a senha com esta sessao. Solicite um novo link de recuperacao ou faca login novamente para reautenticar.'
+  }
+
   return normalized
 }
 
@@ -119,14 +123,6 @@ export async function updatePassword(newPassword) {
 export async function restoreResetSession() {
   assertSupabase()
 
-  const sessionResult = await supabase.auth.getSession()
-  if (sessionResult?.data?.session) {
-    return sessionResult.data.session
-  }
-  if (sessionResult?.error) {
-    throw sessionResult.error
-  }
-
   const currentUrl = new URL(window.location.href)
   const hashParams = new URLSearchParams(currentUrl.hash?.replace(/^#/, '') ?? '')
   const searchParams = currentUrl.searchParams
@@ -134,6 +130,9 @@ export async function restoreResetSession() {
   const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash')
   const type = searchParams.get('type') || hashParams.get('type')
   const email = searchParams.get('email') || hashParams.get('email')
+  const code = searchParams.get('code') || hashParams.get('code')
+  const accessToken = searchParams.get('access_token') || hashParams.get('access_token')
+  const refreshToken = searchParams.get('refresh_token') || hashParams.get('refresh_token')
 
   if (type === 'recovery') {
     if (tokenHash) {
@@ -165,6 +164,62 @@ export async function restoreResetSession() {
         return otpData.session
       }
     }
+
+    if (accessToken && refreshToken) {
+      const { data: sessionData, error: sessionFromTokensError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+      if (sessionFromTokensError) {
+        throw sessionFromTokensError
+      }
+      if (sessionData?.session) {
+        return sessionData.session
+      }
+    }
+
+    if (code) {
+      const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+      if (exchangeError) {
+        throw exchangeError
+      }
+      if (exchangeData?.session) {
+        return exchangeData.session
+      }
+    }
+
+    throw new Error('Link de redefinicao invalido ou expirado. Solicite um novo email.')
+  }
+
+  if (code) {
+    const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    if (exchangeError) {
+      throw exchangeError
+    }
+    if (exchangeData?.session) {
+      return exchangeData.session
+    }
+  }
+
+  if (accessToken && refreshToken) {
+    const { data: sessionData, error: sessionFromTokensError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    })
+    if (sessionFromTokensError) {
+      throw sessionFromTokensError
+    }
+    if (sessionData?.session) {
+      return sessionData.session
+    }
+  }
+
+  const sessionResult = await supabase.auth.getSession()
+  if (sessionResult?.data?.session) {
+    return sessionResult.data.session
+  }
+  if (sessionResult?.error) {
+    throw sessionResult.error
   }
 
   // Tenta usar helper oficial
@@ -183,32 +238,6 @@ export async function restoreResetSession() {
       context: { errorMessage: urlError?.message },
       stack: urlError?.stack,
     }).catch(() => {})
-  }
-
-  const code = searchParams.get('code') || hashParams.get('code')
-  if (code) {
-    const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-    if (exchangeError) {
-      throw exchangeError
-    }
-    if (exchangeData?.session) {
-      return exchangeData.session
-    }
-  }
-
-  const accessToken = hashParams.get('access_token')
-  const refreshToken = hashParams.get('refresh_token')
-  if (accessToken && refreshToken) {
-    const { data: sessionData, error: sessionFromTokensError } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    })
-    if (sessionFromTokensError) {
-      throw sessionFromTokensError
-    }
-    if (sessionData?.session) {
-      return sessionData.session
-    }
   }
 
   throw new Error('Link de redefinicao invalido ou expirado. Solicite um novo email.')
