@@ -18,6 +18,7 @@
 - Fluxo de baixa do ASO passou a fechar o registro atual como `Baixado`, criar um novo ciclo com a data realizada e registrar historico apenas em edicao/baixa.
 - Fluxo de baixa do ASO agora exige o tipo do proximo exame e trata `admissional`, `periodico` e `mudanca_funcao_setor` como um unico grupo renovavel ativo por funcionario.
 - Tela de reset de senha passou a traduzir o erro de senha repetida para portugues e ganhou exibicao/ocultacao por icone de olho nos campos de senha.
+- Fluxo de reset de senha passou a priorizar credenciais de recuperacao da URL antes de reutilizar sessao salva, evitando erro de reautenticacao com sessao antiga.
 - Removida a reautenticacao obrigatoria nas rotas protegidas do backend/front.
 - Fluxo de reset de senha voltou a usar Supabase direto com `token_hash` na tela de reset.
 - Configuracoes agora bloqueiam auto-rebaixamento, auto-desativacao e remocao de `rbac.manage`.
@@ -142,5 +143,7 @@
 - Forecast 2026-04-23: a auditoria do snapshot mede qualidade do forecast em meses ja realizados; o diagnostico estatistico continua sendo uma leitura complementar da distribuicao historica mensal.
 - Auth 2026-05-09: admins recebiam email de recuperacao porque eram resolvidos em `app_users`; dependentes podiam receber sucesso sem envio quando estavam apenas em `app_users_dependentes`, pois `auth-recover` nao tinha o fallback existente no login.
 - Auth 2026-05-09: se o request log mostrar 500 em `auth-recover`, verificar Function Logs da mesma execucao; o log agora informa `stage` para separar falha de rate limit, lookup do dependente/owner ou envio pelo Supabase Auth.
+- Auth 2026-09-12: erro "Password update requires reauthentication" no reset estava associado ao uso de sessao antiga/local antes da validacao do token de recuperacao; `restoreResetSession` agora consome credenciais da URL primeiro.
+- Reset de senha 2026-09-12: `npm run build` passou; `npm run lint` continua bloqueado por pendencias gerais preexistentes do projeto.
 - Dashboard Acidentes 2026-08-01: para o owner `59191387-669b-4585-8e11-7070d9769d86`, havia 5 HHT ativos em 03/2026 somando 99.120,67 e 24 acidentes ativos em 2026; nenhum grupo `mes + centro_servico_id` dos acidentes tinha HHT correspondente, por isso a regra antiga retornava HHT total 0.
 - Estoque 2026-08-01: `npm run build` passou apos a correcao do filtro; `npm run lint` continua bloqueado por pendencias gerais preexistentes no projeto. A tela voltou a aplicar filtros somente pelo botao "Aplicar filtros" e a carga inicial deixou de depender da trava global `hasRunInitialLoad`.
