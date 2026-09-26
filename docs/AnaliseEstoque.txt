@@ -464,6 +464,12 @@ Atualizacao 2026-09 (modo automatico da politica de reposicao)
 - Antes: o modo automatico era recusado e nao havia medida de impacto.
 - Depois: o tenant simula, exporta as mudancas e ativa o Automatico com motivo; pode voltar ao Monitorar a qualquer momento.
 
+Atualizacao 2026-09 (ajuda contextual reorganizada)
+--------------------------------------------------
+- Arquivo alterado: src/help/helpAnaliseEstoque.json (chave analiseEstoque).
+- Antes: 5 passos e 45 notas soltas, com notas desatualizadas (seletor de periodo na Compra, layout do modal) e sem as acoes novas.
+- Depois: 9 passos com itens (filtros; cartoes e Paretos; abas da previsao; aba Compra; minimos; detalhar/exportar/ajustar; politica e modos Monitorar/Automatico com simulacao; Previsao de Orcamento; Auditoria) e 7 notas tecnicas.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

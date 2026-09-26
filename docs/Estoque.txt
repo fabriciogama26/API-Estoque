@@ -229,6 +229,13 @@ Atualizacao 2026-09 (alertas no modo automatico)
 - Resumo: no Automatico o card passa a "Deficit ate o minimo efetivo" com tooltip proprio.
 - Material sem dados da politica (RPC indisponivel) mantem o calculo pelo minimo cadastrado.
 
+Atualizacao 2026-09 (ajuda contextual reorganizada)
+--------------------------------------------------
+- Arquivos alterados: src/help/helpEstoque.json (chave estoque) e src/help/helpConfiguracoes.json (notas de permissao).
+- Antes: notas acumuladas e contraditorias sobre a origem dos alertas (minimo cadastrado x minimo efetivo).
+- Depois: 8 passos com itens (filtros e itens sem movimentacao; Resumo; alertas por modo da politica; minimos por material; acoes; alterar minimo com permissao e historico; historico de saidas; CSV) e 4 notas.
+- Configuracoes: notas explicando o toggle Politica de reposicao (estoque.politica.manage) e a exigencia de estoque.write para alterar o minimo cadastrado.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

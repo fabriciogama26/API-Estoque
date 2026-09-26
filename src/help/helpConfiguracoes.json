@@ -38,7 +38,9 @@
       "Busca retorna titulares e dependentes (id do auth) respeitando o nível do usuário logado; master enxerga tudo.",
       "Em modo local, reset de senha fica indisponível.",
       "Se page_permissions estiver vazio, aplicamos o padrão da credencial.",
-      "As policies usam o level do catálogo para impedir que usuários vejam/editem credenciais acima do seu nível."
+      "As policies usam o level do catálogo para impedir que usuários vejam/editem credenciais acima do seu nível.",
+      "Toggle Politica de reposicao (estoque.politica.manage): permite alterar a politica de reposicao na Analise de Estoque, trocar entre os modos Monitorar e Automatico e criar/revogar overrides de minimo por material.",
+      "Alterar o minimo cadastrado de um material (Estoque atual e aba Compra) exige a permissao Estoque - Alterar (estoque.write) ou master."
     ]
   }
 }
