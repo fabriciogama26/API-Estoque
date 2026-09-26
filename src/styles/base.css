@@ -633,3 +633,27 @@ ul, ol {
   height: 1.9rem;
   z-index: 20;
 }
+
+/* "Nao calculavel" com icone de informacao (politica de reposicao) */
+.nao-calculavel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.summary-tooltip--inline {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.summary-tooltip--inline span {
+  left: auto;
+  right: 0;
+  width: 260px;
+  max-width: 70vw;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+}

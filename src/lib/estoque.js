@@ -265,6 +265,8 @@ function normalizarMaterial(material) {
 
 export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], periodo = null, options = {}) {
   const includeAll = Boolean(options?.includeAll)
+  // Visao base do Estoque atual: material ativo sem movimentacao aparece com saldo zero (decisao 2026-09-26).
+  const includeAtivosSemMovimentacao = Boolean(options?.includeAtivosSemMovimentacao)
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
   const materiaisComMovimentacao = new Set()
 
@@ -372,7 +374,25 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     }
   })
 
-  const itensFiltrados = includeAll ? itens : itens.filter((item) => materiaisComMovimentacao.has(item.materialId))
+  const materiaisAtivos = new Set(
+    materiaisNormalizados.filter((material) => material.ativo !== false).map((material) => material.id),
+  )
+  const itensFiltrados = includeAll
+    ? itens
+    : itens
+        .filter(
+          (item) =>
+            materiaisComMovimentacao.has(item.materialId) ||
+            (includeAtivosSemMovimentacao && materiaisAtivos.has(item.materialId)),
+        )
+        .map((item) => {
+          if (materiaisComMovimentacao.has(item.materialId)) {
+            return item
+          }
+          // Incluido so por estar ativo: aparece na lista, mas nao gera alerta nem soma reposicao,
+          // para preservar os alertas atuais (modo monitorar). A revisao fica na aba Compra.
+          return { ...item, semMovimentacao: true, alerta: false, deficitQuantidade: 0, valorReposicao: 0 }
+        })
 
   const alertas = itensFiltrados
     .filter((item) => item.alerta)

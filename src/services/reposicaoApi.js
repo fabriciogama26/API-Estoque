@@ -68,3 +68,12 @@ export function revokeOverrideReposicao(ownerId, overrideId, motivo) {
     'Falha ao revogar o override do material.',
   )
 }
+
+// Altera somente materiais."estoqueMinimo" (minimo cadastrado), com historico no banco.
+export function updateEstoqueMinimoCadastrado(materialId, estoqueMinimo, motivo = null) {
+  return callRpc(
+    'rpc_material_estoque_minimo_update',
+    { p_material_id: materialId, p_estoque_minimo: estoqueMinimo, p_motivo: motivo || null },
+    'Falha ao salvar o minimo cadastrado.',
+  )
+}

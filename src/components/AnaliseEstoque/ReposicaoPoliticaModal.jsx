@@ -54,6 +54,12 @@ const CAMPOS = [
 
 const HISTORICO_ACOES = { criado: 'Criado', alterado: 'Alterado', revogado: 'Revogado' }
 
+const HISTORICO_ENTIDADES = {
+  politica: 'Politica',
+  override: 'Override de material',
+  minimo_cadastrado: 'Minimo cadastrado de material',
+}
+
 function formatDataHora(value) {
   if (!value) return '-'
   const date = new Date(value)
@@ -237,7 +243,7 @@ export function ReposicaoPoliticaModal({ open, ownerId, onClose, onSaved, report
                 {historico.map((row) => (
                   <tr key={row.id}>
                     <td>{formatDataHora(row.criado_em)}</td>
-                    <td>{row.entidade === 'politica' ? 'Politica' : 'Override de material'}</td>
+                    <td>{HISTORICO_ENTIDADES[row.entidade] || row.entidade}</td>
                     <td>{HISTORICO_ACOES[row.acao] || row.acao}</td>
                     <td>{row.motivo || '-'}</td>
                   </tr>

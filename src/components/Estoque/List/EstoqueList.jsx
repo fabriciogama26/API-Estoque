@@ -6,6 +6,15 @@ import { EntryIcon, ExitIcon, NotificationIcon, SaveIcon } from '../../icons.jsx
 import { listSaidas } from '../../../services/saidasService.js'
 import { EstoqueSaidaModal } from '../Modal/EstoqueSaidaModal.jsx'
 import { EstoqueMinStockModal } from '../Modal/EstoqueMinStockModal.jsx'
+import { NaoCalculavelInfo } from '../../AnaliseEstoque/NaoCalculavelInfo.jsx'
+import {
+  formatBaseCalculo,
+  formatCoberturaMeses,
+  formatFonteRegra,
+  formatQuantidadeOuNaoCalculavel,
+  formatSituacaoReposicao,
+  toNumberOrNull,
+} from '../../../utils/reposicaoUtils.js'
 
 export function EstoqueList({
   itens,
@@ -18,6 +27,9 @@ export function EstoqueList({
   savingMinStock,
   onMinStockChange,
   onMinStockSave,
+  reposicao,
+  canEditMinimo = true,
+  canVerAnalise = false,
 }) {
   const navigate = useNavigate()
   const [minStockModal, setMinStockModal] = useState({ open: false, item: null })
@@ -31,9 +43,13 @@ export function EstoqueList({
     page: 1,
   })
   const minStockInputRef = useRef(null)
+  const [minStockMotivo, setMinStockMotivo] = useState('')
+  const reposicaoPorMaterial = reposicao?.porMaterial instanceof Map ? reposicao.porMaterial : new Map()
+  const reposicaoStatus = reposicao?.status || 'idle'
 
   const closeMinStockModal = () => setMinStockModal({ open: false, item: null })
   const openMinStockModal = (item) => {
+    setMinStockMotivo('')
     setMinStockModal({ open: true, item })
     const initialValue =
       item.estoqueMinimo !== undefined && item.estoqueMinimo !== null ? String(item.estoqueMinimo) : ''
@@ -141,7 +157,7 @@ export function EstoqueList({
 
   const handleModalSave = async () => {
     if (!modalItem || modalIsSaving) return
-    const ok = await onMinStockSave(modalItem)
+    const ok = await onMinStockSave(modalItem, minStockMotivo.trim() || null)
     if (ok) {
       closeMinStockModal()
     }
@@ -166,6 +182,8 @@ export function EstoqueList({
           const totalSaidasItem = Number(item.totalSaidas ?? 0)
           const hasSaida = Boolean(ultimaSaida) || totalSaidasItem > 0
           const ultimaSaidaLabel = hasSaida ? formatDateTimeValue(ultimaSaida.dataEntrega) : 'Sem saídas registradas'
+          const politicaItem = reposicaoPorMaterial.get(String(materialId)) || null
+          const minimoCadastrado = toNumberOrNull(item.estoqueMinimo)
 
           return (
             <article
@@ -176,7 +194,7 @@ export function EstoqueList({
                 <div className="estoque-list__item-alert">
                   <span className="estoque-list__item-alert-label">⚠️ Estoque Baixo</span>
                   <span className="estoque-list__item-alert-deficit">
-                    Necessário repor {deficitQuantidade} ({formatCurrency(item.valorReposicao)})
+                    Necessário repor {deficitQuantidade} ({formatCurrency(item.valorReposicao)}) | limite: mínimo cadastrado
                   </span>
                 </div>
               ) : null}
@@ -194,6 +212,11 @@ export function EstoqueList({
                   <p className="estoque-list__item-extra-info">
                     Validade (dias): {item.validadeDias ?? '-'} | CA: {item.ca || '-'}
                   </p>
+                  {item.semMovimentacao ? (
+                    <p className="estoque-list__item-sem-movimentacao">
+                      Sem movimentação registrada: saldo zero, sem alerta. Revise o mínimo na Análise de Estoque.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="estoque-list__item-metrics">
@@ -258,22 +281,88 @@ export function EstoqueList({
                         >
                             <ExitIcon size={16} aria-hidden="true" />
                           </button>
-                          <button
-                            type="button"
-                            className="estoque-list__action-button"
-                            onClick={() => openMinStockModal(item)}
-                            disabled={isSavingMin}
-                            aria-label="Alterar estoque mínimo"
-                            title="Alterar estoque mínimo"
-                          >
-                            <SaveIcon size={16} strokeWidth={1.8} aria-hidden="true" />
-                          </button>
+                          {canEditMinimo ? (
+                            <button
+                              type="button"
+                              className="estoque-list__action-button"
+                              onClick={() => openMinStockModal(item)}
+                              disabled={isSavingMin}
+                              aria-label="Alterar mínimo cadastrado"
+                              title="Alterar mínimo cadastrado"
+                            >
+                              <SaveIcon size={16} strokeWidth={1.8} aria-hidden="true" />
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </header>
+
+              <dl className="estoque-list__reposicao" aria-label="Minimos do material">
+                <div>
+                  <dt>Mínimo cadastrado</dt>
+                  <dd>{minimoCadastrado && minimoCadastrado > 0 ? formatInteger(minimoCadastrado) : 'Não cadastrado'}</dd>
+                </div>
+                <div>
+                  <dt>Mínimo sugerido</dt>
+                  <dd>
+                    {politicaItem
+                      ? toNumberOrNull(politicaItem.minimo_automatico) === null
+                        ? <NaoCalculavelInfo />
+                        : formatQuantidadeOuNaoCalculavel(politicaItem.minimo_automatico)
+                      : reposicaoStatus === 'loading'
+                        ? 'Calculando...'
+                        : 'Indisponível'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Mínimo efetivo</dt>
+                  <dd>
+                    {politicaItem
+                      ? toNumberOrNull(politicaItem.minimo_efetivo) === null
+                        ? <NaoCalculavelInfo tipo="limite" />
+                        : formatQuantidadeOuNaoCalculavel(politicaItem.minimo_efetivo)
+                      : '-'}
+                    {politicaItem ? <small>{formatFonteRegra(politicaItem.fonte_regra)}</small> : null}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Cobertura</dt>
+                  <dd>
+                    {politicaItem
+                      ? toNumberOrNull(politicaItem.cobertura_atual_meses) === null
+                        ? <NaoCalculavelInfo />
+                        : formatCoberturaMeses(politicaItem.cobertura_atual_meses)
+                      : '-'}
+                    {politicaItem ? <small>{formatBaseCalculo(politicaItem.base_calculo)}</small> : null}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Situação</dt>
+                  <dd>
+                    {politicaItem ? formatSituacaoReposicao(politicaItem.situacao) : '-'}
+                    {politicaItem?.prioridade ? <small>{politicaItem.prioridade}</small> : null}
+                  </dd>
+                </div>
+                {politicaItem?.divergencia_manual ? (
+                  <div className="estoque-list__reposicao-aviso">
+                    <dt>Diferença</dt>
+                    <dd>
+                      Cadastrado {politicaItem.divergencia_manual === 'manual_acima' ? 'acima' : 'abaixo'} do sugerido (
+                      {formatInteger(politicaItem.divergencia_pct)}%)
+                    </dd>
+                  </div>
+                ) : null}
+                {canVerAnalise && politicaItem ? (
+                  <div className="estoque-list__reposicao-link">
+                    <button type="button" className="button button--ghost button--compact" onClick={() => navigate('/analise-estoque?aba=compra')}>
+                      Ver análise de compra
+                    </button>
+                  </div>
+                ) : null}
+              </dl>
 
               <div className="estoque-list__item-body">
                 {fieldError ? <span className="estoque-list__item-error">{fieldError}</span> : null}
@@ -311,6 +400,9 @@ export function EstoqueList({
         onClose={closeMinStockModal}
         onChange={(value) => onMinStockChange(modalMaterialId, value)}
         onSave={handleModalSave}
+        motivo={minStockMotivo}
+        onMotivoChange={setMinStockMotivo}
+        politicaItem={modalMaterialId ? reposicaoPorMaterial.get(String(modalMaterialId)) || null : null}
       />
 
       {totalItems > pageSize ? (

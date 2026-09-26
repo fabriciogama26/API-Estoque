@@ -99,10 +99,11 @@ export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null) {
       },
       {
         id: 'valorReposicao',
-        title: 'Valor para reposição',
+        title: 'Déficit até o mínimo cadastrado',
         value: formatCurrency(resumoFiltrado.valorReposicao),
-        hint: 'Diferenca entre minimo e saldo atual',
-        tooltip: 'Diferenca entre estoque minimo configurado e saldo atual dos itens filtrados.',
+        hint: 'Minimo cadastrado - saldo atual',
+        tooltip:
+          'Quanto falta, em valor, para os itens filtrados chegarem ao minimo cadastrado (manual). Nao e a compra recomendada: considera so o minimo manual, inclusive de materiais sem consumo recente.',
         icon: 'VR',
         accent: 'white',
       },

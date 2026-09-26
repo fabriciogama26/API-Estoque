@@ -46,7 +46,15 @@
       "Atalho: ao clicar em Entrada/Saida a partir do Estoque atual, o sistema tenta preencher automaticamente o Centro de estoque e o Material.",
       "Movimentacao do periodo considera apenas as movimentacoes dentro do intervalo selecionado.",
       "Resumo e alertas seguem o modo selecionado.",
-      "Com Movimentacao do periodo ativa, a lista mostra somente materiais com movimentacao no intervalo."
+      "Com Movimentacao do periodo ativa, a lista mostra somente materiais com movimentacao no intervalo.",
+      "Cada material mostra o Minimo cadastrado (manual), o Minimo sugerido (consumo medio mensal x cobertura minima da politica) e o Minimo efetivo, com a fonte da regra, a cobertura e a situacao da reposicao.",
+      "O Minimo sugerido vem do mesmo calculo da aba Compra da Analise de Estoque; quando nao ha consumo em 180 dias ele aparece como Nao calculavel, nunca como zero.",
+      "Alterar o minimo cadastrado exige Estoque - Alterar (ou master); a alteracao fica no historico com motivo opcional e nao muda nenhum outro campo do material.",
+      "Na visao padrao, materiais ativos sem nenhuma movimentacao aparecem com saldo zero e aviso de sem movimentacao; eles nao geram alerta de estoque baixo.",
+      "Os alertas de estoque baixo continuam usando o minimo cadastrado (modo Monitorar da politica de reposicao).",
+      "O CSV inclui minimo cadastrado, sugerido e efetivo, maximo efetivo, fonte da regra, base do calculo, consumo medio, cobertura e situacao da reposicao.",
+      "O card Deficit ate o minimo cadastrado soma quanto falta para chegar ao minimo manual; a Compra recomendada usa a politica de reposicao (mesmo valor da aba Compra da Analise) e deixa de fora materiais sem consumo recente.",
+      "O card Revisar minimos conta materiais com minimo cadastrado sem saida na janela da politica ou muito diferente do sugerido; a revisao e feita na aba Compra da Analise de Estoque."
     ]
   }
 }

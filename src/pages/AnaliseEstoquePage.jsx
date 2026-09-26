@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import {
@@ -27,6 +28,8 @@ import { useErrorLogger } from '../hooks/useErrorLogger.js'
 import { fetchPoliticaReposicao, fetchReposicaoItens } from '../services/reposicaoApi.js'
 import { ReposicaoPoliticaModal } from '../components/AnaliseEstoque/ReposicaoPoliticaModal.jsx'
 import { ReposicaoOverrideModal } from '../components/AnaliseEstoque/ReposicaoOverrideModal.jsx'
+import { ReposicaoMinimoModal } from '../components/AnaliseEstoque/ReposicaoMinimoModal.jsx'
+import { NaoCalculavelInfo } from '../components/AnaliseEstoque/NaoCalculavelInfo.jsx'
 import {
   SITUACAO_REPOSICAO,
   SITUACAO_REPOSICAO_ORDEM,
@@ -936,7 +939,8 @@ export function AnaliseEstoquePage() {
     diasPeriodo,
     estoqueBase,
   } = useDashboardEstoqueContext()
-  const { profile } = usePermissions()
+  const { profile, permissions, isMaster, isAdmin } = usePermissions()
+  const canEditMinimo = isMaster || isAdmin || (Array.isArray(permissions) && permissions.includes('estoque.write'))
   const { reportError } = useErrorLogger('analise_estoque')
   const [forecastPayload, setForecastPayload] = useState(null)
   const [forecastLoading, setForecastLoading] = useState(false)
@@ -949,7 +953,11 @@ export function AnaliseEstoquePage() {
   const [forecastValidationPrevPage, setForecastValidationPrevPage] = useState(1)
   const [forecastCopiedHistorico, setForecastCopiedHistorico] = useState(false)
   const [forecastCopiedPrevisao, setForecastCopiedPrevisao] = useState(false)
-  const [forecastTab, setForecastTab] = useState('operacional')
+  const location = useLocation()
+  const abaSolicitada = new URLSearchParams(location.search).get('aba')
+  const abaValida = FORECAST_TABS.some((tab) => tab.id === abaSolicitada) ? abaSolicitada : null
+  const [forecastTab, setForecastTab] = useState(abaValida || 'operacional')
+  const forecastSectionRef = useRef(null)
   const [diagnosticoOpen, setDiagnosticoOpen] = useState(false)
   const [diagnosticoLoading, setDiagnosticoLoading] = useState(false)
   const [diagnosticoError, setDiagnosticoError] = useState(null)
@@ -967,6 +975,7 @@ export function AnaliseEstoquePage() {
   const [reposicaoSolicitada, setReposicaoSolicitada] = useState(false)
   const [politicaModalOpen, setPoliticaModalOpen] = useState(false)
   const [overrideItem, setOverrideItem] = useState(null)
+  const [minimoItem, setMinimoItem] = useState(null)
   const [forecastOrcamentoPayload, setForecastOrcamentoPayload] = useState(null)
   const [forecastOrcamentoLoading, setForecastOrcamentoLoading] = useState(false)
   const [forecastOrcamentoError, setForecastOrcamentoError] = useState(null)
@@ -1595,6 +1604,16 @@ export function AnaliseEstoquePage() {
     }
   }, [forecastHasData, ownerRpcId, selectedForecastRpcId])
 
+  // Link externo com ?aba= (ex.: cards do Estoque atual): seleciona a aba e rola ate o bloco de previsao.
+  useEffect(() => {
+    if (!abaValida) return undefined
+    setForecastTab(abaValida)
+    const frame = requestAnimationFrame(() => {
+      forecastSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [abaValida])
+
   // Reposicao atual: independe do snapshot do forecast e usa somente o owner da sessao.
   // Carrega so quando a aba Compra e aberta, para nao concorrer com auditoria/orcamento na abertura da pagina.
   const reposicaoDisponivel = !isLocalMode && isSupabaseConfigured() && Boolean(supabase)
@@ -2164,7 +2183,7 @@ export function AnaliseEstoquePage() {
       />
       <FiltersForm />
       <AnaliseCards />
-      <section className="card analysis-forecast-section">
+      <section className="card analysis-forecast-section" ref={forecastSectionRef}>
         <header className="card__header dashboard-card__header">
           <div className="dashboard-card__title-group">
             <button type="button" className="summary-tooltip dashboard-card__info" aria-label="Informacoes de previsao">
@@ -3016,6 +3035,15 @@ export function AnaliseEstoquePage() {
                             >
                               {copied ? 'Copiado' : 'Copiar ID'}
                             </button>
+                            {canEditMinimo ? (
+                              <button
+                                type="button"
+                                className="button button--ghost button--compact"
+                                onClick={() => setMinimoItem(item)}
+                              >
+                                {semConsumo ? 'Zerar/ajustar minimo' : 'Ajustar minimo'}
+                              </button>
+                            ) : null}
                             {reposicaoPodeEditar ? (
                               <button
                                 type="button"
@@ -3038,12 +3066,22 @@ export function AnaliseEstoquePage() {
                           </div>
                           <div>
                             <dt>Minimo sugerido</dt>
-                            <dd>{formatQuantidadeOuNaoCalculavel(item.minimo_automatico)}</dd>
+                            <dd>
+                              {toNumberOrNull(item.minimo_automatico) === null ? (
+                                <NaoCalculavelInfo />
+                              ) : (
+                                formatQuantidadeOuNaoCalculavel(item.minimo_automatico)
+                              )}
+                            </dd>
                           </div>
                           <div>
                             <dt>Minimo / maximo efetivo</dt>
                             <dd>
-                              {formatQuantidadeOuNaoCalculavel(item.minimo_efetivo)} / {formatQuantidadeOuNaoCalculavel(item.maximo_efetivo)}
+                              {toNumberOrNull(item.minimo_efetivo) === null ? (
+                                <NaoCalculavelInfo tipo="limite" />
+                              ) : (
+                                `${formatQuantidadeOuNaoCalculavel(item.minimo_efetivo)} / ${formatQuantidadeOuNaoCalculavel(item.maximo_efetivo)}`
+                              )}
                             </dd>
                           </div>
                           <div>
@@ -3053,12 +3091,22 @@ export function AnaliseEstoquePage() {
                           <div>
                             <dt>Consumo/mes</dt>
                             <dd>
-                              {formatQuantidadeOuNaoCalculavel(item.consumo_medio_mensal, 2)} ({formatBaseCalculo(item.base_calculo)})
+                              {toNumberOrNull(item.consumo_medio_mensal) === null ? (
+                                <NaoCalculavelInfo />
+                              ) : (
+                                `${formatQuantidadeOuNaoCalculavel(item.consumo_medio_mensal, 2)} (${formatBaseCalculo(item.base_calculo)})`
+                              )}
                             </dd>
                           </div>
                           <div>
                             <dt>Cobertura</dt>
-                            <dd>{formatCoberturaMeses(item.cobertura_atual_meses)}</dd>
+                            <dd>
+                              {toNumberOrNull(item.cobertura_atual_meses) === null ? (
+                                <NaoCalculavelInfo />
+                              ) : (
+                                formatCoberturaMeses(item.cobertura_atual_meses)
+                              )}
+                            </dd>
                           </div>
                           <div>
                             <dt>Preco</dt>
@@ -3115,6 +3163,14 @@ export function AnaliseEstoquePage() {
         materialNome={overrideItem ? resolveNomeReposicao(overrideItem) : ''}
         validadePadraoDias={reposicao.politica?.override_validade_dias}
         onClose={() => setOverrideItem(null)}
+        onSaved={handleReposicaoAlterada}
+        reportError={reportError}
+      />
+      <ReposicaoMinimoModal
+        open={!!minimoItem}
+        item={minimoItem}
+        materialNome={minimoItem ? resolveNomeReposicao(minimoItem) : ''}
+        onClose={() => setMinimoItem(null)}
         onSaved={handleReposicaoAlterada}
         reportError={reportError}
       />

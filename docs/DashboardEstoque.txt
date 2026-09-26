@@ -82,6 +82,15 @@ Atualizacao 2026-02
   - `supabase/migrations/20260218_add_inventory_report_email_fields.sql`
   - `supabase/migrations/20260201_create_inventory_report.sql`
 
+Atualizacao 2026-09 (materiais sem movimentacao no estoque base)
+----------------------------------------------------------------
+- Contexto: o Estoque atual passou a listar materiais ativos sem nenhuma movimentacao (saldo zero, flag `semMovimentacao`), e o Dashboard usa a mesma funcao `listEstoqueAtual()`.
+- Arquivo alterado: src/hooks/useDashboardEstoque.js (`totalMateriais`).
+- Antes: "Materiais monitorados" contava todos os itens do estoque base.
+- Depois: itens com `semMovimentacao` sao ignorados, mantendo o criterio do card ("saldo > 0 ou entradas no periodo").
+- Sem impacto em "Alertas ativos" (itens sem movimentacao nao geram alerta), Paretos, risco operacional e graficos (partem das saidas).
+- Nenhum card novo foi adicionado ao Dashboard.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

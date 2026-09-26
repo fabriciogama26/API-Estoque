@@ -439,6 +439,16 @@ Atualizacao 2026-09 (aba Compra usando a politica de reposicao)
 - Antes: a aba dependia do snapshot, mostrava R$ 40.026,69 em 246 itens (listas top 5 e calculo local de fallback) e o detalhe/CSV usavam apenas o minimo cadastrado.
 - Depois: a aba mostra a reposicao da politica (no tenant de producao, R$ 9.686,82 em 68 itens), com os 178 itens sem consumo em revisao separada, detalhe/CSV completos e gestao de politica e overrides na propria aba.
 
+Atualizacao 2026-09 (ajuste do minimo cadastrado pela aba Compra)
+----------------------------------------------------------------
+- Migration supabase/migrations/20260927_rpc_material_estoque_minimo.sql: RPC rpc_material_estoque_minimo_update (somente "estoqueMinimo", master ou estoque.write, tenant validado, historico em inventory_policy_history com entidade minimo_cadastrado).
+- Novo ReposicaoMinimoModal no detalhe da aba Compra: botao "Ajustar minimo" (ou "Zerar/ajustar minimo" para Sem consumo recente) para quem tem estoque.write/master/admin; valor inicial 0 para sem consumo e o sugerido nos demais; motivo obrigatorio; recarrega a reposicao ao salvar.
+- O historico do modal Politica de reposicao passou a identificar alteracoes de minimo cadastrado.
+- Arquivos alterados: src/components/AnaliseEstoque/ReposicaoMinimoModal.jsx (novo), src/components/AnaliseEstoque/ReposicaoPoliticaModal.jsx, src/pages/AnaliseEstoquePage.jsx, src/services/reposicaoApi.js, docs/AnaliseEstoque.txt.
+- Antes/Depois:
+- Antes: a fila Sem consumo recente so permitia override.
+- Depois: tambem permite zerar ou ajustar o minimo cadastrado, com motivo registrado.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
