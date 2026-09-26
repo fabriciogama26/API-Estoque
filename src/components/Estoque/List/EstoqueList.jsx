@@ -194,7 +194,8 @@ export function EstoqueList({
                 <div className="estoque-list__item-alert">
                   <span className="estoque-list__item-alert-label">⚠️ Estoque Baixo</span>
                   <span className="estoque-list__item-alert-deficit">
-                    Necessário repor {deficitQuantidade} ({formatCurrency(item.valorReposicao)}) | limite: mínimo cadastrado
+                    Necessário repor {deficitQuantidade} ({formatCurrency(item.valorReposicao)}) | limite:{' '}
+                    {item.limiteOrigem ? formatFonteRegra(item.limiteOrigem).toLowerCase() : 'mínimo cadastrado'}
                   </span>
                 </div>
               ) : null}

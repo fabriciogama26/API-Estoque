@@ -3,6 +3,7 @@ import { formatCurrency, formatInteger } from '../utils/estoqueUtils.js'
 import { useAuth } from './AuthContext.jsx'
 import { usePermissions } from './PermissionsContext.jsx'
 import { fetchReposicaoItens } from '../services/reposicaoApi.js'
+import { aplicarLimiteEfetivo } from '../utils/reposicaoUtils.js'
 import { isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { useErrorLogger } from '../hooks/useErrorLogger.js'
@@ -70,7 +71,17 @@ export function EstoqueProvider({ children }) {
     () => user?.id || user?.user?.id || user?.name || user?.username || 'sistema',
     (err, ctx) => reportError(err, { area: 'load_estoque', ...ctx }),
   )
-  const filtroState = useEstoqueFiltro(INITIAL_FILTERS, estoqueState.estoque, estoqueState.estoqueBase)
+  // Modo automatico da politica: alertas e deficit pelo minimo efetivo; monitorar mantem o minimo cadastrado.
+  const modoPolitica = reposicao.status === 'ready' ? reposicao.politica?.modo || 'monitorar' : 'monitorar'
+  const estoqueVisao = useMemo(
+    () => aplicarLimiteEfetivo(estoqueState.estoque, reposicao.porMaterial, modoPolitica),
+    [estoqueState.estoque, modoPolitica, reposicao.porMaterial],
+  )
+  const estoqueBaseVisao = useMemo(
+    () => aplicarLimiteEfetivo(estoqueState.estoqueBase, reposicao.porMaterial, modoPolitica),
+    [estoqueState.estoqueBase, modoPolitica, reposicao.porMaterial],
+  )
+  const filtroState = useEstoqueFiltro(INITIAL_FILTERS, estoqueVisao, estoqueBaseVisao)
 
   const handleMinStockSave = async (item, motivo = null) => {
     const ok = await estoqueState.handleMinStockSave(
@@ -120,8 +131,19 @@ export function EstoqueProvider({ children }) {
       })
     }
     const link = canVerAnalise ? { label: 'Ver na Analise (aba Compra)', to: '/analise-estoque?aba=compra' } : null
+    const cardsBase = filtroState.summaryCards.map((card) =>
+      card.id === 'valorReposicao' && modoPolitica === 'automatico'
+        ? {
+            ...card,
+            title: 'Déficit até o mínimo efetivo',
+            hint: 'Minimo efetivo (politica automatica) - saldo atual',
+            tooltip:
+              'Modo Automatico: quanto falta, em valor, para os itens filtrados chegarem ao minimo efetivo da politica (sugerido pelo consumo, override ou cadastrado como fallback). Materiais sem consumo recente ficam fora.',
+          }
+        : card,
+    )
     return [
-      ...filtroState.summaryCards,
+      ...cardsBase,
       {
         id: 'compraRecomendada',
         title: 'Compra recomendada',
@@ -147,7 +169,7 @@ export function EstoqueProvider({ children }) {
         link,
       },
     ]
-  }, [canVerAnalise, filtroState.itensFiltrados, filtroState.summaryCards, reposicao])
+  }, [canVerAnalise, filtroState.itensFiltrados, filtroState.summaryCards, modoPolitica, reposicao])
 
   const handleFilterChange = (event) => {
     filtroState.handleChange(event)
@@ -188,6 +210,7 @@ export function EstoqueProvider({ children }) {
     isLoading: estoqueState.isLoading,
     // politica de reposicao (minimo sugerido/efetivo)
     reposicao,
+    modoPolitica,
     canEditMinimo,
     canVerAnalise,
     // tamanhos de pagina

@@ -77,3 +77,12 @@ export function updateEstoqueMinimoCadastrado(materialId, estoqueMinimo, motivo 
     'Falha ao salvar o minimo cadastrado.',
   )
 }
+
+// Calcula a reposicao no modo informado e compara com o modo atual, sem gravar nada.
+export function simularModoPolitica(ownerId, modo) {
+  return callRpc(
+    'rpc_inventory_policy_simular_modo',
+    { p_owner_id: ownerId, p_modo: modo },
+    'Falha ao simular o modo da politica.',
+  )
+}

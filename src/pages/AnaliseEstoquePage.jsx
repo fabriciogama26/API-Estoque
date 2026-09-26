@@ -2398,7 +2398,25 @@ export function AnaliseEstoquePage() {
                       Cobertura mediana:{' '}
                       {reposicao.coberturaMediana === null ? 'Nao calculavel' : `${formatNumber(reposicao.coberturaMediana, 1)} meses`}
                     </span>
-                    <span>Fora da compra (revisao): {formatCurrency(reposicao.valorReferenciaManual)}</span>
+                    <span className="nao-calculavel">
+                      Fora da compra (revisao): {formatCurrency(reposicao.valorReferenciaManual)}
+                      <button
+                        type="button"
+                        className="summary-tooltip summary-tooltip--inline"
+                        aria-label="O que e o valor fora da compra"
+                      >
+                        <InfoIcon size={12} aria-hidden="true" />
+                        <span>
+                          Quanto custaria levar ao minimo cadastrado os{' '}
+                          {formatNumber(reposicao.bySituacao.sem_consumo_recente.length)} materiais em &quot;Sem consumo recente&quot;:
+                          eles tem minimo cadastrado, mas nenhuma saida nos ultimos{' '}
+                          {formatNumber(reposicao.politica?.janela_sem_consumo_dias || 0)} dias. Esse valor NAO entra na
+                          necessidade de reposicao nem na compra recomendada, porque nao ha consumo que justifique a
+                          compra. Serve so para revisao: em Revisao de minimos, decida se mantem o minimo, zera ou cria um
+                          override.
+                        </span>
+                      </button>
+                    </span>
                   </div>
                 ) : null}
               </div>
@@ -3180,6 +3198,7 @@ export function AnaliseEstoquePage() {
         onClose={() => setPoliticaModalOpen(false)}
         onSaved={reloadReposicao}
         reportError={reportError}
+        resolveNome={resolveNomeReposicao}
       />
       <ChartExpandModal
         open={orcamentoImpactModalOpen}

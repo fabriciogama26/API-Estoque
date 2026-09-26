@@ -67,7 +67,9 @@
       "Valores que nao podem ser calculados (sem consumo, sem limite) aparecem como Nao calculavel e nunca como zero; quantidades de minimo, maximo e compra sao sempre inteiras.",
       "O botao Politica de reposicao mostra coberturas, janela sem consumo, validade de override e o historico de alteracoes; alterar exige a permissao Politica de reposicao e um motivo.",
       "No detalhe de cada material, quem tem a permissao Politica de reposicao pode criar ou revogar um override de minimo/maximo com motivo e validade (padrao 90 dias); o minimo cadastrado do material nao e alterado.",
-      "A Revisao de minimos lista avisos de governanca (minimo sem consumo, minimo divergente do sugerido, sem minimo e sem consumo, overrides ativos e sem preco); esses avisos nao geram compra."
+      "A Revisao de minimos lista avisos de governanca (minimo sem consumo, minimo divergente do sugerido, sem minimo e sem consumo, overrides ativos e sem preco); esses avisos nao geram compra.",
+      "Em Politica de reposicao > Modo de operacao, simule o modo Automatico antes de ativar: a tabela compara hoje x simulado e o CSV lista cada material que muda. Ativar exige marcar a revisao e informar o motivo; voltar ao Monitorar exige so o motivo.",
+      "No modo Automatico o minimo sugerido pelo consumo prevalece; o minimo cadastrado so vale para itens sem historico; overrides continuam acima de tudo."
     ]
   }
 }

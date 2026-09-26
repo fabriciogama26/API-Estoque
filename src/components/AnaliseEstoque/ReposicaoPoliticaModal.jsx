@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChartExpandModal } from '../Dashboard/ChartExpandModal.jsx'
 import { SaveIcon } from '../icons.jsx'
+import { ReposicaoModoPanel } from './ReposicaoModoPanel.jsx'
 import {
   fetchPoliticaReposicao,
   fetchPoliticaReposicaoHistorico,
@@ -71,7 +72,7 @@ function toForm(politica) {
   return Object.fromEntries(CAMPOS.map(({ key }) => [key, politica?.[key] ?? '']))
 }
 
-export function ReposicaoPoliticaModal({ open, ownerId, onClose, onSaved, reportError }) {
+export function ReposicaoPoliticaModal({ open, ownerId, onClose, onSaved, reportError, resolveNome }) {
   const [politica, setPolitica] = useState(null)
   const [historico, setHistorico] = useState([])
   const [form, setForm] = useState(() => toForm(null))
@@ -112,6 +113,19 @@ export function ReposicaoPoliticaModal({ open, ownerId, onClose, onSaved, report
   }, [open, ownerId, reportError])
 
   const podeEditar = Boolean(politica?.pode_editar)
+
+  const handleModoAlterado = async (saved) => {
+    setPolitica(saved)
+    setForm(toForm(saved))
+    setSuccess(saved?.modo === 'automatico' ? 'Modo Automatico ativado. A reposicao foi recalculada.' : 'Modo Monitorar ativado. A reposicao foi recalculada.')
+    try {
+      const historicoData = await fetchPoliticaReposicaoHistorico(ownerId, 30)
+      setHistorico(Array.isArray(historicoData) ? historicoData : [])
+    } catch (err) {
+      reportError?.(err, { area: 'politica_reposicao_historico' })
+    }
+    onSaved?.()
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -176,8 +190,8 @@ export function ReposicaoPoliticaModal({ open, ownerId, onClose, onSaved, report
               {politica.updated_at ? ` | Atualizada em ${formatDataHora(politica.updated_at)}` : ' | Valores padrao'}
             </p>
             <span>
-              No modo Monitorar o minimo cadastrado continua valendo onde existe; sem minimo cadastrado, vale o minimo
-              sugerido pelo consumo. O modo Automatico sera liberado apos a validacao com dados reais.
+              Coberturas, janela e tolerancias valem para os dois modos. A troca de modo fica na secao Modo de operacao,
+              com simulacao do impacto antes de ativar o Automatico.
             </span>
           </div>
           <div className="reposicao-politica-grid">
@@ -223,6 +237,16 @@ export function ReposicaoPoliticaModal({ open, ownerId, onClose, onSaved, report
             </p>
           )}
         </form>
+      ) : null}
+      {!loading && politica ? (
+        <ReposicaoModoPanel
+          ownerId={ownerId}
+          politica={politica}
+          podeEditar={podeEditar}
+          onChanged={handleModoAlterado}
+          reportError={reportError}
+          resolveNome={resolveNome}
+        />
       ) : null}
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       {success ? <p className="feedback feedback--success">{success}</p> : null}

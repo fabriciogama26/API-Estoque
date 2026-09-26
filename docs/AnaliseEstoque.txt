@@ -449,6 +449,21 @@ Atualizacao 2026-09 (ajuste do minimo cadastrado pela aba Compra)
 - Antes: a fila Sem consumo recente so permitia override.
 - Depois: tambem permite zerar ou ajustar o minimo cadastrado, com motivo registrado.
 
+Atualizacao 2026-09 (modo automatico da politica de reposicao)
+-------------------------------------------------------------
+- Migration supabase/migrations/20260928_inventory_policy_modo_automatico.sql:
+  - `_inventory_reposicao_calcular_modo(owner, modo)` calcula a reposicao em qualquer modo sem gravar; `_inventory_reposicao_calcular(owner)` delega com o modo gravado (resultado identico) e o payload ganhou `modo_calculado`;
+  - `rpc_inventory_policy_simular_modo(owner, modo)` devolve `resumo_atual`, `resumo_simulado` e `mudancas` (materiais cujo minimo/maximo efetivo, situacao ou compra muda, com antes/depois e diferenca de valor), validando o tenant;
+  - `rpc_inventory_policy_update` aceita `automatico` (motivo obrigatorio, historico); `rpc_inventory_policy_get` informa `modo_automatico_liberado = true`.
+- Regra do modo automatico: override > minimo sugerido pelo consumo quando calculavel > minimo cadastrado como fallback sem historico (`fallback_manual`) > sem_politica. Item com minimo cadastrado sem saida na janela continua em `sem_consumo_recente`.
+- Modal Politica de reposicao: nova secao Modo de operacao (`ReposicaoModoPanel`) com simulacao, tabela atual x simulado, 3 maiores impactos, exportacao CSV das mudancas (`downloadSimulacaoModoCsv`), confirmacao "Revisei o impacto" e motivo. Ativar o Automatico exige simulacao revisada; voltar ao Monitorar exige apenas motivo.
+- Falhas registradas com useErrorLogger nas areas `politica_reposicao_simulacao`, `politica_reposicao_modo` e `politica_reposicao_historico`.
+- Fora do escopo (continuam pelo minimo cadastrado mesmo no Automatico): card "Alertas ativos" do Dashboard de Estoque (decisao do usuario de nao alterar a tela), Paretos/risco operacional da Analise e relatorios automaticos por email.
+- Arquivos alterados: supabase/migrations/20260928_inventory_policy_modo_automatico.sql (novo), src/components/AnaliseEstoque/ReposicaoModoPanel.jsx (novo), src/components/AnaliseEstoque/ReposicaoPoliticaModal.jsx, src/pages/AnaliseEstoquePage.jsx, src/services/reposicaoApi.js, src/utils/reposicaoUtils.js, src/styles/DashboardPage.css, src/help/helpAnaliseEstoque.json, docs/AnaliseEstoque.txt, TASKS.md.
+- Antes/Depois:
+- Antes: o modo automatico era recusado e nao havia medida de impacto.
+- Depois: o tenant simula, exporta as mudancas e ativa o Automatico com motivo; pode voltar ao Monitorar a qualquer momento.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

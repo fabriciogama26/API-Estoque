@@ -220,6 +220,15 @@ Atualizacao 2025-12
 - Tela refatorada para hook/context com carregamento silencioso e sem flicker no botao de filtro.
 - Cache de chave de filtros reduz chamadas repetidas.
 
+Atualizacao 2026-09 (alertas no modo automatico)
+-----------------------------------------------
+- Arquivos alterados: src/utils/reposicaoUtils.js (`aplicarLimiteEfetivo`), src/context/EstoqueContext.jsx, src/hooks/useEstoqueFiltro.js, src/components/Estoque/Alerts/EstoqueAlerts.jsx, src/components/Estoque/List/EstoqueList.jsx.
+- Modo Monitorar: nada muda (alertas, deficit e valor de reposicao pelo minimo cadastrado).
+- Modo Automatico: `aplicarLimiteEfetivo` recalcula por material `alerta` (saldo < minimo efetivo, exceto sem consumo recente), `deficitQuantidade` (inteiro), `valorReposicao`, `estoqueMinimoAlerta` e `limiteOrigem` (fonte da regra) antes dos filtros.
+- Alertas exibem o minimo efetivo com a origem (automatico, override, cadastrado sem historico); o card do material mostra "limite: <origem>".
+- Resumo: no Automatico o card passa a "Deficit ate o minimo efetivo" com tooltip proprio.
+- Material sem dados da politica (RPC indisponivel) mantem o calculo pelo minimo cadastrado.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

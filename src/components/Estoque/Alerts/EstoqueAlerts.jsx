@@ -1,5 +1,6 @@
 import { TablePagination } from '../../TablePagination.jsx'
 import { formatCurrency, formatDateTimeValue } from '../../../utils/estoqueUtils.js'
+import { formatFonteRegra } from '../../../utils/reposicaoUtils.js'
 
 export function EstoqueAlerts({
   alertas,
@@ -34,6 +35,7 @@ export function EstoqueAlerts({
               <p className="estoque-alert-card__estoque">
                 Estoque atual: <strong>{alerta.estoqueAtual}</strong> | Minimo:{' '}
                 <strong>{alerta.estoqueMinimo}</strong>
+                {alerta.limiteOrigem ? <small> ({formatFonteRegra(alerta.limiteOrigem)})</small> : null}
               </p>
               <p className="estoque-alert-card__id-inline">ID: {idLabel}</p>
               <p className="estoque-alert-card__descricao">{resumo}</p>

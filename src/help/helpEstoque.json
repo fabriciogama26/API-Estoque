@@ -54,7 +54,8 @@
       "Os alertas de estoque baixo continuam usando o minimo cadastrado (modo Monitorar da politica de reposicao).",
       "O CSV inclui minimo cadastrado, sugerido e efetivo, maximo efetivo, fonte da regra, base do calculo, consumo medio, cobertura e situacao da reposicao.",
       "O card Deficit ate o minimo cadastrado soma quanto falta para chegar ao minimo manual; a Compra recomendada usa a politica de reposicao (mesmo valor da aba Compra da Analise) e deixa de fora materiais sem consumo recente.",
-      "O card Revisar minimos conta materiais com minimo cadastrado sem saida na janela da politica ou muito diferente do sugerido; a revisao e feita na aba Compra da Analise de Estoque."
+      "O card Revisar minimos conta materiais com minimo cadastrado sem saida na janela da politica ou muito diferente do sugerido; a revisao e feita na aba Compra da Analise de Estoque.",
+      "Com a politica no modo Automatico, alertas e deficit usam o minimo efetivo (mostrado com a origem do limite); no modo Monitorar continuam pelo minimo cadastrado."
     ]
   }
 }

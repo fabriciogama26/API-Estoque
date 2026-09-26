@@ -316,3 +316,102 @@ export function formatValorOuTraco(value) {
   const number = toNumberOrNull(value)
   return number === null ? '-' : formatCurrency(number)
 }
+
+// CSV da simulacao de troca de modo: um material por linha, com antes/depois.
+export function buildSimulacaoModoCsv(mudancas = [], context = {}) {
+  const headers = [
+    'Modo atual',
+    'Modo simulado',
+    'Material ID',
+    'Material',
+    'Fabricante',
+    'Estoque atual',
+    'Minimo cadastrado',
+    'Minimo sugerido',
+    'Base do calculo',
+    'Fonte antes',
+    'Fonte depois',
+    'Minimo efetivo antes',
+    'Minimo efetivo depois',
+    'Maximo efetivo antes',
+    'Maximo efetivo depois',
+    'Situacao antes',
+    'Situacao depois',
+    'Compra antes',
+    'Compra depois',
+    'Valor antes',
+    'Valor depois',
+    'Diferenca de valor',
+  ]
+  const rows = (Array.isArray(mudancas) ? mudancas : []).map((item) => {
+    const antes = item.antes || {}
+    const depois = item.depois || {}
+    const values = [
+      context.modoAtual || '',
+      context.modoSimulado || '',
+      item.material_id || '',
+      context.resolveNome ? context.resolveNome(item) : item.nome || '',
+      item.fabricante || '',
+      csvNumber(item.estoque_atual),
+      csvNumber(item.minimo_manual),
+      csvNumber(item.minimo_automatico),
+      formatBaseCalculo(item.base_calculo),
+      formatFonteRegra(antes.fonte_regra),
+      formatFonteRegra(depois.fonte_regra),
+      csvNumber(antes.minimo_efetivo),
+      csvNumber(depois.minimo_efetivo),
+      csvNumber(antes.maximo_efetivo),
+      csvNumber(depois.maximo_efetivo),
+      formatSituacaoReposicao(antes.situacao),
+      formatSituacaoReposicao(depois.situacao),
+      csvNumber(antes.compra_sugerida_qtd),
+      csvNumber(depois.compra_sugerida_qtd),
+      csvNumber(antes.valor_compra_sugerida, 2),
+      csvNumber(depois.valor_compra_sugerida, 2),
+      csvNumber(item.diferenca_valor, 2),
+    ]
+    return values.map(sanitizeCsvCell).join(';')
+  })
+  return [headers.join(';'), ...rows].join('\n')
+}
+
+export function downloadSimulacaoModoCsv(mudancas = [], context = {}) {
+  const date = new Date().toISOString().slice(0, 10)
+  const csv = buildSimulacaoModoCsv(mudancas, context)
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', `politica-reposicao-simulacao-${context.modoSimulado || 'modo'}-${date}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+// Modo automatico: alerta, deficit e valor de reposicao do Estoque atual passam a usar o minimo efetivo
+// da politica. Material sem consumo recente nao alerta (mesma regra da compra). No modo monitorar os
+// dados voltam sem alteracao (alertas pelo minimo cadastrado).
+export function aplicarLimiteEfetivo(estoqueData, porMaterial, modo) {
+  if (modo !== 'automatico' || !(porMaterial instanceof Map) || !porMaterial.size) {
+    return estoqueData
+  }
+  const itens = (Array.isArray(estoqueData?.itens) ? estoqueData.itens : []).map((item) => {
+    const politica = porMaterial.get(String(item?.materialId ?? ''))
+    if (!politica) return item
+    const minimoEfetivo = toNumberOrNull(politica.minimo_efetivo)
+    const quantidade = Number(item.quantidade ?? item.estoqueAtual ?? 0)
+    const alerta =
+      minimoEfetivo !== null && quantidade < minimoEfetivo && politica.situacao !== 'sem_consumo_recente'
+    const deficitQuantidade = alerta ? Math.max(Math.ceil(minimoEfetivo - quantidade), 0) : 0
+    return {
+      ...item,
+      alerta,
+      deficitQuantidade,
+      valorReposicao: Number((deficitQuantidade * Number(item.valorUnitario ?? 0)).toFixed(2)),
+      estoqueMinimoAlerta: minimoEfetivo,
+      limiteOrigem: politica.fonte_regra,
+    }
+  })
+  return { ...estoqueData, itens, alertas: itens.filter((item) => item.alerta) }
+}
