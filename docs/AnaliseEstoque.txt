@@ -392,6 +392,24 @@ Atualizacao 2026-09 (politica de reposicao - banco, modo monitorar)
 - Antes: nao havia politica por tenant; a compra sugerida usava apenas o minimo cadastrado, com quantidades decimais e listas top 5.
 - Depois: cada material tem minimo cadastrado, sugerido e efetivo, fonte da regra, situacao, prioridade e compra inteira, com politica e overrides auditados; `materiais.estoqueMinimo` nunca e alterado.
 
+Atualizacao 2026-09 (situacao sem_consumo_recente)
+-------------------------------------------------
+- Migration `supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql` adicionada.
+- Diagnostico com dados reais (owner 59191387-..., 395 materiais): 178 dos 246 itens com compra recomendada nao tinham saida em 180 dias e somavam R$ 30.339,87 dos R$ 40.026,69; 143 das 182 rupturas eram desses itens. A aba Previsao de Orcamento ja ignorava esses itens (so 116 materiais entram no orcamento de R$ 24.702,02), gerando conflito entre as abas.
+- `inventory_policy` ganhou `janela_sem_consumo_dias` (padrao 180, entre 30 e 1095), editavel por `rpc_inventory_policy_update` e exposta em `inventory_policy_effective`.
+- Nova situacao `sem_consumo_recente`, avaliada antes de ruptura: fonte `manual`/`fallback_manual`, nenhuma saida na janela e saldo abaixo do minimo efetivo. Motivo `minimo_manual_sem_consumo_na_janela`, aviso `revisar_minimo_sem_consumo`.
+- Esses itens ficam sem prioridade e com `compra_sugerida_qtd = 0`; a quantidade ate o minimo cadastrado vai para `compra_referencia_manual_qtd` / `valor_referencia_manual` (fila de revisao). Overrides nao entram na regra.
+- `resumo_reposicao` ganhou `sem_consumo_recente`, `quantidade_referencia_manual` e `valor_referencia_manual`; cada item ganhou `consumo_janela_sem_consumo` e `janela_sem_consumo_dias`.
+- O motivo `estoque_sem_consumo_recente` (acima do alvo sem consumo) foi renomeado para `sem_consumo_e_acima_do_dobro_do_maximo`.
+- Chaves legadas de `rpc_previsao_compra_sugerida` inalteradas; a tela atual nao muda ate a entrega 3.
+- Arquivos alterados:
+- `supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql`
+- `docs/AnaliseEstoque.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: item com minimo cadastrado e sem consumo, abaixo do minimo, virava ruptura/reposicao necessaria e somava na compra recomendada.
+- Depois: esse item vai para a fila `sem_consumo_recente`, fora da compra recomendada, com a referencia ate o minimo cadastrado exibida a parte.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -515,6 +533,10 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql
   - Responsavel por: calcular minimo cadastrado/sugerido/efetivo, situacao, prioridade e compra inteira por material (`rpc_reposicao_itens`) e anexar esse resultado a `rpc_previsao_compra_sugerida`.
+- Migration da situacao sem consumo recente
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql
+  - Responsavel por: adicionar `janela_sem_consumo_dias` a politica e separar itens com minimo cadastrado sem consumo na situacao `sem_consumo_recente`, fora da compra recomendada.
 - Edge Function forecast-gasto-mensal
   - Tipo: Supabase Edge Function
   - Caminho: supabase/functions/forecast-gasto-mensal/index.ts
