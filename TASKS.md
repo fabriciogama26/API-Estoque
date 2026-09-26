@@ -1,6 +1,7 @@
 # Tasks
 
 ## Concluido
+- Documentacao detalhada criada em `docs/ListasExportacoesRelatoriosEmail.md` explicando a lista `Registros de Pessoas`, exportacoes CSV e envio de relatorios por email.
 - Tela de ASO foi criada com cadastro manual, cards, filtros, lista, detalhes, historico e modal de registro de exame.
 - Navegacao e controle de acesso da tela ASO foram integrados em rota, menu lateral e `permissions.js`.
 - `Credenciais e Permissoes` ganhou toggle proprio para `Controle de ASO`, separado de `Pessoas`, com chaves de pagina dedicadas e backfill de roles/overrides.
@@ -81,8 +82,134 @@
 - Dashboard de Acidentes passou a ignorar a view agregada quando ha filtro dimensional ativo, permitindo que `Centro de servico` e demais selects filtrem cards, HHT e graficos via calculo JS com `vw_acidentes` + `hht_mensal_view`.
 - Catalogo `acidente_locais` passou a ser owner-scoped com `account_owner_id`, RLS por tenant, remapeamento de acidentes existentes e administracao pela tela Cadastro Base como "Locais de acidente".
 - Migration de `acidente_locais` ajustada para bancos onde a coluna legada `ordem` nao existe.
+- Politica de reposicao - entrega 1 (seguranca), 2026-09-26: `EstoqueOperations.current/dashboard` (`GET /api/estoque`) passaram a exigir usuario autenticado e filtrar materiais, entradas, saidas e pessoas por `account_owner_id`.
+- Politica de reposicao - entrega 1 (seguranca), 2026-09-26: migration `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql` criada para validar o owner da sessao em `rpc_previsao_compra_sugerida` e `rpc_previsao_gasto_mensal_auditar` (tenant cruzado retorna `42501`).
 
 ## Pendente
+### Plano de execucao - politica de reposicao por cobertura (2026-09)
+
+- Objetivo da fase:
+  - preservar `materiais.estoqueMinimo` como minimo cadastrado e editavel manualmente;
+  - calcular e exibir, sem gravar no cadastro do material, consumo medio, minimo sugerido, maximo operacional/estoque alvo, cobertura, compra sugerida, valor e situacao;
+  - manter a analise completa na aba `Compra` / `Necessidade de reposicao atual` e reutilizar o mesmo calculo na tela `Estoque atual`, sem criar nova tela;
+  - na lista de estoque, mostrar lado a lado `Minimo cadastrado` (manual/editavel), `Minimo sugerido` (automatico), `Minimo efetivo` e a fonte da regra, sem sobrescrever silenciosamente um pelo outro;
+  - fazer alertas, ruptura, cobertura e prioridade de compra usarem os limites efetivos retornados pela mesma regra central.
+- Diagnostico confirmado - usuario Master:
+  - o problema de periodos vazios foi reproduzido apenas no acesso Master; ao acessar com outro usuario do tenant, os periodos aparecem;
+  - o Master enxerga indicadores globais pela RLS, mas o forecast filtra pelo `owner_id` proprio do Master, que nao representa necessariamente o tenant operacional;
+  - a correcao deve exigir selecao explicita de tenant no acesso Master e usar esse mesmo owner em todas as fontes da pagina.
+- Premissas recomendadas para aprovacao antes da implementacao:
+  - sem historico em 180 dias, campos automaticos permanecem `null`, a situacao fica `sem_base_para_calculo` e a reposicao ate o minimo manual continua disponivel com `criterio_compra = minimo_manual`;
+  - DECIDIDO 2026-09-26: consumo medio pode manter duas casas decimais, mas minimo sugerido, maximo/estoque alvo e compra sugerida sao sempre arredondados para cima (`ceil`) para numero inteiro;
+  - DECIDIDO 2026-09-26: materiais ativos sem nenhuma movimentacao passam a aparecer na lista com saldo zero e situacao `sem_base_para_calculo`;
+  - DECIDIDO 2026-09-26: validade padrao do override por material e de 90 dias;
+  - DECIDIDO 2026-09-26: flag `critico` e `piso_minimo` ficam FORA desta fase, em reavaliacao pelo usuario; nenhuma tabela, coluna ou regra de criticidade sera criada agora. Protecao de itens de baixo giro nesta fase fica apenas pelo override por material e pelo modo `monitorar`. Ideia em estudo registrada em `Observacoes`;
+  - a primeira fase mantem a regra fixa `90d / 3`, com fallback `180d / 6`; `janela_preferencial_dias` fica fora ate existir semantica de configuracao definida;
+  - a configuracao fica em `Analise de Estoque > Compra`, em um painel `Politica de reposicao`; nao entra no Cadastro Base, que hoje administra catalogos simples de nome/status/relacao;
+  - cobertura minima e cobertura alvo/maxima operacional serao editadas por tenant por usuario com nova permissao `estoque.politica.manage`; `estoque.reprocessar` permanece exclusiva do processamento do forecast;
+  - implantar primeiro o modo `monitorar`, no qual o manual continua efetivo e o automatico apenas compara impacto, para nao mudar alertas e compras sem revisao;
+  - depois da validacao, permitir que o tenant ative o modo `automatico`: o automatico prevalece quando calculavel, o manual vira fallback sem historico e somente um override explicito pode substituir o automatico;
+  - nao usar `greatest(minimo_manual, minimo_automatico)` como regra padrao, pois um manual antigo e alto continuaria prevalecendo e impediria que o automatico corrigisse distorcoes;
+  - alteracoes da politica e overrides serao auditados e nunca alterarao automaticamente `materiais.estoqueMinimo`.
+- Regra de precedencia recomendada:
+  - override manual ativo, com motivo e validade: minimo/maximo efetivos usam o override ate a expiracao;
+  - sem override, tenant em modo automatico e calculo confiavel: limites efetivos usam os valores automaticos;
+  - automatico nao calculavel: usar o minimo manual como fallback, identificando `fonte_regra = fallback_manual`;
+  - sem automatico e sem manual valido: retornar `sem_politica`, nunca converter ausencia de base em zero;
+  - no modo inicial `monitorar`, o manual permanece efetivo e a divergencia com o automatico gera aviso de revisao, nao alerta de compra automatico.
+- Ordem de entrega recomendada (PRs separados):
+  - 1) correcoes de seguranca independentes: Etapa 3.3 (`EstoqueOperations` sem owner) e isolamento `SECURITY DEFINER` da `rpc_previsao_compra_sugerida` (primeiro item da Etapa 2);
+  - 2) bug de periodos vazios do Master (Etapa 0.1);
+  - 3) migration da politica + evolucao da RPC, somente com modo `monitorar`;
+  - 4) aba Compra (Etapas 3 e 4);
+  - 5) Estoque atual e alertas (Etapas 3.1 e 3.2);
+  - 6) liberacao do modo `automatico` apos validacao com dados reais.
+- Etapa 0 - validar pre-requisitos no Supabase remoto:
+  - consultar a definicao e ACL efetivamente aplicadas de `rpc_previsao_compra_sugerida(uuid, uuid)`;
+  - confirmar a aplicacao das migrations de forecast e do helper seguro de status cancelado;
+  - conferir se o `owner_id` resolvido para a sessao possui linhas em `inventory_forecast`, `agg_gasto_mensal` e `f_previsao_gasto_mensal`, diferenciando tenant sem dados de falha de acesso/RLS;
+  - registrar backup e contagem/hash de `materiais.estoqueMinimo` antes da mudanca.
+- Etapa 0.1 - corrigir periodos vazios e diagnostico do forecast:
+  - aguardar o carregamento de `PermissionsContext` antes da primeira consulta e recarregar o forecast quando `profile.owner_id` ou a sessao mudar; hoje o efeito executa apenas uma vez e pode consultar antes de o owner existir;
+  - para usuario master, exigir selecao explicita do tenant analisado e aplicar o mesmo owner aos indicadores, estoque, fallback, snapshots e RPCs; nao combinar visao global da RLS master com forecast do UUID pessoal do master;
+  - cancelar respostas obsoletas ao trocar usuario/tenant e limpar selecao de snapshot que nao pertenca ao novo owner;
+  - no endpoint de forecast, nao converter erro de banco/schema/RLS em `status = missing`; reservar `missing` apenas para consulta valida sem snapshots e registrar o erro com `useErrorLogger('analise_estoque')`;
+  - exibir estados distintos: `Carregando perfil`, `Sem previsao calculada`, `Falha ao consultar previsao` e `Previsao disponivel`;
+  - disponibilizar acao de reprocessamento somente para `estoque.reprocessar`, informando quando o tenant ainda nao possui historico suficiente;
+  - adicionar teste de regressao para perfil carregado depois da montagem da pagina e para troca de tenant/sessao.
+- Etapa 1 - criar migration versionada da politica:
+  - criar `inventory_policy` com uma linha por `account_owner_id`, modo (`monitorar`/`automatico`), cobertura minima `1`, cobertura alvo/maxima operacional `2`, validade padrao de override `90` dias, constraints positivas e `alvo >= minimo`;
+  - criar `inventory_material_override` owner-scoped por material com minimo/maximo manuais opcionais, motivo obrigatorio, inicio, expiracao, revogacao e ator; impedir overrides ativos sobrepostos;
+  - fazer backfill dos tenants existentes e integrar o default ao provisionamento de novos tenants;
+  - habilitar e forcar RLS, revogar acesso anonimo/publico e permitir escrita somente por RPC autorizada;
+  - criar historico transacional da politica e dos overrides com antes/depois, tenant, ator, motivo e data;
+  - avaliar com `EXPLAIN (ANALYZE, BUFFERS)` os indices compostos de materiais, entradas e saidas antes de adiciona-los.
+- Etapa 2 - evoluir `rpc_previsao_compra_sugerida` sem substituir a assinatura atual:
+  - corrigir primeiro a falha atual de isolamento do `SECURITY DEFINER`: resolver o owner da sessao, negar owner ausente, bloquear tenant cruzado com SQLSTATE `42501` e aplicar `REVOKE/GRANT` minimo;
+  - autorizar a leitura da reposicao para master ou usuario do proprio tenant com acesso a `estoque.atual` ou `dashboard_analise_estoque`, separando essa leitura de `estoque.write` e `estoque.reprocessar`;
+  - agregar estoque e consumo por tenant, excluir cancelados, ignorar movimentos futuros e usar 90 dias com fallback para 180 dias;
+  - retornar `null`, e nao zero, para consumo/cobertura/minimo sugerido/alvo sem base historica;
+  - calcular minimo automatico como consumo x cobertura minima e maximo operacional/estoque alvo como consumo x cobertura alvo;
+  - resolver `minimo_efetivo`, `maximo_efetivo` e `fonte_regra` pela precedencia configurada, sem mistura oculta de manual e automatico;
+  - calcular os estados mutuamente exclusivos: `ruptura_atual`, `reposicao_necessaria`, `reposicao_programada`, `manter`, `acima_do_alvo` e `sem_base_para_calculo`;
+  - retornar `politica`, `calculado_em`, resumo reconciliado e um array completo `itens`, preservando temporariamente aliases legados para compatibilidade;
+  - incluir por material minimo manual, minimo automatico, minimo/maximo efetivos, override, fonte da regra, consumos 90d/180d, base usada, coberturas, estoque alvo, compra automatica, fallback manual, criterio da compra, preco, valor e situacao;
+  - corrigir o nome amigavel do material por join com o catalogo, sem devolver UUID como nome.
+- Etapa 3 - adaptar a aba de reposicao atual:
+  - desacoplar a carga de reposicao de `forecastHasData` e remover o seletor enganoso de snapshot dessa aba;
+  - usar o array completo da RPC como fonte unica para contadores, categorias, detalhe e CSV, sem misturar com o periodo filtrado de `riscoOperacional`;
+  - remover o fallback silencioso que hoje apresenta calculo degradado como recomendacao oficial;
+  - incluir painel/modal `Politica de reposicao` na propria aba Compra para modo do tenant, coberturas, validade de override e simulacao de impacto antes de ativar o automatico;
+  - manter overrides por material no detalhe da Compra, com acesso reutilizavel pela Estoque Atual, sem duplicar a configuracao no Cadastro Base;
+  - distinguir visualmente minimo cadastrado, sugerido e efetivo, exibir `Nao calculavel` para `null`, mostrar fonte da regra e base `90d`, `180d` ou `sem_historico`;
+  - listar divergencias relevantes entre manual e automatico para revisar minimos antigos muito acima ou abaixo do consumo real;
+  - registrar falhas com `useErrorLogger('analise_estoque')` e contexto de leitura, atualizacao da politica e exportacao.
+- Etapa 3.1 - integrar os minimos na tela Estoque atual:
+  - manter o modal manual ja existente, mas mostrar em cada cartao o valor atual de `Minimo cadastrado`; hoje o valor fica visivel apenas nos alertas e no CSV;
+  - carregar em lote o `Minimo sugerido` da mesma RPC/servico central da aba Compra, evitando calculo duplicado no React e consultas N+1;
+  - mostrar `Nao calculavel` quando nao houver consumo em 180 dias e manter o minimo cadastrado como referencia operacional independente;
+  - exibir diferenca entre minimo cadastrado e sugerido, minimo efetivo, fonte da regra, cobertura atual e base do calculo, com link para a analise detalhada quando o usuario tiver `dashboard_analise_estoque`;
+  - permitir edicao do minimo cadastrado somente a master ou usuario com `estoque.write`; para os demais, ocultar/desabilitar a acao e manter os valores somente para leitura;
+  - substituir a atualizacao generica do material por uma RPC dedicada ao minimo cadastrado, owner-scoped e auditada, ou comprovar por testes que `material_update_full` preserva todos os demais campos;
+  - incluir os dois minimos e a base do calculo no CSV de Estoque atual, mantendo `null` diferente de zero;
+  - manter a sugestao vinculada ao saldo fisico de `estoqueBase`, mesmo quando o filtro `Movimentacao do periodo` estiver ativo, para nao comparar o minimo com um saldo liquido temporal;
+  - incluir materiais ativos sem qualquer movimentacao, hoje excluidos da lista, com saldo zero e situacao sem historico (decidido 2026-09-26);
+  - no modo `monitorar`, preservar alertas existentes pelo minimo cadastrado; no modo `automatico`, usar o minimo efetivo e identificar visualmente a fonte do limite.
+- Etapa 3.2 - unificar alertas e prioridade de compra:
+  - fazer Estoque Atual e Analise de Estoque consumirem `minimo_efetivo`, `maximo_efetivo`, `fonte_regra`, `policy_version` e `calculado_em` da mesma resposta;
+  - separar alerta operacional (`ruptura`, `abaixo do minimo efetivo`, `cobertura critica`) de aviso de governanca (`manual divergente`, `sem base`, `override expirando`);
+  - classificar compra como P0 ruptura, P1 abaixo do minimo/cobertura minima, P2 entre minimo e alvo e P3 manter; tratar acima do alvo e sem base em filas separadas de revisao;
+  - calcular reposicao ate o maximo operacional/estoque alvo, sem confundir o ponto que dispara compra com a quantidade final desejada;
+  - registrar em cada alerta a origem do limite (`manual`, `automatico`, `override` ou `fallback_manual`) para explicacao e auditoria;
+  - alinhar a fronteira atual divergente (`<=` no legado e `<` no fluxo principal) e cobri-la com testes de igualdade ao minimo/alvo.
+- Etapa 3.3 - fechar caminhos alternativos sem escopo de tenant:
+  - corrigir `EstoqueOperations.current/dashboard` no backend para receber o usuario/tenant autenticado e filtrar materiais, entradas e saidas por `account_owner_id`; o caminho atual usa `supabaseAdmin` sem owner;
+  - manter RLS ativa no acesso direto do frontend e adicionar teste tenant A x tenant B tanto para Supabase direto quanto para `/api/estoque`;
+  - impedir que dados globais do estoque sejam combinados com snapshots tenant-scoped da previsao.
+- Etapa 4 - atualizar o CSV da aba Compra:
+  - exportar todos os registros da categoria selecionada, sem limite de top 5 ou pagina atual;
+  - incluir estoque atual, minimos cadastrado/sugerido/efetivo, maximo efetivo, fonte/versao da regra, override, consumos 90d/180d/mensal, base, coberturas atual/minima/alvo, estoque alvo, compra, preco, valor, criterio, situacao e data do calculo;
+  - preservar BOM e separador `;`, manter `null` distinto de zero e neutralizar formula injection (`=`, `+`, `-`, `@`).
+- Etapa 5 - atualizar documentacao obrigatoria:
+  - atualizar `docs/AnaliseEstoque.txt` no padrao mapeado, incluindo antes/depois, arquivos, funcoes, RPCs, politica, RLS e auditoria;
+  - atualizar `docs/Estoque.txt` com os dois minimos, permissao de edicao, origem do calculo, estados sem historico e arquivos/funcoes tocados;
+  - atualizar `src/help/helpAnaliseEstoque.json`, `docs/rls-multi-tenant-map.txt`, `docs/rls-policies-guide.txt`, `supabase/README.md` e o README principal sem alterar sua estrutura obrigatoria;
+  - registrar a feature em CHANGELOG caso o arquivo seja criado futuramente; o repositorio nao possui `CHANGELOG.md` hoje.
+- Etapa 6 - validar antes do deploy:
+  - SQL: modos monitorar/automatico, override ativo/expirado/revogado, 90d, fallback 180d, sem historico, cancelados, movimento futuro, preco ausente e fronteiras exatas dos estados;
+  - seguranca: titular, dependente, master, usuario sem permissao, anonimo e tentativa de owner cruzado;
+  - integridade: confirmar que `materiais.estoqueMinimo` permanece identico e que toda alteracao de politica/override gera historico;
+  - consistencia: soma dos quatro estados igual a `materiais_monitorados`, com o mesmo universo no resumo, modal e CSV;
+  - frontend: validar responsividade, master com tenant selecionado, titular/dependente, troca de sessao/tenant, filtro de movimentacao, mensagens de erro, `npm run build` e `npm run lint`, separando pendencias preexistentes;
+  - aplicar as migrations em staging, validar com dados reais e somente depois promover para producao.
+- Arquivos previstos para a implementacao:
+  - criar migrations `supabase/migrations/20260926_create_inventory_policy.sql` e `supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql`;
+  - modificar `src/pages/AnaliseEstoquePage.jsx`, `src/pages/EstoquePage.jsx`, `src/context/EstoqueContext.jsx`, `src/hooks/useEstoque.js`, `src/services/estoqueApi.js`, `src/components/Estoque/List/EstoqueList.jsx`, `src/components/Estoque/Modal/EstoqueMinStockModal.jsx`, `src/utils/estoqueUtils.js`, `src/styles/DashboardPage.css`, `src/styles/EstoquePage.css`, `src/help/helpAnaliseEstoque.json`, `src/help/helpEstoque.json` e a camada compartilhada de servico/hook da reposicao;
+  - extrair utilitarios de normalizacao/exportacao e, se necessario para reduzir o tamanho da pagina, componentes do painel/modal de reposicao;
+  - atualizar `docs/AnaliseEstoque.txt`, `docs/Estoque.txt`, documentos de RLS, `supabase/README.md`, `README.md` e este `TASKS.md`.
+
+- Aplicar a migration `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql` no Supabase (depois de `20260423_add_forecast_audit_and_purchase_rpcs.sql`) e validar: usuario do tenant A chamando `rpc_previsao_compra_sugerida` com owner do tenant B deve receber 42501; o proprio tenant e master continuam recebendo dados.
+- Validar `GET /api/estoque` e `GET /api/estoque?view=dashboard` com tenants A e B: cada um so recebe os proprios materiais/movimentacoes; sem token deve retornar 401.
 - Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.
 - Aplicar a migration `supabase/migrations/20260802_acidente_locais_owner_scope.sql` no projeto Supabase para ativar locais de acidente por tenant no Cadastro Base.
 - Aplicar a migration `supabase/migrations/20260801_fix_purchase_budget_uuid_empty.sql` no projeto Supabase se a aba ainda mostrar `invalid input syntax for type uuid: ""`.
@@ -147,3 +274,4 @@
 - Reset de senha 2026-09-12: `npm run build` passou; `npm run lint` continua bloqueado por pendencias gerais preexistentes do projeto.
 - Dashboard Acidentes 2026-08-01: para o owner `59191387-669b-4585-8e11-7070d9769d86`, havia 5 HHT ativos em 03/2026 somando 99.120,67 e 24 acidentes ativos em 2026; nenhum grupo `mes + centro_servico_id` dos acidentes tinha HHT correspondente, por isso a regra antiga retornava HHT total 0.
 - Estoque 2026-08-01: `npm run build` passou apos a correcao do filtro; `npm run lint` continua bloqueado por pendencias gerais preexistentes no projeto. A tela voltou a aplicar filtros somente pelo botao "Aplicar filtros" e a carga inicial deixou de depender da trava global `hasRunInitialLoad`.
+- Politica de reposicao 2026-09-26 (em estudo, fora da fase atual): flag `critico` + `piso_minimo`. Ideia discutida: marcar por item (`grupos_material_itens`, ex. Luva de vaqueta) ou grupo (`grupos_material`) com excecao por material, herdando para todos os fornecedores/CAs/tamanhos; como esses catalogos sao globais, a marcacao teria que ficar em tabela owner-scoped propria. Pontos em aberto: piso por material x piso somado por item, sugestao automatica de candidatos e efeito no P0.

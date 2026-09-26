@@ -1627,18 +1627,23 @@ async function registrarHistoricoPreco(materialId, valorUnitario, usuario, authT
   )
 }
 
-async function carregarMovimentacoes(params) {
+async function carregarMovimentacoes(params, ownerId) {
+  if (!ownerId) {
+    throw createHttpError(403, 'Owner nao resolvido para consultar estoque.')
+  }
   const periodo = parsePeriodo(params)
   const resolvedRange = resolvePeriodoRange(periodo)
 
   const entradasQuery = supabaseAdmin
     .from('entradas')
     .select('*')
+    .eq('account_owner_id', ownerId)
     .order('dataEntrada', { ascending: false })
 
   const saidasQuery = supabaseAdmin
     .from('saidas')
     .select('*')
+    .eq('account_owner_id', ownerId)
     .order('dataEntrega', { ascending: false })
 
   let entradasFiltered = entradasQuery
@@ -1655,11 +1660,8 @@ async function carregarMovimentacoes(params) {
     saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
   }
 
-  const [materiaisRegistros, entradas, saidas] = await Promise.all([
-    execute(
-      supabaseAdmin.from(MATERIAIS_VIEW).select('*').order('nome'),
-      'Falha ao listar materiais.',
-    ),
+  const [materiais, entradas, saidas] = await Promise.all([
+    carregarMateriaisPorOwner(ownerId),
     execute(entradasFiltered, 'Falha ao listar entradas.'),
     execute(saidasFiltered, 'Falha ao listar saídas.'),
   ])
@@ -1670,7 +1672,7 @@ async function carregarMovimentacoes(params) {
   const saidasNormalizadas = (saidas ?? []).map(mapSaidaRecord)
 
   return {
-    materiais: (materiaisRegistros ?? []).map(mapMaterialRecord),
+    materiais,
     entradas: entradasNormalizadas,
     saidas: saidasNormalizadas,
     periodo,
@@ -3584,14 +3586,25 @@ async function loadReportRegistry(ownerId, tipo) {
 }
 
 export const EstoqueOperations = {
-  async current(params = {}) {
-    const { materiais, entradas, saidas, periodo } = await carregarMovimentacoes(params)
+  async current(params = {}, user) {
+    if (!user?.id) {
+      throw createHttpError(401, 'Usuario nao autenticado para consultar estoque.')
+    }
+    const ownerId = await resolveOwnerId(user.id)
+    const { materiais, entradas, saidas, periodo } = await carregarMovimentacoes(params, ownerId)
     return montarEstoqueAtual(materiais, entradas, saidas, periodo)
   },
-  async dashboard(params = {}) {
+  async dashboard(params = {}, user) {
+    if (!user?.id) {
+      throw createHttpError(401, 'Usuario nao autenticado para consultar dashboard.')
+    }
+    const ownerId = await resolveOwnerId(user.id)
     const [{ materiais, entradas, saidas, periodo }, pessoas] = await Promise.all([
-      carregarMovimentacoes(params),
-      execute(supabaseAdmin.from('pessoas').select('*'), 'Falha ao listar pessoas.'),
+      carregarMovimentacoes(params, ownerId),
+      execute(
+        supabaseAdmin.from('pessoas').select('*').eq('account_owner_id', ownerId),
+        'Falha ao listar pessoas.'
+      ),
     ])
     return montarDashboard({ materiais, entradas, saidas, pessoas }, periodo)
   },
