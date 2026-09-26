@@ -1139,6 +1139,27 @@
   margin-top: 0.25rem;
 }
 
+/* Politica de reposicao e override (aba Compra) */
+.reposicao-politica-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.reposicao-politica-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.reposicao-politica-historico,
+.reposicao-override-ativo {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
 @media (max-width: 960px) {
   .analysis-pareto-grid {
     grid-template-columns: 1fr;

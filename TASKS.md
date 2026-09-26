@@ -88,6 +88,7 @@
 - Politica de reposicao - entrega 2 (banco, modo monitorar), 2026-09-26: migration `supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql` criada com `rpc_reposicao_itens` e as chaves novas `politica`, `calculado_em`, `resumo_reposicao` e `itens` em `rpc_previsao_compra_sugerida`, preservando as chaves legadas; validada localmente em Postgres do Supabase.
 - Politica de reposicao - ajuste 2026-09-26: migration `supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql` criada com a situacao `sem_consumo_recente` (minimo cadastrado, sem saida na janela e abaixo do minimo: fora da compra recomendada, com referencia ate o minimo em fila de revisao) e `janela_sem_consumo_dias` configuravel (padrao 180). Motivo: 178 de 246 itens com compra (R$ 30.339,87 de R$ 40.026,69) nao tinham consumo em 180 dias.
 - Politica de reposicao - 2026-09-26: migrations `20260926_secure_forecast_purchase_rpcs.sql`, `20260926_create_inventory_policy.sql`, `20260926_update_rpc_previsao_compra_sugerida.sql` e `20260927_inventory_policy_sem_consumo_recente.sql` aplicadas no Supabase. Conferencia no owner `59191387-669b-4585-8e11-7070d9769d86`: 395 monitorados = ruptura 39 + necessaria 24 + programada 5 + manter 72 + acima do alvo 63 + sem base 14 + sem consumo recente 178; compra recomendada R$ 9.686,82 em 68 itens; referencia manual dos sem consumo R$ 30.339,87; aba Compra sem alteracao visual.
+- Politica de reposicao - entrega 3 (aba Compra), 2026-09-26: aba Compra passou a usar `rpc_reposicao_itens` sem depender do snapshot, removeu o seletor de snapshot e o fallback local, ganhou cards P0/P1/P2/sem consumo, tabelas de situacao, cobertura e revisao de minimos, detalhe e CSV completos, modal `Politica de reposicao` com historico e override por material; permissao `estoque.politica.manage` adicionada em `permissions.js`.
 
 ## Pendente
 ### Plano de execucao - politica de reposicao por cobertura (2026-09)
@@ -130,7 +131,7 @@
 - Ordem de entrega recomendada (PRs separados):
   - 1) correcoes de seguranca independentes: Etapa 3.3 (`EstoqueOperations` sem owner) e isolamento `SECURITY DEFINER` da `rpc_previsao_compra_sugerida` (primeiro item da Etapa 2) - CONCLUIDA 2026-09-26;
   - 2) migration da politica + evolucao da RPC, somente com modo `monitorar` - CONCLUIDA 2026-09-26 (pendente aplicar no Supabase);
-  - 3) aba Compra (Etapas 3 e 4);
+  - 3) aba Compra (Etapas 3 e 4) - CONCLUIDA 2026-09-26 (pendente validacao visual com dados reais);
   - 4) Estoque atual e alertas (Etapas 3.1 e 3.2);
   - 5) liberacao do modo `automatico` apos validacao com dados reais;
   - ADIADO 2026-09-26 por decisao do usuario: bug de periodos vazios do Master (Etapa 0.1), sem data definida; ate la, o Master continua analisando o forecast pelo proprio owner.
@@ -218,7 +219,8 @@
   - extrair utilitarios de normalizacao/exportacao e, se necessario para reduzir o tamanho da pagina, componentes do painel/modal de reposicao;
   - atualizar `docs/AnaliseEstoque.txt`, `docs/Estoque.txt`, documentos de RLS, `supabase/README.md`, `README.md` e este `TASKS.md`.
 
-- Adicionar `estoque.politica.manage` em `src/config/permissions.js` (toggles de Credenciais e Permissoes) na entrega 3, junto com o painel `Politica de reposicao`.
+- Validar a aba Compra com dados reais: numeros iguais ao `resumo_reposicao` (R$ 9.686,82 / 68 itens no owner `59191387-...`), detalhe e CSV completos, modal de politica somente leitura para usuario sem `estoque.politica.manage`, criacao/revogacao de override e toggle `Politica de reposicao` em Credenciais e Permissoes.
+- Entrega 4: acao `zerar/ajustar minimo cadastrado` na fila de revisao depende da RPC dedicada ao minimo cadastrado (Etapa 3.1).
 - Validar em producao o isolamento de `20260926_secure_forecast_purchase_rpcs.sql` (migration ja aplicada): usuario do tenant A chamando `rpc_previsao_compra_sugerida` com owner do tenant B deve receber 42501; o proprio tenant e master continuam recebendo dados.
 - Validar `GET /api/estoque` e `GET /api/estoque?view=dashboard` com tenants A e B: cada um so recebe os proprios materiais/movimentacoes; sem token deve retornar 401.
 - Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.

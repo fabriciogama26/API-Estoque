@@ -33,7 +33,7 @@
       "O periodo exibido pode ser selecionado no combo com historicos gerados.",
       "A aba Operacional concentra o rolling 12 meses com historico, saida prevista, entrada prevista e saldo.",
       "A aba Compra mostra a necessidade de reposicao atual; ela nao representa o orcamento anual dos proximos 12 meses.",
-      "A aba Compra prioriza a recomendacao do RPC de compra, calculada por estoque atual, estoque minimo, consumo recente e cobertura.",
+      "A aba Compra usa a politica de reposicao calculada no banco: cada material tem minimo cadastrado, minimo sugerido (consumo x cobertura minima) e minimo efetivo, com a fonte da regra. A reposicao nao depende do snapshot do forecast.",
       "A aba Previsao de Orcamento mostra o Orcamento de compras - proximos 12 meses, calculado separadamente da reposicao atual.",
       "A Previsao de Orcamento mostra a verba recomendada do cenario-base, cenarios comparativos, composicao reconciliada e cronograma financeiro.",
       "Na Previsao de Orcamento, o estoque utilizavel reduz a necessidade de novas compras; esse valor nao representa dinheiro em caixa.",
@@ -41,8 +41,8 @@
       "Na composicao do orcamento, use Lista consolidada de materiais para abrir o modal Maiores componentes da verba projetada.",
       "O modal de orcamento responde: o que mais exigira dinheiro no proximo periodo? Ele compara gasto historico 12m, quantidade prevista, estoque utilizavel, quantidade a comprar, preco futuro e impacto no orcamento.",
       "A quantidade geral da Compra e exibida por materiais recomendados, sem somar unidades, pares, metros ou litros em um unico total.",
-      "A reconciliacao da Compra separa decisao operacional de condicoes de risco como abaixo do minimo e cobertura curta.",
-      "A leitura de cobertura da Compra usa faixas por dias/meses para evitar que excesso em alguns materiais esconda ruptura em outros.",
+      "Na Situacao da reposicao cada material aparece uma unica vez: Ruptura (P0), Reposicao necessaria (P1), Reposicao programada (P2), Manter (P3), Acima do alvo, Sem consumo recente e Sem base para calculo; a soma fecha o total monitorado.",
+      "A Cobertura do estoque usa faixas exclusivas (menos de 30 dias ate acima de 12 meses, mais sem consumo em 180 dias) que somam o total monitorado.",
       "Nas tabelas da Compra, use Detalhar para abrir o modal com os materiais daquela decisao ou faixa de cobertura.",
       "No modal de detalhes da Compra, use Exportar Excel (CSV) para extrair a lista aberta.",
       "O modal de detalhes da Compra usa cards por material para evitar sobreposicao de colunas.",
@@ -62,7 +62,12 @@
       "Tooltip da previsao separa contingencia de 25%, P75/P90 estatisticos, mediana e alerta de volatilidade.",
       "Previsao inclui entradas, saidas, saldo liquido projetado e fluxo bruto movimentado em indicadores separados.",
       "Diagnostico usa agg_gasto_mensal (valor_saida) para estatisticas mensais.",
-      "Acuracia da auditoria usa WAPE/MAPE sobre os meses do snapshot que ja possuem realizado."
-      ]
-    }
+      "Acuracia da auditoria usa WAPE/MAPE sobre os meses do snapshot que ja possuem realizado.",
+      "Material com minimo cadastrado e sem nenhuma saida na janela da politica (padrao 180 dias) vai para Sem consumo recente: fica fora da compra recomendada e mostra a referencia ate o minimo cadastrado para revisao.",
+      "Valores que nao podem ser calculados (sem consumo, sem limite) aparecem como Nao calculavel e nunca como zero; quantidades de minimo, maximo e compra sao sempre inteiras.",
+      "O botao Politica de reposicao mostra coberturas, janela sem consumo, validade de override e o historico de alteracoes; alterar exige a permissao Politica de reposicao e um motivo.",
+      "No detalhe de cada material, quem tem a permissao Politica de reposicao pode criar ou revogar um override de minimo/maximo com motivo e validade (padrao 90 dias); o minimo cadastrado do material nao e alterado.",
+      "A Revisao de minimos lista avisos de governanca (minimo sem consumo, minimo divergente do sugerido, sem minimo e sem consumo, overrides ativos e sem preco); esses avisos nao geram compra."
+    ]
+  }
 }
