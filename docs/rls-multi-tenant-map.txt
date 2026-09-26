@@ -138,6 +138,26 @@ Frontend
 - src/services/api.js: api.entradas.create()/update()
   - insert direto com RLS owner + entradas.write/estoque.write
 
+Politica de reposicao (2026-09)
+-------------------------------
+Tabelas (owner-scoped, RLS habilitada, sem force, escrita somente por RPC)
+- inventory_policy: uma linha por account_owner_id; ausencia = valores padrao.
+- inventory_material_override: override de minimo/maximo por material; um nao revogado por material.
+- inventory_policy_history: historico gravado por trigger (antes/depois, motivo, ator).
+- SELECT: master ou (account_owner_id = my_owner_id() e has_permission('estoque.read')).
+- INSERT/UPDATE/DELETE: revogados de anon/authenticated; somente RPCs SECURITY DEFINER.
+
+Helpers
+- forecast_assert_owner_access(p_owner_id): 42501 se owner da sessao nulo ou diferente (libera master e service_role).
+- inventory_policy_assert_manage(p_owner_id): acima + has_permission('estoque.politica.manage').
+
+RPCs
+- Leitura (tenant da sessao): rpc_reposicao_itens, rpc_previsao_compra_sugerida, rpc_previsao_gasto_mensal_auditar,
+  rpc_inventory_policy_get, rpc_inventory_policy_history.
+- Escrita (estoque.politica.manage): rpc_inventory_policy_update, rpc_inventory_override_set, rpc_inventory_override_revoke.
+- Internas sem acesso para authenticated: _inventory_reposicao_calcular, _rpc_previsao_compra_sugerida_impl,
+  _rpc_previsao_gasto_mensal_auditar_impl, inventory_policy_effective.
+
 Estado atual e problemas observados
 -----------------------------------
 - Materiais: funcionando via RPC full + preflight.

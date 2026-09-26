@@ -84,6 +84,8 @@
 - Migration de `acidente_locais` ajustada para bancos onde a coluna legada `ordem` nao existe.
 - Politica de reposicao - entrega 1 (seguranca), 2026-09-26: `EstoqueOperations.current/dashboard` (`GET /api/estoque`) passaram a exigir usuario autenticado e filtrar materiais, entradas, saidas e pessoas por `account_owner_id`.
 - Politica de reposicao - entrega 1 (seguranca), 2026-09-26: migration `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql` criada para validar o owner da sessao em `rpc_previsao_compra_sugerida` e `rpc_previsao_gasto_mensal_auditar` (tenant cruzado retorna `42501`).
+- Politica de reposicao - entrega 2 (banco, modo monitorar), 2026-09-26: migration `supabase/migrations/20260926_create_inventory_policy.sql` criada com `inventory_policy`, `inventory_material_override`, `inventory_policy_history` (trigger), permissao `estoque.politica.manage` e RPCs de leitura/gestao da politica e dos overrides.
+- Politica de reposicao - entrega 2 (banco, modo monitorar), 2026-09-26: migration `supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql` criada com `rpc_reposicao_itens` e as chaves novas `politica`, `calculado_em`, `resumo_reposicao` e `itens` em `rpc_previsao_compra_sugerida`, preservando as chaves legadas; validada localmente em Postgres do Supabase.
 
 ## Pendente
 ### Plano de execucao - politica de reposicao por cobertura (2026-09)
@@ -99,7 +101,12 @@
   - o Master enxerga indicadores globais pela RLS, mas o forecast filtra pelo `owner_id` proprio do Master, que nao representa necessariamente o tenant operacional;
   - a correcao deve exigir selecao explicita de tenant no acesso Master e usar esse mesmo owner em todas as fontes da pagina.
 - Premissas recomendadas para aprovacao antes da implementacao:
-  - sem historico em 180 dias, campos automaticos permanecem `null`, a situacao fica `sem_base_para_calculo` e a reposicao ate o minimo manual continua disponivel com `criterio_compra = minimo_manual`;
+  - sem historico em 180 dias, campos automaticos permanecem `null`, `base_calculo = sem_historico` e a reposicao ate o minimo manual continua disponivel com `criterio_compra = ate_minimo_manual`;
+  - AJUSTADO 2026-09-26 na implementacao: `sem_base_para_calculo` fica restrito a materiais sem limite resolvido (sem manual e sem consumo em 180 dias); material sem historico mas com minimo manual segue a situacao pelo minimo (ex.: ruptura), com aviso `sem_historico`;
+  - AJUSTADO 2026-09-26 na implementacao: no modo `monitorar`, material sem minimo cadastrado usa o minimo automatico (fonte `automatico`), como o calculo legado ja usava consumo x 2 como alvo; onde ha minimo cadastrado, ele continua efetivo;
+  - AJUSTADO 2026-09-26 na implementacao: RLS habilitada sem `force`, no padrao das demais tabelas owner-scoped; escrita bloqueada por revoke e feita apenas por RPC;
+  - AJUSTADO 2026-09-26 na implementacao: tenant sem linha em `inventory_policy` usa os valores padrao nas RPCs, sem necessidade de integrar ao provisionamento; o backfill cria a linha para tenants com materiais;
+  - AJUSTADO 2026-09-26 na implementacao: `rpc_inventory_policy_update` recusa o modo `automatico` ate a entrega 5;
   - DECIDIDO 2026-09-26: consumo medio pode manter duas casas decimais, mas minimo sugerido, maximo/estoque alvo e compra sugerida sao sempre arredondados para cima (`ceil`) para numero inteiro;
   - DECIDIDO 2026-09-26: materiais ativos sem nenhuma movimentacao passam a aparecer na lista com saldo zero e situacao `sem_base_para_calculo`;
   - DECIDIDO 2026-09-26: validade padrao do override por material e de 90 dias;
@@ -118,12 +125,12 @@
   - sem automatico e sem manual valido: retornar `sem_politica`, nunca converter ausencia de base em zero;
   - no modo inicial `monitorar`, o manual permanece efetivo e a divergencia com o automatico gera aviso de revisao, nao alerta de compra automatico.
 - Ordem de entrega recomendada (PRs separados):
-  - 1) correcoes de seguranca independentes: Etapa 3.3 (`EstoqueOperations` sem owner) e isolamento `SECURITY DEFINER` da `rpc_previsao_compra_sugerida` (primeiro item da Etapa 2);
-  - 2) bug de periodos vazios do Master (Etapa 0.1);
-  - 3) migration da politica + evolucao da RPC, somente com modo `monitorar`;
-  - 4) aba Compra (Etapas 3 e 4);
-  - 5) Estoque atual e alertas (Etapas 3.1 e 3.2);
-  - 6) liberacao do modo `automatico` apos validacao com dados reais.
+  - 1) correcoes de seguranca independentes: Etapa 3.3 (`EstoqueOperations` sem owner) e isolamento `SECURITY DEFINER` da `rpc_previsao_compra_sugerida` (primeiro item da Etapa 2) - CONCLUIDA 2026-09-26;
+  - 2) migration da politica + evolucao da RPC, somente com modo `monitorar` - CONCLUIDA 2026-09-26 (pendente aplicar no Supabase);
+  - 3) aba Compra (Etapas 3 e 4);
+  - 4) Estoque atual e alertas (Etapas 3.1 e 3.2);
+  - 5) liberacao do modo `automatico` apos validacao com dados reais;
+  - ADIADO 2026-09-26 por decisao do usuario: bug de periodos vazios do Master (Etapa 0.1), sem data definida; ate la, o Master continua analisando o forecast pelo proprio owner.
 - Etapa 0 - validar pre-requisitos no Supabase remoto:
   - consultar a definicao e ACL efetivamente aplicadas de `rpc_previsao_compra_sugerida(uuid, uuid)`;
   - confirmar a aplicacao das migrations de forecast e do helper seguro de status cancelado;
@@ -208,6 +215,8 @@
   - extrair utilitarios de normalizacao/exportacao e, se necessario para reduzir o tamanho da pagina, componentes do painel/modal de reposicao;
   - atualizar `docs/AnaliseEstoque.txt`, `docs/Estoque.txt`, documentos de RLS, `supabase/README.md`, `README.md` e este `TASKS.md`.
 
+- Aplicar no Supabase, nesta ordem e depois de `20260926_secure_forecast_purchase_rpcs.sql`: `supabase/migrations/20260926_create_inventory_policy.sql` e `supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql`; conferir que a aba Compra continua igual e que `select public.rpc_reposicao_itens('<owner>')` devolve `resumo_reposicao` com a soma das situacoes igual a `materiais_monitorados`.
+- Adicionar `estoque.politica.manage` em `src/config/permissions.js` (toggles de Credenciais e Permissoes) na entrega 3, junto com o painel `Politica de reposicao`.
 - Aplicar a migration `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql` no Supabase (depois de `20260423_add_forecast_audit_and_purchase_rpcs.sql`) e validar: usuario do tenant A chamando `rpc_previsao_compra_sugerida` com owner do tenant B deve receber 42501; o proprio tenant e master continuam recebendo dados.
 - Validar `GET /api/estoque` e `GET /api/estoque?view=dashboard` com tenants A e B: cada um so recebe os proprios materiais/movimentacoes; sem token deve retornar 401.
 - Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.
