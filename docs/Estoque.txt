@@ -95,6 +95,23 @@ Melhoria possivel
 -----------------
 - Criar um RPC no Supabase para calcular o saldo do Estoque atual (com corte por data inicio/fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
 
+Atualizacao 2026-09 (isolamento de tenant no backend)
+-----------------------------------------------------
+- Arquivos alterados:
+  - api/_shared/operations.js
+  - api/index.js
+  - docs/Estoque.txt
+  - TASKS.md
+- Funcoes tocadas:
+  - EstoqueOperations.current
+  - EstoqueOperations.dashboard
+  - carregarMovimentacoes
+- Comportamento antes/depois:
+  - Antes: `GET /api/estoque` (atual e `view=dashboard`) usava `supabaseAdmin` sem filtro de owner e devolvia materiais, entradas, saidas e pessoas de todos os tenants.
+  - Depois: as duas rotas exigem usuario autenticado, resolvem o owner com `resolveOwnerId(user.id)` e filtram materiais (`carregarMateriaisPorOwner`), entradas, saidas e pessoas por `account_owner_id`.
+  - Depois: sem usuario a rota retorna 401; sem owner resolvido retorna erro, nunca a visao global.
+  - A tela Estoque atual do frontend consulta o Supabase direto com RLS e nao foi alterada.
+
 Atualizacao 2026-08
 -------------------
 - Arquivos alterados:

@@ -341,6 +341,21 @@ Atualizacao 2026-08 (auditoria do orcamento)
 - Antes: a aba Auditoria validava o snapshot operacional, mas nao explicava a inflacao da verba anual por material.
 - Depois: a aba Auditoria abre modal com fator de crescimento, metodo, trava aplicada e impacto financeiro por material orcado.
 
+Atualizacao 2026-09 (isolamento de tenant das RPCs de auditoria e compra)
+------------------------------------------------------------------------
+- Migration `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql` adicionada.
+- O corpo original de `rpc_previsao_gasto_mensal_auditar` e `rpc_previsao_compra_sugerida` foi renomeado para `_rpc_previsao_gasto_mensal_auditar_impl` e `_rpc_previsao_compra_sugerida_impl`, sem acesso para `anon`/`authenticated`.
+- As funcoes publicas mantem a mesma assinatura `(p_owner_id uuid, p_forecast_id uuid)` e chamam `forecast_assert_owner_access(p_owner_id)` antes de delegar.
+- `forecast_assert_owner_access` libera master e `service_role`; para os demais, nega com SQLSTATE `42501` quando o owner da sessao nao e resolvido ou quando `p_owner_id` difere de `my_owner_id()`.
+- O frontend nao mudou: a tela ja envia `p_owner_id` do perfil e exibe a mensagem de erro da RPC.
+- Arquivos alterados:
+- `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql`
+- `docs/AnaliseEstoque.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: as RPCs rodavam como SECURITY DEFINER e confiavam no `p_owner_id` do chamador; qualquer usuario autenticado podia ler auditoria e compra sugerida de outro tenant.
+- Depois: somente o proprio tenant, master ou `service_role` executam a consulta; tenant cruzado retorna `Acesso negado ao owner informado.`
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -452,6 +467,10 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260801_purchase_budget_validation_audit.sql
   - Responsavel por: corrigir a previsao de demanda intermitente, adicionar travas por padrao de consumo e expor `validacao_orcamento` para a aba Auditoria.
+- Migration de isolamento de tenant das RPCs de auditoria e compra
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql
+  - Responsavel por: mover o corpo das RPCs para funcoes internas e validar o owner da sessao (`forecast_assert_owner_access`) antes de retornar auditoria/compra sugerida.
 - Edge Function forecast-gasto-mensal
   - Tipo: Supabase Edge Function
   - Caminho: supabase/functions/forecast-gasto-mensal/index.ts

@@ -260,9 +260,9 @@ export default withAuth(async (req, res, user) => {
     }
     if (path === '/api/estoque') {
       if (query.view === 'dashboard') {
-        return sendJson(res, 200, await EstoqueOperations.dashboard(query))
+        return sendJson(res, 200, await EstoqueOperations.dashboard(query, user))
       }
-      return sendJson(res, 200, await EstoqueOperations.current(query))
+      return sendJson(res, 200, await EstoqueOperations.current(query, user))
     }
 
     if (path === '/api/documentos/termo-epi' && method === 'GET') {
