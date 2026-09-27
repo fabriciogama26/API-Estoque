@@ -1,0 +1,39 @@
+{
+  "requisitosControle": {
+    "title": "Requisitos de Controle",
+    "summary": "Cadastro dos treinamentos, certificados, documentos, capacitacoes e exames obrigatorios, com a validade de cada um e a quem se aplicam.",
+    "steps": [
+      {
+        "title": "Cadastrar o requisito",
+        "description": "Informe nome, codigo, categoria, tipo (origem da exigencia) e a validade em dias ou meses. Desmarque 'Possui validade' para requisitos que nao vencem, como uma integracao feita uma unica vez.",
+        "mediaHint": "Formulario Cadastro de requisito."
+      },
+      {
+        "title": "Definir a quem se aplica",
+        "description": "Na lista, use o botao de aplicabilidade. Cada regra pode combinar cargo, setor, centro de servico (unidade), centro de custo ou um colaborador especifico. Criterios de uma mesma regra precisam coincidir todos; regras diferentes se somam. A previa mostra quantos colaboradores ativos a regra alcanca.",
+        "mediaHint": "Modal de aplicabilidade com regras e previa."
+      },
+      {
+        "title": "Alterar a validade",
+        "description": "Mudar o periodo exige a permissao de regras de validade e um motivo. A nova validade vale somente para registros e renovacoes feitos depois; os registros antigos mantem a validade com que foram cadastrados.",
+        "mediaHint": "Campo Motivo da alteracao da validade."
+      },
+      {
+        "title": "Inativar",
+        "description": "Inativar tira o requisito do controle e dos alertas, sem apagar historico. Pode ser reativado depois.",
+        "mediaHint": "Botao ativar/inativar na lista."
+      },
+      {
+        "title": "Configurar janela e alertas",
+        "description": "A janela critica (padrao 7 dias) define quando o status vira 'Proximo do vencimento'. Os alertas por e-mail saem uma unica vez ao entrar na janela e uma unica vez no dia do vencimento, para os administradores do tenant.",
+        "mediaHint": "Card Configuracao do controle de validades."
+      }
+    ],
+    "notes": [
+      "Vencimento = data de realizacao + periodo - 1 dia (ex.: 10/01/2024 + 24 meses vence em 09/01/2026).",
+      "Colaboradores inativos ou desligados nao entram no controle.",
+      "Toda alteracao de requisito, regra e configuracao fica no historico com usuario, data e motivo.",
+      "ASO continua sendo controlado na tela Controle de ASO."
+    ]
+  }
+}

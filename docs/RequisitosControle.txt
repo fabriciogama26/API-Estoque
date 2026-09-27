@@ -1,0 +1,148 @@
+Tela: Requisitos de Controle
+============================
+
+Visao geral
+-----------
+- Cadastro administrativo do que e obrigatorio: treinamentos, certificados, documentos, capacitacoes, exames e outros requisitos com (ou sem) validade.
+- Define a quem cada requisito se aplica (aplicabilidade) usando os cadastros existentes: cargo, setor, centro de servico (unidade), centro de custo ou um colaborador especifico.
+- Rota: `/pcsmo/requisitos-controle` (menu PCSMO > Requisitos de Controle).
+- Chave de pagina: `pcsmo.requisitos_controle`.
+- Nao disponivel no modo local (`VITE_DATA_MODE=local`): a tela mostra aviso de indisponivel, porque todas as regras ficam no banco.
+- ASO continua na tela Controle de ASO (decisao 2026-09-27: modulos separados).
+
+Arquitetura
+-----------
+- Contexto:
+  - `RequisitosControleProvider` (`RequisitosControleContext`) expoe o hook `useRequisitosController`.
+- Hook `useRequisitosController`:
+  - carrega contexto (permissoes e configuracao), requisitos e catalogos;
+  - formulario de requisito, ativar/inativar, regras de aplicabilidade com previa, historico e configuracao;
+  - erros registrados com `useErrorLogger('requisitos_controle')`.
+- Servico:
+  - `validadesApi.js` chama RPCs do Supabase diretamente (mesmo padrao de `reposicaoApi.js`); nao passa pela API Vercel.
+- Banco (fonte de verdade):
+  - `requisitos_controle`: catalogo por tenant (`account_owner_id`).
+  - `requisitos_aplicabilidade`: regras (cargo/setor/centro de servico/centro de custo/pessoa); dentro de uma regra os criterios combinam com E, regras diferentes com OU.
+  - `requisitos_config`: janela critica, fuso e alertas por tenant (ausencia de linha = padrao).
+  - `requisitos_historico`: auditoria gravada por trigger (antes/depois, motivo, ator).
+- Seguranca:
+  - RLS habilitada; `authenticated` so tem SELECT (owner + `validades.read`); escrita somente por RPC SECURITY DEFINER.
+  - Toda RPC valida o owner da sessao (`forecast_assert_owner_access`) e a permissao (`validades_assert_access`).
+  - Trigger impede regra com cargo/setor/centro/pessoa de outro tenant.
+
+Cadastro
+--------
+- Campos:
+  - Nome (*), Codigo/sigla, Categoria (*), Tipo/origem da exigencia (*), Descricao, Observacao.
+  - Possui validade; se sim, Validade (*) + Unidade (dias ou meses).
+- Categorias: treinamento, certificado, documento, capacitacao, exame, outro.
+- Tipos: legal/normativo, interno, exigencia de cliente, outro.
+- Regras:
+  - nome e codigo unicos por tenant (sem diferenciar maiusculas);
+  - vencimento = data de realizacao + periodo - 1 dia (ex.: 10/01/2024 + 24 meses vence em 09/01/2026);
+  - alterar a validade exige a permissao `validades.regras.manage` e motivo;
+  - a nova validade vale apenas para realizacoes futuras (snapshot, ver Controle de Validades);
+  - inativar exige motivo; o requisito sai do controle e dos alertas, sem apagar historico.
+
+Filtros, auto-complete e listagem
+---------------------------------
+- Lista com busca por nome/codigo e opcao "Mostrar inativos".
+- Colunas: Requisito, Categoria, Tipo, Validade, Regras, Exigidos, Pendentes, Vencidos, Situacao, Acoes.
+- Acoes: Editar, Aplicabilidade, Historico, Ativar/Inativar.
+- Aplicabilidade (modal):
+  - lista as regras ativas com quantidade de colaboradores ativos alcancados;
+  - nova regra com selects de catalogo (`rpc_catalog_list`) e auto-complete de colaborador;
+  - previa "Esta regra alcanca N colaborador(es) ativo(s)" calculada no banco antes de salvar;
+  - remover regra exige motivo (soft delete com auditoria).
+
+Boas praticas
+-------------
+- Preferir regras por cargo/setor/unidade; usar regra individual apenas para excecoes positivas.
+- Para dispensar alguem de uma regra geral, usar Dispensar na tela Controle de Validades (nao remover a regra).
+- Revisar a previa de afetados antes de adicionar a regra.
+
+Configuracao (card)
+-------------------
+- Janela critica (padrao 7 dias, 1 a 90).
+- Alertas por e-mail ativos (padrao sim); alerta ao entrar na janela; alerta no vencimento.
+- Tolerancia do alerta de vencimento (padrao 7 dias, 0 a 30): se o cron falhar no dia, o alerta de vencimento ainda sai ate N dias depois.
+- Fuso horario (padrao America/Sao_Paulo) usado para "hoje".
+- Alterar exige `validades.regras.manage` e motivo; fica auditado.
+- Destinatarios: administradores (admin/master) do tenant com e-mail. Configuracao de destinatarios fica para etapa futura.
+
+Permissoes
+----------
+- `pcsmo.requisitos_controle` (pagina) -> `validades.read`, `validades.requisitos.manage`, `pessoas.read`.
+- `validades.requisitos.manage`: criar/editar requisito, regras e dispensas.
+- `validades.regras.manage`: alterar validade, janela critica, fuso e alertas.
+- Roles `master`, `admin` e `owner` recebem todas as chaves na migration; demais perfis via toggles em Configuracoes.
+
+Atualizacao 2026-09
+-------------------
+- Criada a tela e o dominio de Requisitos de Controle (migrations `20260929_01..03`).
+- Dependencias de permissao atualizadas no banco (`expand_permission_dependencies`) e no front (`PERMISSION_DEPENDENCIES`).
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- RequisitosControlePage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/RequisitosControlePage.jsx
+  - Responsavel por: montar formulario, lista, configuracao e modais.
+- useRequisitosController
+  - Tipo: hook/controller
+  - Caminho: src/hooks/useRequisitosController.js
+  - Responsavel por: estado, chamadas RPC, previa de regra, historico e configuracao.
+- RequisitosControleContext
+  - Tipo: contexto
+  - Caminho: src/context/RequisitosControleContext.jsx
+  - Responsavel por: compartilhar o controller com a pagina.
+- RequisitoForm / RequisitosTable / RequisitoRegrasModal / RequisitoHistoricoModal / ValidadesConfigCard / ValidadeMotivoModal
+  - Tipo: componentes de UI
+  - Caminho: src/components/Validades/
+  - Responsavel por: formulario, lista, aplicabilidade, historico, configuracao e motivo.
+
+Constantes e configuracoes
+--------------------------
+- ValidadesConfig.js
+  - Caminho: src/config/ValidadesConfig.js
+  - Uso: defaults de formulario/regra, opcoes de categoria, tipo e unidade, rotulos do historico.
+- permissions.js
+  - Caminho: src/config/permissions.js
+  - Uso: pagina `pcsmo-requisitos-controle`, labels, grupos de toggle e dependencias.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- validadesUtils.js
+  - Caminho: src/utils/validadesUtils.js
+  - Responsavel por: rotulos, formatacao de validade/datas e mensagens de erro (sem regra de negocio).
+
+Servicos e integracoes externas
+-------------------------------
+- validadesApi.js
+  - Caminho: src/services/validadesApi.js
+  - Responsavel por: `rpc_requisitos_listar`, `rpc_requisito_salvar`, `rpc_requisito_definir_ativo`, `rpc_requisito_regras`,
+    `rpc_requisito_previa`, `rpc_requisito_regra_adicionar`, `rpc_requisito_regra_remover`, `rpc_requisitos_historico`,
+    `rpc_requisitos_config_update`, `rpc_validades_contexto`, `rpc_catalog_list`.
+- Migrations
+  - supabase/migrations/20260929_01_validades_schema.sql: permissoes, tabelas, triggers, RLS, `_validades_base`.
+  - supabase/migrations/20260929_02_validades_rpcs.sql: RPCs das telas.
+
+Ajuda contextual
+----------------
+- Botao `Ajuda` no cabecalho; conteudo em `src/help/helpRequisitosControle.json` (topico `requisitosControle`).
+
+Arquivos alterados/criados
+--------------------------
+- Criados: src/pages/RequisitosControlePage.jsx, src/hooks/useRequisitosController.js, src/context/RequisitosControleContext.jsx,
+  src/components/Validades/*, src/config/ValidadesConfig.js, src/services/validadesApi.js, src/utils/validadesUtils.js,
+  src/styles/ValidadesPage.css, src/help/helpRequisitosControle.json, supabase/migrations/20260929_01..03.
+- Alterados: src/App.jsx, src/components/NavBar.jsx, src/config/permissions.js, src/components/Help/HelpButton.jsx, README.md, TASKS.md.
+
+Comportamento antes/depois
+--------------------------
+- Antes: nao havia cadastro de requisitos com validade nem regra de quem precisa de cada requisito.
+- Depois: requisitos configuraveis por tenant, aplicabilidade por cargo/setor/unidade/centro de custo/pessoa, validade com historico e configuracao de janela/alertas.

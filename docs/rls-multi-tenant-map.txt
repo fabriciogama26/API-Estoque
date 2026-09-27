@@ -158,6 +158,30 @@ RPCs
 - Internas sem acesso para authenticated: _inventory_reposicao_calcular, _rpc_previsao_compra_sugerida_impl,
   _rpc_previsao_gasto_mensal_auditar_impl, inventory_policy_effective.
 
+Controle de Validades (2026-09)
+-------------------------------
+Tabelas (owner-scoped, RLS habilitada, escrita somente por RPC)
+- requisitos_controle, requisitos_aplicabilidade, requisitos_realizacoes, requisitos_dispensas,
+  requisitos_config, requisitos_historico: SELECT = master ou (account_owner_id = my_owner_id() e has_permission('validades.read')).
+- requisitos_alertas_envios: sem policy para authenticated (somente service_role).
+- INSERT/UPDATE/DELETE revogados de anon/authenticated; nada concedido a anon.
+- FK composta (account_owner_id, requisito_id) -> requisitos_controle(account_owner_id, id).
+- Triggers bloqueiam cargo/setor/centro/pessoa de outro tenant em regras, realizacoes e dispensas.
+
+Helpers
+- validades_assert_access(p_owner_id, permissao): forecast_assert_owner_access + has_permission (libera master e service_role).
+- validades_pode(permissao): usado para devolver flags de acao a tela.
+- Internas sem acesso para authenticated: _validades_base, _validades_filtrada, _validades_pessoas_ativas,
+  validades_hoje, _validades_realizacao_json, _requisito_json, _requisitos_config_json, _validades_regra_json.
+- Alertas (somente service_role): _validades_alertas_candidatos, rpc_validades_alertas_owners,
+  rpc_validades_alertas_reservar, rpc_validades_alertas_finalizar.
+
+Permissoes
+- pcsmo.controle_validades -> validades.read, pessoas.read
+- pcsmo.requisitos_controle -> validades.read, validades.requisitos.manage, pessoas.read
+- validades.registrar / validades.renovar / validades.requisitos.manage -> validades.read
+- validades.regras.manage -> validades.read, validades.requisitos.manage
+
 Estado atual e problemas observados
 -----------------------------------
 - Materiais: funcionando via RPC full + preflight.

@@ -1,0 +1,226 @@
+Tela: Controle de Validades
+===========================
+
+Visao geral
+-----------
+- Tela operacional que compara, por colaborador:
+  - o que ele deveria possuir (regras de Requisitos de Controle);
+  - o que ele efetivamente possui (realizacoes registradas).
+- Requisito exigido sem realizacao aparece como PENDENTE (nao desaparece da lista).
+- Rota: `/pcsmo/controle-validades` (menu PCSMO > Controle de Validades).
+- Chave de pagina: `pcsmo.controle_validades`.
+- Abas `Painel` (cards e graficos) e `Lista` (colaboradores x requisitos) usando os mesmos filtros.
+- Nao disponivel no modo local: mostra aviso de indisponivel (regras ficam no banco).
+
+Arquitetura
+-----------
+- Contexto:
+  - `ControleValidadesProvider` (`ControleValidadesContext`) expoe `useControleValidadesController`.
+- Hook `useControleValidadesController`:
+  - filtros aplicados, lista paginada no servidor, painel, drill-down, registro com previa, renovar/editar/cancelar, dispensa, historico e exportacao;
+  - erros com `useErrorLogger('controle_validades')`.
+- Servico: `validadesApi.js` (RPCs do Supabase).
+- Banco (fonte de verdade de todas as regras):
+  - `_validades_base(owner)`: base unica esperado x realizado x status (uma linha por colaborador ativo x requisito ativo exigido por regra ou com realizacao vigente).
+  - `_validades_filtrada(owner, filtros)`: filtros compartilhados por lista, painel e exportacao.
+  - `validade_status(...)`: regra unica de status (lista, painel, exportacao e alertas).
+  - `validade_calcular_vencimento(...)`: regra unica de vencimento.
+  - `validades_hoje(owner)`: "hoje" no fuso do tenant (nunca `current_date` em UTC).
+  - Tabelas: `requisitos_realizacoes`, `requisitos_dispensas`, `requisitos_historico`, `requisitos_alertas_envios`.
+- Pendencias NAO sao gravadas: sao calculadas a cada consulta (mudanca de cargo/setor reflete na hora).
+
+Cadastro
+--------
+- Bloco "Registrar realizacao" (visivel com `validades.registrar`):
+  - Colaborador (*) por matricula/nome, Requisito (*), Data de realizacao/emissao (*), Numero do certificado, Entidade emissora, Observacao.
+  - Vencimento exibido como previa calculada no banco (`rpc_validades_simular_vencimento`), igual ao que sera gravado.
+- Regras no banco (`rpc_validades_registrar`):
+  - data futura bloqueada;
+  - duplicidade colaborador + requisito + data bloqueada;
+  - sem realizacao vigente: grava como vigente;
+  - data posterior a vigente: bloqueia e orienta Renovar (hint `use_renovar`; a tela oferece o botao "Renovar registro vigente");
+  - data anterior a vigente: grava como historico (`retroativo`, status `substituido`), sem alterar o status atual nem gerar alerta.
+- Snapshot da validade (obrigatorio):
+  - na gravacao, trigger copia `possui_validade`, `validade_quantidade` e `validade_unidade` do requisito para a realizacao;
+  - o snapshot e imutavel (trigger bloqueia UPDATE);
+  - mudar a validade do requisito afeta apenas novas realizacoes/renovacoes.
+
+Renovacao
+---------
+- Acao Renovar (`validades.renovar`), somente sobre a realizacao vigente.
+- Nao edita o registro anterior: marca-o como `substituido` e cria novo registro `vigente` com `renovacao_de_id`.
+- Nova data deve ser posterior a atual e nao futura.
+- O novo registro usa a validade vigente do requisito (novo snapshot) e inicia um novo ciclo de alertas.
+
+Edicao e cancelamento
+---------------------
+- Editar (`validades.registrar`): data, documento, emissora e observacao; motivo obrigatorio.
+  - o vencimento e recalculado com o snapshot do proprio registro;
+  - a vigente continua sendo a mais recente do historico (data invalida e bloqueada).
+- Cancelar (`validades.registrar`): motivo obrigatorio; o registro fica `cancelado` (nao e apagado).
+  - cancelar a vigente devolve a vigencia ao registro anterior mais recente.
+
+Dispensa
+--------
+- Dispensar (`validades.requisitos.manage`) quando a regra geral nao se aplica a alguem (ex.: funcao sem exposicao, restricao medica).
+- Motivo obrigatorio e data limite opcional; status `Dispensado`, nao conta como pendente e nao gera alerta.
+- Revogar dispensa exige motivo; o requisito volta a ser cobrado.
+
+Filtros, auto-complete e listagem
+---------------------------------
+- Filtros: busca (nome, matricula, requisito, codigo), requisito, categoria, status, exigencia, cargo, setor, centro de servico (unidade), centro de custo, "vence em" (faixa) e periodo de vencimento.
+- Exigencia: Exigidos (padrao), Sem exigencia atual, Dispensados, Todos.
+  - "Sem exigencia atual": realizacao vigente de requisito que as regras nao exigem mais (ex.: mudou de cargo). Aparece na lista, fica fora dos cards e nao gera alerta.
+- Lista paginada no servidor (20 por pagina), ordenada por gravidade: vencido, vence hoje, proximo, pendente, valido, sem validade.
+- Colunas: Colaborador (cargo | setor | centro de servico | centro de custo), Matricula, Requisito, Categoria, Realizacao, Vencimento, Dias restantes, Status, Origem (regra que exigiu), Acoes.
+- Acoes: Registrar (pendente), Renovar, Editar, Cancelar, Dispensar/Revogar dispensa, Historico.
+
+Status e datas
+--------------
+- Regra unica (`validade_status`), janela critica configuravel (padrao 7):
+  - PENDENTE: exigido e sem realizacao vigente;
+  - VALIDO: mais dias restantes que a janela;
+  - PROXIMO DO VENCIMENTO: 1 a N dias;
+  - VENCE HOJE: 0 dias (ultimo dia valido);
+  - VENCIDO: menos de 0;
+  - SEM VALIDADE: realizado e o requisito nao vence;
+  - DISPENSADO: dispensa ativa.
+- Dias restantes = vencimento - hoje do tenant (fuso configurado, padrao America/Sao_Paulo).
+
+Painel (dashboard)
+------------------
+- Cards (somente requisitos exigidos): Monitorados, Validos (inclui sem validade), Proximos do vencimento, Vencem hoje, Vencidos, Pendentes.
+  - Monitorados = Validos + Proximos + Vencem hoje + Vencidos + Pendentes (sem numero ambiguo).
+  - Cada card tem tooltip com o criterio e abre a lista filtrada ao clicar (drill-down).
+- Nota abaixo dos cards: quantidade de dispensados e de registros sem exigencia atual.
+- Graficos (respeitam os filtros aplicados, clique abre a lista filtrada):
+  - Status dos requisitos exigidos (barras por status).
+  - Proximos vencimentos por faixa sem sobreposicao: ate 7, 8 a 30, 31 a 60, 61 a 90 dias.
+  - Pendencias e vencimentos por requisito (top 15, empilhado).
+  - Concentracao por centro de servico, setor ou centro de custo (top 15, empilhado).
+- Paleta dos empilhados validada para daltonismo: Vencidos #b91c1c, A vencer (hoje + janela) #d97706, Pendentes #4f46e5.
+- Agregados calculados no banco (`rpc_validades_resumo`); o navegador nao carrega historico para calcular.
+
+Exportacao
+----------
+- Botao "Exportar Excel (CSV)" na aba Lista.
+- Exporta todas as paginas dos filtros aplicados (`listarTodasValidades`), nao so a pagina visivel.
+- Formato: BOM UTF-8, `sep=;`, separador `;`, datas dd/mm/aaaa, dias restantes como numero inteiro.
+- Colunas: Colaborador, Matricula, Cargo, Setor, Centro de servico, Centro de custo, Requisito, Codigo, Categoria, Exigencia, Origem da exigencia, Data de realizacao, Vencimento, Dias restantes, Status, Numero do documento, Entidade emissora.
+- Utilitario compartilhado `src/utils/csvExport.js` (modulos antigos mantem suas copias).
+
+Alertas por e-mail
+------------------
+- Edge Function `validades-alertas` (cron diario, `CRON_SECRET`).
+- Marcos (uma unica vez cada):
+  - janela_critica: quando o status vira "Proximo do vencimento" (1 a N dias);
+  - vencimento: no dia do vencimento; se o cron falhar, recupera ate `alerta_vencimento_tolerancia_dias` (padrao 7) com texto "Venceu ha N dias".
+- Somente requisitos exigidos, com realizacao vigente e com validade. Pendentes, dispensados e sem exigencia atual nao geram alerta.
+- Idempotencia persistente: unique (`realizacao_id`, `tipo_alerta`, `data_vencimento`) em `requisitos_alertas_envios`.
+  - reserva via insert on conflict do nothing (duas execucoes concorrentes nao duplicam);
+  - erro de envio volta para retentativa (ate 3 tentativas); processamento preso ha mais de 1 hora e retomado.
+  - renovacao = nova realizacao = novo ciclo; correcao de data = novo vencimento = novo ciclo.
+- Consolidacao: 1 e-mail por tenant por execucao, com tabelas "Proximos do vencimento" e "Vencimento".
+- Lote registrado em `inventory_report` com `metadados.tipo = 'validades-alertas'` (sem nomes nos metadados; a listagem do Relatorio de Estoque filtra `tipo = mensal`).
+- Destinatarios: admin/master do tenant com e-mail (`listarAdminsOwner` na propria funcao), maximo 99.
+- Estrutura no padrao das demais functions: `validades-alertas/index.ts` (HTTP, CRON_SECRET, log) + `validades-alertas/_shared/validadesAlertasCore.ts` (core autocontido, sem imports fora da pasta). No editor do painel, criar os dois arquivos com esses caminhos.
+- Variaveis ja existentes no projeto: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `BREVO_API_KEY`, `RELATORIO_ESTOQUE_EMAIL_FROM` (opcionais `RELATORIO_ESTOQUE_EMAIL_FROM_NAME`, `RELATORIO_ESTOQUE_EMAIL_REPLY_TO`).
+- Teste manual sem gravar status: body `{ "test_email": "voce@dominio", "test_owner_id": "<owner>" }`.
+- Agendamento (pg_cron, mesmo padrao das outras functions):
+  - Cron (UTC): 0 10 * * * (07:00 horario de Brasilia)
+  - URL: https://<project-ref>.supabase.co/functions/v1/validades-alertas
+  - Header: `x-cron-secret: <CRON_SECRET>`; metodo POST.
+- Log de execucao em `edge_functions_error_report` (`function_name = validades-alertas`).
+
+Boas praticas
+-------------
+- Registrar sempre pela data real de realizacao/emissao; o sistema calcula o vencimento.
+- Usar Renovar (e nao Editar) quando houver nova realizacao; Editar e apenas correcao.
+- Usar Dispensar para excecoes individuais, com motivo claro.
+
+Permissoes
+----------
+- Consulta: `pcsmo.controle_validades` (-> `validades.read`, `pessoas.read`).
+- Registrar/editar/cancelar: `validades.registrar`.
+- Renovar: `validades.renovar`.
+- Dispensar/revogar: `validades.requisitos.manage`.
+- A tela usa `rpc_validades_contexto` para habilitar botoes; o banco valida de novo em cada RPC.
+
+Seguranca e multi-tenant
+------------------------
+- Todas as RPCs recebem `p_owner_id` e validam owner da sessao + permissao; SECURITY DEFINER com filtro explicito por `account_owner_id`.
+- Tabelas com RLS (SELECT por owner + `validades.read`); INSERT/UPDATE/DELETE revogados de `authenticated`; nada liberado para `anon`.
+- FKs compostas (`account_owner_id`, `requisito_id`) e triggers impedem realizacao/regra/dispensa ligada a colaborador ou catalogo de outro tenant.
+- Funcoes internas (`_validades_*`) e de alerta restritas ao `service_role`.
+- Pendencia registrada em TASKS: views legadas (`pessoas_view`, `aso_controle_view`, `materiais_view`, `entradas_material_view`) sem `security_invoker` e com grant para `anon` (auditoria geral posterior).
+
+Testes
+------
+- `supabase/tests/validades/run-local.ps1`: aplica stub + migrations + `10_validades_validacao.sql` em PostgreSQL local descartavel (87 verificacoes; termina em ROLLBACK).
+- Cobertura: regras de vencimento/status, pendentes, snapshot, renovacao, retroativo, edicao, cancelamento, dispensa, isolamento entre tenants, RLS/grants, permissoes, paginacao, alertas (marcos, retentativa, idempotencia, novo ciclo, tolerancia), timezone e auditoria.
+
+Atualizacao 2026-09
+-------------------
+- Criada a tela, o painel, a exportacao e os alertas do Controle de Validades.
+- Desempenho medido em PostgreSQL local com 5.000 colaboradores, 27.500 pares e 4.000 realizacoes: pagina da lista ~0,6 s, painel ~0,7 s, lista filtrada ~0,3 s (base com joins de igualdade e FULL JOIN esperado x realizado; versao inicial com CTEs levava 98 s).
+
+===========================================
+Mapa de Codigo (funcoes, hooks e constantes)
+===========================================
+
+Funcoes principais
+------------------
+- ControleValidadesPage
+  - Tipo: componente de pagina React
+  - Caminho: src/pages/ControleValidadesPage.jsx
+  - Responsavel por: registro, filtros, abas Painel/Lista, exportacao e modais.
+- useControleValidadesController
+  - Tipo: hook/controller
+  - Caminho: src/hooks/useControleValidadesController.js
+  - Responsavel por: estado, RPCs, drill-down, previas, acoes e exportacao.
+- ControleValidadesContext
+  - Tipo: contexto
+  - Caminho: src/context/ControleValidadesContext.jsx
+- ValidadesPainel
+  - Tipo: componente (cards + graficos recharts com drill-down)
+  - Caminho: src/components/Validades/ValidadesPainel.jsx
+- ValidadesTable / ValidadesFilters / ValidadeRegistroForm / ValidadeAcaoModal / ValidadeDispensaModal / ValidadeHistoricoModal / ValidadeMotivoModal / ValidadesEventosTimeline / ValidadeStatusChip / ValidadesIndisponivel
+  - Tipo: componentes de UI
+  - Caminho: src/components/Validades/
+
+Constantes e configuracoes
+--------------------------
+- ValidadesConfig.js (src/config/ValidadesConfig.js): filtros padrao, tamanho de pagina, opcoes de status/exigencia/faixa, grupos dos graficos e rotulos.
+- permissions.js (src/config/permissions.js): pagina `pcsmo-controle-validades`, labels, toggles e dependencias.
+
+Funcoes utilitarias relacionadas
+--------------------------------
+- validadesUtils.js (src/utils/validadesUtils.js): rotulos, formatacao, previa e mensagens de erro.
+- validadesExport.js (src/utils/validadesExport.js): colunas e montagem do CSV.
+- csvExport.js (src/utils/csvExport.js): sanitizacao, BOM, `sep=;` e download.
+
+Servicos e integracoes externas
+-------------------------------
+- validadesApi.js (src/services/validadesApi.js): `rpc_validades_contexto`, `rpc_validades_lista`, `rpc_validades_resumo`,
+  `rpc_validades_simular_vencimento`, `rpc_validades_registrar`, `rpc_validades_renovar`, `rpc_validades_editar`,
+  `rpc_validades_cancelar`, `rpc_validades_historico`, `rpc_validades_dispensar`, `rpc_validades_dispensa_revogar`.
+- pessoasService.searchPessoas: auto-complete de colaborador (reuso).
+- Edge Function: supabase/functions/validades-alertas/index.ts (HTTP) e _shared/validadesAlertasCore.ts (eventos, Brevo, destinatarios e e-mail).
+- Migrations: supabase/migrations/20260929_01_validades_schema.sql, 20260929_02_validades_rpcs.sql, 20260929_03_validades_alertas.sql.
+
+Ajuda contextual
+----------------
+- Botao `Ajuda` no cabecalho; conteudo em `src/help/helpControleValidades.json` (topico `controleValidades`).
+
+Arquivos alterados/criados
+--------------------------
+- Criados: src/pages/ControleValidadesPage.jsx, src/hooks/useControleValidadesController.js, src/context/ControleValidadesContext.jsx,
+  src/components/Validades/*, src/utils/validadesExport.js, src/utils/csvExport.js, src/help/helpControleValidades.json,
+  supabase/functions/validades-alertas/index.ts, supabase/functions/validades-alertas/_shared/validadesAlertasCore.ts,
+  supabase/tests/validades/*.
+- Alterados: src/App.jsx, src/components/NavBar.jsx, src/config/permissions.js, src/components/Help/HelpButton.jsx, README.md, TASKS.md, docs/rls-multi-tenant-map.txt.
+
+Comportamento antes/depois
+--------------------------
+- Antes: nao havia controle de treinamentos/documentos com validade; pendencias nao eram visiveis.
+- Depois: esperado x realizado por colaborador, pendentes visiveis, renovacao com historico, snapshot de validade, painel com drill-down, exportacao CSV e alertas idempotentes por e-mail.

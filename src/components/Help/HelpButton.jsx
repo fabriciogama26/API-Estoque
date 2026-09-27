@@ -13,6 +13,8 @@ import helpTermoEpi from '../../help/helpTermoEpi.json'
 import helpConfiguracoes from '../../help/helpConfiguracoes.json'
 import helpRelatorioEstoque from '../../help/helpRelatorioEstoque.json'
 import helpAnaliseEstoque from '../../help/helpAnaliseEstoque.json'
+import helpRequisitosControle from '../../help/helpRequisitosControle.json'
+import helpControleValidades from '../../help/helpControleValidades.json'
 import { HelpIcon, InfoIcon } from '../icons.jsx'
 import '../../styles/help.css'
 
@@ -39,6 +41,8 @@ const helpByTopic = {
   configuracoes: helpConfiguracoes,
   relatorioEstoque: helpRelatorioEstoque,
   analiseEstoque: helpAnaliseEstoque,
+  requisitosControle: helpRequisitosControle,
+  controleValidades: helpControleValidades,
 }
 
 const resolveContent = (topic) => {

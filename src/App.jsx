@@ -20,6 +20,8 @@ import { NoAccessPage } from './pages/NoAccessPage.jsx'
 import { ErrorBoundaryWithLogger } from './components/ErrorBoundary.jsx'
 import { CadastroBasePage } from './pages/CadastroBase.jsx'
 import { AsoPage } from './pages/AsoPage.jsx'
+import { RequisitosControlePage } from './pages/RequisitosControlePage.jsx'
+import { ControleValidadesPage } from './pages/ControleValidadesPage.jsx'
 
 function App() {
   return (
@@ -45,6 +47,8 @@ function App() {
 
             <Route path="pcsmo">
               <Route path="controledeaso" element={<AsoPage />} />
+              <Route path="requisitos-controle" element={<RequisitosControlePage />} />
+              <Route path="controle-validades" element={<ControleValidadesPage />} />
             </Route>
 
             <Route path="acidentes">

@@ -92,8 +92,27 @@
 - Politica de reposicao - entrega 4 (Estoque atual), 2026-09-27: migration `supabase/migrations/20260927_rpc_material_estoque_minimo.sql` com `rpc_material_estoque_minimo_update` (somente o minimo cadastrado, com historico); Estoque atual mostra minimo cadastrado/sugerido/efetivo, fonte, cobertura e situacao por material via uma chamada a `rpc_reposicao_itens`; edicao do minimo restrita a `estoque.write`/master; materiais ativos sem movimentacao aparecem com saldo zero sem gerar alerta; CSV com as colunas da politica; aba Compra ganhou `Zerar/ajustar minimo` na revisao. Resumo do Estoque atual: "Valor para reposicao" renomeado para "Deficit ate o minimo cadastrado" e novos cards "Compra recomendada" e "Revisar minimos" (seguem os filtros) com link para `/analise-estoque?aba=compra`, que abre a Analise na aba Compra; "Nao calculavel" ganhou icone de informacao; Dashboard de Estoque manteve o criterio de "Materiais monitorados" (ignora itens sem movimentacao), sem cards novos por decisao do usuario.
 - Politica de reposicao - entrega 5 (modo automatico), 2026-09-28: migration `supabase/migrations/20260928_inventory_policy_modo_automatico.sql` com `rpc_inventory_policy_simular_modo` (compara modos sem gravar) e liberacao do modo `automatico`; modal da politica ganhou a secao Modo de operacao com simulacao, CSV das mudancas, confirmacao e motivo; no Automatico o Estoque atual passa a alertar pelo minimo efetivo com a origem do limite. Dashboard (Alertas ativos), Paretos e relatorios por email seguem no minimo cadastrado.
 - Politica de reposicao - ajuda contextual, 2026-09-28: textos do botao Ajuda reescritos em Analise de Estoque (9 passos por area), Estoque atual (8 passos, alertas por modo da politica) e Configuracoes (permissoes Politica de reposicao e Estoque - Alterar); Dashboard de Estoque sem mudanca de texto.
+- Controle de Validades (codigo pronto, 2026-09-27): telas `Requisitos de Controle` (`/pcsmo/requisitos-controle`) e `Controle de Validades` (`/pcsmo/controle-validades`) com painel, drill-down, exportacao CSV e alertas por e-mail.
+  - Decisoes do usuario (2026-09-27): centro de servico = unidade; ASO continua separado; vencimento = data + periodo - 1 dia; registros sem exigencia atual aparecem na lista, fora dos cards e sem alerta; dispensa individual com motivo e data limite opcional; data anterior a vigente vira historico retroativo; alerta de vencimento perdido e recuperado ate 7 dias; destinatarios = admins do tenant; anexos fora desta entrega; indisponivel no modo local; testes via scripts SQL.
+  - Banco: migrations `20260929_01_validades_schema.sql`, `20260929_02_validades_rpcs.sql`, `20260929_03_validades_alertas.sql` (snapshot imutavel, renovacao sem apagar historico, status centralizado em `validade_status`, pendencias calculadas, idempotencia de alertas, RLS somente leitura, escrita por RPC).
+  - Validacao: `supabase/tests/validades/run-local.ps1` com 87 verificacoes passando em PostgreSQL 18 local; telas verificadas em navegador contra PostgREST local; Edge Function `validades-alertas` executada ponta a ponta com Brevo simulado (envio, reenvio bloqueado, falha e retentativa).
 
 ## Pendente
+### Controle de Validades - implantacao (2026-09)
+- Aplicar no Supabase, em ordem: `20260929_01_validades_schema.sql`, `20260929_02_validades_rpcs.sql`, `20260929_03_validades_alertas.sql`.
+- Publicar a Edge Function `validades-alertas` com 2 arquivos, no padrao das demais: `index.ts` e `_shared/validadesAlertasCore.ts` (core sem imports fora da pasta da funcao).
+- 2026-09-27: migrations `20260929_01..03` aplicadas no Supabase pelo usuario; primeira publicacao pelo painel falhou porque `_shared/validadesAlertasCore.ts` nao foi criado no editor e o core importava a `_shared` da raiz (corrigido: core autocontido dentro da pasta da funcao).
+- Agendar no pg_cron: `0 10 * * *` (UTC) chamando `https://<project-ref>.supabase.co/functions/v1/validades-alertas` com `x-cron-secret`.
+- Testar o e-mail em producao com `test_email` + `test_owner_id` antes do primeiro cron.
+- Conferir toggles em Configuracoes para perfis que nao sao admin/master (as chaves novas so foram concedidas a `master`, `admin` e `owner`).
+- Futuro: configuracao de destinatarios dos alertas; anexos de certificado (bucket privado por owner); integracao opcional com ASO.
+
+### Auditoria de seguranca - views e grants para anon (2026-09-27)
+- Decisao do usuario: tratar depois, em auditoria geral do sistema.
+- Views sem `security_invoker` e com `grant select ... to anon`: `pessoas_view`, `aso_controle_view`, `materiais_view`, `entradas_material_view` (conferir tambem `hht_mensal_view`, `vw_acidentes`, `vw_indicadores_acidentes`, `materiais_unicos_view`).
+- Diagnostico em producao: `select relname, reloptions from pg_class where relname in ('pessoas_view','aso_controle_view','materiais_view','entradas_material_view');`
+- Plano: revogar `anon` em tabelas/views/funcoes (exceto fluxos publicos via Edge Function), `security_invoker = on` nas views, revisar RPCs SECURITY DEFINER sem checagem de owner e testar consumidores por perfil (Saidas, Termo de EPI, ASO, Pessoas).
+
 ### Plano de execucao - politica de reposicao por cobertura (2026-09)
 
 - Objetivo da fase:
