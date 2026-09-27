@@ -95,6 +95,56 @@ Melhoria possivel
 -----------------
 - Criar um RPC no Supabase para calcular o saldo do Estoque atual (com corte por data inicio/fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
 
+Atualizacao 2026-09 (minimos da politica de reposicao)
+------------------------------------------------------
+- Arquivos alterados:
+  - supabase/migrations/20260927_rpc_material_estoque_minimo.sql (novo)
+  - src/services/reposicaoApi.js
+  - src/hooks/useEstoque.js
+  - src/context/EstoqueContext.jsx
+  - src/pages/EstoquePage.jsx
+  - src/components/Estoque/List/EstoqueList.jsx
+  - src/components/Estoque/Modal/EstoqueMinStockModal.jsx
+  - src/utils/estoqueUtils.js
+  - src/lib/estoque.js
+  - src/services/api.js
+  - src/services/localApi.js
+  - src/styles/EstoquePage.css
+  - src/help/helpEstoque.json
+  - src/hooks/useEstoqueFiltro.js
+  - src/hooks/useDashboardEstoque.js
+  - src/components/Estoque/Summary/EstoqueSummary.jsx
+  - src/components/AnaliseEstoque/NaoCalculavelInfo.jsx (novo)
+  - src/styles/base.css
+  - docs/Estoque.txt
+  - TASKS.md
+- Funcoes/hooks tocadas:
+  - rpc_material_estoque_minimo_update (SQL)
+  - updateEstoqueMinimoCadastrado
+  - useEstoque.handleMinStockSave
+  - EstoqueProvider.loadReposicao / handleMinStockSave / applyFilters
+  - EstoqueList (bloco estoque-list__reposicao)
+  - EstoqueMinStockModal
+  - buildEstoqueCsv / downloadEstoqueCsv / sanitizeCsvValue
+  - montarEstoqueAtual (opcao includeAtivosSemMovimentacao)
+  - api.estoque.current / localApi estoque.current
+- Comportamento antes/depois:
+  - Antes: o card mostrava apenas quantidade e valores; o minimo cadastrado so aparecia nos alertas e no CSV.
+  - Depois: o card mostra minimo cadastrado, minimo sugerido, minimo efetivo (com fonte da regra), cobertura (com base 90d/180d/sem historico), situacao/prioridade e diferenca entre cadastrado e sugerido; link para a Analise de Estoque quando o usuario acessa a pagina.
+  - O minimo sugerido/efetivo vem de uma unica chamada a rpc_reposicao_itens (mesma fonte da aba Compra), sem calculo no React e sem consultas por material; se a RPC falhar, a tela avisa e o minimo cadastrado/alertas continuam validos.
+  - Antes: salvar o minimo usava material_update_full (regrava todos os campos do payload, sem historico) e aceitava decimal.
+  - Depois: no Supabase o minimo e salvo por rpc_material_estoque_minimo_update, que altera somente "estoqueMinimo", exige master ou estoque.write, valida o tenant e grava antes/depois, motivo (opcional) e ator em inventory_policy_history (entidade minimo_cadastrado). O valor precisa ser inteiro >= 0. No modo local continua updateMaterial.
+  - O botao de alterar minimo fica oculto para quem nao tem estoque.write (nem master/admin).
+  - Antes: materiais ativos sem nenhuma movimentacao ficavam fora da lista.
+  - Depois: na visao padrao (sem filtro Movimentacao do periodo) eles aparecem com saldo zero, flag semMovimentacao e aviso no card; nao geram alerta nem somam valor de reposicao, preservando os alertas existentes. Materiais inativos continuam fora.
+  - Alertas continuam pelo minimo cadastrado (modo Monitorar); o card de alerta informa "limite: minimo cadastrado".
+  - CSV: novas colunas Minimo cadastrado, Minimo sugerido, Minimo efetivo, Maximo efetivo, Fonte da regra, Base do calculo, Consumo medio mensal, Cobertura (meses) e Situacao da reposicao; null aparece como "nao calculavel" e sem dados da politica como "indisponivel"; BOM para o Excel e neutralizacao de formula injection.
+  - O minimo sugerido segue o saldo fisico (rpc_reposicao_itens), mesmo com o filtro Movimentacao do periodo ativo.
+  - "Nao calculavel" (minimo sugerido, consumo e cobertura) ganhou icone de informacao (NaoCalculavelInfo): significa nenhuma saida nos ultimos 180 dias, e nao consumo baixo nem falta de entradas; no minimo efetivo, indica tambem ausencia de minimo cadastrado.
+  - Resumo: o card "Valor para reposicao" passou a se chamar "Deficit ate o minimo cadastrado" (mesmo calculo, tooltip explica que considera so o minimo manual).
+  - Resumo: novos cards "Compra recomendada" (soma de valor_compra_sugerida e itens com compra da politica) e "Revisar minimos" (sem consumo recente + divergentes do sugerido), ambos somando apenas os itens visiveis com os filtros aplicados, com link para a Analise de Estoque quando o usuario tem acesso. O link (e o botao Ver analise de compra do card do material) abre /analise-estoque?aba=compra: a Analise seleciona a aba Compra e rola ate o bloco de previsao.
+  - Dashboard de Estoque: o card "Materiais monitorados" ignora itens semMovimentacao para manter o criterio "saldo > 0 ou entradas no periodo" (useDashboardEstoque.totalMateriais).
+
 Atualizacao 2026-09 (isolamento de tenant no backend)
 -----------------------------------------------------
 - Arquivos alterados:
@@ -169,6 +219,22 @@ Atualizacao 2025-12
 -------------------
 - Tela refatorada para hook/context com carregamento silencioso e sem flicker no botao de filtro.
 - Cache de chave de filtros reduz chamadas repetidas.
+
+Atualizacao 2026-09 (alertas no modo automatico)
+-----------------------------------------------
+- Arquivos alterados: src/utils/reposicaoUtils.js (`aplicarLimiteEfetivo`), src/context/EstoqueContext.jsx, src/hooks/useEstoqueFiltro.js, src/components/Estoque/Alerts/EstoqueAlerts.jsx, src/components/Estoque/List/EstoqueList.jsx.
+- Modo Monitorar: nada muda (alertas, deficit e valor de reposicao pelo minimo cadastrado).
+- Modo Automatico: `aplicarLimiteEfetivo` recalcula por material `alerta` (saldo < minimo efetivo, exceto sem consumo recente), `deficitQuantidade` (inteiro), `valorReposicao`, `estoqueMinimoAlerta` e `limiteOrigem` (fonte da regra) antes dos filtros.
+- Alertas exibem o minimo efetivo com a origem (automatico, override, cadastrado sem historico); o card do material mostra "limite: <origem>".
+- Resumo: no Automatico o card passa a "Deficit ate o minimo efetivo" com tooltip proprio.
+- Material sem dados da politica (RPC indisponivel) mantem o calculo pelo minimo cadastrado.
+
+Atualizacao 2026-09 (ajuda contextual reorganizada)
+--------------------------------------------------
+- Arquivos alterados: src/help/helpEstoque.json (chave estoque) e src/help/helpConfiguracoes.json (notas de permissao).
+- Antes: notas acumuladas e contraditorias sobre a origem dos alertas (minimo cadastrado x minimo efetivo).
+- Depois: 8 passos com itens (filtros e itens sem movimentacao; Resumo; alertas por modo da politica; minimos por material; acoes; alterar minimo com permissao e historico; historico de saidas; CSV) e 4 notas.
+- Configuracoes: notas explicando o toggle Politica de reposicao (estoque.politica.manage) e a exigencia de estoque.write para alterar o minimo cadastrado.
 
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listEstoqueAtual } from '../services/estoqueApi.js'
 import { updateMaterial } from '../services/materiaisService.js'
+import { updateEstoqueMinimoCadastrado } from '../services/reposicaoApi.js'
+import { isSupabaseConfigured } from '../services/supabaseClient.js'
+import { isLocalMode } from '../config/runtime.js'
 
 export function useEstoque(initialFilters, userResolver, onError) {
   const [estoque, setEstoque] = useState({ itens: [], alertas: [] })
@@ -104,7 +107,7 @@ export function useEstoque(initialFilters, userResolver, onError) {
     setMinStockDrafts((prev) => ({ ...prev, [materialId]: value }))
   }
 
-  const handleMinStockSave = async (item, filters, onError) => {
+  const handleMinStockSave = async (item, filters, onError, motivo = null) => {
     const draftValue = (minStockDrafts[item.materialId] ?? '').trim()
     if (draftValue === '') {
       setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Informe um valor' }))
@@ -112,8 +115,8 @@ export function useEstoque(initialFilters, userResolver, onError) {
     }
 
     const parsed = Number(draftValue)
-    if (Number.isNaN(parsed) || parsed < 0) {
-      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Valor invalido' }))
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      setMinStockErrors((prev) => ({ ...prev, [item.materialId]: 'Informe um inteiro maior ou igual a zero' }))
       return false
     }
 
@@ -134,11 +137,16 @@ export function useEstoque(initialFilters, userResolver, onError) {
 
     setSavingMinStock((prev) => ({ ...prev, [item.materialId]: true }))
     try {
-      const usuario = typeof userResolver === 'function' ? userResolver() : 'sistema'
-      await updateMaterial(item.materialId, {
-        estoqueMinimo: parsed,
-        usuarioResponsavel: usuario,
-      })
+      if (!isLocalMode && isSupabaseConfigured()) {
+        // RPC dedicada: altera somente o minimo cadastrado e grava historico.
+        await updateEstoqueMinimoCadastrado(item.materialId, parsed, motivo)
+      } else {
+        const usuario = typeof userResolver === 'function' ? userResolver() : 'sistema'
+        await updateMaterial(item.materialId, {
+          estoqueMinimo: parsed,
+          usuarioResponsavel: usuario,
+        })
+      }
       await load({ ...filters }, { force: true })
       return true
     } catch (err) {

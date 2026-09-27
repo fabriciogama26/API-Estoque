@@ -419,7 +419,9 @@ export function useDashboardEstoque(onError) {
   const totalMovimentacoes = entradasDetalhadasFiltradas.length + saidasDetalhadasFiltradas.length
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
   const materiaisEmAlerta = estoqueBase?.alertas?.length ?? data?.estoqueAtual?.alertas?.length ?? 0
-  const totalMateriais = estoqueBase?.itens?.length ?? data?.estoqueAtual?.itens?.length ?? 0
+  // Materiais ativos sem movimentacao (semMovimentacao) aparecem no Estoque atual, mas nao contam aqui:
+  // o card mantem o criterio "saldo > 0 ou entradas no periodo".
+  const totalMateriais = (estoqueBase?.itens ?? data?.estoqueAtual?.itens ?? []).filter((item) => !item?.semMovimentacao).length
 
   const highlightCards = useMemo(
     () => [

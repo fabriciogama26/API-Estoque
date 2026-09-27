@@ -6327,6 +6327,7 @@ export const api = {
       ])
       return montarEstoqueAtual(materiais, entradas, saidas, usarMovimentacao ? periodo : null, {
         includeAll: false,
+        includeAtivosSemMovimentacao: !usarMovimentacao,
       })
     },
     async saldo(materialId) {

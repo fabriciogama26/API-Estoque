@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom'
 import { InfoIcon } from '../../icons.jsx'
 
 export function EstoqueSummary({ cards }) {
+  const navigate = useNavigate()
   return (
     <div className="estoque-summary-grid">
       {cards.map((card) => (
@@ -24,6 +26,15 @@ export function EstoqueSummary({ cards }) {
           </div>
           <strong className="estoque-summary-card__value">{card.value}</strong>
           <span className="estoque-summary-card__hint">{card.hint}</span>
+          {card.link ? (
+            <button
+              type="button"
+              className="button button--ghost button--compact estoque-summary-card__link"
+              onClick={() => navigate(card.link.to)}
+            >
+              {card.link.label}
+            </button>
+          ) : null}
         </article>
       ))}
     </div>

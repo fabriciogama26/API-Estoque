@@ -61,6 +61,18 @@ const navSections = [
     icon: ChecklistIcon,
     items: [
       { to: '/pcsmo/controledeaso', label: 'Controle de ASO', icon: ChecklistIcon, pageId: 'cadastros-aso' },
+      {
+        to: '/pcsmo/controle-validades',
+        label: 'Controle de Validades',
+        icon: ChecklistIcon,
+        pageId: 'pcsmo-controle-validades',
+      },
+      {
+        to: '/pcsmo/requisitos-controle',
+        label: 'Requisitos de Controle',
+        icon: ChecklistIcon,
+        pageId: 'pcsmo-requisitos-controle',
+      },
     ],
   },
   {

@@ -1,4 +1,9 @@
 // Utilitarios puros para Estoque
+import {
+  formatBaseCalculo,
+  formatFonteRegra,
+  formatSituacaoReposicao,
+} from './reposicaoUtils.js'
 
 export const formatCurrency = (value) =>
   new Intl.NumberFormat('pt-BR', {
@@ -184,7 +189,11 @@ const sanitizeCsvValue = (value) => {
     return ''
   }
   const text = typeof value === 'string' ? value : String(value)
-  const clean = text.replace(/"/g, '""').replace(/\r?\n/g, ' ').trim()
+  let clean = text.replace(/"/g, '""').replace(/\r?\n/g, ' ').trim()
+  // Neutraliza formula injection (=, +, -, @) sem afetar numeros negativos.
+  if (/^[=+\-@\t]/.test(clean) && !/^-?\d+([.,]\d+)?$/.test(clean)) {
+    clean = `'${clean}`
+  }
   if (/[;"\n]/.test(clean)) {
     return `"${clean}"`
   }
@@ -213,7 +222,16 @@ const formatCsvDate = (value) => {
   return date.toLocaleString('pt-BR')
 }
 
-export const buildEstoqueCsv = (itens = []) => {
+// null da politica vira texto explicito, nunca zero.
+const formatCsvPolitica = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return 'nao calculavel'
+  }
+  return formatCsvNumber(value)
+}
+
+export const buildEstoqueCsv = (itens = [], reposicaoPorMaterial = null) => {
+  const politicaMap = reposicaoPorMaterial instanceof Map ? reposicaoPorMaterial : new Map()
   const headers = [
     'Material ID',
     'Material',
@@ -225,7 +243,15 @@ export const buildEstoqueCsv = (itens = []) => {
     'Quantidade em estoque',
     'Total de entradas',
     'Total de saídas',
-    'Estoque mínimo',
+    'Mínimo cadastrado',
+    'Mínimo sugerido',
+    'Mínimo efetivo',
+    'Máximo efetivo',
+    'Fonte da regra',
+    'Base do cálculo',
+    'Consumo médio mensal',
+    'Cobertura (meses)',
+    'Situação da reposição',
     'Déficit',
     'Valor unitário',
     'Valor total',
@@ -236,6 +262,7 @@ export const buildEstoqueCsv = (itens = []) => {
 
   const rows = (Array.isArray(itens) ? itens : []).map((item) => {
     const ultimaSaidaData = item?.ultimaSaida?.dataEntrega ?? null
+    const politica = politicaMap.get(String(item?.materialId ?? '')) || null
     const valores = [
       item?.materialId,
       item?.resumo || item?.nome || '',
@@ -248,6 +275,14 @@ export const buildEstoqueCsv = (itens = []) => {
       formatCsvNumber(item?.totalEntradas ?? 0),
       formatCsvNumber(item?.totalSaidas ?? 0),
       formatCsvNumber(item?.estoqueMinimo ?? 0),
+      politica ? formatCsvPolitica(politica.minimo_automatico) : 'indisponivel',
+      politica ? formatCsvPolitica(politica.minimo_efetivo) : 'indisponivel',
+      politica ? formatCsvPolitica(politica.maximo_efetivo) : 'indisponivel',
+      politica ? formatFonteRegra(politica.fonte_regra) : '',
+      politica ? formatBaseCalculo(politica.base_calculo) : '',
+      politica ? formatCsvPolitica(politica.consumo_medio_mensal) : 'indisponivel',
+      politica ? formatCsvPolitica(politica.cobertura_atual_meses) : 'indisponivel',
+      politica ? formatSituacaoReposicao(politica.situacao) : '',
       formatCsvNumber(item?.deficitQuantidade ?? 0),
       formatCsvNumber(item?.valorUnitario ?? 0, 2),
       formatCsvNumber(item?.valorTotal ?? 0, 2),
@@ -266,8 +301,9 @@ export const downloadEstoqueCsv = (itens = [], options = {}) => {
     typeof options.filename === 'string' && options.filename.trim()
       ? options.filename.trim()
       : 'estoque-atual.csv'
-  const csvContent = buildEstoqueCsv(itens)
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const csvContent = buildEstoqueCsv(itens, options.reposicaoPorMaterial)
+  // BOM para o Excel abrir acentos corretamente.
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

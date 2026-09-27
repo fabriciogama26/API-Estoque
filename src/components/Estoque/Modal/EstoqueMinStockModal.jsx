@@ -1,4 +1,5 @@
 import { CancelIcon } from '../../icons.jsx'
+import { formatFonteRegra, formatQuantidadeOuNaoCalculavel } from '../../../utils/reposicaoUtils.js'
 
 export function EstoqueMinStockModal({
   open,
@@ -10,6 +11,9 @@ export function EstoqueMinStockModal({
   onClose,
   onChange,
   onSave,
+  motivo = '',
+  onMotivoChange,
+  politicaItem = null,
 }) {
   if (!open || !item) {
     return null
@@ -25,7 +29,7 @@ export function EstoqueMinStockModal({
       className="estoque-min-stock-modal__overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Alterar estoque minimo"
+      aria-label="Alterar minimo cadastrado"
       onClick={handleOverlayClick}
     >
       <div className="estoque-min-stock-modal__content" onClick={(event) => event.stopPropagation()}>
@@ -40,17 +44,36 @@ export function EstoqueMinStockModal({
         </header>
 
         <div className="estoque-min-stock-modal__body">
+          {politicaItem ? (
+            <p className="field__hint">
+              Sugerido pelo consumo: {formatQuantidadeOuNaoCalculavel(politicaItem.minimo_automatico)} | Efetivo hoje:{' '}
+              {formatQuantidadeOuNaoCalculavel(politicaItem.minimo_efetivo)} ({formatFonteRegra(politicaItem.fonte_regra)})
+            </p>
+          ) : null}
           <label className="field">
-            <span>Novo estoque minimo</span>
+            <span>Novo minimo cadastrado</span>
             <input
               ref={inputRef}
               type="number"
               min="0"
+              step="1"
               value={draftValue}
               onChange={(event) => onChange(event.target.value)}
               disabled={isSaving}
             />
           </label>
+          {onMotivoChange ? (
+            <label className="field">
+              <span>Motivo (opcional, fica no historico)</span>
+              <input
+                type="text"
+                maxLength={300}
+                value={motivo}
+                onChange={(event) => onMotivoChange(event.target.value)}
+                disabled={isSaving}
+              />
+            </label>
+          ) : null}
           {error ? <p className="feedback feedback--error">{error}</p> : null}
         </div>
 

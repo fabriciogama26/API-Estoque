@@ -1,0 +1,45 @@
+{
+  "controleValidades": {
+    "title": "Controle de Validades",
+    "summary": "Compara o que cada colaborador deveria ter (regras em Requisitos de Controle) com o que ele efetivamente tem (realizacoes registradas).",
+    "steps": [
+      {
+        "title": "Registrar uma realizacao",
+        "description": "Selecione o colaborador e o requisito, informe a data de realizacao ou emissao e, se houver, numero do certificado e entidade emissora. O vencimento e calculado pelo sistema. Na lista, o botao + de uma linha pendente preenche o formulario.",
+        "mediaHint": "Bloco Registrar realizacao."
+      },
+      {
+        "title": "Renovar",
+        "description": "Use Renovar na linha do requisito. O registro atual e preservado no historico e um novo registro passa a valer, com a validade vigente do requisito e um novo ciclo de alertas. Registrar uma data mais recente que a vigente pelo formulario tambem orienta a renovar.",
+        "mediaHint": "Modal Renovar."
+      },
+      {
+        "title": "Registro retroativo",
+        "description": "Se informar uma data anterior a realizacao vigente (ex.: certificado antigo encontrado depois), o registro vai para o historico e o status atual nao muda.",
+        "mediaHint": "Mensagem de registro guardado no historico."
+      },
+      {
+        "title": "Painel e drill-down",
+        "description": "Na aba Painel, clique em um card ou em uma barra para abrir a lista ja filtrada. Cards consideram apenas requisitos exigidos; dispensados e registros sem exigencia atual aparecem na nota abaixo dos cards.",
+        "mediaHint": "Cards e graficos da aba Painel."
+      },
+      {
+        "title": "Dispensar um colaborador",
+        "description": "Quando a regra geral nao se aplica a alguem (ex.: sem exposicao, restricao medica), use Dispensar informando o motivo e, se quiser, uma data limite. Revogar a dispensa volta a cobrar o requisito.",
+        "mediaHint": "Modal Dispensar requisito."
+      },
+      {
+        "title": "Exportar",
+        "description": "Na aba Lista, o botao Exportar Excel (CSV) gera todos os registros dos filtros aplicados (nao apenas a pagina visivel), com datas em dd/mm/aaaa e dias restantes como numero.",
+        "mediaHint": "Botao Exportar Excel (CSV)."
+      }
+    ],
+    "notes": [
+      "Status: Valido (mais dias que a janela critica), Proximo do vencimento (1 a N dias), Vence hoje (ultimo dia valido), Vencido, Pendente (exigido e sem registro), Sem validade, Dispensado.",
+      "A janela critica padrao e 7 dias e pode ser alterada em Requisitos de Controle.",
+      "Editar ou cancelar exige motivo e fica no historico. Cancelar a realizacao vigente devolve a vigencia ao registro anterior.",
+      "Alertas por e-mail: uma vez ao entrar na janela critica e uma vez no vencimento, consolidados em um e-mail por dia.",
+      "Nao disponivel no modo local (dados em navegador)."
+    ]
+  }
+}

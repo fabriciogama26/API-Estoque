@@ -1,68 +1,111 @@
 {
   "analiseEstoque": {
     "title": "Analise de estoque",
-    "summary": "Centralize os Paretos e indicadores de acao para decisao rapida sobre estoque.",
+    "summary": "Paretos e cartoes de decisao para priorizar acoes, mais a area de previsao com as abas Operacional, Compra (reposicao atual pela politica), Previsao de Orcamento e Auditoria.",
     "steps": [
       {
         "title": "Aplicar filtros",
-        "description": "Use Periodo inicial/final e Busca para recalcular os Paretos e os cartoes de decisao."
+        "description": "Use Periodo inicial/final e Busca para recalcular os Paretos e os cartoes de decisao.",
+        "items": [
+          "A area de previsao nao usa esses filtros: cada aba mostra a propria base de calculo."
+        ]
       },
       {
-        "title": "Ler os cartoes de decisao",
-        "description": "Os cartoes resumem concentracao, risco, financeiro e recomendacoes automaticas para priorizar acoes."
+        "title": "Ler os cartoes e os Paretos",
+        "description": "Os cartoes resumem concentracao, risco, financeiro e recomendacoes; cada Pareto traz interpretacao e acao recomendada.",
+        "items": [
+          "Pareto 80/20 por quantidade: o que mais sai fisicamente?",
+          "Pareto de score de risco: o que nao pode faltar? Ordena pelo score e colore por faixa (alto/medio/baixo).",
+          "Pareto financeiro: o que mais pesa no caixa?",
+          "Risco operacional: Classe A = abaixo do minimo + giro alto; Classe B = abaixo do minimo; Classe C = acima do minimo.",
+          "Clique em barras com ID para copiar o materialId."
+        ]
       },
       {
-        "title": "Interpretar os Paretos",
-        "description": "Cada Pareto vem com interpretacao e acao recomendada ao lado. Use o bloco para orientar compras e controle."
+        "title": "Escolher a aba da previsao",
+        "description": "A area de previsao tem quatro abas com perguntas diferentes.",
+        "items": [
+          "Operacional: rolling 12 meses com historico, saida e entrada previstas, saldo liquido e fluxo bruto.",
+          "Compra: o que comprar agora (reposicao atual pela politica de reposicao).",
+          "Previsao de Orcamento: quanto reservar para os proximos 12 meses.",
+          "Auditoria: qualidade do snapshot (previsto x realizado) e validacao do orcamento.",
+          "O periodo do snapshot e escolhido nas abas Operacional e Auditoria e vale tambem para o Orcamento. A aba Compra nao usa snapshot.",
+          "Links de outras telas podem abrir a Analise direto em uma aba (ex.: botoes Ver na Analise do Estoque atual abrem a aba Compra)."
+        ]
       },
       {
-        "title": "Area de previsao",
-        "description": "A area de forecast foi separada em abas Operacional, Compra, Previsao de Orcamento e Auditoria para leitura do rolling, reposicao, verba anual e validacao."
+        "title": "Aba Compra: ler a reposicao atual",
+        "description": "Calculada no banco a partir do estoque de hoje e das saidas dos ultimos 90 dias (ou 180, se nao houver saida em 90). Carrega ao abrir a aba; use Atualizar para recalcular.",
+        "items": [
+          "Necessidade de reposicao atual: valor da compra recomendada e quantos materiais tem compra.",
+          "Cards: Ruptura (P0), Reposicao necessaria (P1), Reposicao programada (P2) e Sem consumo recente.",
+          "Situacao da reposicao: cada material aparece em uma unica situacao; a soma fecha o total monitorado.",
+          "Cobertura do estoque: estoque atual dividido pelo consumo medio mensal, em faixas que somam o total.",
+          "Revisao de minimos: avisos que nao geram compra (minimo sem consumo, minimo divergente do sugerido, sem minimo e sem consumo, overrides ativos, sem preco).",
+          "Fora da compra (revisao): valor para levar ao minimo cadastrado os materiais sem consumo recente. Nao entra na compra; passe o mouse no (i) para a explicacao.",
+          "Quantidades de minimo, maximo e compra sao sempre inteiras."
+        ]
       },
       {
-        "title": "Copiar IDs",
-        "description": "Clique em barras com ID para copiar o materialId e usar em consultas ou cadastros."
+        "title": "Entender os minimos",
+        "description": "Cada material tem tres minimos, e a fonte da regra indica qual esta valendo.",
+        "items": [
+          "Minimo cadastrado: o valor manual do cadastro do material.",
+          "Minimo sugerido: consumo medio mensal x cobertura minima da politica.",
+          "Minimo efetivo: o que o sistema usa de fato (cadastrado, sugerido, override ou cadastrado como reserva sem historico).",
+          "Nao calculavel significa que o material nao teve nenhuma saida nos ultimos 180 dias. Nao e consumo baixo nem falta de entradas; o (i) explica.",
+          "Material com minimo cadastrado e sem saida na janela da politica (padrao 180 dias) vai para Sem consumo recente: fica fora da compra e entra na revisao."
+        ]
+      },
+      {
+        "title": "Detalhar, exportar e ajustar",
+        "description": "Clique em Detalhar em qualquer linha das tabelas para abrir os materiais daquela situacao, faixa ou aviso.",
+        "items": [
+          "O detalhe mostra todos os materiais da linha, com estoque, minimos, fonte da regra, consumo, cobertura, compra e avisos.",
+          "Exportar Excel (CSV) baixa a lista completa aberta, com as colunas da politica.",
+          "Ajustar minimo (ou Zerar/ajustar minimo em Sem consumo recente) altera o minimo cadastrado com motivo; exige Estoque - Alterar ou master.",
+          "Override define minimo/maximo temporarios (padrao 90 dias) sem mexer no cadastro; exige a permissao Politica de reposicao.",
+          "Use Copiar ID quando o material aparecer como Material sem nome cadastrado."
+        ]
+      },
+      {
+        "title": "Configurar a politica de reposicao",
+        "description": "O botao Politica de reposicao mostra coberturas, janela sem consumo, validade do override, tolerancia de divergencia e o historico de alteracoes. Alterar exige a permissao Politica de reposicao e um motivo.",
+        "items": [
+          "Modo Monitorar: o minimo cadastrado vale onde existe; sem minimo cadastrado, vale o sugerido. Alertas usam o minimo cadastrado.",
+          "Modo Automatico: o minimo sugerido prevalece; o cadastrado so vale para itens sem historico; override continua acima de tudo. Alertas do Estoque atual usam o minimo efetivo.",
+          "Antes de ativar o Automatico, use Simular impacto: compara hoje x simulado e permite exportar em CSV cada material que muda. Ativar exige marcar a revisao e informar o motivo.",
+          "Voltar para o Monitorar exige apenas o motivo. Toda troca fica no historico."
+        ]
+      },
+      {
+        "title": "Previsao de Orcamento",
+        "description": "Orcamento de compras dos proximos 12 meses, calculado separadamente da reposicao atual.",
+        "items": [
+          "Verba recomendada do cenario-base, com cenarios economico e conservador para comparacao.",
+          "O estoque utilizavel reduz a necessidade de novas compras; nao representa dinheiro em caixa.",
+          "Comparacao com a base do snapshot: entradas consideradas, verba recomendada e reducao ou aumento previsto.",
+          "Lista consolidada de materiais abre os maiores componentes da verba (valor, risco e reducao)."
+        ]
+      },
+      {
+        "title": "Auditoria",
+        "description": "Mostra o snapshot selecionado, previsto x realizado por mes e os atalhos de validacao.",
+        "items": [
+          "Validar orcamento: realizado 12m, padrao de demanda, previsao bruta e final, travas, preco futuro e impacto; permite copiar ou exportar em CSV.",
+          "Validacao da previsao: tabelas de gasto mensal e previsao mensal.",
+          "Diagnostico: estatisticas mensais; mostra Nao calculavel quando a amostra e insuficiente."
+        ]
       }
     ],
     "notes": [
-      "Pareto 80/20 - Saida por quantidade responde: \"O que mais sai fisicamente?\".",
-      "Pareto de score de risco responde: \"O que nao pode faltar de jeito nenhum?\". Ordena pelo score (alto para baixo) e colore as barras por faixa de score (alto/medio/baixo).",
-      "Pareto financeiro - Saida por valor responde: \"O que doi mais no caixa?\".",
-      "Risco operacional: Classe A = abaixo minimo + giro alto; Classe B = abaixo minimo; Classe C = acima do minimo.",
-      "A previsao rolling nao usa filtros de periodo: o card mostra a base historica usada e o horizonte previsto.",
-      "O periodo exibido pode ser selecionado no combo com historicos gerados.",
-      "A aba Operacional concentra o rolling 12 meses com historico, saida prevista, entrada prevista e saldo.",
-      "A aba Compra mostra a necessidade de reposicao atual; ela nao representa o orcamento anual dos proximos 12 meses.",
-      "A aba Compra prioriza a recomendacao do RPC de compra, calculada por estoque atual, estoque minimo, consumo recente e cobertura.",
-      "A aba Previsao de Orcamento mostra o Orcamento de compras - proximos 12 meses, calculado separadamente da reposicao atual.",
-      "A Previsao de Orcamento mostra a verba recomendada do cenario-base, cenarios comparativos, composicao reconciliada e cronograma financeiro.",
-      "Na Previsao de Orcamento, o estoque utilizavel reduz a necessidade de novas compras; esse valor nao representa dinheiro em caixa.",
-      "A comparacao com a base do snapshot mostra entradas consideradas no agregado mensal do snapshot, verba recomendada e reducao ou aumento previsto.",
-      "Na composicao do orcamento, use Lista consolidada de materiais para abrir o modal Maiores componentes da verba projetada.",
-      "O modal de orcamento responde: o que mais exigira dinheiro no proximo periodo? Ele compara gasto historico 12m, quantidade prevista, estoque utilizavel, quantidade a comprar, preco futuro e impacto no orcamento.",
-      "A quantidade geral da Compra e exibida por materiais recomendados, sem somar unidades, pares, metros ou litros em um unico total.",
-      "A reconciliacao da Compra separa decisao operacional de condicoes de risco como abaixo do minimo e cobertura curta.",
-      "A leitura de cobertura da Compra usa faixas por dias/meses para evitar que excesso em alguns materiais esconda ruptura em outros.",
-      "Nas tabelas da Compra, use Detalhar para abrir o modal com os materiais daquela decisao ou faixa de cobertura.",
-      "No modal de detalhes da Compra, use Exportar Excel (CSV) para extrair a lista aberta.",
-      "O modal de detalhes da Compra usa cards por material para evitar sobreposicao de colunas.",
-      "Se aparecer Material sem nome cadastrado, use a coluna ID material ou Copiar ID para localizar o cadastro tecnico; o CSV leva o ID completo.",
-      "A aba Compra concentra o detalhe por material no modal para manter a tela principal mais curta.",
-      "A aba Auditoria centraliza o snapshot selecionado, mostra previsto x realizado por mes e mantem os atalhos de Validacao e Diagnostico.",
-      "Na aba Auditoria, use Validar orcamento para abrir o modal de validacao do orcamento de compras, com realizado 12m, padrao de demanda, previsao bruta, limite aplicado, previsao final, fator de crescimento, preco futuro e impacto financeiro.",
-      "No modal Validar orcamento, use Copiar tabela ou Exportar Excel (CSV) para extrair a visao filtrada.",
-      "Na validacao do orcamento, itens intermitentes nao sao anualizados apenas pelos meses com movimento; a regra aplica travas para evitar superestimacao de consumo eventual.",
-      "O botao Validacao da previsao mostra as tabelas de gasto mensal e previsao mensal.",
-      "O botao Diagnostico abre um modal com estatisticas mensais e mostra \"Nao calculavel\" quando a amostra mensal e insuficiente.",
-      "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes.",
-      "Os dados do card e grafico de previsao sao lidos das tabelas agregadas (nao ha calculo no client).",
-      "Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m).",
-      "Sazonalidade media do periodo e calculada a partir da media movel de 3 meses (aplicada junto com fator_tendencia).",
-      "Previsao de entrada usa media movel 3m de entrada e fator sazonal de entrada.",
-      "Tooltip da previsao separa contingencia de 25%, P75/P90 estatisticos, mediana e alerta de volatilidade.",
-      "Previsao inclui entradas, saidas, saldo liquido projetado e fluxo bruto movimentado em indicadores separados.",
-      "Diagnostico usa agg_gasto_mensal (valor_saida) para estatisticas mensais.",
-      "Acuracia da auditoria usa WAPE/MAPE sobre os meses do snapshot que ja possuem realizado."
-      ]
-    }
+      "A aba Compra e a Previsao de Orcamento respondem perguntas diferentes: comprar agora x reservar verba para 12 meses.",
+      "A previsao rolling e o orcamento sao lidos de tabelas agregadas; nao ha calculo no navegador.",
+      "Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m); a sazonalidade usa media movel de 3 meses.",
+      "O tooltip da previsao separa contingencia de 25%, P75/P90 estatisticos, mediana e alerta de volatilidade.",
+      "Itens intermitentes nao sao anualizados apenas pelos meses com movimento; o orcamento aplica travas contra superestimacao.",
+      "A acuracia da Auditoria usa WAPE/MAPE sobre os meses do snapshot que ja possuem realizado; o Diagnostico usa agg_gasto_mensal.",
+      "Cron pode usar body {\"force\": true} para rodar fora do ultimo dia do mes."
+    ]
+  }
 }

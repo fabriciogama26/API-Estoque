@@ -356,6 +356,120 @@ Atualizacao 2026-09 (isolamento de tenant das RPCs de auditoria e compra)
 - Antes: as RPCs rodavam como SECURITY DEFINER e confiavam no `p_owner_id` do chamador; qualquer usuario autenticado podia ler auditoria e compra sugerida de outro tenant.
 - Depois: somente o proprio tenant, master ou `service_role` executam a consulta; tenant cruzado retorna `Acesso negado ao owner informado.`
 
+Atualizacao 2026-09 (politica de reposicao - banco, modo monitorar)
+-------------------------------------------------------------------
+- Migration `supabase/migrations/20260926_create_inventory_policy.sql`:
+  - tabela `inventory_policy` (uma por tenant): modo `monitorar`/`automatico`, cobertura minima 1, alvo 2, excesso 6 meses, validade de override 90 dias, tolerancia de divergencia 50%, versao;
+  - tabela `inventory_material_override`: minimo/maximo inteiros por material, motivo obrigatorio, validade, revogacao; um override nao revogado por material (o anterior e encerrado ao criar outro);
+  - tabela `inventory_policy_history` alimentada por trigger com antes/depois, motivo e ator;
+  - permissao `estoque.politica.manage` (master/admin/owner), dependente de `estoque.read`;
+  - RPCs `rpc_inventory_policy_get`, `rpc_inventory_policy_update`, `rpc_inventory_override_set`, `rpc_inventory_override_revoke`, `rpc_inventory_policy_history`;
+  - o modo `automatico` e recusado por `rpc_inventory_policy_update` ate a entrega 5 do plano.
+- Migration `supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql`:
+  - funcao interna `_inventory_reposicao_calcular` e RPC publica `rpc_reposicao_itens(p_owner_id)` (sem snapshot);
+  - `rpc_previsao_compra_sugerida` devolve as chaves legadas sem alteracao e acrescenta `politica`, `calculado_em`, `resumo_reposicao` e `itens`.
+- Regras do calculo novo (`itens`):
+  - saldo = entradas - saidas nao canceladas, ignorando movimentos com data futura;
+  - consumo medio mensal = saidas 90d / 3; sem saida em 90d usa 180d / 6; sem saida em 180d = `null` (`base_calculo = sem_historico`);
+  - `minimo_automatico = ceil(consumo x cobertura minima)`, `maximo_automatico = ceil(consumo x cobertura alvo)`;
+  - `minimo_manual` = `materiais.estoqueMinimo` somente quando > 0;
+  - fonte da regra: override ativo > modo automatico (`automatico` ou `fallback_manual`) > modo monitorar (`manual` quando cadastrado; sem manual, `automatico`) > `sem_politica`;
+  - no modo monitorar o maximo efetivo com minimo manual preserva o alvo legado: maior entre minimo cadastrado e maximo automatico;
+  - situacoes mutuamente exclusivas: `ruptura_atual` (saldo <= 0 com limite ou consumo), `sem_base_para_calculo` (sem limite resolvido), `reposicao_necessaria` (abaixo do minimo efetivo ou cobertura abaixo da minima), `reposicao_programada` (abaixo do maximo efetivo), `acima_do_alvo` (cobertura acima do excesso, ou sem consumo e saldo acima do dobro do maximo) e `manter`;
+  - prioridade P0 ruptura, P1 necessaria, P2 programada, P3 manter; acima do alvo e sem base ficam sem prioridade (filas de revisao);
+  - compra sugerida = `ceil(maximo efetivo - saldo)`, sempre inteira; `criterio_compra` informa `ate_maximo_efetivo`, `ate_minimo_manual`, `ate_maximo_automatico` ou `sem_compra`;
+  - avisos de governanca por item: `manual_divergente`, `sem_historico`, `sem_politica`, `sem_preco`, `override_expirando` (15 dias);
+  - nome amigavel resolvido por `grupos_material_itens` e `fabricantes`, sem devolver UUID quando o item existe.
+- Validado localmente em Postgres do Supabase (imagem 17.6) com tenants A/B, dependente sem permissao, master, anon, override substituido/revogado, movimentos cancelados/futuros e consumo fracionado.
+- O frontend nao mudou: a aba Compra continua lendo as chaves legadas; o uso de `itens` entra na entrega 3.
+- Arquivos alterados:
+- `supabase/migrations/20260926_create_inventory_policy.sql`
+- `supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql`
+- `docs/AnaliseEstoque.txt`
+- `docs/rls-multi-tenant-map.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: nao havia politica por tenant; a compra sugerida usava apenas o minimo cadastrado, com quantidades decimais e listas top 5.
+- Depois: cada material tem minimo cadastrado, sugerido e efetivo, fonte da regra, situacao, prioridade e compra inteira, com politica e overrides auditados; `materiais.estoqueMinimo` nunca e alterado.
+
+Atualizacao 2026-09 (situacao sem_consumo_recente)
+-------------------------------------------------
+- Migration `supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql` adicionada.
+- Diagnostico com dados reais (owner 59191387-..., 395 materiais): 178 dos 246 itens com compra recomendada nao tinham saida em 180 dias e somavam R$ 30.339,87 dos R$ 40.026,69; 143 das 182 rupturas eram desses itens. A aba Previsao de Orcamento ja ignorava esses itens (so 116 materiais entram no orcamento de R$ 24.702,02), gerando conflito entre as abas.
+- `inventory_policy` ganhou `janela_sem_consumo_dias` (padrao 180, entre 30 e 1095), editavel por `rpc_inventory_policy_update` e exposta em `inventory_policy_effective`.
+- Nova situacao `sem_consumo_recente`, avaliada antes de ruptura: fonte `manual`/`fallback_manual`, nenhuma saida na janela e saldo abaixo do minimo efetivo. Motivo `minimo_manual_sem_consumo_na_janela`, aviso `revisar_minimo_sem_consumo`.
+- Esses itens ficam sem prioridade e com `compra_sugerida_qtd = 0`; a quantidade ate o minimo cadastrado vai para `compra_referencia_manual_qtd` / `valor_referencia_manual` (fila de revisao). Overrides nao entram na regra.
+- `resumo_reposicao` ganhou `sem_consumo_recente`, `quantidade_referencia_manual` e `valor_referencia_manual`; cada item ganhou `consumo_janela_sem_consumo` e `janela_sem_consumo_dias`.
+- O motivo `estoque_sem_consumo_recente` (acima do alvo sem consumo) foi renomeado para `sem_consumo_e_acima_do_dobro_do_maximo`.
+- Chaves legadas de `rpc_previsao_compra_sugerida` inalteradas; a tela atual nao muda ate a entrega 3.
+- Arquivos alterados:
+- `supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql`
+- `docs/AnaliseEstoque.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: item com minimo cadastrado e sem consumo, abaixo do minimo, virava ruptura/reposicao necessaria e somava na compra recomendada.
+- Depois: esse item vai para a fila `sem_consumo_recente`, fora da compra recomendada, com a referencia ate o minimo cadastrado exibida a parte.
+
+Atualizacao 2026-09 (aba Compra usando a politica de reposicao)
+--------------------------------------------------------------
+- A aba Compra passou a consumir `rpc_reposicao_itens(p_owner_id)` e `rpc_inventory_policy_get(p_owner_id)`, carregados por efeito proprio que depende apenas de `ownerRpcId` (nao depende mais de `forecastHasData` nem do snapshot selecionado).
+- O seletor `Snapshot de reposicao` foi removido da aba; a chamada a `rpc_previsao_compra_sugerida` saiu de `loadSupportData` (a RPC continua no banco por compatibilidade).
+- O calculo local de fallback (`compraInsights` com `riscoOperacional`/`estoqueBase`) foi removido: sem RPC a aba mostra estado de erro explicito, e no modo local informa que a reposicao depende do Supabase.
+- Cabecalho: necessidade de reposicao (`valor_compra_sugerida`), itens com compra, data do calculo, modo/coberturas da politica, janela sem consumo, compra urgente (P0+P1), programada (P2), cobertura mediana e valor fora da compra (referencia dos sem consumo); botoes `Politica de reposicao` e `Atualizar`.
+- Cards: Ruptura (P0), Reposicao necessaria (P1), Reposicao programada (P2) e Sem consumo recente.
+- Tabelas: `Situacao da reposicao` (7 situacoes exclusivas + total), `Cobertura do estoque` (faixas exclusivas que somam o total) e `Revisao de minimos` (avisos de governanca que nao geram compra).
+- Modal de detalhe: todos os itens da linha, com estoque, minimo cadastrado/sugerido/efetivo, maximo efetivo, fonte da regra, consumo e base, cobertura, compra ou referencia manual, avisos e override; `null` aparece como `Nao calculavel`.
+- CSV do detalhe (`downloadReposicaoCsv`): todos os itens da linha, BOM + `;`, `nao calculavel` para null, prefixo `'` contra formula injection (`=`, `+`, `-`, `@`) e colunas de politica, override, consumos, coberturas, compra, referencia manual, divergencia e avisos.
+- `ReposicaoPoliticaModal`: le/edita coberturas, excesso, janela sem consumo, validade de override e tolerancia de divergencia com motivo obrigatorio; lista o historico. Somente leitura sem `estoque.politica.manage` (flag `pode_editar` da RPC).
+- `ReposicaoOverrideModal`: cria/substitui override inteiro de minimo/maximo com motivo e expiracao (padrao da politica, 90 dias) e revoga o override ativo; recarrega a reposicao ao salvar.
+- Permissao `estoque.politica.manage` adicionada em `src/config/permissions.js` (label, grupo `Politica de reposicao` e dependencia de `estoque.read`).
+- Falhas registradas com `useErrorLogger('analise_estoque')` nas areas `reposicao_leitura`, `politica_reposicao_leitura`, `politica_reposicao_update`, `override_reposicao_set` e `override_reposicao_revoke`.
+- Arquivos alterados:
+- `src/pages/AnaliseEstoquePage.jsx`
+- `src/services/reposicaoApi.js` (novo)
+- `src/utils/reposicaoUtils.js` (novo)
+- `src/components/AnaliseEstoque/ReposicaoPoliticaModal.jsx` (novo)
+- `src/components/AnaliseEstoque/ReposicaoOverrideModal.jsx` (novo)
+- `src/styles/DashboardPage.css`
+- `src/config/permissions.js`
+- `src/help/helpAnaliseEstoque.json`
+- `docs/AnaliseEstoque.txt`
+- `TASKS.md`
+- Antes/Depois:
+- Antes: a aba dependia do snapshot, mostrava R$ 40.026,69 em 246 itens (listas top 5 e calculo local de fallback) e o detalhe/CSV usavam apenas o minimo cadastrado.
+- Depois: a aba mostra a reposicao da politica (no tenant de producao, R$ 9.686,82 em 68 itens), com os 178 itens sem consumo em revisao separada, detalhe/CSV completos e gestao de politica e overrides na propria aba.
+
+Atualizacao 2026-09 (ajuste do minimo cadastrado pela aba Compra)
+----------------------------------------------------------------
+- Migration supabase/migrations/20260927_rpc_material_estoque_minimo.sql: RPC rpc_material_estoque_minimo_update (somente "estoqueMinimo", master ou estoque.write, tenant validado, historico em inventory_policy_history com entidade minimo_cadastrado).
+- Novo ReposicaoMinimoModal no detalhe da aba Compra: botao "Ajustar minimo" (ou "Zerar/ajustar minimo" para Sem consumo recente) para quem tem estoque.write/master/admin; valor inicial 0 para sem consumo e o sugerido nos demais; motivo obrigatorio; recarrega a reposicao ao salvar.
+- O historico do modal Politica de reposicao passou a identificar alteracoes de minimo cadastrado.
+- Arquivos alterados: src/components/AnaliseEstoque/ReposicaoMinimoModal.jsx (novo), src/components/AnaliseEstoque/ReposicaoPoliticaModal.jsx, src/pages/AnaliseEstoquePage.jsx, src/services/reposicaoApi.js, docs/AnaliseEstoque.txt.
+- Antes/Depois:
+- Antes: a fila Sem consumo recente so permitia override.
+- Depois: tambem permite zerar ou ajustar o minimo cadastrado, com motivo registrado.
+
+Atualizacao 2026-09 (modo automatico da politica de reposicao)
+-------------------------------------------------------------
+- Migration supabase/migrations/20260928_inventory_policy_modo_automatico.sql:
+  - `_inventory_reposicao_calcular_modo(owner, modo)` calcula a reposicao em qualquer modo sem gravar; `_inventory_reposicao_calcular(owner)` delega com o modo gravado (resultado identico) e o payload ganhou `modo_calculado`;
+  - `rpc_inventory_policy_simular_modo(owner, modo)` devolve `resumo_atual`, `resumo_simulado` e `mudancas` (materiais cujo minimo/maximo efetivo, situacao ou compra muda, com antes/depois e diferenca de valor), validando o tenant;
+  - `rpc_inventory_policy_update` aceita `automatico` (motivo obrigatorio, historico); `rpc_inventory_policy_get` informa `modo_automatico_liberado = true`.
+- Regra do modo automatico: override > minimo sugerido pelo consumo quando calculavel > minimo cadastrado como fallback sem historico (`fallback_manual`) > sem_politica. Item com minimo cadastrado sem saida na janela continua em `sem_consumo_recente`.
+- Modal Politica de reposicao: nova secao Modo de operacao (`ReposicaoModoPanel`) com simulacao, tabela atual x simulado, 3 maiores impactos, exportacao CSV das mudancas (`downloadSimulacaoModoCsv`), confirmacao "Revisei o impacto" e motivo. Ativar o Automatico exige simulacao revisada; voltar ao Monitorar exige apenas motivo.
+- Falhas registradas com useErrorLogger nas areas `politica_reposicao_simulacao`, `politica_reposicao_modo` e `politica_reposicao_historico`.
+- Fora do escopo (continuam pelo minimo cadastrado mesmo no Automatico): card "Alertas ativos" do Dashboard de Estoque (decisao do usuario de nao alterar a tela), Paretos/risco operacional da Analise e relatorios automaticos por email.
+- Arquivos alterados: supabase/migrations/20260928_inventory_policy_modo_automatico.sql (novo), src/components/AnaliseEstoque/ReposicaoModoPanel.jsx (novo), src/components/AnaliseEstoque/ReposicaoPoliticaModal.jsx, src/pages/AnaliseEstoquePage.jsx, src/services/reposicaoApi.js, src/utils/reposicaoUtils.js, src/styles/DashboardPage.css, src/help/helpAnaliseEstoque.json, docs/AnaliseEstoque.txt, TASKS.md.
+- Antes/Depois:
+- Antes: o modo automatico era recusado e nao havia medida de impacto.
+- Depois: o tenant simula, exporta as mudancas e ativa o Automatico com motivo; pode voltar ao Monitorar a qualquer momento.
+
+Atualizacao 2026-09 (ajuda contextual reorganizada)
+--------------------------------------------------
+- Arquivo alterado: src/help/helpAnaliseEstoque.json (chave analiseEstoque).
+- Antes: 5 passos e 45 notas soltas, com notas desatualizadas (seletor de periodo na Compra, layout do modal) e sem as acoes novas.
+- Depois: 9 passos com itens (filtros; cartoes e Paretos; abas da previsao; aba Compra; minimos; detalhar/exportar/ajustar; politica e modos Monitorar/Automatico com simulacao; Previsao de Orcamento; Auditoria) e 7 notas tecnicas.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -471,6 +585,30 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql
   - Responsavel por: mover o corpo das RPCs para funcoes internas e validar o owner da sessao (`forecast_assert_owner_access`) antes de retornar auditoria/compra sugerida.
+- Migration da politica de reposicao
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260926_create_inventory_policy.sql
+  - Responsavel por: criar politica por tenant, overrides por material, historico auditado, permissao `estoque.politica.manage` e RPCs de gestao.
+- Migration do calculo de reposicao por politica
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql
+  - Responsavel por: calcular minimo cadastrado/sugerido/efetivo, situacao, prioridade e compra inteira por material (`rpc_reposicao_itens`) e anexar esse resultado a `rpc_previsao_compra_sugerida`.
+- Servico da reposicao
+  - Tipo: JS (frontend)
+  - Caminho: src/services/reposicaoApi.js
+  - Responsavel por: chamar `rpc_reposicao_itens`, `rpc_inventory_policy_get/update/history` e `rpc_inventory_override_set/revoke`.
+- Utilitarios da reposicao
+  - Tipo: JS (frontend)
+  - Caminho: src/utils/reposicaoUtils.js
+  - Responsavel por: rotulos de situacao/fonte/base/criterio/avisos, faixas de cobertura, linhas de revisao e CSV da aba Compra.
+- Modais da politica e do override
+  - Tipo: React
+  - Caminho: src/components/AnaliseEstoque/ReposicaoPoliticaModal.jsx e src/components/AnaliseEstoque/ReposicaoOverrideModal.jsx
+  - Responsavel por: editar a politica do tenant com historico e criar/revogar override por material.
+- Migration da situacao sem consumo recente
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql
+  - Responsavel por: adicionar `janela_sem_consumo_dias` a politica e separar itens com minimo cadastrado sem consumo na situacao `sem_consumo_recente`, fora da compra recomendada.
 - Edge Function forecast-gasto-mensal
   - Tipo: Supabase Edge Function
   - Caminho: supabase/functions/forecast-gasto-mensal/index.ts

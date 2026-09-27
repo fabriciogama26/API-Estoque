@@ -43,6 +43,9 @@ function EstoquePageContent() {
     savingMinStock,
     handleMinStockChange,
     handleMinStockSave,
+    reposicao,
+    canEditMinimo,
+    canVerAnalise,
   } = useEstoqueContext()
 
   const handleSubmit = (event) => {
@@ -58,7 +61,7 @@ function EstoquePageContent() {
       String(now.getDate()).padStart(2, '0'),
     ].join('-')
     const filename = `estoque-atual-${localDate}.csv`
-    downloadEstoqueCsv(itensFiltradosBase, { filename })
+    downloadEstoqueCsv(itensFiltradosBase, { filename, reposicaoPorMaterial: reposicao?.porMaterial })
   }
 
   const handleRefresh = () => {
@@ -104,6 +107,11 @@ function EstoquePageContent() {
       </section>
 
       {error ? <p className="feedback feedback--error">{error}</p> : null}
+      {reposicao?.status === 'error' ? (
+        <p className="feedback feedback--warning">
+          Minimo sugerido indisponivel no momento ({reposicao.error}). O minimo cadastrado e os alertas continuam validos.
+        </p>
+      ) : null}
 
       <section className="card">
         <header className="card__header">
@@ -142,6 +150,9 @@ function EstoquePageContent() {
           savingMinStock={savingMinStock}
           onMinStockChange={handleMinStockChange}
           onMinStockSave={handleMinStockSave}
+          reposicao={reposicao}
+          canEditMinimo={canEditMinimo}
+          canVerAnalise={canVerAnalise}
         />
       </section>
     </div>

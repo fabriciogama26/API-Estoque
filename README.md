@@ -6,7 +6,7 @@ Aplicacao web para gestao de EPIs e estoque integrada ao Supabase.
 ---
 
 ## Visao geral
-- Problema resolvido: centralizar cadastros, movimentacoes de estoque e historicos.
+- Problema resolvido: centralizar cadastros, movimentacoes de estoque, historicos e o controle de validades de treinamentos, documentos e certificados exigidos por colaborador.
 - Solucao proposta: frontend React com Supabase Auth/Database/Storage e migrations versionadas.
 - Contexto de uso: times de seguranca e almoxarifado em ambiente multi-tenant.
 
@@ -171,6 +171,7 @@ docs/
   CadastroBaseEmMassa.txt  # documentacao: CadastroBaseEmMassa.txt
   CadastroEmMassa.txt  # documentacao: CadastroEmMassa.txt
   Configuracoes.txt  # documentacao: Configuracoes.txt
+  ControleValidades.txt  # documentacao: tela Controle de Validades (lista, painel, registro, renovacao, alertas)
   CredenciaisPermissoes.txt  # documentacao: CredenciaisPermissoes.txt
   DashboardAcidentes.txt  # documentacao: DashboardAcidentes.txt
   DashboardEstoque.txt  # documentacao: DashboardEstoque.txt
@@ -184,6 +185,7 @@ docs/
   PermissoesToggles.txt  # documentacao: PermissoesToggles.txt
   Pessoas.txt  # documentacao: Pessoas.txt
   RelatorioEstoque.txt  # documentacao: RelatorioEstoque.txt
+  RequisitosControle.txt  # documentacao: tela Requisitos de Controle (requisitos, aplicabilidade, configuracao)
   Saidas.txt  # documentacao: Saidas.txt
   TermosEpi.txt  # documentacao: TermosEpi.txt
   _from_tables.txt  # documentacao: _from_tables.txt
@@ -359,6 +361,23 @@ src/
     SessionReauthModal.jsx  # componente React
     SystemStatus.jsx  # componente React
     TablePagination.jsx  # componente React
+    Validades/
+      RequisitoForm.jsx  # cadastro/edicao de requisito (validade exige motivo ao mudar)
+      RequisitoHistoricoModal.jsx  # historico de requisito e regras
+      RequisitoRegrasModal.jsx  # aplicabilidade (cargo, setor, centro de servico, centro de custo, pessoa) com previa
+      RequisitosTable.jsx  # lista de requisitos com contagens de exigidos/pendentes/vencidos
+      ValidadeAcaoModal.jsx  # renovar ou editar realizacao
+      ValidadeDispensaModal.jsx  # dispensa individual com motivo e data limite
+      ValidadeHistoricoModal.jsx  # realizacoes, dispensas e eventos de um colaborador/requisito
+      ValidadeMotivoModal.jsx  # modal generico de motivo (cancelar, inativar, remover regra, revogar)
+      ValidadeRegistroForm.jsx  # bloco "Registrar realizacao" com previa do vencimento
+      ValidadeStatusChip.jsx  # chip de status (rotulo/cor)
+      ValidadesConfigCard.jsx  # janela critica, alertas e fuso do tenant
+      ValidadesEventosTimeline.jsx  # timeline de auditoria (de -> para)
+      ValidadesFilters.jsx  # filtros combinaveis
+      ValidadesIndisponivel.jsx  # aviso de modo local
+      ValidadesPainel.jsx  # cards e graficos com drill-down
+      ValidadesTable.jsx  # lista paginada no servidor com acoes
     charts/
       ChartAgentes.jsx  # componente React
       ChartCargos.jsx  # componente React
@@ -378,6 +397,7 @@ src/
     MateriaisConfig.js  # configuracoes/constantes
     PessoasConfig.js  # configuracoes/constantes
     RelatorioEstoqueConfig.js  # configuracoes/constantes
+    ValidadesConfig.js  # estados iniciais e rotulos do controle de validades
     env.js  # configuracoes/constantes
     pagination.js  # configuracoes/constantes
     permissions.js  # configuracoes/constantes
@@ -388,6 +408,7 @@ src/
     AsoContext.jsx  # contexto React
     AuthContext.jsx  # contexto React
     CadastroBaseContext.jsx  # contexto React
+    ControleValidadesContext.jsx  # contexto React
     DashboardAcidentesContext.jsx  # contexto React
     DashboardEstoqueContext.jsx  # contexto React
     EntradasContext.jsx  # contexto React
@@ -395,6 +416,7 @@ src/
     MateriaisContext.jsx  # contexto React
     PermissionsContext.jsx  # contexto React
     PessoasContext.jsx  # contexto React
+    RequisitosControleContext.jsx  # contexto React
     SaidasContext.jsx  # contexto React
   controllers/
     acidenteController.js  # controller de pagina
@@ -413,6 +435,7 @@ src/
     helpAcidentesAgentes.json  # conteudo de ajuda
     helpAnaliseEstoque.json  # conteudo de ajuda
     helpConfiguracoes.json  # conteudo de ajuda
+    helpControleValidades.json  # conteudo de ajuda
     helpDashboard.json  # conteudo de ajuda
     helpDashboardAcidentes.json  # conteudo de ajuda
     helpEntradas.json  # conteudo de ajuda
@@ -423,6 +446,7 @@ src/
     helpAso.json  # conteudo de ajuda
     helpPessoas.json  # conteudo de ajuda
     helpRelatorioEstoque.json  # conteudo de ajuda
+    helpRequisitosControle.json  # conteudo de ajuda
     helpSaidas.json  # conteudo de ajuda
     helpTermoEpi.json  # conteudo de ajuda
   hooks/
@@ -433,6 +457,7 @@ src/
     useAsoController.js  # hook de estado/efeitos
     useCadastroBaseController.js  # hook de estado/efeitos
     useChangePassword.js  # hook de estado/efeitos
+    useControleValidadesController.js  # controller da tela Controle de Validades
     useDashboardAcidentes.js  # hook de estado/efeitos
     useDashboardEstoque.js  # hook de estado/efeitos
     useEntradasController.js  # hook de estado/efeitos
@@ -447,6 +472,7 @@ src/
     usePessoas.js  # hook de estado/efeitos
     usePessoasController.js  # hook de estado/efeitos
     useRelatorioEstoque.js  # hook de estado/efeitos
+    useRequisitosController.js  # controller da tela Requisitos de Controle
     useResetPassword.js  # hook de estado/efeitos
     useSaidasController.js  # hook de estado/efeitos
     useTermoEpi.js  # hook de estado/efeitos
@@ -470,6 +496,7 @@ src/
     AsoPage.jsx  # pagina React
     CadastroBase.jsx  # pagina React
     Configuracoes.jsx  # pagina React
+    ControleValidadesPage.jsx  # pagina React (/pcsmo/controle-validades)
     DashboardAcidentes.jsx  # pagina React
     DashboardPage.jsx  # pagina React
     EntradasPage.jsx  # pagina React
@@ -480,6 +507,7 @@ src/
     NoAccessPage.jsx  # pagina React
     Pessoas.jsx  # pagina React
     RelatorioEstoque.jsx  # pagina React
+    RequisitosControlePage.jsx  # pagina React (/pcsmo/requisitos-controle)
     ResetPasswordPage.jsx  # pagina React
     SaidasPage.jsx  # pagina React
     TermosEpiPage.jsx  # pagina React
@@ -547,6 +575,7 @@ src/
     sessionService.js  # service frontend (API/data client)
     supabaseClient.js  # service frontend (API/data client)
     termoEpiService.js  # service frontend (API/data client)
+    validadesApi.js  # RPCs do controle de validades (Supabase)
   styles/
     AcidentesPage.css  # estilos
     AcidentesTableStatus.css  # estilos
@@ -563,6 +592,7 @@ src/
     ResetPasswordPage.css  # estilos
     SessionReauthModal.css  # estilos
     SystemStatus.css  # estilos
+    ValidadesPage.css  # estilos
     base.css  # estilos
     charts.css  # estilos
     help.css  # estilos
@@ -576,6 +606,7 @@ src/
     acidentesExport.js  # utilitario
     acidentesUtils.js  # utilitario
     clipboard.js  # utilitario
+    csvExport.js  # CSV para Excel pt-BR (sep=;, BOM) usado pelo controle de validades
     dashboardAcidentesUtils.js  # utilitario
     dashboardEstoqueUtils.js  # utilitario
     entradasExport.js  # utilitario
@@ -590,6 +621,8 @@ src/
     saidasExport.js  # utilitario
     saidasUtils.js  # utilitario
     selectionUtils.js  # utilitario
+    validadesExport.js  # exportacao CSV do controle de validades
+    validadesUtils.js  # rotulos e formatacao (status vem do banco)
 supabase/
   .gitignore  # regras de ignore do Supabase
   .temp/
@@ -672,6 +705,10 @@ supabase/
       _shared/
         auth.ts  # helper JWT local da edge function
       index.ts  # edge function (Supabase)
+    validades-alertas/
+      _shared/
+        validadesAlertasCore.ts  # core autocontido: eventos, Brevo, destinatarios admin/master e e-mail consolidado
+      index.ts  # edge function de cron (CRON_SECRET) dos alertas de validade
     verify-captcha/
       index.ts  # edge function (Supabase)
   migrations/
@@ -891,6 +928,9 @@ supabase/
     20260423_fix_forecast_snapshot_versioning.sql  # migration SQL
     20260423_add_forecast_audit_and_purchase_rpcs.sql  # migration SQL
     20260423_fix_forecast_audit_purchase_security_definer.sql  # migration SQL
+    20260929_01_validades_schema.sql  # controle de validades: permissoes, tabelas, triggers, RLS, base calculada
+    20260929_02_validades_rpcs.sql  # controle de validades: RPCs das telas
+    20260929_03_validades_alertas.sql  # controle de validades: funcoes de alerta (service_role)
   migrations_rebuild/
     0001_extensions.sql  # migration rebuild SQL
     0002_tables.sql  # migration rebuild SQL
@@ -902,6 +942,11 @@ supabase/
     0008_rls.sql  # migration rebuild SQL
     0009_storage.sql  # migration rebuild SQL
     0010_seed_core.sql  # migration rebuild SQL
+  tests/
+    validades/
+      00_stub_supabase_local.sql  # stub minimo do Supabase para Postgres local descartavel
+      10_validades_validacao.sql  # validacao SQL do controle de validades (termina em ROLLBACK)
+      run-local.ps1  # executa stub + migrations + validacao em Postgres local
 temp_readme.txt  # documento de suporte
 vercel.json  # configuracao de deploy (Vercel)
 vite.config.js  # configuracao do Vite
@@ -920,6 +965,9 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Cadastrar catalogos base (grupos, fabricantes, cores, caracteristicas, medidas).
 - Cadastrar materiais e pessoas.
 - Cadastrar e acompanhar ASOs por funcionario em `/pcsmo/controledeaso`.
+- Cadastrar requisitos com validade (treinamentos, certificados, documentos) e a quem se aplicam em `/pcsmo/requisitos-controle`.
+- Registrar e renovar realizacoes, acompanhar pendentes/vencimentos e exportar em `/pcsmo/controle-validades`.
+- Receber alertas de validade por e-mail (uma vez ao entrar na janela critica e uma vez no vencimento) pela Edge Function `validades-alertas`.
 - Registrar entradas para compor saldo.
 - Registrar saidas e acompanhar historico.
 - Exportar lista de materiais em CSV quando necessario.
@@ -931,7 +979,15 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 ---
 
 ## Testes
-- Nao existem testes automatizados.
+- Nao existem testes automatizados de frontend.
+- Controle de Validades: validacao SQL (tenant, permissoes, snapshot, renovacao, pendentes, status, datas/timezone e idempotencia dos alertas) em PostgreSQL local descartavel. Nao conecta no Supabase.
+
+```powershell
+# servidor PostgreSQL 15+ local aceitando conexoes na porta informada
+powershell -ExecutionPolicy Bypass -File supabase/tests/validades/run-local.ps1 -Port 5432
+```
+
+- Resultado esperado: linhas `NOTICE: ok - ...` e `Validacao concluida sem falhas.`
 
 
 ---
@@ -950,6 +1006,10 @@ D:\Fabricio\Projetos SaaS\API-Estoque\supabasebackup
 - Relatorio automatico nao executa: validar `CRON_SECRET` e as Edge Functions `relatorio-estoque-mensal`/`relatorio-estoque-mensal-email`.
 - Erro 500 em cron: `CRON_SECRET` ausente ou header `x-cron-secret` divergente.
 - Nenhuma movimentacao encontrada: revisar filtros e periodo do relatorio.
+- Controle de Validades vazio: o requisito precisa estar ativo e ter ao menos uma regra de aplicabilidade que alcance colaboradores ativos (conferir a previa no modal de aplicabilidade).
+- "Use Renovar" ao registrar: ja existe realizacao vigente mais antiga; usar a acao Renovar para preservar o historico.
+- Alerta de validade nao enviado: conferir `requisitos_config.alertas_ativos`, admins com e-mail no tenant, `requisitos_alertas_envios.erro` e o cron `validades-alertas` em `edge_functions_error_report`.
+- Alerta repetido nao ocorre por design: um evento por realizacao + tipo + vencimento; renovar ou corrigir a data gera novo ciclo.
 
 
 ---

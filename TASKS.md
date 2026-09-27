@@ -84,8 +84,35 @@
 - Migration de `acidente_locais` ajustada para bancos onde a coluna legada `ordem` nao existe.
 - Politica de reposicao - entrega 1 (seguranca), 2026-09-26: `EstoqueOperations.current/dashboard` (`GET /api/estoque`) passaram a exigir usuario autenticado e filtrar materiais, entradas, saidas e pessoas por `account_owner_id`.
 - Politica de reposicao - entrega 1 (seguranca), 2026-09-26: migration `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql` criada para validar o owner da sessao em `rpc_previsao_compra_sugerida` e `rpc_previsao_gasto_mensal_auditar` (tenant cruzado retorna `42501`).
+- Politica de reposicao - entrega 2 (banco, modo monitorar), 2026-09-26: migration `supabase/migrations/20260926_create_inventory_policy.sql` criada com `inventory_policy`, `inventory_material_override`, `inventory_policy_history` (trigger), permissao `estoque.politica.manage` e RPCs de leitura/gestao da politica e dos overrides.
+- Politica de reposicao - entrega 2 (banco, modo monitorar), 2026-09-26: migration `supabase/migrations/20260926_update_rpc_previsao_compra_sugerida.sql` criada com `rpc_reposicao_itens` e as chaves novas `politica`, `calculado_em`, `resumo_reposicao` e `itens` em `rpc_previsao_compra_sugerida`, preservando as chaves legadas; validada localmente em Postgres do Supabase.
+- Politica de reposicao - ajuste 2026-09-26: migration `supabase/migrations/20260927_inventory_policy_sem_consumo_recente.sql` criada com a situacao `sem_consumo_recente` (minimo cadastrado, sem saida na janela e abaixo do minimo: fora da compra recomendada, com referencia ate o minimo em fila de revisao) e `janela_sem_consumo_dias` configuravel (padrao 180). Motivo: 178 de 246 itens com compra (R$ 30.339,87 de R$ 40.026,69) nao tinham consumo em 180 dias.
+- Politica de reposicao - 2026-09-26: migrations `20260926_secure_forecast_purchase_rpcs.sql`, `20260926_create_inventory_policy.sql`, `20260926_update_rpc_previsao_compra_sugerida.sql` e `20260927_inventory_policy_sem_consumo_recente.sql` aplicadas no Supabase. Conferencia no owner `59191387-669b-4585-8e11-7070d9769d86`: 395 monitorados = ruptura 39 + necessaria 24 + programada 5 + manter 72 + acima do alvo 63 + sem base 14 + sem consumo recente 178; compra recomendada R$ 9.686,82 em 68 itens; referencia manual dos sem consumo R$ 30.339,87; aba Compra sem alteracao visual.
+- Politica de reposicao - entrega 3 (aba Compra), 2026-09-26: aba Compra passou a usar `rpc_reposicao_itens` sem depender do snapshot, removeu o seletor de snapshot e o fallback local, ganhou cards P0/P1/P2/sem consumo, tabelas de situacao, cobertura e revisao de minimos, detalhe e CSV completos, modal `Politica de reposicao` com historico e override por material; permissao `estoque.politica.manage` adicionada em `permissions.js`.
+- Politica de reposicao - entrega 4 (Estoque atual), 2026-09-27: migration `supabase/migrations/20260927_rpc_material_estoque_minimo.sql` com `rpc_material_estoque_minimo_update` (somente o minimo cadastrado, com historico); Estoque atual mostra minimo cadastrado/sugerido/efetivo, fonte, cobertura e situacao por material via uma chamada a `rpc_reposicao_itens`; edicao do minimo restrita a `estoque.write`/master; materiais ativos sem movimentacao aparecem com saldo zero sem gerar alerta; CSV com as colunas da politica; aba Compra ganhou `Zerar/ajustar minimo` na revisao. Resumo do Estoque atual: "Valor para reposicao" renomeado para "Deficit ate o minimo cadastrado" e novos cards "Compra recomendada" e "Revisar minimos" (seguem os filtros) com link para `/analise-estoque?aba=compra`, que abre a Analise na aba Compra; "Nao calculavel" ganhou icone de informacao; Dashboard de Estoque manteve o criterio de "Materiais monitorados" (ignora itens sem movimentacao), sem cards novos por decisao do usuario.
+- Politica de reposicao - entrega 5 (modo automatico), 2026-09-28: migration `supabase/migrations/20260928_inventory_policy_modo_automatico.sql` com `rpc_inventory_policy_simular_modo` (compara modos sem gravar) e liberacao do modo `automatico`; modal da politica ganhou a secao Modo de operacao com simulacao, CSV das mudancas, confirmacao e motivo; no Automatico o Estoque atual passa a alertar pelo minimo efetivo com a origem do limite. Dashboard (Alertas ativos), Paretos e relatorios por email seguem no minimo cadastrado.
+- Politica de reposicao - ajuda contextual, 2026-09-28: textos do botao Ajuda reescritos em Analise de Estoque (9 passos por area), Estoque atual (8 passos, alertas por modo da politica) e Configuracoes (permissoes Politica de reposicao e Estoque - Alterar); Dashboard de Estoque sem mudanca de texto.
+- Controle de Validades (codigo pronto, 2026-09-27): telas `Requisitos de Controle` (`/pcsmo/requisitos-controle`) e `Controle de Validades` (`/pcsmo/controle-validades`) com painel, drill-down, exportacao CSV e alertas por e-mail.
+  - Decisoes do usuario (2026-09-27): centro de servico = unidade; ASO continua separado; vencimento = data + periodo - 1 dia; registros sem exigencia atual aparecem na lista, fora dos cards e sem alerta; dispensa individual com motivo e data limite opcional; data anterior a vigente vira historico retroativo; alerta de vencimento perdido e recuperado ate 7 dias; destinatarios = admins do tenant; anexos fora desta entrega; indisponivel no modo local; testes via scripts SQL.
+  - Banco: migrations `20260929_01_validades_schema.sql`, `20260929_02_validades_rpcs.sql`, `20260929_03_validades_alertas.sql` (snapshot imutavel, renovacao sem apagar historico, status centralizado em `validade_status`, pendencias calculadas, idempotencia de alertas, RLS somente leitura, escrita por RPC).
+  - Validacao: `supabase/tests/validades/run-local.ps1` com 87 verificacoes passando em PostgreSQL 18 local; telas verificadas em navegador contra PostgREST local; Edge Function `validades-alertas` executada ponta a ponta com Brevo simulado (envio, reenvio bloqueado, falha e retentativa).
 
 ## Pendente
+### Controle de Validades - implantacao (2026-09)
+- Aplicar no Supabase, em ordem: `20260929_01_validades_schema.sql`, `20260929_02_validades_rpcs.sql`, `20260929_03_validades_alertas.sql`.
+- Publicar a Edge Function `validades-alertas` com 2 arquivos, no padrao das demais: `index.ts` e `_shared/validadesAlertasCore.ts` (core sem imports fora da pasta da funcao).
+- 2026-09-27: migrations `20260929_01..03` aplicadas no Supabase pelo usuario; primeira publicacao pelo painel falhou porque `_shared/validadesAlertasCore.ts` nao foi criado no editor e o core importava a `_shared` da raiz (corrigido: core autocontido dentro da pasta da funcao).
+- Agendar no pg_cron: `0 10 * * *` (UTC) chamando `https://<project-ref>.supabase.co/functions/v1/validades-alertas` com `x-cron-secret`.
+- Testar o e-mail em producao com `test_email` + `test_owner_id` antes do primeiro cron.
+- Conferir toggles em Configuracoes para perfis que nao sao admin/master (as chaves novas so foram concedidas a `master`, `admin` e `owner`).
+- Futuro: configuracao de destinatarios dos alertas; anexos de certificado (bucket privado por owner); integracao opcional com ASO.
+
+### Auditoria de seguranca - views e grants para anon (2026-09-27)
+- Decisao do usuario: tratar depois, em auditoria geral do sistema.
+- Views sem `security_invoker` e com `grant select ... to anon`: `pessoas_view`, `aso_controle_view`, `materiais_view`, `entradas_material_view` (conferir tambem `hht_mensal_view`, `vw_acidentes`, `vw_indicadores_acidentes`, `materiais_unicos_view`).
+- Diagnostico em producao: `select relname, reloptions from pg_class where relname in ('pessoas_view','aso_controle_view','materiais_view','entradas_material_view');`
+- Plano: revogar `anon` em tabelas/views/funcoes (exceto fluxos publicos via Edge Function), `security_invoker = on` nas views, revisar RPCs SECURITY DEFINER sem checagem de owner e testar consumidores por perfil (Saidas, Termo de EPI, ASO, Pessoas).
+
 ### Plano de execucao - politica de reposicao por cobertura (2026-09)
 
 - Objetivo da fase:
@@ -99,7 +126,13 @@
   - o Master enxerga indicadores globais pela RLS, mas o forecast filtra pelo `owner_id` proprio do Master, que nao representa necessariamente o tenant operacional;
   - a correcao deve exigir selecao explicita de tenant no acesso Master e usar esse mesmo owner em todas as fontes da pagina.
 - Premissas recomendadas para aprovacao antes da implementacao:
-  - sem historico em 180 dias, campos automaticos permanecem `null`, a situacao fica `sem_base_para_calculo` e a reposicao ate o minimo manual continua disponivel com `criterio_compra = minimo_manual`;
+  - sem historico em 180 dias, campos automaticos permanecem `null`, `base_calculo = sem_historico` e a reposicao ate o minimo manual continua disponivel com `criterio_compra = ate_minimo_manual`;
+  - AJUSTADO 2026-09-26 na implementacao: `sem_base_para_calculo` fica restrito a materiais sem limite resolvido (sem manual e sem consumo em 180 dias); material sem historico mas com minimo manual segue a situacao pelo minimo (ex.: ruptura), com aviso `sem_historico`;
+  - AJUSTADO 2026-09-26 na implementacao: no modo `monitorar`, material sem minimo cadastrado usa o minimo automatico (fonte `automatico`), como o calculo legado ja usava consumo x 2 como alvo; onde ha minimo cadastrado, ele continua efetivo;
+  - AJUSTADO 2026-09-26 na implementacao: RLS habilitada sem `force`, no padrao das demais tabelas owner-scoped; escrita bloqueada por revoke e feita apenas por RPC;
+  - AJUSTADO 2026-09-26 na implementacao: tenant sem linha em `inventory_policy` usa os valores padrao nas RPCs, sem necessidade de integrar ao provisionamento; o backfill cria a linha para tenants com materiais;
+  - AJUSTADO 2026-09-26 na implementacao: `rpc_inventory_policy_update` recusa o modo `automatico` ate a entrega 5;
+  - DECIDIDO 2026-09-26: item com minimo cadastrado, sem nenhuma saida na janela `janela_sem_consumo_dias` (padrao 180, configuravel na politica) e abaixo do minimo vira `sem_consumo_recente`: fora da compra recomendada e das prioridades, com a referencia ate o minimo cadastrado em fila de revisao (manter minimo, criar override ou zerar o minimo);
   - DECIDIDO 2026-09-26: consumo medio pode manter duas casas decimais, mas minimo sugerido, maximo/estoque alvo e compra sugerida sao sempre arredondados para cima (`ceil`) para numero inteiro;
   - DECIDIDO 2026-09-26: materiais ativos sem nenhuma movimentacao passam a aparecer na lista com saldo zero e situacao `sem_base_para_calculo`;
   - DECIDIDO 2026-09-26: validade padrao do override por material e de 90 dias;
@@ -118,12 +151,12 @@
   - sem automatico e sem manual valido: retornar `sem_politica`, nunca converter ausencia de base em zero;
   - no modo inicial `monitorar`, o manual permanece efetivo e a divergencia com o automatico gera aviso de revisao, nao alerta de compra automatico.
 - Ordem de entrega recomendada (PRs separados):
-  - 1) correcoes de seguranca independentes: Etapa 3.3 (`EstoqueOperations` sem owner) e isolamento `SECURITY DEFINER` da `rpc_previsao_compra_sugerida` (primeiro item da Etapa 2);
-  - 2) bug de periodos vazios do Master (Etapa 0.1);
-  - 3) migration da politica + evolucao da RPC, somente com modo `monitorar`;
-  - 4) aba Compra (Etapas 3 e 4);
-  - 5) Estoque atual e alertas (Etapas 3.1 e 3.2);
-  - 6) liberacao do modo `automatico` apos validacao com dados reais.
+  - 1) correcoes de seguranca independentes: Etapa 3.3 (`EstoqueOperations` sem owner) e isolamento `SECURITY DEFINER` da `rpc_previsao_compra_sugerida` (primeiro item da Etapa 2) - CONCLUIDA 2026-09-26;
+  - 2) migration da politica + evolucao da RPC, somente com modo `monitorar` - CONCLUIDA 2026-09-26 (pendente aplicar no Supabase);
+  - 3) aba Compra (Etapas 3 e 4) - CONCLUIDA 2026-09-26 (pendente validacao visual com dados reais);
+  - 4) Estoque atual e alertas (Etapas 3.1 e 3.2) - CONCLUIDA 2026-09-27 no modo monitorar (pendente aplicar migration e validar); a troca dos alertas para o minimo efetivo (Etapa 3.2) passa a valer com o modo automatico na entrega 5;
+  - 5) liberacao do modo `automatico` apos validacao com dados reais - CONCLUIDA 2026-09-28 (pendente aplicar migration, simular com dados reais e decidir a ativacao);
+  - ADIADO 2026-09-26 por decisao do usuario: bug de periodos vazios do Master (Etapa 0.1), sem data definida; ate la, o Master continua analisando o forecast pelo proprio owner.
 - Etapa 0 - validar pre-requisitos no Supabase remoto:
   - consultar a definicao e ACL efetivamente aplicadas de `rpc_previsao_compra_sugerida(uuid, uuid)`;
   - confirmar a aplicacao das migrations de forecast e do helper seguro de status cancelado;
@@ -208,7 +241,11 @@
   - extrair utilitarios de normalizacao/exportacao e, se necessario para reduzir o tamanho da pagina, componentes do painel/modal de reposicao;
   - atualizar `docs/AnaliseEstoque.txt`, `docs/Estoque.txt`, documentos de RLS, `supabase/README.md`, `README.md` e este `TASKS.md`.
 
-- Aplicar a migration `supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql` no Supabase (depois de `20260423_add_forecast_audit_and_purchase_rpcs.sql`) e validar: usuario do tenant A chamando `rpc_previsao_compra_sugerida` com owner do tenant B deve receber 42501; o proprio tenant e master continuam recebendo dados.
+- Validar a aba Compra com dados reais: numeros iguais ao `resumo_reposicao` (R$ 9.686,82 / 68 itens no owner `59191387-...`), detalhe e CSV completos, modal de politica somente leitura para usuario sem `estoque.politica.manage`, criacao/revogacao de override e toggle `Politica de reposicao` em Credenciais e Permissoes.
+- Aplicar no Supabase `supabase/migrations/20260928_inventory_policy_modo_automatico.sql` (depois de `20260927_*`) e, no modal Politica de reposicao, simular o modo Automatico com dados reais, exportar o CSV e revisar antes de ativar.
+- Decidir se o card "Alertas ativos" do Dashboard de Estoque, os Paretos e os relatorios por email devem seguir o minimo efetivo quando o tenant estiver no modo Automatico (hoje usam o minimo cadastrado).
+- Aplicar no Supabase `supabase/migrations/20260927_rpc_material_estoque_minimo.sql` e validar: editar minimo no Estoque atual e pela aba Compra (Zerar/ajustar minimo), conferir o registro em `inventory_policy_history` (entidade `minimo_cadastrado`), botao oculto para usuario sem `estoque.write`, materiais ativos sem movimentacao listados sem alerta e CSV com as colunas novas.
+- Validar em producao o isolamento de `20260926_secure_forecast_purchase_rpcs.sql` (migration ja aplicada): usuario do tenant A chamando `rpc_previsao_compra_sugerida` com owner do tenant B deve receber 42501; o proprio tenant e master continuam recebendo dados.
 - Validar `GET /api/estoque` e `GET /api/estoque?view=dashboard` com tenants A e B: cada um so recebe os proprios materiais/movimentacoes; sem token deve retornar 401.
 - Aplicar a migration `supabase/migrations/20260801_purchase_budget_12m.sql` no projeto Supabase para ativar o orcamento anual da aba Previsao de Orcamento.
 - Aplicar a migration `supabase/migrations/20260802_acidente_locais_owner_scope.sql` no projeto Supabase para ativar locais de acidente por tenant no Cadastro Base.

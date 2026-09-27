@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { TablePagination } from '../components/TablePagination.jsx'
 import {
@@ -23,6 +24,30 @@ import { fetchEstoqueForecast } from '../services/estoqueApi.js'
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient.js'
 import { isLocalMode } from '../config/runtime.js'
 import { usePermissions } from '../context/PermissionsContext.jsx'
+import { useErrorLogger } from '../hooks/useErrorLogger.js'
+import { fetchPoliticaReposicao, fetchReposicaoItens } from '../services/reposicaoApi.js'
+import { ReposicaoPoliticaModal } from '../components/AnaliseEstoque/ReposicaoPoliticaModal.jsx'
+import { ReposicaoOverrideModal } from '../components/AnaliseEstoque/ReposicaoOverrideModal.jsx'
+import { ReposicaoMinimoModal } from '../components/AnaliseEstoque/ReposicaoMinimoModal.jsx'
+import { NaoCalculavelInfo } from '../components/AnaliseEstoque/NaoCalculavelInfo.jsx'
+import {
+  SITUACAO_REPOSICAO,
+  SITUACAO_REPOSICAO_ORDEM,
+  buildCoberturaFaixas,
+  buildReposicaoResumo,
+  buildRevisaoRows,
+  downloadReposicaoCsv,
+  formatAvisos,
+  formatBaseCalculo,
+  formatCoberturaMeses,
+  formatCriterioCompra,
+  formatFonteRegra,
+  formatMotivoSituacao,
+  formatQuantidadeOuNaoCalculavel,
+  formatSituacaoReposicao,
+  resolveReposicaoNome,
+  toNumberOrNull,
+} from '../utils/reposicaoUtils.js'
 
 import '../styles/DashboardPage.css'
 
@@ -133,9 +158,6 @@ function resolveCompraMaterialName(item = {}) {
   return display || 'Material sem nome cadastrado'
 }
 
-function getCompraItemId(item = {}) {
-  return String(item.material_id || item.materialId || item.id || item.nome || item.displayNome || '')
-}
 
 function getCompraMaterialKey(item = {}) {
   return String(item.materialKey || item.material_id || item.materialId || item.id || item.nome || item.displayNome || '')
@@ -169,61 +191,13 @@ function formatDemandPattern(pattern) {
   return labels[pattern] || pattern || '-'
 }
 
-function formatCompraClassification(item = {}) {
-  const parts = [item.grupoMaterial, item.unidade, item.fabricante].filter((value) => value && !isUuidOnly(value))
-  return parts.length ? parts.join(' | ') : '-'
-}
 
-function getCompraEstoqueAtual(item = {}) {
-  return Number(item.estoque_atual ?? item.estoqueAtual ?? 0)
-}
 
-function getCompraEstoqueMinimo(item = {}) {
-  return Number(item.estoque_minimo ?? item.estoqueMinimo ?? 0)
-}
 
-function getCompraValorUnitario(item = {}) {
-  return Number(item.valor_unitario ?? item.valorUnitario ?? 0)
-}
 
-function getCompraConsumoMensal(item = {}) {
-  if (item.consumo_medio_mensal !== null && item.consumo_medio_mensal !== undefined) {
-    return Number(item.consumo_medio_mensal || 0)
-  }
-  if (item.giroDiario !== null && item.giroDiario !== undefined) {
-    return Number(item.giroDiario || 0) * 30
-  }
-  return 0
-}
 
-function getCoberturaDias(item = {}) {
-  const coberturaMeses = item.cobertura_meses ?? item.coberturaMeses
-  if (coberturaMeses === null || coberturaMeses === undefined) {
-    return null
-  }
-  return Number(coberturaMeses) * 30
-}
 
-function formatCoberturaDias(item = {}) {
-  const dias = getCoberturaDias(item)
-  if (dias === null || Number.isNaN(dias)) {
-    return 'sem consumo recente'
-  }
-  return `${formatNumber(Math.max(0, dias), 0)} dias`
-}
 
-function getCompraMotivo(item = {}) {
-  const estoqueAtual = getCompraEstoqueAtual(item)
-  const estoqueMinimo = getCompraEstoqueMinimo(item)
-  const coberturaDias = getCoberturaDias(item)
-  const motivos = []
-  if (estoqueAtual < estoqueMinimo) motivos.push('abaixo do minimo')
-  if (coberturaDias !== null && coberturaDias < 30) motivos.push('risco de ruptura')
-  if (getCompraConsumoMensal(item) <= 0) motivos.push('sem consumo recente')
-  if (getCompraValorUnitario(item) <= 0) motivos.push('sem preco valido')
-  if (motivos.length) return motivos.join(' e ')
-  return 'reposicao por cobertura/estoque alvo'
-}
 
 function sanitizeCompraCsvValue(value) {
   const raw = value === null || value === undefined ? '' : String(value)
@@ -252,58 +226,7 @@ function slugCompraCsvName(value) {
     .toLowerCase() || 'materiais'
 }
 
-function buildCompraDetailCsv(items = [], context = {}) {
-  const headers = [
-    'Categoria do detalhe',
-    'Snapshot',
-    'Material ID',
-    'Material',
-    'Classificacao',
-    'Estoque atual',
-    'Estoque minimo',
-    'Consumo mensal',
-    'Cobertura',
-    'Quantidade sugerida',
-    'Preco unitario',
-    'Valor sugerido',
-    'Motivo',
-  ]
-  const rows = (Array.isArray(items) ? items : []).map((item) => {
-    const values = [
-      context.label || '',
-      context.snapshot || '',
-      getCompraMaterialKey(item),
-      resolveCompraMaterialName(item),
-      formatCompraClassification(item),
-      formatCompraCsvNumber(getCompraEstoqueAtual(item)),
-      formatCompraCsvNumber(getCompraEstoqueMinimo(item)),
-      formatCompraCsvNumber(getCompraConsumoMensal(item), 2),
-      formatCoberturaDias(item),
-      formatCompraCsvNumber(item.compra_sugerida_qtd ?? item.compra_minima_qtd ?? item.deficitQuantidade ?? 0),
-      formatCompraCsvNumber(getCompraValorUnitario(item), 2),
-      formatCompraCsvNumber(item.valor_compra_sugerida ?? item.deficitValor ?? 0, 2),
-      getCompraMotivo(item),
-    ]
-    return values.map(sanitizeCompraCsvValue).join(';')
-  })
-  return [headers.join(';'), ...rows].join('\n')
-}
 
-function downloadCompraDetailCsv(items = [], context = {}) {
-  const label = slugCompraCsvName(context.label)
-  const date = new Date().toISOString().slice(0, 10)
-  const filename = `analise-estoque-compra-${label}-${date}.csv`
-  const csvContent = buildCompraDetailCsv(items, context)
-  const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.setAttribute('download', filename)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-}
 
 function getBudgetImpactValue(item = {}) {
   return Number(item.verba_recomendada ?? item.valorImpacto ?? item.impacto_orcamento ?? 0)
@@ -485,49 +408,6 @@ function buildBudgetValidationClipboardText(items = [], context = {}) {
   return [BUDGET_VALIDATION_EXPORT_HEADERS.join('\t'), ...rows].join('\n')
 }
 
-function computeCompraCoverageStats(items = []) {
-  const coberturaValores = []
-  const stats = {
-    mediana: null,
-    menos30: 0,
-    entre30e60: 0,
-    entre60e90: 0,
-    acima12m: 0,
-    semConsumo: 0,
-    criticosSemCobertura: 0,
-  }
-
-  items.forEach((item) => {
-    const coberturaMeses =
-      item.cobertura_meses ?? item.coberturaMeses ??
-      (Number(item.giroDiario || 0) > 0
-        ? Number(item.estoqueAtual || item.estoque_atual || 0) / (Number(item.giroDiario || 0) * 30)
-        : null)
-
-    if (coberturaMeses === null || coberturaMeses === undefined || Number.isNaN(Number(coberturaMeses))) {
-      stats.semConsumo += 1
-      return
-    }
-
-    const cobertura = Number(coberturaMeses)
-    coberturaValores.push(cobertura)
-    if (cobertura < 1) stats.menos30 += 1
-    if (cobertura >= 1 && cobertura < 2) stats.entre30e60 += 1
-    if (cobertura >= 2 && cobertura < 3) stats.entre60e90 += 1
-    if (cobertura > 12) stats.acima12m += 1
-    if ((item.classeRisco || item.classe) === 'A' && cobertura < 1) {
-      stats.criticosSemCobertura += 1
-    }
-  })
-
-  if (coberturaValores.length) {
-    const sorted = [...coberturaValores].sort((a, b) => a - b)
-    const middle = Math.floor(sorted.length / 2)
-    stats.mediana = sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
-  }
-
-  return stats
-}
 
 function addMonthsDate(value, months) {
   if (!value) {
@@ -1004,6 +884,49 @@ function ParetoSection({
   )
 }
 
+function ReposicaoRowsTable({ header, rows, onOpen, onKeyDown }) {
+  return (
+    <div className="table-wrapper">
+      <table className="data-table analysis-audit-table">
+        <thead>
+          <tr>
+            <th>{header}</th>
+            <th>Materiais</th>
+            <th>Detalhe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.id}
+              className={row.items.length ? 'analysis-table-row--clickable' : undefined}
+              tabIndex={row.items.length ? 0 : undefined}
+              onClick={() => onOpen(row)}
+              onKeyDown={(event) => onKeyDown(event, row)}
+            >
+              <td>{row.label}</td>
+              <td>{row.value}</td>
+              <td>
+                <button
+                  type="button"
+                  className="button button--ghost button--compact"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onOpen(row)
+                  }}
+                  disabled={!row.items.length}
+                >
+                  Detalhar
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function AnaliseEstoquePage() {
   const {
     paretoQuantidadeTop,
@@ -1013,11 +936,12 @@ export function AnaliseEstoquePage() {
     paretoRisco,
     paretoFinanceiro,
     saidasResumo,
-    riscoOperacional,
     diasPeriodo,
     estoqueBase,
   } = useDashboardEstoqueContext()
-  const { profile } = usePermissions()
+  const { profile, permissions, isMaster, isAdmin } = usePermissions()
+  const canEditMinimo = isMaster || isAdmin || (Array.isArray(permissions) && permissions.includes('estoque.write'))
+  const { reportError } = useErrorLogger('analise_estoque')
   const [forecastPayload, setForecastPayload] = useState(null)
   const [forecastLoading, setForecastLoading] = useState(false)
   const [forecastError, setForecastError] = useState(null)
@@ -1029,7 +953,11 @@ export function AnaliseEstoquePage() {
   const [forecastValidationPrevPage, setForecastValidationPrevPage] = useState(1)
   const [forecastCopiedHistorico, setForecastCopiedHistorico] = useState(false)
   const [forecastCopiedPrevisao, setForecastCopiedPrevisao] = useState(false)
-  const [forecastTab, setForecastTab] = useState('operacional')
+  const location = useLocation()
+  const abaSolicitada = new URLSearchParams(location.search).get('aba')
+  const abaValida = FORECAST_TABS.some((tab) => tab.id === abaSolicitada) ? abaSolicitada : null
+  const [forecastTab, setForecastTab] = useState(abaValida || 'operacional')
+  const forecastSectionRef = useRef(null)
   const [diagnosticoOpen, setDiagnosticoOpen] = useState(false)
   const [diagnosticoLoading, setDiagnosticoLoading] = useState(false)
   const [diagnosticoError, setDiagnosticoError] = useState(null)
@@ -1039,9 +967,15 @@ export function AnaliseEstoquePage() {
   const [forecastAuditPayload, setForecastAuditPayload] = useState(null)
   const [forecastAuditLoading, setForecastAuditLoading] = useState(false)
   const [forecastAuditError, setForecastAuditError] = useState(null)
-  const [forecastCompraPayload, setForecastCompraPayload] = useState(null)
-  const [forecastCompraLoading, setForecastCompraLoading] = useState(false)
-  const [forecastCompraError, setForecastCompraError] = useState(null)
+  const [reposicaoPayload, setReposicaoPayload] = useState(null)
+  const [reposicaoLoading, setReposicaoLoading] = useState(false)
+  const [reposicaoError, setReposicaoError] = useState(null)
+  const [reposicaoReloadKey, setReposicaoReloadKey] = useState(0)
+  const [reposicaoPodeEditar, setReposicaoPodeEditar] = useState(false)
+  const [reposicaoSolicitada, setReposicaoSolicitada] = useState(false)
+  const [politicaModalOpen, setPoliticaModalOpen] = useState(false)
+  const [overrideItem, setOverrideItem] = useState(null)
+  const [minimoItem, setMinimoItem] = useState(null)
   const [forecastOrcamentoPayload, setForecastOrcamentoPayload] = useState(null)
   const [forecastOrcamentoLoading, setForecastOrcamentoLoading] = useState(false)
   const [forecastOrcamentoError, setForecastOrcamentoError] = useState(null)
@@ -1599,9 +1533,6 @@ export function AnaliseEstoquePage() {
       setForecastAuditPayload(null)
       setForecastAuditError(null)
       setForecastAuditLoading(false)
-      setForecastCompraPayload(null)
-      setForecastCompraError(null)
-      setForecastCompraLoading(false)
       setForecastOrcamentoPayload(null)
       setForecastOrcamentoError(null)
       setForecastOrcamentoLoading(false)
@@ -1612,18 +1543,12 @@ export function AnaliseEstoquePage() {
 
     const loadSupportData = async () => {
       setForecastAuditLoading(true)
-      setForecastCompraLoading(true)
       setForecastOrcamentoLoading(true)
       setForecastAuditError(null)
-      setForecastCompraError(null)
       setForecastOrcamentoError(null)
 
-      const [auditResult, compraResult, orcamentoResult] = await Promise.allSettled([
+      const [auditResult, orcamentoResult] = await Promise.allSettled([
         supabase.rpc('rpc_previsao_gasto_mensal_auditar', {
-          p_owner_id: ownerRpcId,
-          p_forecast_id: selectedForecastRpcId,
-        }),
-        supabase.rpc('rpc_previsao_compra_sugerida', {
           p_owner_id: ownerRpcId,
           p_forecast_id: selectedForecastRpcId,
         }),
@@ -1656,18 +1581,6 @@ export function AnaliseEstoquePage() {
         setForecastAuditPayload(null)
       }
 
-      if (compraResult.status === 'fulfilled') {
-        if (compraResult.value.error) {
-          setForecastCompraError(compraResult.value.error.message || 'Erro ao carregar planejamento de compra.')
-          setForecastCompraPayload(null)
-        } else {
-          setForecastCompraPayload(compraResult.value.data || null)
-        }
-      } else {
-        setForecastCompraError(compraResult.reason?.message || 'Erro ao carregar planejamento de compra.')
-        setForecastCompraPayload(null)
-      }
-
       if (orcamentoResult.status === 'fulfilled') {
         if (orcamentoResult.value.error) {
           setForecastOrcamentoError(orcamentoResult.value.error.message || 'Erro ao carregar orcamento anual de compra.')
@@ -1681,7 +1594,6 @@ export function AnaliseEstoquePage() {
       }
 
       setForecastAuditLoading(false)
-      setForecastCompraLoading(false)
       setForecastOrcamentoLoading(false)
     }
 
@@ -1692,306 +1604,98 @@ export function AnaliseEstoquePage() {
     }
   }, [forecastHasData, ownerRpcId, selectedForecastRpcId])
 
-  const compraInsights = useMemo(() => {
-    const riscoList = Array.isArray(riscoOperacional) ? riscoOperacional : []
-    const enrichCompraItem = (item = {}) => {
-      const materialKey = getCompraMaterialKey(item)
-      const materialInfo = materialInfoMap.get(materialKey) || {}
-      const estoqueAtual = Number(item.estoque_atual ?? item.estoqueAtual ?? materialInfo.estoqueAtual ?? 0)
-      const consumoMensal = getCompraConsumoMensal(item)
-      const coberturaMeses =
-        item.cobertura_meses ?? item.coberturaMeses ?? (consumoMensal > 0 ? estoqueAtual / consumoMensal : null)
+  // Link externo com ?aba= (ex.: cards do Estoque atual): seleciona a aba e rola ate o bloco de previsao.
+  useEffect(() => {
+    if (!abaValida) return undefined
+    setForecastTab(abaValida)
+    const frame = requestAnimationFrame(() => {
+      forecastSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [abaValida])
 
-      return {
-        ...item,
-        materialKey,
-        displayNome: resolveCompraMaterialName({
-          ...item,
-          displayNome: item.displayNome || materialInfo.displayNome,
-        }),
-        grupoMaterial: item.grupoMaterial || item.grupo_material || materialInfo.grupoMaterial || '',
-        unidade: item.unidade || materialInfo.unidade || '',
-        fabricante: item.fabricante || materialInfo.fabricante || '',
-        valor_unitario: Number(item.valor_unitario ?? materialInfo.valorUnitario ?? 0),
-        estoque_atual: estoqueAtual,
-        estoque_minimo: Number(item.estoque_minimo ?? item.estoqueMinimo ?? materialInfo.estoqueMinimo ?? 0),
-        consumo_medio_mensal: consumoMensal,
-        cobertura_meses: coberturaMeses,
+  // Reposicao atual: independe do snapshot do forecast e usa somente o owner da sessao.
+  // Carrega so quando a aba Compra e aberta, para nao concorrer com auditoria/orcamento na abertura da pagina.
+  const reposicaoDisponivel = !isLocalMode && isSupabaseConfigured() && Boolean(supabase)
+  useEffect(() => {
+    if (forecastTab === 'compra') setReposicaoSolicitada(true)
+  }, [forecastTab])
+
+  useEffect(() => {
+    if (!reposicaoSolicitada) return undefined
+    if (!reposicaoDisponivel || !ownerRpcId) {
+      setReposicaoPayload(null)
+      setReposicaoError(null)
+      setReposicaoLoading(false)
+      return undefined
+    }
+    let cancelled = false
+    const loadReposicao = async () => {
+      setReposicaoLoading(true)
+      setReposicaoError(null)
+      try {
+        const [itensData, politicaData] = await Promise.all([
+          fetchReposicaoItens(ownerRpcId),
+          fetchPoliticaReposicao(ownerRpcId),
+        ])
+        if (cancelled) return
+        setReposicaoPayload(itensData || null)
+        setReposicaoPodeEditar(Boolean(politicaData?.pode_editar))
+      } catch (err) {
+        if (cancelled) return
+        setReposicaoPayload(null)
+        setReposicaoError(err.message || 'Falha ao consultar a reposicao atual.')
+        reportError(err, { area: 'reposicao_leitura', ownerId: ownerRpcId })
+      } finally {
+        if (!cancelled) setReposicaoLoading(false)
       }
     }
-    const monitorados = riscoList.map(enrichCompraItem)
-    const coberturaStats = computeCompraCoverageStats(monitorados)
-    const buildCoverageGroups = (items) => {
-      const withCoverage = items
-        .filter((item) => getCoberturaDias(item) !== null)
-        .sort((a, b) => Number(a.cobertura_meses ?? a.coberturaMeses ?? 999) - Number(b.cobertura_meses ?? b.coberturaMeses ?? 999))
-      return {
-        mediana: withCoverage,
-        menos30: withCoverage.filter((item) => Number(item.cobertura_meses ?? item.coberturaMeses ?? 0) < 1),
-        entre30e60: withCoverage.filter((item) => {
-          const cobertura = Number(item.cobertura_meses ?? item.coberturaMeses ?? 0)
-          return cobertura >= 1 && cobertura < 2
-        }),
-        entre60e90: withCoverage.filter((item) => {
-          const cobertura = Number(item.cobertura_meses ?? item.coberturaMeses ?? 0)
-          return cobertura >= 2 && cobertura < 3
-        }),
-        acima12m: withCoverage.filter((item) => Number(item.cobertura_meses ?? item.coberturaMeses ?? 0) > 12),
-        semConsumo: items.filter((item) => getCompraConsumoMensal(item) <= 0),
-        criticosSemCobertura: withCoverage.filter((item) => (item.classeRisco || item.classe) === 'A' && Number(item.cobertura_meses ?? item.coberturaMeses ?? 0) < 1),
-      }
+    loadReposicao()
+    return () => {
+      cancelled = true
     }
-    const coberturaGrupos = buildCoverageGroups(monitorados)
-    const semPrecoList = monitorados.filter((item) => getCompraValorUnitario(item) <= 0)
-    const semConsumoList = coberturaGrupos.semConsumo
-    const resolveManterList = (...excludedLists) => {
-      const excluded = new Set(
-        excludedLists.flatMap((list) => list.map((item) => getCompraMaterialKey(item)).filter(Boolean)),
-      )
-      return monitorados.filter((item) => {
-        const key = getCompraMaterialKey(item)
-        return key && !excluded.has(key) && getCompraConsumoMensal(item) > 0 && getCompraValorUnitario(item) > 0
-      })
-    }
+  }, [ownerRpcId, reposicaoDisponivel, reposicaoReloadKey, reposicaoSolicitada, reportError])
 
-    if (forecastCompraPayload?.status === 'ok') {
-      const resumo = forecastCompraPayload?.resumo || {}
-      const compraImediata = (Array.isArray(forecastCompraPayload?.compra_imediata) ? forecastCompraPayload.compra_imediata : []).map(enrichCompraItem)
-      const reposicaoPlanejada = (
-        Array.isArray(forecastCompraPayload?.reposicao_planejada) ? forecastCompraPayload.reposicao_planejada : []
-      ).map(enrichCompraItem)
-      const excessoOuBaixoGiro = (
-        Array.isArray(forecastCompraPayload?.excesso_ou_baixo_giro) ? forecastCompraPayload.excesso_ou_baixo_giro : []
-      ).map(enrichCompraItem)
-      const semCoberturaCurta = (
-        Array.isArray(forecastCompraPayload?.cobertura_curta) ? forecastCompraPayload.cobertura_curta : []
-      ).map(enrichCompraItem)
-      const manterEstoque = resolveManterList(compraImediata, reposicaoPlanejada, excessoOuBaixoGiro, semConsumoList, semPrecoList)
-      const materiaisMonitorados = Number(resumo.materiais_monitorados || 0)
-      const itensCompraImediata = Number(resumo.itens_compra_imediata || 0)
-      const itensReposicaoPlanejada = Number(resumo.itens_reposicao_planejada || 0)
-      const itensExcesso = Number(resumo.itens_excesso || 0)
-      const itensSemConsumo = semConsumoList.length
-      const itensSemPreco = semPrecoList.length
-      const itensManter = Math.max(
-        0,
-        materiaisMonitorados - itensCompraImediata - itensReposicaoPlanejada - itensExcesso - itensSemConsumo - itensSemPreco,
-      )
+  const reloadReposicao = useCallback(() => setReposicaoReloadKey((value) => value + 1), [])
 
-      return {
-        materiaisMonitorados,
-        itensAbaixoMinimo: Number(resumo.itens_abaixo_minimo || 0),
-        itensCompraImediata,
-        itensReposicaoPlanejada,
-        itensCoberturaCurta: Number(resumo.itens_cobertura_curta || 0),
-        itensExcesso,
-        itensSemConsumo,
-        itensSemPreco,
-        itensManter,
-        itensCompraRecomendada: itensCompraImediata + itensReposicaoPlanejada,
-        valorCompraMinima: Number(resumo.valor_compra_minima || 0),
-        quantidadeCompraMinima: Number(resumo.quantidade_compra_minima || 0),
-        valorCompraSugerida: Number(resumo.valor_compra_sugerida || 0),
-        quantidadeCompraSugerida: Number(resumo.quantidade_compra_sugerida || 0),
-        coberturaMediaMeses:
-          resumo.cobertura_media_meses !== null && resumo.cobertura_media_meses !== undefined
-            ? Number(resumo.cobertura_media_meses)
-            : null,
-        saidaMediaMensalPrevista: Number(resumo.saida_media_mensal_prevista || 0),
-        entradaMediaMensalPrevista: Number(resumo.entrada_media_mensal_prevista || 0),
-        saldoAnualPrevisto: Number(resumo.saldo_anual_previsto || 0),
-        coberturaStats,
-        coberturaGrupos,
-        compraImediata,
-        reposicaoPlanejada,
-        excessoOuBaixoGiro,
-        semCoberturaCurta,
-        manterEstoque,
-        semConsumo: semConsumoList,
-        semPreco: semPrecoList,
-        todosMonitorados: monitorados,
-        origem: 'rpc',
-      }
-    }
-
-    const materiaisMonitorados = Array.isArray(estoqueBase?.itens) ? estoqueBase.itens.length : riscoList.length
-    const deficitItems = monitorados
-      .map((item) => {
-        const estoqueAtual = getCompraEstoqueAtual(item)
-        const estoqueMinimo = getCompraEstoqueMinimo(item)
-        const deficitQuantidade = Math.max(0, estoqueMinimo - estoqueAtual)
-        return {
-          ...item,
-          deficitQuantidade,
-          deficitValor: deficitQuantidade * getCompraValorUnitario(item),
-        }
-      })
-      .filter((item) => item.deficitQuantidade > 0)
-
-    const compraImediata = [...deficitItems]
-      .filter((item) => (item.classeRisco || item.classe) === 'A')
-      .sort((a, b) => {
-        const scoreDiff = Number(b.score || 0) - Number(a.score || 0)
-        if (scoreDiff !== 0) return scoreDiff
-        return Number(b.deficitValor || 0) - Number(a.deficitValor || 0)
-      })
-
-    const reposicaoPlanejada = [...deficitItems]
-      .filter((item) => (item.classeRisco || item.classe) !== 'A')
-      .sort((a, b) => Number(b.deficitQuantidade || 0) - Number(a.deficitQuantidade || 0))
-
-    const excessoOuBaixoGiro = [...monitorados]
-      .filter((item) => getCompraEstoqueAtual(item) > Number(item.estoque_alvo ?? item.pressaoVidaUtil ?? 0) * 1.5)
-      .sort((a, b) => Number(b.valorTotal || 0) - Number(a.valorTotal || 0))
-
-    const semCoberturaCurta = coberturaGrupos.menos30
-
-    const valorCompraMinima = deficitItems.reduce((acc, item) => acc + Number(item.deficitValor || 0), 0)
-    const quantidadeCompraMinima = deficitItems.reduce((acc, item) => acc + Number(item.deficitQuantidade || 0), 0)
-    const itensSemPreco = semPrecoList.length
-    const itensSemConsumo = semConsumoList.length
-    const itensExcesso = excessoOuBaixoGiro.length
-    const manterEstoque = resolveManterList(compraImediata, reposicaoPlanejada, excessoOuBaixoGiro, semConsumoList, semPrecoList)
-    const itensManter = Math.max(
-      0,
-      materiaisMonitorados - compraImediata.length - reposicaoPlanejada.length - itensExcesso - itensSemConsumo - itensSemPreco,
-    )
-
+  const reposicao = useMemo(() => {
+    const { itens, resumo, bySituacao } = buildReposicaoResumo(reposicaoPayload)
+    const politica = reposicaoPayload?.politica || null
+    const count = (key) => Number(resumo?.[key] || 0)
+    const decisionRows = SITUACAO_REPOSICAO_ORDEM.map((key) => ({
+      id: `situacao-${key}`,
+      label: SITUACAO_REPOSICAO[key].prioridade
+        ? `${SITUACAO_REPOSICAO[key].label} (${SITUACAO_REPOSICAO[key].prioridade})`
+        : SITUACAO_REPOSICAO[key].label,
+      value: formatNumber(bySituacao[key].length),
+      items: bySituacao[key],
+    }))
+    decisionRows.push({
+      id: 'situacao-total',
+      label: 'Total monitorado',
+      value: formatNumber(itens.length),
+      items: itens,
+    })
     return {
-      materiaisMonitorados,
-      itensAbaixoMinimo: deficitItems.length,
-      itensCompraImediata: compraImediata.length,
-      itensReposicaoPlanejada: reposicaoPlanejada.length,
-      itensCoberturaCurta: semCoberturaCurta.length,
-      itensExcesso,
-      itensSemConsumo,
-      itensSemPreco,
-      itensManter,
-      itensCompraRecomendada: compraImediata.length + reposicaoPlanejada.length,
-      valorCompraMinima,
-      quantidadeCompraMinima,
-      valorCompraSugerida: valorCompraMinima,
-      quantidadeCompraSugerida: quantidadeCompraMinima,
-      coberturaMediaMeses:
-        semCoberturaCurta.length > 0
-          ? semCoberturaCurta.reduce((acc, item) => acc + Number(item.coberturaMeses || 0), 0) /
-            Math.max(1, semCoberturaCurta.length)
-          : null,
-      saidaMediaMensalPrevista: previsaoSaidaTotal / 12,
-      entradaMediaMensalPrevista: previsaoEntradaTotal / 12,
-      saldoAnualPrevisto: previsaoSaldoTotal,
-      coberturaStats,
-      coberturaGrupos,
-      compraImediata,
-      reposicaoPlanejada,
-      excessoOuBaixoGiro,
-      semCoberturaCurta,
-      manterEstoque,
-      semConsumo: semConsumoList,
-      semPreco: semPrecoList,
-      todosMonitorados: monitorados,
-      origem: 'fallback',
+      disponivel: Array.isArray(reposicaoPayload?.itens),
+      itens,
+      resumo,
+      politica,
+      bySituacao,
+      calculadoEm: reposicaoPayload?.calculado_em || null,
+      decisionRows,
+      coverageRows: buildCoberturaFaixas(itens),
+      revisaoRows: buildRevisaoRows(itens),
+      itensComCompra: count('itens_com_compra'),
+      valorCompraSugerida: count('valor_compra_sugerida'),
+      valorCompraUrgente: count('valor_compra_urgente'),
+      valorCompraProgramada: count('valor_compra_programada'),
+      valorReferenciaManual: count('valor_referencia_manual'),
+      coberturaMediana: toNumberOrNull(resumo?.cobertura_mediana_meses),
     }
-  }, [estoqueBase, forecastCompraPayload, materialInfoMap, previsaoEntradaTotal, previsaoSaidaTotal, previsaoSaldoTotal, riscoOperacional])
+  }, [reposicaoPayload])
 
-  const compraDecisionRows = useMemo(
-    () => [
-      {
-        id: 'compra-imediata',
-        label: 'Compra imediata',
-        value: formatNumber(compraInsights.itensCompraImediata || 0),
-        items: compraInsights.compraImediata || [],
-      },
-      {
-        id: 'compra-programada',
-        label: 'Compra programada',
-        value: formatNumber(compraInsights.itensReposicaoPlanejada || 0),
-        items: compraInsights.reposicaoPlanejada || [],
-      },
-      {
-        id: 'manter-estoque',
-        label: 'Manter estoque',
-        value: formatNumber(compraInsights.itensManter || 0),
-        items: compraInsights.manterEstoque || [],
-      },
-      {
-        id: 'reduzir-compra',
-        label: 'Reduzir ou suspender compra',
-        value: formatNumber(compraInsights.itensExcesso || 0),
-        items: compraInsights.excessoOuBaixoGiro || [],
-      },
-      {
-        id: 'sem-consumo',
-        label: 'Sem consumo suficiente',
-        value: formatNumber(compraInsights.itensSemConsumo || 0),
-        items: compraInsights.semConsumo || [],
-      },
-      {
-        id: 'sem-preco',
-        label: 'Sem preco valido',
-        value: formatNumber(compraInsights.itensSemPreco || 0),
-        items: compraInsights.semPreco || [],
-      },
-      {
-        id: 'total-monitorado',
-        label: 'Total monitorado',
-        value: formatNumber(compraInsights.materiaisMonitorados || 0),
-        items: compraInsights.todosMonitorados || [],
-      },
-    ],
-    [compraInsights],
-  )
-
-  const compraCoverageRows = useMemo(
-    () => [
-      {
-        id: 'cobertura-mediana',
-        label: 'Cobertura mediana',
-        value:
-          compraInsights.coberturaStats?.mediana === null
-            ? 'sem consumo suficiente'
-            : `${formatNumber(compraInsights.coberturaStats?.mediana || 0, 1)} meses`,
-        items: compraInsights.coberturaGrupos?.mediana || [],
-      },
-      {
-        id: 'cobertura-menos-30',
-        label: 'Menos de 30 dias',
-        value: formatNumber(compraInsights.coberturaStats?.menos30 || 0),
-        items: compraInsights.coberturaGrupos?.menos30 || [],
-      },
-      {
-        id: 'cobertura-30-60',
-        label: '30 a 60 dias',
-        value: formatNumber(compraInsights.coberturaStats?.entre30e60 || 0),
-        items: compraInsights.coberturaGrupos?.entre30e60 || [],
-      },
-      {
-        id: 'cobertura-60-90',
-        label: '60 a 90 dias',
-        value: formatNumber(compraInsights.coberturaStats?.entre60e90 || 0),
-        items: compraInsights.coberturaGrupos?.entre60e90 || [],
-      },
-      {
-        id: 'cobertura-acima-12',
-        label: 'Acima de 12 meses',
-        value: formatNumber(compraInsights.coberturaStats?.acima12m || 0),
-        items: compraInsights.coberturaGrupos?.acima12m || [],
-      },
-      {
-        id: 'cobertura-sem-consumo',
-        label: 'Sem consumo recente',
-        value: formatNumber(compraInsights.coberturaStats?.semConsumo || 0),
-        items: compraInsights.coberturaGrupos?.semConsumo || [],
-      },
-      {
-        id: 'cobertura-criticos',
-        label: 'Criticos sem cobertura',
-        value: formatNumber(compraInsights.coberturaStats?.criticosSemCobertura || 0),
-        items: compraInsights.coberturaGrupos?.criticosSemCobertura || [],
-      },
-    ],
-    [compraInsights],
-  )
+  const resolveNomeReposicao = useCallback((item) => resolveReposicaoNome(item, materialInfoMap), [materialInfoMap])
 
   const compraOrcamentoInsights = useMemo(() => {
     const payloadOk = forecastOrcamentoPayload?.status === 'ok'
@@ -2363,10 +2067,19 @@ export function AnaliseEstoquePage() {
 
   const handleExportCompraDetailCsv = () => {
     if (!compraDetailModal?.items?.length) return
-    downloadCompraDetailCsv(compraDetailModal.items, {
+    downloadReposicaoCsv(compraDetailModal.items, {
       label: compraDetailModal.label,
-      snapshot: forecastPeriodoLabel,
+      calculadoEm: formatForecastTimestamp(reposicao.calculadoEm),
+      modo: reposicao.politica?.modo || '',
+      versao: reposicao.politica?.versao ?? '',
+      resolveNome: resolveNomeReposicao,
     })
+  }
+
+  // Apos override: fecha o detalhe (itens desatualizados) e recalcula a reposicao.
+  const handleReposicaoAlterada = () => {
+    setCompraDetailModal(null)
+    reloadReposicao()
   }
 
   const handleOpenOrcamentoImpactModal = () => {
@@ -2470,7 +2183,7 @@ export function AnaliseEstoquePage() {
       />
       <FiltersForm />
       <AnaliseCards />
-      <section className="card analysis-forecast-section">
+      <section className="card analysis-forecast-section" ref={forecastSectionRef}>
         <header className="card__header dashboard-card__header">
           <div className="dashboard-card__title-group">
             <button type="button" className="summary-tooltip dashboard-card__info" aria-label="Informacoes de previsao">
@@ -2630,176 +2343,186 @@ export function AnaliseEstoquePage() {
                 <div className="analysis-forecast-summary-row">
                   <div className="analysis-forecast-summary-main">
                     <p className="analysis-forecast-label">Necessidade de reposicao atual</p>
-                    <p className="analysis-forecast-value">{formatCurrency(compraInsights.valorCompraSugerida || compraInsights.valorCompraMinima)}</p>
+                    <p className="analysis-forecast-value">
+                      {reposicao.disponivel ? formatCurrency(reposicao.valorCompraSugerida) : '-'}
+                    </p>
                     <p className="analysis-forecast-subtitle">
-                      {formatNumber(compraInsights.itensCompraRecomendada || 0)} materiais com compra recomendada.
+                      {reposicao.disponivel
+                        ? `${formatNumber(reposicao.itensComCompra)} materiais com compra recomendada.`
+                        : 'Reposicao ainda nao calculada.'}
                     </p>
                   </div>
-                  <label className="field">
-                    <span>Snapshot de reposicao</span>
-                    <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
-                      <option value="">Selecione um periodo</option>
-                      {forecastPeriodos.map((periodo) => {
-                        const value = String(periodo.id)
-                        const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
-                        return (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        )
-                      })}
-                    </select>
-                  </label>
+                  <div className="analysis-audit-actions analysis-audit-actions--inline">
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={() => setPoliticaModalOpen(true)}
+                      disabled={!reposicaoDisponivel || !ownerRpcId}
+                    >
+                      Politica de reposicao
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={reloadReposicao}
+                      disabled={!reposicaoDisponivel || !ownerRpcId || reposicaoLoading}
+                    >
+                      {reposicaoLoading ? 'Calculando...' : 'Atualizar'}
+                    </button>
+                  </div>
                 </div>
-                <div className="analysis-forecast-meta analysis-forecast-meta--grid analysis-forecast-meta--compact">
-                  <span>Base historica usada: {forecastPeriodoLabel}</span>
-                  <span>Horizonte projetado: {forecastHorizonLabel}</span>
-                  <span>Snapshot: {forecastCreatedAtLabel}</span>
-                  <span>Itens monitorados: {formatNumber(compraInsights.materiaisMonitorados)}</span>
-                  <span>Abaixo do minimo: {formatNumber(compraInsights.itensAbaixoMinimo)}</span>
-                  <span>Cobertura mediana: {compraInsights.coberturaStats?.mediana === null ? 'sem consumo suficiente' : `${formatNumber(compraInsights.coberturaStats?.mediana || 0, 1)} meses`}</span>
-                  <span>Menos de 30 dias: {formatNumber(compraInsights.coberturaStats?.menos30 || 0)} materiais</span>
-                  <span>Acima de 12 meses: {formatNumber(compraInsights.coberturaStats?.acima12m || 0)} materiais</span>
-                  {forecastCompraLoading ? <span>Atualizando recomendacao de compra...</span> : null}
-                  {forecastCompraError && compraInsights.origem !== 'rpc' ? <span>{forecastCompraError}</span> : null}
-                  {forecastStatusMessage ? <span>{forecastStatusMessage}</span> : null}
-                </div>
+                {!reposicaoDisponivel ? (
+                  <p className="feedback feedback--warning">
+                    A reposicao atual e calculada no Supabase e nao esta disponivel no modo local.
+                  </p>
+                ) : null}
+                {reposicaoDisponivel && !ownerRpcId ? (
+                  <p className="analysis-forecast-subtitle">Carregando perfil...</p>
+                ) : null}
+                {reposicaoError ? (
+                  <p className="feedback feedback--error">Falha ao consultar a reposicao: {reposicaoError}</p>
+                ) : null}
+                {reposicao.disponivel ? (
+                  <div className="analysis-forecast-meta analysis-forecast-meta--grid analysis-forecast-meta--compact">
+                    <span>Calculado em: {formatForecastTimestamp(reposicao.calculadoEm)}</span>
+                    <span>
+                      Politica: {reposicao.politica?.modo === 'automatico' ? 'Automatico' : 'Monitorar'} | minimo{' '}
+                      {formatNumber(reposicao.politica?.cobertura_minima_meses || 0, 1)} e alvo{' '}
+                      {formatNumber(reposicao.politica?.cobertura_alvo_meses || 0, 1)} meses
+                    </span>
+                    <span>Janela sem consumo: {formatNumber(reposicao.politica?.janela_sem_consumo_dias || 0)} dias</span>
+                    <span>Itens monitorados: {formatNumber(reposicao.itens.length)}</span>
+                    <span>Compra urgente (P0 + P1): {formatCurrency(reposicao.valorCompraUrgente)}</span>
+                    <span>Compra programada (P2): {formatCurrency(reposicao.valorCompraProgramada)}</span>
+                    <span>
+                      Cobertura mediana:{' '}
+                      {reposicao.coberturaMediana === null ? 'Nao calculavel' : `${formatNumber(reposicao.coberturaMediana, 1)} meses`}
+                    </span>
+                    <span className="nao-calculavel">
+                      Fora da compra (revisao): {formatCurrency(reposicao.valorReferenciaManual)}
+                      <button
+                        type="button"
+                        className="summary-tooltip summary-tooltip--inline"
+                        aria-label="O que e o valor fora da compra"
+                      >
+                        <InfoIcon size={12} aria-hidden="true" />
+                        <span>
+                          Quanto custaria levar ao minimo cadastrado os{' '}
+                          {formatNumber(reposicao.bySituacao.sem_consumo_recente.length)} materiais em &quot;Sem consumo recente&quot;:
+                          eles tem minimo cadastrado, mas nenhuma saida nos ultimos{' '}
+                          {formatNumber(reposicao.politica?.janela_sem_consumo_dias || 0)} dias. Esse valor NAO entra na
+                          necessidade de reposicao nem na compra recomendada, porque nao ha consumo que justifique a
+                          compra. Serve so para revisao: em Revisao de minimos, decida se mantem o minimo, zera ou cria um
+                          override.
+                        </span>
+                      </button>
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
-            <div className="dashboard-highlights dashboard-highlights--secondary">
-              <article className="dashboard-insight-card dashboard-insight-card--orange">
-                <header className="dashboard-insight-card__header">
-                  <p className="dashboard-insight-card__title">Compra imediata</p>
-                  <span className="dashboard-insight-card__avatar">
-                    <AlertIcon size={22} />
-                  </span>
-                </header>
-                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensCompraImediata)}</strong>
-                <span className="dashboard-insight-card__helper">Materiais abaixo do minimo ou com cobertura menor que 30 dias.</span>
-              </article>
-              <article className="dashboard-insight-card dashboard-insight-card--blue">
-                <header className="dashboard-insight-card__header">
-                  <p className="dashboard-insight-card__title">Compra programada</p>
-                  <span className="dashboard-insight-card__avatar">
-                    <StockIcon size={22} />
-                  </span>
-                </header>
-                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensReposicaoPlanejada || 0)}</strong>
-                <span className="dashboard-insight-card__helper">
-                  Materiais para recomposicao fora da urgencia imediata.
-                </span>
-              </article>
-              <article className="dashboard-insight-card dashboard-insight-card--red">
-                <header className="dashboard-insight-card__header">
-                  <p className="dashboard-insight-card__title">Risco de ruptura</p>
-                  <span className="dashboard-insight-card__avatar">
-                    <AlertIcon size={22} />
-                  </span>
-                </header>
-                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensCoberturaCurta || 0)}</strong>
-                <span className="dashboard-insight-card__helper">Materiais com cobertura inferior a 30 dias.</span>
-              </article>
-              <article className="dashboard-insight-card dashboard-insight-card--slate">
-                <header className="dashboard-insight-card__header">
-                  <p className="dashboard-insight-card__title">Excesso ou baixo giro</p>
-                  <span className="dashboard-insight-card__avatar">
-                    <BarsIcon size={22} />
-                  </span>
-                </header>
-                <strong className="dashboard-insight-card__value">{formatNumber(compraInsights.itensExcesso || 0)}</strong>
-                <span className="dashboard-insight-card__helper">Materiais com estoque alto frente ao consumo recente.</span>
-              </article>
-            </div>
-            <div className="analysis-forecast-grid analysis-forecast-grid--equal">
-              <article className="analysis-forecast-card analysis-forecast-card--list">
-                <p className="analysis-forecast-label">Reconciliacao das decisoes</p>
-                <p className="analysis-forecast-subtitle">
-                  Abaixo do minimo e cobertura curta sao condicoes; a tabela abaixo fecha as decisoes do total monitorado.
-                </p>
-                <div className="table-wrapper">
-                  <table className="data-table analysis-audit-table">
-                    <thead>
-                      <tr>
-                        <th>Decisao</th>
-                        <th>Materiais</th>
-                        <th>Detalhe</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compraDecisionRows.map((row) => (
-                        <tr
-                          key={row.id}
-                          className={row.items.length ? 'analysis-table-row--clickable' : undefined}
-                          tabIndex={row.items.length ? 0 : undefined}
-                          onClick={() => handleOpenCompraDetail(row)}
-                          onKeyDown={(event) => handleCompraDetailKeyDown(event, row)}
-                        >
-                          <td>{row.label}</td>
-                          <td>{row.value}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="button button--ghost button--compact"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                handleOpenCompraDetail(row)
-                              }}
-                              disabled={!row.items.length}
-                            >
-                              Detalhar
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {reposicao.disponivel ? (
+              <>
+                <div className="dashboard-highlights dashboard-highlights--secondary">
+                  <article className="dashboard-insight-card dashboard-insight-card--red">
+                    <header className="dashboard-insight-card__header">
+                      <p className="dashboard-insight-card__title">Ruptura (P0)</p>
+                      <span className="dashboard-insight-card__avatar">
+                        <AlertIcon size={22} />
+                      </span>
+                    </header>
+                    <strong className="dashboard-insight-card__value">
+                      {formatNumber(reposicao.bySituacao.ruptura_atual.length)}
+                    </strong>
+                    <span className="dashboard-insight-card__helper">
+                      Estoque zerado em material com consumo recente ou limite definido.
+                    </span>
+                  </article>
+                  <article className="dashboard-insight-card dashboard-insight-card--orange">
+                    <header className="dashboard-insight-card__header">
+                      <p className="dashboard-insight-card__title">Reposicao necessaria (P1)</p>
+                      <span className="dashboard-insight-card__avatar">
+                        <AlertIcon size={22} />
+                      </span>
+                    </header>
+                    <strong className="dashboard-insight-card__value">
+                      {formatNumber(reposicao.bySituacao.reposicao_necessaria.length)}
+                    </strong>
+                    <span className="dashboard-insight-card__helper">
+                      Abaixo do minimo efetivo ou com cobertura menor que a minima.
+                    </span>
+                  </article>
+                  <article className="dashboard-insight-card dashboard-insight-card--blue">
+                    <header className="dashboard-insight-card__header">
+                      <p className="dashboard-insight-card__title">Reposicao programada (P2)</p>
+                      <span className="dashboard-insight-card__avatar">
+                        <StockIcon size={22} />
+                      </span>
+                    </header>
+                    <strong className="dashboard-insight-card__value">
+                      {formatNumber(reposicao.bySituacao.reposicao_programada.length)}
+                    </strong>
+                    <span className="dashboard-insight-card__helper">Entre o minimo e o maximo efetivo.</span>
+                  </article>
+                  <article className="dashboard-insight-card dashboard-insight-card--slate">
+                    <header className="dashboard-insight-card__header">
+                      <p className="dashboard-insight-card__title">Sem consumo recente</p>
+                      <span className="dashboard-insight-card__avatar">
+                        <BarsIcon size={22} />
+                      </span>
+                    </header>
+                    <strong className="dashboard-insight-card__value">
+                      {formatNumber(reposicao.bySituacao.sem_consumo_recente.length)}
+                    </strong>
+                    <span className="dashboard-insight-card__helper">
+                      Minimo cadastrado sem saida em {formatNumber(reposicao.politica?.janela_sem_consumo_dias || 0)} dias; fora da
+                      compra, para revisao.
+                    </span>
+                  </article>
                 </div>
-              </article>
-              <article className="analysis-forecast-card analysis-forecast-card--list">
-                <p className="analysis-forecast-label">Cobertura do estoque</p>
-                <p className="analysis-forecast-subtitle">
-                  Leitura por faixa para evitar que estoque parado esconda ruptura em materiais criticos.
-                </p>
-                <div className="table-wrapper">
-                  <table className="data-table analysis-audit-table">
-                    <thead>
-                      <tr>
-                        <th>Faixa</th>
-                        <th>Materiais</th>
-                        <th>Detalhe</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compraCoverageRows.map((row) => (
-                        <tr
-                          key={row.id}
-                          className={row.items.length ? 'analysis-table-row--clickable' : undefined}
-                          tabIndex={row.items.length ? 0 : undefined}
-                          onClick={() => handleOpenCompraDetail(row)}
-                          onKeyDown={(event) => handleCompraDetailKeyDown(event, row)}
-                        >
-                          <td>{row.label}</td>
-                          <td>{row.value}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className="button button--ghost button--compact"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                handleOpenCompraDetail(row)
-                              }}
-                              disabled={!row.items.length}
-                            >
-                              Detalhar
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="analysis-forecast-grid analysis-forecast-grid--equal">
+                  <article className="analysis-forecast-card analysis-forecast-card--list">
+                    <p className="analysis-forecast-label">Situacao da reposicao</p>
+                    <p className="analysis-forecast-subtitle">
+                      Cada material aparece em uma unica situacao; a soma fecha o total monitorado.
+                    </p>
+                    <ReposicaoRowsTable
+                      header="Situacao"
+                      rows={reposicao.decisionRows}
+                      onOpen={handleOpenCompraDetail}
+                      onKeyDown={handleCompraDetailKeyDown}
+                    />
+                  </article>
+                  <article className="analysis-forecast-card analysis-forecast-card--list">
+                    <p className="analysis-forecast-label">Cobertura do estoque</p>
+                    <p className="analysis-forecast-subtitle">
+                      Estoque atual dividido pelo consumo medio mensal; faixas exclusivas que somam o total monitorado.
+                    </p>
+                    <ReposicaoRowsTable
+                      header="Faixa"
+                      rows={reposicao.coverageRows}
+                      onOpen={handleOpenCompraDetail}
+                      onKeyDown={handleCompraDetailKeyDown}
+                    />
+                  </article>
                 </div>
-              </article>
-            </div>
+                <div className="analysis-forecast-grid analysis-forecast-grid--single">
+                  <article className="analysis-forecast-card analysis-forecast-card--list">
+                    <p className="analysis-forecast-label">Revisao de minimos</p>
+                    <p className="analysis-forecast-subtitle">
+                      Avisos de governanca: nao geram compra. Revise o minimo cadastrado ou defina um override no detalhe do
+                      material.
+                    </p>
+                    <ReposicaoRowsTable
+                      header="Aviso"
+                      rows={reposicao.revisaoRows}
+                      onOpen={handleOpenCompraDetail}
+                      onKeyDown={handleCompraDetailKeyDown}
+                    />
+                  </article>
+                </div>
+              </>
+            ) : null}
           </div>
         ) : null}
         {forecastTab === 'orcamento' ? (
@@ -3283,8 +3006,10 @@ export function AnaliseEstoquePage() {
           <>
             <div className="analysis-audit-summary">
               <p>
-                {formatNumber(compraDetailItems.length)} materiais disponiveis para detalhamento neste snapshot.
+                {formatNumber(compraDetailItems.length)} materiais | compra recomendada{' '}
+                {formatCurrency(compraDetailItems.reduce((acc, item) => acc + Number(item.valor_compra_sugerida || 0), 0))}
               </p>
+              <span>Calculado em {formatForecastTimestamp(reposicao.calculadoEm)}. Valores nulos aparecem como "Nao calculavel".</span>
             </div>
             <div className="analysis-audit-actions">
               <button
@@ -3301,14 +3026,20 @@ export function AnaliseEstoquePage() {
               <>
                 <div className="analysis-compra-detail-list">
                   {compraDetailPageItems.map((item, index) => {
-                    const materialId = getCompraMaterialKey(item)
+                    const materialId = String(item.material_id || '')
                     const copied = compraCopiedMaterialId === materialId
+                    const avisos = formatAvisos(item.avisos)
+                    const semConsumo = item.situacao === 'sem_consumo_recente'
                     return (
-                      <article className="analysis-compra-detail-card" key={`compra-detail-${getCompraItemId(item)}-${index}`}>
+                      <article className="analysis-compra-detail-card" key={`compra-detail-${materialId}-${index}`}>
                         <header className="analysis-compra-detail-card__header">
                           <div className="analysis-compra-detail-card__title">
-                            <strong>{resolveCompraMaterialName(item)}</strong>
-                            <span>{formatCompraClassification(item)}</span>
+                            <strong>{resolveNomeReposicao(item)}</strong>
+                            <span>
+                              {formatSituacaoReposicao(item.situacao)}
+                              {item.prioridade ? ` (${item.prioridade})` : ''} | {formatMotivoSituacao(item.motivo_situacao)}
+                              {item.fabricante ? ` | ${item.fabricante}` : ''}
+                            </span>
                           </div>
                           <div className="analysis-compra-detail-card__actions">
                             <span className="analysis-compra-detail-card__id" title={materialId || undefined}>
@@ -3322,40 +3053,108 @@ export function AnaliseEstoquePage() {
                             >
                               {copied ? 'Copiado' : 'Copiar ID'}
                             </button>
+                            {canEditMinimo ? (
+                              <button
+                                type="button"
+                                className="button button--ghost button--compact"
+                                onClick={() => setMinimoItem(item)}
+                              >
+                                {semConsumo ? 'Zerar/ajustar minimo' : 'Ajustar minimo'}
+                              </button>
+                            ) : null}
+                            {reposicaoPodeEditar ? (
+                              <button
+                                type="button"
+                                className="button button--ghost button--compact"
+                                onClick={() => setOverrideItem(item)}
+                              >
+                                {item.override ? 'Ver override' : 'Override'}
+                              </button>
+                            ) : null}
                           </div>
                         </header>
                         <dl className="analysis-compra-detail-card__metrics">
                           <div>
                             <dt>Estoque</dt>
-                            <dd>{formatNumber(getCompraEstoqueAtual(item))}</dd>
+                            <dd>{formatQuantidadeOuNaoCalculavel(item.estoque_atual, 2)}</dd>
                           </div>
                           <div>
-                            <dt>Minimo</dt>
-                            <dd>{formatNumber(getCompraEstoqueMinimo(item))}</dd>
+                            <dt>Minimo cadastrado</dt>
+                            <dd>{toNumberOrNull(item.minimo_manual) === null ? 'Nao cadastrado' : formatNumber(item.minimo_manual)}</dd>
                           </div>
                           <div>
-                            <dt>Consumo/mês</dt>
-                            <dd>{formatNumber(getCompraConsumoMensal(item), 2)}</dd>
+                            <dt>Minimo sugerido</dt>
+                            <dd>
+                              {toNumberOrNull(item.minimo_automatico) === null ? (
+                                <NaoCalculavelInfo />
+                              ) : (
+                                formatQuantidadeOuNaoCalculavel(item.minimo_automatico)
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Minimo / maximo efetivo</dt>
+                            <dd>
+                              {toNumberOrNull(item.minimo_efetivo) === null ? (
+                                <NaoCalculavelInfo tipo="limite" />
+                              ) : (
+                                `${formatQuantidadeOuNaoCalculavel(item.minimo_efetivo)} / ${formatQuantidadeOuNaoCalculavel(item.maximo_efetivo)}`
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Fonte da regra</dt>
+                            <dd>{formatFonteRegra(item.fonte_regra)}</dd>
+                          </div>
+                          <div>
+                            <dt>Consumo/mes</dt>
+                            <dd>
+                              {toNumberOrNull(item.consumo_medio_mensal) === null ? (
+                                <NaoCalculavelInfo />
+                              ) : (
+                                `${formatQuantidadeOuNaoCalculavel(item.consumo_medio_mensal, 2)} (${formatBaseCalculo(item.base_calculo)})`
+                              )}
+                            </dd>
                           </div>
                           <div>
                             <dt>Cobertura</dt>
-                            <dd>{formatCoberturaDias(item)}</dd>
-                          </div>
-                          <div>
-                            <dt>Qtd sugerida</dt>
-                            <dd>{formatNumber(item.compra_sugerida_qtd ?? item.compra_minima_qtd ?? item.deficitQuantidade ?? 0)}</dd>
+                            <dd>
+                              {toNumberOrNull(item.cobertura_atual_meses) === null ? (
+                                <NaoCalculavelInfo />
+                              ) : (
+                                formatCoberturaMeses(item.cobertura_atual_meses)
+                              )}
+                            </dd>
                           </div>
                           <div>
                             <dt>Preco</dt>
-                            <dd>{formatCurrency(getCompraValorUnitario(item))}</dd>
+                            <dd>{formatCurrency(Number(item.preco_unitario || 0))}</dd>
                           </div>
-                          <div>
-                            <dt>Valor</dt>
-                            <dd>{formatCurrency(item.valor_compra_sugerida ?? item.deficitValor ?? 0)}</dd>
-                          </div>
+                          {semConsumo ? (
+                            <div className="analysis-compra-detail-card__reason">
+                              <dt>Referencia ate o minimo cadastrado (fora da compra)</dt>
+                              <dd>
+                                {formatNumber(item.compra_referencia_manual_qtd || 0)} un. |{' '}
+                                {formatCurrency(Number(item.valor_referencia_manual || 0))}
+                              </dd>
+                            </div>
+                          ) : (
+                            <div className="analysis-compra-detail-card__reason">
+                              <dt>Compra sugerida</dt>
+                              <dd>
+                                {formatNumber(item.compra_sugerida_qtd || 0)} un. | {formatCurrency(Number(item.valor_compra_sugerida || 0))} |{' '}
+                                {formatCriterioCompra(item.criterio_compra)}
+                              </dd>
+                            </div>
+                          )}
                           <div className="analysis-compra-detail-card__reason">
-                            <dt>Motivo</dt>
-                            <dd>{getCompraMotivo(item)}</dd>
+                            <dt>Avisos</dt>
+                            <dd>
+                              {avisos.length ? avisos.join(' | ') : 'Nenhum'}
+                              {item.override
+                                ? ` | Override ate ${String(item.override.expira_em || '').slice(0, 10)}: ${item.override.motivo}`
+                                : ''}
+                            </dd>
                           </div>
                         </dl>
                       </article>
@@ -3375,6 +3174,32 @@ export function AnaliseEstoquePage() {
           </>
         ) : null}
       </ChartExpandModal>
+      <ReposicaoOverrideModal
+        open={!!overrideItem}
+        ownerId={ownerRpcId}
+        item={overrideItem}
+        materialNome={overrideItem ? resolveNomeReposicao(overrideItem) : ''}
+        validadePadraoDias={reposicao.politica?.override_validade_dias}
+        onClose={() => setOverrideItem(null)}
+        onSaved={handleReposicaoAlterada}
+        reportError={reportError}
+      />
+      <ReposicaoMinimoModal
+        open={!!minimoItem}
+        item={minimoItem}
+        materialNome={minimoItem ? resolveNomeReposicao(minimoItem) : ''}
+        onClose={() => setMinimoItem(null)}
+        onSaved={handleReposicaoAlterada}
+        reportError={reportError}
+      />
+      <ReposicaoPoliticaModal
+        open={politicaModalOpen}
+        ownerId={ownerRpcId}
+        onClose={() => setPoliticaModalOpen(false)}
+        onSaved={reloadReposicao}
+        reportError={reportError}
+        resolveNome={resolveNomeReposicao}
+      />
       <ChartExpandModal
         open={orcamentoImpactModalOpen}
         title="Maiores componentes da verba projetada"

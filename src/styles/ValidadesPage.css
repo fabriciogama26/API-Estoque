@@ -1,0 +1,267 @@
+/* Requisitos de Controle e Controle de Validades */
+
+.validades-status-chip {
+  border: 1px solid transparent;
+}
+
+.validades-status-chip--danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #ef4444;
+}
+
+.validades-status-chip--today {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #f97316;
+}
+
+.validades-status-chip--warning {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+.validades-status-chip--pending {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
+}
+
+.validades-status-chip--ok {
+  background: #e8f7ee;
+  color: #117a3b;
+  border-color: #b7e4c7;
+}
+
+.validades-status-chip--info {
+  background: #e0f2fe;
+  color: #075985;
+  border-color: #7dd3fc;
+}
+
+.validades-status-chip--closed {
+  background: #f5f3ff;
+  color: #5b21b6;
+  border-color: #c4b5fd;
+}
+
+.data-table--saidas tbody tr.validades-row--danger td {
+  background: #fef2f2;
+}
+
+.data-table--saidas tbody tr.validades-row--today td {
+  background: #fff7ed;
+}
+
+.data-table--saidas tbody tr.validades-row--warning td {
+  background: #fffbeb;
+}
+
+.data-table--saidas tbody tr.validades-row--pending td {
+  background: #f8fafc;
+}
+
+.data-table tbody tr.validades-row--inativo td {
+  color: var(--color-muted);
+  background: #f8fafc;
+}
+
+.validades-validade-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.validades-toolbar {
+  margin-bottom: 1rem;
+}
+
+.validades-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.validades-header-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.validades-modal__body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.entradas-history__modal.validades-modal--wide {
+  width: min(960px, 96vw);
+  max-width: 960px;
+}
+
+.validades-regra-form {
+  display: grid;
+  gap: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.validades-regra-form h4 {
+  margin: 0;
+}
+
+.validades-conflito {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.9rem;
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.validades-conflito p {
+  margin: 0;
+}
+
+/* Cards do painel sao botoes (drill-down para a lista).
+   Seletor composto: a ordem de carga do DashboardPage.css varia conforme as paginas importadas. */
+.dashboard-highlights.validades-cards {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem;
+}
+
+.validades-card-button {
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.validades-card-button:hover,
+.validades-card-button:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.14);
+}
+
+.validades-painel__nota {
+  margin: 0;
+}
+
+.validades-select-compacto {
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  font-size: 0.85rem;
+}
+
+/* Historico */
+.validades-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.validades-timeline__entry {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: var(--color-card);
+}
+
+.validades-timeline__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.validades-timeline__note {
+  margin: 0 0 0.4rem;
+  color: var(--color-text);
+}
+
+.validades-timeline__changes {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+  color: var(--color-text);
+}
+
+.validades-registros {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.validades-registro {
+  border: 1px solid var(--color-border);
+  border-left: 4px solid #15803d;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: var(--color-card);
+}
+
+.validades-registro--substituido {
+  border-left-color: #94a3b8;
+}
+
+.validades-registro--cancelado {
+  border-left-color: #b91c1c;
+  opacity: 0.8;
+}
+
+.validades-registro__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.validades-registro__situacao--vigente {
+  background: #e8f7ee;
+  color: #117a3b;
+}
+
+.validades-registro__situacao--substituido {
+  background: #eef2f7;
+  color: #475569;
+}
+
+.validades-registro__situacao--cancelado {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.validades-registro__dados {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.validades-registro__dados dt {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.validades-registro__dados dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+  .validades-validade-group {
+    grid-template-columns: 1fr;
+  }
+
+  .validades-header-actions {
+    flex-wrap: wrap;
+  }
+}
