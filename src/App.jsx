@@ -22,6 +22,7 @@ import { CadastroBasePage } from './pages/CadastroBase.jsx'
 import { AsoPage } from './pages/AsoPage.jsx'
 import { RequisitosControlePage } from './pages/RequisitosControlePage.jsx'
 import { ControleValidadesPage } from './pages/ControleValidadesPage.jsx'
+import { StockCorrectionsPage } from './pages/StockCorrectionsPage.jsx'
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
             <Route path="analise-estoque" element={<AnaliseEstoqueProviderPage />} />
             <Route path="dashboard/acidentes" element={<DashboardAcidentes />} />
             <Route path="estoque" element={<EstoquePage />} />
+            <Route path="estoque/correcoes" element={<StockCorrectionsPage />} />
 
             <Route path="cadastros">
               <Route path="pessoas" element={<PessoasPage />} />
