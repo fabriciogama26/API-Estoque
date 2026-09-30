@@ -342,9 +342,11 @@ $$;
 
 alter table public.stock_correction_requests enable row level security;
 alter table public.stock_adjustments enable row level security;
+drop policy if exists stock_correction_requests_select on public.stock_correction_requests;
 create policy stock_correction_requests_select on public.stock_correction_requests for select to authenticated
 using ((public.is_master() or account_owner_id=public.current_account_owner_id()) and
  (public.is_master() or public.has_permission('estoque.correcao.read') or public.has_permission('estoque.correcao.solicitar') or public.has_permission('estoque.correcao.aprovar')));
+drop policy if exists stock_adjustments_select on public.stock_adjustments;
 create policy stock_adjustments_select on public.stock_adjustments for select to authenticated
 using ((public.is_master() or account_owner_id=public.current_account_owner_id()) and
  (public.is_master() or public.has_permission('estoque.correcao.read') or public.has_permission('estoque.read')));

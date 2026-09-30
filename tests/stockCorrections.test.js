@@ -45,6 +45,8 @@ test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
   assert.match(migration, /from public\.entradas e/)
   assert.match(migration, /from public\.saidas o/)
   assert.doesNotMatch(migration, /public\.(?:materials|stock_centers|stock_entries|stock_outputs)\b/)
+  assert.match(migration, /drop policy if exists stock_correction_requests_select/)
+  assert.match(migration, /drop policy if exists stock_adjustments_select/)
 })
 
 test('API de correções consulta somente colunas existentes em materiais', () => {
