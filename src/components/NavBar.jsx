@@ -32,6 +32,7 @@ const navSections = [
     icon: InventoryIcon,
     items: [
       { to: '/estoque', label: 'Estoque Atual', icon: ChecklistIcon, pageId: 'estoque' },
+      { to: '/estoque/correcoes', label: 'Correções de Estoque', icon: ChecklistIcon, pageId: 'estoque-correcoes' },
       { to: '/movimentacoes/entradas', label: 'Entradas', icon: EntryIcon, pageId: 'entradas' },
       { to: '/movimentacoes/saidas', label: 'Saidas', icon: ExitIcon, pageId: 'saidas' },
     ],
