@@ -1,0 +1,30 @@
+.stock-corrections-page .card__subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.88rem;
+  font-weight: 400;
+}
+
+.stock-corrections-page .status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.8rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stock-corrections-page .status-badge--warning {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+@media (max-width: 720px) {
+  .stock-corrections-page .status-badge {
+    align-self: flex-start;
+  }
+}
