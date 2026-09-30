@@ -265,6 +265,8 @@ function normalizarMaterial(material) {
 
 export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], periodo = null, options = {}) {
   const includeAll = Boolean(options?.includeAll)
+  const ajustes = Array.isArray(options?.ajustes) ? options.ajustes : []
+  const correcoesPendentes = Array.isArray(options?.correcoesPendentes) ? options.correcoesPendentes : []
   // Visao base do Estoque atual: material ativo sem movimentacao aparece com saldo zero (decisao 2026-09-26).
   const includeAtivosSemMovimentacao = Boolean(options?.includeAtivosSemMovimentacao)
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
@@ -280,7 +282,13 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
       .filter((saida) => !isRegistroCancelado(saida))
 
-    const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo)
+    const ajustesMaterial = ajustes
+      .filter((ajuste) => ajuste.materialId === material.id)
+      .filter((ajuste) => filtrarPorPeriodo(ajuste, 'dataAjuste', periodo))
+    // Correções alteram o saldo, mas permanecem fora de entradas, saídas e
+    // métricas de consumo.
+    const totalAjustes = ajustesMaterial.reduce((acc, ajuste) => acc + Number(ajuste.quantidadeAjuste ?? 0), 0)
+    const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo) + totalAjustes
     const { estoqueMinimo, deficitQuantidade, valorReposicao } = calcularDeficit(material, saldo)
 
     if (saldo !== 0 || entradasMaterial.length > 0) {
@@ -303,7 +311,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       0
     )
 
-    const ultimaAtualizacaoDate = [...entradasMaterial.map((item) => item.dataEntrada), ...saidasMaterial.map((item) => item.dataEntrega)]
+    const ultimaAtualizacaoDate = [...entradasMaterial.map((item) => item.dataEntrada), ...saidasMaterial.map((item) => item.dataEntrega), ...ajustesMaterial.map((item) => item.dataAjuste)]
       .map((raw) => {
         const data = new Date(raw)
         return Number.isNaN(data.getTime()) ? null : data
@@ -371,6 +379,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       ultimaAtualizacao: ultimaAtualizacaoDate ? ultimaAtualizacaoDate.toISOString() : null,
       temSaida: saidasMaterial.length > 0,
       ultimaSaida,
+      correcoesPendentes: correcoesPendentes.filter((correcao) => correcao.materialId === material.id),
     }
   })
 

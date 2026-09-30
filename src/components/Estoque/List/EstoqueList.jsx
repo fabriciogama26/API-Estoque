@@ -6,7 +6,9 @@ import { EntryIcon, ExitIcon, NotificationIcon, SaveIcon } from '../../icons.jsx
 import { listSaidas } from '../../../services/saidasService.js'
 import { EstoqueSaidaModal } from '../Modal/EstoqueSaidaModal.jsx'
 import { EstoqueMinStockModal } from '../Modal/EstoqueMinStockModal.jsx'
+import { EstoqueCorrectionModal } from '../Modal/EstoqueCorrectionModal.jsx'
 import { NaoCalculavelInfo } from '../../AnaliseEstoque/NaoCalculavelInfo.jsx'
+import { usePermissions } from '../../../context/PermissionsContext.jsx'
 import {
   formatBaseCalculo,
   formatCoberturaMeses,
@@ -30,9 +32,13 @@ export function EstoqueList({
   reposicao,
   canEditMinimo = true,
   canVerAnalise = false,
+  onCorrectionSubmitted,
 }) {
   const navigate = useNavigate()
+  const { permissions, isAdmin, isMaster } = usePermissions()
+  const canRequestCorrection = isAdmin || isMaster || permissions.includes('estoque.correcao.solicitar')
   const [minStockModal, setMinStockModal] = useState({ open: false, item: null })
+  const [correctionModal, setCorrectionModal] = useState({ open: false, item: null })
   const [saidaModal, setSaidaModal] = useState({
     open: false,
     item: null,
@@ -199,6 +205,18 @@ export function EstoqueList({
                   </span>
                 </div>
               ) : null}
+              {item.correcoesPendentes?.map((correcao) => (
+                <button
+                  key={correcao.id}
+                  type="button"
+                  className="feedback feedback--warning"
+                  onClick={() => navigate(`/estoque/correcoes?materialId=${encodeURIComponent(materialId)}`)}
+                  title={`Solicitação ${correcao.id}`}
+                >
+                  🔒 Correção física pendente — Sistema: {formatInteger(correcao.saldoSistema)} | Físico informado:{' '}
+                  {formatInteger(correcao.quantidadeFisica)} | Diferença: {correcao.diferenca > 0 ? '+' : ''}{formatInteger(correcao.diferenca)}
+                </button>
+              ))}
 
               <header className="estoque-list__item-header">
                 <div className="estoque-list__item-title">
@@ -238,6 +256,13 @@ export function EstoqueList({
                       <div className="estoque-list__actions-group" aria-label="Ações do material">
                         <span className="estoque-list__actions-title">Ações</span>
                         <div className="estoque-list__item-actions">
+                          {canRequestCorrection ? <button
+                            type="button"
+                            className="estoque-list__action-button"
+                            onClick={() => setCorrectionModal({ open: true, item })}
+                            aria-label="Correção de Estoque Físico"
+                            title="Correção de Estoque Físico"
+                          >🔒</button> : null}
                           <button
                             type="button"
                             className={`estoque-list__action-button${hasSaida ? ' estoque-list__action-button--notify' : ''}`}
@@ -404,6 +429,13 @@ export function EstoqueList({
         motivo={minStockMotivo}
         onMotivoChange={setMinStockMotivo}
         politicaItem={modalMaterialId ? reposicaoPorMaterial.get(String(modalMaterialId)) || null : null}
+      />
+
+      <EstoqueCorrectionModal
+        open={correctionModal.open}
+        item={correctionModal.item}
+        onClose={() => setCorrectionModal({ open: false, item: null })}
+        onSubmitted={onCorrectionSubmitted}
       />
 
       {totalItems > pageSize ? (
