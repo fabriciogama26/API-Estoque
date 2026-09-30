@@ -46,3 +46,10 @@ test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
   assert.match(migration, /from public\.saidas o/)
   assert.doesNotMatch(migration, /public\.(?:materials|stock_centers|stock_entries|stock_outputs)\b/)
 })
+
+test('API de correções consulta somente colunas existentes em materiais', () => {
+  const service = readFileSync(new URL('../src/services/stockCorrectionsApi.js', import.meta.url), 'utf8')
+  assert.match(service, /from\('materiais_view'\)\.select\('id, descricao, "materialItemNome"'\)/)
+  assert.doesNotMatch(service, /material:materiais\(/)
+  assert.doesNotMatch(service, /from\('materiais'\).*materialItemNome/)
+})

@@ -13,11 +13,11 @@ function unwrap({ data, error }, fallback) {
 }
 
 export async function listStockCorrections({ status = '', materialId = '', stockCenterId = '', start = '', end = '' } = {}) {
-  let query = ensureClient()
+  const client = ensureClient()
+  let query = client
     .from('stock_correction_requests')
     .select(`
       *,
-      material:materiais(id, descricao, "materialItemNome"),
       stock_center:centros_estoque(id, almox),
       requester:app_users!stock_correction_requests_requested_by_fkey(id, display_name, username),
       approver:app_users!stock_correction_requests_approved_by_fkey(id, display_name, username)
@@ -28,13 +28,22 @@ export async function listStockCorrections({ status = '', materialId = '', stock
   if (stockCenterId) query = query.eq('stock_center_id', stockCenterId)
   if (start) query = query.gte('requested_at', `${start}T00:00:00`)
   if (end) query = query.lte('requested_at', `${end}T23:59:59.999`)
-  return unwrap(await query, 'Falha ao consultar correções de estoque.') || []
+  const requests = unwrap(await query, 'Falha ao consultar correções de estoque.') || []
+  const materialIds = [...new Set(requests.map((request) => request.material_id).filter(Boolean))]
+  if (!materialIds.length) return requests
+
+  const materials = unwrap(
+    await client.from('materiais_view').select('id, descricao, "materialItemNome"').in('id', materialIds),
+    'Falha ao consultar os materiais das correções.',
+  ) || []
+  const materialsById = new Map(materials.map((material) => [material.id, material]))
+  return requests.map((request) => ({ ...request, material: materialsById.get(request.material_id) || null }))
 }
 
 export async function listCorrectionOptions() {
   const client = ensureClient()
   const [materialsResult, centersResult] = await Promise.all([
-    client.from('materiais').select('id, descricao, "materialItemNome"').eq('ativo', true).order('descricao'),
+    client.from('materiais_view').select('id, descricao, "materialItemNome"').eq('ativo', true).order('materialItemNome'),
     client.from('centros_estoque').select('id, almox').eq('ativo', true).order('almox'),
   ])
   return {
