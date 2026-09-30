@@ -1,12 +1,14 @@
 -- Correcoes de estoque fisico com aprovacao e bloqueio por material/centro.
 -- Toda alteracao de saldo deve utilizar calcular_saldo_estoque para que ajustes
 -- aprovados nunca sejam classificados como consumo.
+-- IMPORTANTE: esta migration usa o schema operacional legado em portugues
+-- (materiais, centros_estoque, entradas e saidas), e nao o migrations_rebuild.
 
 create table if not exists public.stock_correction_requests (
   id uuid primary key default gen_random_uuid(),
-  account_owner_id uuid not null default public.my_owner_id(),
-  material_id uuid not null references public.materials(id),
-  stock_center_id uuid not null references public.stock_centers(id),
+  account_owner_id uuid not null default public.current_account_owner_id(),
+  material_id uuid not null references public.materiais(id),
+  stock_center_id uuid not null references public.centros_estoque(id),
   system_balance numeric(14,2) not null,
   physical_quantity numeric(14,2) not null check (physical_quantity >= 0),
   difference numeric(14,2) not null,
@@ -45,8 +47,8 @@ create table if not exists public.stock_adjustments (
   id uuid primary key default gen_random_uuid(),
   request_id uuid not null unique references public.stock_correction_requests(id),
   account_owner_id uuid not null,
-  material_id uuid not null references public.materials(id),
-  stock_center_id uuid not null references public.stock_centers(id),
+  material_id uuid not null references public.materiais(id),
+  stock_center_id uuid not null references public.centros_estoque(id),
   adjustment_quantity numeric(14,2) not null check (adjustment_quantity <> 0),
   reason text not null default 'Correção de Saldo',
   created_by uuid not null references public.app_users(id),
@@ -82,21 +84,21 @@ set row_security = off
 as $$
   select
     coalesce((
-      select sum(e.quantity)
-      from public.stock_entries e
-      left join public.stock_entry_statuses st on st.id = e.status
+      select sum(e.quantidade)
+      from public.entradas e
+      left join public.status_entrada st on st.id = e.status
       where e.account_owner_id = p_account_owner_id
-        and e.material_id = p_material_id
-        and e.stock_center_id = p_stock_center_id
+        and e."materialId" = p_material_id
+        and e.centro_estoque = p_stock_center_id
         and lower(coalesce(st.status, '')) <> 'cancelado'
     ), 0)
     - coalesce((
-      select sum(o.quantity)
-      from public.stock_outputs o
-      left join public.stock_output_statuses st on st.id = o.status
+      select sum(o.quantidade)
+      from public.saidas o
+      left join public.status_saida st on st.id = o.status
       where o.account_owner_id = p_account_owner_id
-        and o.material_id = p_material_id
-        and o.stock_center_id = p_stock_center_id
+        and o."materialId" = p_material_id
+        and o.centro_estoque = p_stock_center_id
         and lower(coalesce(st.status, '')) <> 'cancelado'
     ), 0)
     + coalesce((
@@ -150,40 +152,40 @@ declare v_old_active boolean := false; v_new_active boolean := false; v_status t
 begin
   if tg_op <> 'INSERT' then
     execute format('select lower(coalesce(status, '''')) from public.%I where id = $1',
-      case when tg_table_name = 'stock_entries' then 'stock_entry_statuses' else 'stock_output_statuses' end)
+      case when tg_table_name = 'entradas' then 'status_entrada' else 'status_saida' end)
       into v_status using old.status;
     v_old_active := v_status <> 'cancelado';
     if v_old_active then
-      perform public.lock_stock_position(old.account_owner_id, old.material_id, old.stock_center_id);
-      perform public.assert_stock_position_unlocked(old.account_owner_id, old.material_id, old.stock_center_id);
+      perform public.lock_stock_position(old.account_owner_id, old."materialId", old.centro_estoque);
+      perform public.assert_stock_position_unlocked(old.account_owner_id, old."materialId", old.centro_estoque);
     end if;
   end if;
   if tg_op <> 'DELETE' then
     execute format('select lower(coalesce(status, '''')) from public.%I where id = $1',
-      case when tg_table_name = 'stock_entries' then 'stock_entry_statuses' else 'stock_output_statuses' end)
+      case when tg_table_name = 'entradas' then 'status_entrada' else 'status_saida' end)
       into v_status using new.status;
     v_new_active := v_status <> 'cancelado';
     if v_new_active then
-      perform public.lock_stock_position(new.account_owner_id, new.material_id, new.stock_center_id);
-      perform public.assert_stock_position_unlocked(new.account_owner_id, new.material_id, new.stock_center_id);
+      perform public.lock_stock_position(new.account_owner_id, new."materialId", new.centro_estoque);
+      perform public.assert_stock_position_unlocked(new.account_owner_id, new."materialId", new.centro_estoque);
     end if;
   end if;
   return case when tg_op = 'DELETE' then old else new end;
 end;
 $$;
 
-drop trigger if exists trg_block_pending_correction_entries on public.stock_entries;
+drop trigger if exists trg_block_pending_correction_entries on public.entradas;
 create trigger trg_block_pending_correction_entries
-before insert or update or delete on public.stock_entries for each row
+before insert or update or delete on public.entradas for each row
 execute function public.trg_block_pending_stock_correction();
-drop trigger if exists trg_block_pending_correction_outputs on public.stock_outputs;
+drop trigger if exists trg_block_pending_correction_outputs on public.saidas;
 create trigger trg_block_pending_correction_outputs
-before insert or update or delete on public.stock_outputs for each row
+before insert or update or delete on public.saidas for each row
 execute function public.trg_block_pending_stock_correction();
 
-drop trigger if exists trg_validar_saldo_saida on public.stock_outputs;
+drop trigger if exists trg_validar_saldo_saida on public.saidas;
 create trigger trg_validar_saldo_saida
-before insert or update of quantity, material_id, stock_center_id, status on public.stock_outputs
+before insert or update of quantidade, "materialId", centro_estoque, status on public.saidas
 for each row execute function public.validar_saldo_saida();
 
 -- Substitui a validação antiga, que agregava o material globalmente e não
@@ -192,20 +194,20 @@ create or replace function public.validar_saldo_saida() returns trigger
 language plpgsql security definer set search_path = public set row_security = off as $$
 declare v_saldo numeric; v_status text; v_old_quantity numeric := 0;
 begin
-  select lower(coalesce(status, '')) into v_status from public.stock_output_statuses where id = new.status;
-  if coalesce(new.quantity, 0) <= 0 or v_status = 'cancelado' then return new; end if;
-  perform public.lock_stock_position(new.account_owner_id, new.material_id, new.stock_center_id);
-  perform public.assert_stock_position_unlocked(new.account_owner_id, new.material_id, new.stock_center_id);
-  v_saldo := public.calcular_saldo_estoque(new.account_owner_id, new.material_id, new.stock_center_id);
+  select lower(coalesce(status, '')) into v_status from public.status_saida where id = new.status;
+  if coalesce(new.quantidade, 0) <= 0 or v_status = 'cancelado' then return new; end if;
+  perform public.lock_stock_position(new.account_owner_id, new."materialId", new.centro_estoque);
+  perform public.assert_stock_position_unlocked(new.account_owner_id, new."materialId", new.centro_estoque);
+  v_saldo := public.calcular_saldo_estoque(new.account_owner_id, new."materialId", new.centro_estoque);
   if tg_op = 'UPDATE' and old.account_owner_id = new.account_owner_id
-     and old.material_id = new.material_id and old.stock_center_id = new.stock_center_id then
-    select case when lower(coalesce(s.status, '')) = 'cancelado' then 0 else old.quantity end
-      into v_old_quantity from public.stock_output_statuses s where s.id = old.status;
+     and old."materialId" = new."materialId" and old.centro_estoque = new.centro_estoque then
+    select case when lower(coalesce(s.status, '')) = 'cancelado' then 0 else old.quantidade end
+      into v_old_quantity from public.status_saida s where s.id = old.status;
     v_saldo := v_saldo + coalesce(v_old_quantity, 0);
   end if;
-  if new.quantity > v_saldo then
+  if new.quantidade > v_saldo then
     raise exception 'Quantidade % excede estoque disponível (%) para o material % neste centro.',
-      new.quantity, v_saldo, new.material_id using errcode = 'P0001';
+      new.quantidade, v_saldo, new."materialId" using errcode = 'P0001';
   end if;
   return new;
 end;
@@ -215,12 +217,12 @@ create or replace function public.validar_cancelamento_entrada() returns trigger
 language plpgsql security definer set search_path = public set row_security = off as $$
 declare v_old_status text; v_new_status text; v_saldo numeric;
 begin
-  select lower(coalesce(status, '')) into v_old_status from public.stock_entry_statuses where id=old.status;
-  select lower(coalesce(status, '')) into v_new_status from public.stock_entry_statuses where id=new.status;
+  select lower(coalesce(status, '')) into v_old_status from public.status_entrada where id=old.status;
+  select lower(coalesce(status, '')) into v_new_status from public.status_entrada where id=new.status;
   if v_old_status <> 'cancelado' and v_new_status = 'cancelado' then
-    perform public.lock_stock_position(old.account_owner_id, old.material_id, old.stock_center_id);
-    perform public.assert_stock_position_unlocked(old.account_owner_id, old.material_id, old.stock_center_id);
-    v_saldo := public.calcular_saldo_estoque(old.account_owner_id, old.material_id, old.stock_center_id) - old.quantity;
+    perform public.lock_stock_position(old.account_owner_id, old."materialId", old.centro_estoque);
+    perform public.assert_stock_position_unlocked(old.account_owner_id, old."materialId", old.centro_estoque);
+    v_saldo := public.calcular_saldo_estoque(old.account_owner_id, old."materialId", old.centro_estoque) - old.quantidade;
     if v_saldo < 0 then
       raise exception 'Não é possível cancelar esta entrada: o estoque do material no centro ficaria negativo (%).', v_saldo
         using errcode='P0001';
@@ -234,7 +236,7 @@ create or replace function public.rpc_stock_correction_request(
   p_material_id uuid, p_stock_center_id uuid, p_physical_quantity numeric, p_notes text default null
 ) returns public.stock_correction_requests
 language plpgsql security definer set search_path = public set row_security = off as $$
-declare v_owner uuid := public.my_owner_id(); v_balance numeric; v_row public.stock_correction_requests;
+declare v_owner uuid := public.current_account_owner_id(); v_balance numeric; v_row public.stock_correction_requests;
 begin
   if not (public.is_master() or public.has_permission('estoque.correcao.solicitar')) then
     raise exception 'Sem permissão para solicitar correção de estoque.' using errcode = '42501';
@@ -242,8 +244,8 @@ begin
   if p_physical_quantity is null or p_physical_quantity < 0 then
     raise exception 'A quantidade física deve ser maior ou igual a zero.' using errcode = '22023';
   end if;
-  if not exists (select 1 from public.materials where id=p_material_id and account_owner_id=v_owner)
-     or not exists (select 1 from public.stock_centers where id=p_stock_center_id and account_owner_id=v_owner) then
+  if not exists (select 1 from public.materiais where id=p_material_id and account_owner_id=v_owner)
+     or not exists (select 1 from public.centros_estoque where id=p_stock_center_id and account_owner_id=v_owner) then
     raise exception 'Material ou centro de estoque não pertence ao tenant atual.' using errcode = '42501';
   end if;
   perform public.lock_stock_position(v_owner, p_material_id, p_stock_center_id);
@@ -262,14 +264,14 @@ $$;
 create or replace function public.rpc_stock_correction_balance(p_material_id uuid, p_stock_center_id uuid)
 returns numeric language plpgsql stable security definer
 set search_path = public set row_security = off as $$
-declare v_owner uuid := public.my_owner_id();
+declare v_owner uuid := public.current_account_owner_id();
 begin
   if not (public.is_master() or public.has_permission('estoque.correcao.read')
       or public.has_permission('estoque.correcao.solicitar') or public.has_permission('estoque.correcao.aprovar')) then
     raise exception 'Sem permissão para consultar o saldo.' using errcode='42501';
   end if;
-  if not exists (select 1 from public.materials where id=p_material_id and account_owner_id=v_owner)
-     or not exists (select 1 from public.stock_centers where id=p_stock_center_id and account_owner_id=v_owner) then
+  if not exists (select 1 from public.materiais where id=p_material_id and account_owner_id=v_owner)
+     or not exists (select 1 from public.centros_estoque where id=p_stock_center_id and account_owner_id=v_owner) then
     raise exception 'Material ou centro de estoque não pertence ao tenant atual.' using errcode='42501';
   end if;
   return public.calcular_saldo_estoque(v_owner, p_material_id, p_stock_center_id);
@@ -279,7 +281,7 @@ $$;
 create or replace function public.rpc_stock_correction_approve(p_request_id uuid)
 returns public.stock_correction_requests language plpgsql security definer
 set search_path = public set row_security = off as $$
-declare v_owner uuid := public.my_owner_id(); v_req public.stock_correction_requests; v_balance numeric;
+declare v_owner uuid := public.current_account_owner_id(); v_req public.stock_correction_requests; v_balance numeric;
 begin
   if not (public.is_master() or public.has_permission('estoque.correcao.aprovar')) then
     raise exception 'Sem permissão para aprovar correção de estoque.' using errcode = '42501';
@@ -309,7 +311,7 @@ $$;
 create or replace function public.rpc_stock_correction_reject(p_request_id uuid, p_reason text)
 returns public.stock_correction_requests language plpgsql security definer
 set search_path = public set row_security = off as $$
-declare v_owner uuid := public.my_owner_id(); v_req public.stock_correction_requests;
+declare v_owner uuid := public.current_account_owner_id(); v_req public.stock_correction_requests;
 begin
   if not (public.is_master() or public.has_permission('estoque.correcao.aprovar')) then raise exception 'Sem permissão.' using errcode='42501'; end if;
   if nullif(btrim(p_reason), '') is null then raise exception 'Informe o motivo da rejeição.' using errcode='22023'; end if;
@@ -325,7 +327,7 @@ $$;
 create or replace function public.rpc_stock_correction_cancel(p_request_id uuid, p_reason text default null)
 returns public.stock_correction_requests language plpgsql security definer
 set search_path = public set row_security = off as $$
-declare v_owner uuid := public.my_owner_id(); v_req public.stock_correction_requests;
+declare v_owner uuid := public.current_account_owner_id(); v_req public.stock_correction_requests;
 begin
   select * into v_req from public.stock_correction_requests where id=p_request_id and account_owner_id=v_owner for update;
   if not found or v_req.status <> 'PENDENTE' then raise exception 'Solicitação pendente não encontrada.'; end if;
@@ -341,10 +343,10 @@ $$;
 alter table public.stock_correction_requests enable row level security;
 alter table public.stock_adjustments enable row level security;
 create policy stock_correction_requests_select on public.stock_correction_requests for select to authenticated
-using ((public.is_master() or account_owner_id=public.my_owner_id()) and
+using ((public.is_master() or account_owner_id=public.current_account_owner_id()) and
  (public.is_master() or public.has_permission('estoque.correcao.read') or public.has_permission('estoque.correcao.solicitar') or public.has_permission('estoque.correcao.aprovar')));
 create policy stock_adjustments_select on public.stock_adjustments for select to authenticated
-using ((public.is_master() or account_owner_id=public.my_owner_id()) and
+using ((public.is_master() or account_owner_id=public.current_account_owner_id()) and
  (public.is_master() or public.has_permission('estoque.correcao.read') or public.has_permission('estoque.read')));
 
 revoke all on public.stock_correction_requests, public.stock_adjustments from anon, authenticated;

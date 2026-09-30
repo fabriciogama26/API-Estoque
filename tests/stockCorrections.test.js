@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { montarEstoqueAtual } from '../src/lib/estoque.js'
 
 const material = {
@@ -32,4 +33,16 @@ test('correção positiva integra o saldo oficial', () => {
   })
   assert.equal(result.itens[0].quantidade, 23)
   assert.equal(result.resumo.totalItens, 23)
+})
+
+test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
+  const migration = readFileSync(
+    new URL('../supabase/migrations/20260930_stock_physical_corrections.sql', import.meta.url),
+    'utf8',
+  )
+  assert.match(migration, /references public\.materiais\(id\)/)
+  assert.match(migration, /references public\.centros_estoque\(id\)/)
+  assert.match(migration, /from public\.entradas e/)
+  assert.match(migration, /from public\.saidas o/)
+  assert.doesNotMatch(migration, /public\.(?:materials|stock_centers|stock_entries|stock_outputs)\b/)
 })

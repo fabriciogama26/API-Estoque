@@ -17,8 +17,8 @@ export async function listStockCorrections({ status = '', materialId = '', stock
     .from('stock_correction_requests')
     .select(`
       *,
-      material:materials(id, description),
-      stock_center:stock_centers(id, warehouse_name),
+      material:materiais(id, descricao, "materialItemNome"),
+      stock_center:centros_estoque(id, almox),
       requester:app_users!stock_correction_requests_requested_by_fkey(id, display_name, username),
       approver:app_users!stock_correction_requests_approved_by_fkey(id, display_name, username)
     `)
@@ -34,8 +34,8 @@ export async function listStockCorrections({ status = '', materialId = '', stock
 export async function listCorrectionOptions() {
   const client = ensureClient()
   const [materialsResult, centersResult] = await Promise.all([
-    client.from('materials').select('id, description').eq('is_active', true).order('description'),
-    client.from('stock_centers').select('id, warehouse_name').eq('is_active', true).order('warehouse_name'),
+    client.from('materiais').select('id, descricao, "materialItemNome"').eq('ativo', true).order('descricao'),
+    client.from('centros_estoque').select('id, almox').eq('ativo', true).order('almox'),
   ])
   return {
     materials: unwrap(materialsResult, 'Falha ao consultar materiais.') || [],
