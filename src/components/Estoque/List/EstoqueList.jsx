@@ -6,6 +6,7 @@ import { EntryIcon, ExitIcon, NotificationIcon, SaveIcon } from '../../icons.jsx
 import { listSaidas } from '../../../services/saidasService.js'
 import { EstoqueSaidaModal } from '../Modal/EstoqueSaidaModal.jsx'
 import { EstoqueMinStockModal } from '../Modal/EstoqueMinStockModal.jsx'
+import { EstoqueCorrectionModal } from '../Modal/EstoqueCorrectionModal.jsx'
 import { NaoCalculavelInfo } from '../../AnaliseEstoque/NaoCalculavelInfo.jsx'
 import { usePermissions } from '../../../context/PermissionsContext.jsx'
 import {
@@ -31,11 +32,13 @@ export function EstoqueList({
   reposicao,
   canEditMinimo = true,
   canVerAnalise = false,
+  onCorrectionSubmitted,
 }) {
   const navigate = useNavigate()
   const { permissions, isAdmin, isMaster } = usePermissions()
   const canRequestCorrection = isAdmin || isMaster || permissions.includes('estoque.correcao.solicitar')
   const [minStockModal, setMinStockModal] = useState({ open: false, item: null })
+  const [correctionModal, setCorrectionModal] = useState({ open: false, item: null })
   const [saidaModal, setSaidaModal] = useState({
     open: false,
     item: null,
@@ -426,6 +429,13 @@ export function EstoqueList({
         motivo={minStockMotivo}
         onMotivoChange={setMinStockMotivo}
         politicaItem={modalMaterialId ? reposicaoPorMaterial.get(String(modalMaterialId)) || null : null}
+      />
+
+      <EstoqueCorrectionModal
+        open={correctionModal.open}
+        item={correctionModal.item}
+        onClose={() => setCorrectionModal({ open: false, item: null })}
+        onSubmitted={onCorrectionSubmitted}
       />
 
       {totalItems > pageSize ? (
