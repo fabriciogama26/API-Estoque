@@ -259,7 +259,7 @@ export function EstoqueList({
                           {canRequestCorrection ? <button
                             type="button"
                             className="estoque-list__action-button"
-                            onClick={() => setCorrectionModal({ open: true, item })}
+                            onClick={() => navigate(`/estoque/correcoes?materialId=${encodeURIComponent(materialId)}`)}
                             aria-label="Correção de Estoque Físico"
                             title="Correção de Estoque Físico"
                           >🔒</button> : null}
