@@ -4249,7 +4249,7 @@ const hasDashboardDimensionFilters = (params = {}) =>
 
 async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
-  const [entradas, saidas] = await Promise.all([
+  const [entradas, saidas, ajustesResult] = await Promise.all([
     (() => {
       let query = supabase
         .from('entradas')
@@ -4272,13 +4272,30 @@ async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
       }
       return execute(query, 'Falha ao consultar saidas.')
     })(),
+    (() => {
+      let query = supabase
+        .from('stock_adjustments')
+        .select('material_id, stock_center_id, adjustment_quantity')
+        .eq('material_id', materialId)
+      if (centroEstoqueId) {
+        query = query.eq('stock_center_id', centroEstoqueId)
+      }
+      return query
+    })(),
   ])
 
   const entradasNormalizadas = (entradas ?? []).map(mapEntradaRecord)
   const saidasNormalizadas = (saidas ?? [])
     .map(mapSaidaRecord)
     .filter((saida) => !isSaidaCanceladaSync(saida))
-  return calcularSaldoMaterial(materialId, entradasNormalizadas, saidasNormalizadas, null)
+  if (ajustesResult?.error && ajustesResult.error.code !== '42P01') {
+    throw new Error(ajustesResult.error.message || 'Falha ao consultar correções de estoque.')
+  }
+  const totalAjustes = (ajustesResult?.data ?? []).reduce(
+    (total, ajuste) => total + Number(ajuste.adjustment_quantity ?? 0),
+    0,
+  )
+  return calcularSaldoMaterial(materialId, entradasNormalizadas, saidasNormalizadas, null) + totalAjustes
 }
 
 async function obterSaldoMaterial(materialId) {

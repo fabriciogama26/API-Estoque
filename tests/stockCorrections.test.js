@@ -47,6 +47,8 @@ test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
   assert.doesNotMatch(migration, /public\.(?:materials|stock_centers|stock_entries|stock_outputs)\b/)
   assert.match(migration, /drop policy if exists stock_correction_requests_select/)
   assert.match(migration, /drop policy if exists stock_adjustments_select/)
+  assert.match(migration, /resolve_stock_position_owner/)
+  assert.match(migration, /v_owner := v_req\.account_owner_id/)
 })
 
 test('API de correções consulta somente colunas existentes em materiais', () => {
@@ -54,4 +56,11 @@ test('API de correções consulta somente colunas existentes em materiais', () =
   assert.match(service, /from\('materiais_view'\)\.select\('id, descricao, "materialItemNome"'\)/)
   assert.doesNotMatch(service, /material:materiais\(/)
   assert.doesNotMatch(service, /from\('materiais'\).*materialItemNome/)
+})
+
+test('consulta de saldo usada nas movimentações inclui ajustes aprovados', () => {
+  const api = readFileSync(new URL('../src/services/api.js', import.meta.url), 'utf8')
+  assert.match(api, /from\('stock_adjustments'\)/)
+  assert.match(api, /adjustment_quantity/)
+  assert.match(api, /calcularSaldoMaterial\(materialId, entradasNormalizadas, saidasNormalizadas, null\) \+ totalAjustes/)
 })
