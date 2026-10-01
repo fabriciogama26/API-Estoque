@@ -164,7 +164,16 @@ export function useSaidasController() {
             if (!id) return null
             return { id, nome: nome || id }
           }
-          setCentrosEstoqueOptions((centrosEstoqueData ?? []).map(normalizarCentro).filter(Boolean))
+          const centrosNormalizados = (centrosEstoqueData ?? []).map(normalizarCentro).filter(Boolean)
+          const nomesDuplicados = new Set(
+            centrosNormalizados
+              .filter((centro, index) => centrosNormalizados.some((outro, outroIndex) => outroIndex !== index && outro.nome === centro.nome))
+              .map((centro) => centro.nome),
+          )
+          setCentrosEstoqueOptions(centrosNormalizados.map((centro) => ({
+            ...centro,
+            nome: nomesDuplicados.has(centro.nome) ? `${centro.nome} (${String(centro.id).slice(0, 8)})` : centro.nome,
+          })))
         }
         if (centrosCustoData) setCentrosCustoOptions(centrosCustoData ?? [])
         if (centrosServicoData) setCentrosServicoOptions(centrosServicoData ?? [])
