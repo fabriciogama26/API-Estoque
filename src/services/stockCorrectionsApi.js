@@ -43,12 +43,18 @@ export async function listStockCorrections({ status = '', materialId = '', stock
 export async function listCorrectionOptions() {
   const client = ensureClient()
   const [materialsResult, centersResult] = await Promise.all([
-    client.from('materiais_view').select('id, descricao, "materialItemNome"').eq('ativo', true).order('materialItemNome'),
-    client.from('centros_estoque').select('id, almox').eq('ativo', true).order('almox'),
+    client.rpc('rpc_stock_correction_material_options'),
+    client.rpc('rpc_catalog_list', { p_table: 'centros_estoque' }),
   ])
   return {
-    materials: unwrap(materialsResult, 'Falha ao consultar materiais.') || [],
-    centers: unwrap(centersResult, 'Falha ao consultar centros de estoque.') || [],
+    materials: (unwrap(materialsResult, 'Falha ao consultar materiais.') || []).map((material) => ({
+      ...material,
+      materialItemNome: material.material_item_nome,
+    })),
+    centers: (unwrap(centersResult, 'Falha ao consultar centros de estoque.') || []).map((center) => ({
+      ...center,
+      almox: center.nome,
+    })),
   }
 }
 

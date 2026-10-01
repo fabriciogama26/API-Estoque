@@ -67,8 +67,20 @@ test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
 test('API de correções consulta somente colunas existentes em materiais', () => {
   const service = readFileSync(new URL('../src/services/stockCorrectionsApi.js', import.meta.url), 'utf8')
   assert.match(service, /from\('materiais_view'\)\.select\('id, descricao, "materialItemNome"'\)/)
+  assert.match(service, /rpc\('rpc_stock_correction_material_options'\)/)
+  assert.match(service, /rpc\('rpc_catalog_list', \{ p_table: 'centros_estoque' \}\)/)
   assert.doesNotMatch(service, /material:materiais\(/)
   assert.doesNotMatch(service, /from\('materiais'\).*materialItemNome/)
+})
+
+test('catalogos operacionais nunca liberam todos os tenants para master', () => {
+  const migration = readFileSync(
+    new URL('../supabase/migrations/20261001_fix_operational_catalog_tenant_scope.sql', import.meta.url),
+    'utf8',
+  )
+  assert.match(migration, /where account_owner_id = \$1/)
+  assert.doesNotMatch(migration, /if v_is_master then/)
+  assert.match(migration, /m\.account_owner_id = public\.current_account_owner_id\(\)/)
 })
 
 test('consulta de saldo usada nas movimentações inclui ajustes aprovados', () => {
