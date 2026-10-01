@@ -175,8 +175,15 @@ export function EstoqueList({
         {itens.map((item) => {
           const isSavingMin = Boolean(savingMinStock[item.materialId])
           const fieldError = minStockErrors[item.materialId]
-          const centrosCustoLabel =
-            item.centrosCusto && item.centrosCusto.length
+          const centrosDetalhes = Array.isArray(item.centrosEstoqueDetalhes) ? item.centrosEstoqueDetalhes : []
+          const nomesRepetidos = new Set(
+            centrosDetalhes
+              .filter((centro, index, lista) => lista.some((outro, outroIndex) => outroIndex !== index && outro.nome === centro.nome))
+              .map((centro) => centro.nome),
+          )
+          const centrosCustoLabel = centrosDetalhes.length
+            ? centrosDetalhes.map((centro) => nomesRepetidos.has(centro.nome) ? `${centro.nome} (${centro.id.slice(0, 8)})` : centro.nome).join(', ')
+            : item.centrosCusto && item.centrosCusto.length
               ? item.centrosCusto.join(', ')
               : 'Sem centro de estoque'
           const ultimaAtualizacaoItem = formatDateTimeValue(item.ultimaAtualizacao)

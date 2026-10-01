@@ -296,9 +296,16 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
     }
 
     const centrosCustoSet = new Set()
+    const centrosEstoqueMap = new Map()
     entradasMaterial.forEach((entrada) => {
       if (entrada?.centroCusto) {
         centrosCustoSet.add(String(entrada.centroCusto).trim())
+      }
+      if (entrada?.centroCustoId) {
+        centrosEstoqueMap.set(String(entrada.centroCustoId), {
+          id: String(entrada.centroCustoId),
+          nome: String(entrada.centroCusto || entrada.centroCustoId).trim(),
+        })
       }
     })
 
@@ -374,6 +381,7 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       valorReposicao,
       alerta: alertaAtivo,
       centrosCusto: Array.from(centrosCustoSet).filter(Boolean),
+      centrosEstoqueDetalhes: Array.from(centrosEstoqueMap.values()),
       totalEntradas: totalEntradasMaterial,
       totalSaidas: totalSaidasMaterial,
       ultimaAtualizacao: ultimaAtualizacaoDate ? ultimaAtualizacaoDate.toISOString() : null,

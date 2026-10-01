@@ -28,9 +28,16 @@ export function EstoqueCorrectionModal({ open, item, onClose, onSubmitted }) {
     setError(null)
     setSuccess(false)
     listCorrectionOptions()
-      .then(({ centers: availableCenters }) => setCenters(availableCenters))
+      .then(({ centers: availableCenters }) => {
+        const itemCenterIds = new Set((item?.centrosEstoqueDetalhes || []).map((center) => String(center.id)))
+        const relevantCenters = itemCenterIds.size
+          ? availableCenters.filter((center) => itemCenterIds.has(String(center.id)))
+          : availableCenters
+        setCenters(relevantCenters)
+        if (relevantCenters.length === 1) setStockCenterId(relevantCenters[0].id)
+      })
       .catch((loadError) => setError(loadError.message))
-  }, [open, item?.materialId])
+  }, [open, item?.materialId, item?.centrosEstoqueDetalhes])
 
   useEffect(() => {
     if (!open || !item?.materialId || !stockCenterId) {
@@ -52,6 +59,11 @@ export function EstoqueCorrectionModal({ open, item, onClose, onSubmitted }) {
     const physical = Number(physicalQuantity)
     return Number.isFinite(physical) ? physical - balance : null
   }, [balance, physicalQuantity])
+  const duplicateCenterNames = useMemo(() => new Set(
+    centers
+      .filter((center, index) => centers.some((other, otherIndex) => otherIndex !== index && other.almox === center.almox))
+      .map((center) => center.almox),
+  ), [centers])
 
   if (!open || !item) return null
 
@@ -99,7 +111,7 @@ export function EstoqueCorrectionModal({ open, item, onClose, onSubmitted }) {
           <label className="field"><span>Centro de estoque</span>
             <select value={stockCenterId} onChange={(event) => setStockCenterId(event.target.value)} disabled={saving || success} required>
               <option value="">Selecione</option>
-              {centers.map((center) => <option key={center.id} value={center.id}>{center.almox || center.id}</option>)}
+              {centers.map((center) => <option key={center.id} value={center.id}>{duplicateCenterNames.has(center.almox) ? `${center.almox || 'Centro'} (${center.id.slice(0, 8)})` : center.almox || center.id}</option>)}
             </select>
           </label>
           <div className="estoque-correction-modal__balance">

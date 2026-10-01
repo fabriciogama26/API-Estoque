@@ -35,6 +35,18 @@ test('correção positiva integra o saldo oficial', () => {
   assert.equal(result.resumo.totalItens, 23)
 })
 
+test('estoque preserva os ids dos centros mesmo quando possuem o mesmo nome', () => {
+  const entradas = [
+    { ...entrada, id: 'e1', centroCustoId: 'centro-a', centroCusto: 'Almox', quantidade: 10 },
+    { ...entrada, id: 'e2', centroCustoId: 'centro-b', centroCusto: 'Almox', quantidade: 6 },
+  ]
+  const result = montarEstoqueAtual([material], entradas, [])
+  assert.deepEqual(result.itens[0].centrosEstoqueDetalhes, [
+    { id: 'centro-a', nome: 'Almox' },
+    { id: 'centro-b', nome: 'Almox' },
+  ])
+})
+
 test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
   const migration = readFileSync(
     new URL('../supabase/migrations/20260930_stock_physical_corrections.sql', import.meta.url),
