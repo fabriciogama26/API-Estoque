@@ -153,6 +153,7 @@ function EstoquePageContent() {
           reposicao={reposicao}
           canEditMinimo={canEditMinimo}
           canVerAnalise={canVerAnalise}
+          onCorrectionSubmitted={handleRefresh}
         />
       </section>
     </div>
