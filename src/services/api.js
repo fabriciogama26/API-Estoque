@@ -4249,7 +4249,7 @@ const hasDashboardDimensionFilters = (params = {}) =>
 
 async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
-  const [entradas, saidas] = await Promise.all([
+  const [entradas, saidas, ajustesResult] = await Promise.all([
     (() => {
       let query = supabase
         .from('entradas')
@@ -4272,13 +4272,30 @@ async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
       }
       return execute(query, 'Falha ao consultar saidas.')
     })(),
+    (() => {
+      let query = supabase
+        .from('stock_adjustments')
+        .select('material_id, stock_center_id, adjustment_quantity')
+        .eq('material_id', materialId)
+      if (centroEstoqueId) {
+        query = query.eq('stock_center_id', centroEstoqueId)
+      }
+      return query
+    })(),
   ])
 
   const entradasNormalizadas = (entradas ?? []).map(mapEntradaRecord)
   const saidasNormalizadas = (saidas ?? [])
     .map(mapSaidaRecord)
     .filter((saida) => !isSaidaCanceladaSync(saida))
-  return calcularSaldoMaterial(materialId, entradasNormalizadas, saidasNormalizadas, null)
+  if (ajustesResult?.error && ajustesResult.error.code !== '42P01') {
+    throw new Error(ajustesResult.error.message || 'Falha ao consultar correções de estoque.')
+  }
+  const totalAjustes = (ajustesResult?.data ?? []).reduce(
+    (total, ajuste) => total + Number(ajuste.adjustment_quantity ?? 0),
+    0,
+  )
+  return calcularSaldoMaterial(materialId, entradasNormalizadas, saidasNormalizadas, null) + totalAjustes
 }
 
 async function obterSaldoMaterial(materialId) {
@@ -6320,14 +6337,39 @@ export const api = {
           if (params.mes) queryParams.mes = params.mes
         }
       }
-      const [materiais, entradas, saidas] = await Promise.all([
+      const [materiais, entradas, saidas, ajustesResult, correcoesResult] = await Promise.all([
         carregarMateriais(),
         carregarEntradas(queryParams),
         carregarSaidas(queryParams),
+        supabase.from('stock_adjustments').select('material_id, adjustment_quantity, created_at'),
+        supabase
+          .from('stock_correction_requests')
+          .select('id, material_id, stock_center_id, system_balance, physical_quantity, difference, requested_at')
+          .eq('status', 'PENDENTE'),
       ])
+      const ajustes = ajustesResult?.error
+        ? []
+        : (ajustesResult?.data || []).map((item) => ({
+            materialId: item.material_id,
+            quantidadeAjuste: Number(item.adjustment_quantity || 0),
+            dataAjuste: item.created_at,
+          }))
+      const correcoesPendentes = correcoesResult?.error
+        ? []
+        : (correcoesResult?.data || []).map((item) => ({
+            id: item.id,
+            materialId: item.material_id,
+            centroEstoqueId: item.stock_center_id,
+            saldoSistema: Number(item.system_balance),
+            quantidadeFisica: Number(item.physical_quantity),
+            diferenca: Number(item.difference),
+            solicitadoEm: item.requested_at,
+          }))
       return montarEstoqueAtual(materiais, entradas, saidas, usarMovimentacao ? periodo : null, {
         includeAll: false,
         includeAtivosSemMovimentacao: !usarMovimentacao,
+        ajustes,
+        correcoesPendentes,
       })
     },
     async saldo(materialId) {
@@ -8115,5 +8157,3 @@ async function carregarPessoasViewDetalhes(ids) {
     return new Map()
   }
 }
-
-
