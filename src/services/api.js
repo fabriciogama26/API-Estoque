@@ -4249,6 +4249,19 @@ const hasDashboardDimensionFilters = (params = {}) =>
 
 async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
+  if (centroEstoqueId) {
+    const { data: saldoOficial, error: saldoError } = await supabase.rpc('rpc_stock_balance', {
+      p_material_id: materialId,
+      p_stock_center_id: centroEstoqueId,
+    })
+    if (!saldoError) {
+      return Number(saldoOficial ?? 0)
+    }
+    const rpcIndisponivel = saldoError.code === '42883' || saldoError.code === 'PGRST202'
+    if (!rpcIndisponivel) {
+      throw new Error(saldoError.message || 'Falha ao consultar saldo oficial do material.')
+    }
+  }
   const [entradas, saidas, ajustesResult] = await Promise.all([
     (() => {
       let query = supabase

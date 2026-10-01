@@ -49,6 +49,7 @@ test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
   assert.match(migration, /drop policy if exists stock_adjustments_select/)
   assert.match(migration, /resolve_stock_position_owner/)
   assert.match(migration, /v_owner := v_req\.account_owner_id/)
+  assert.match(migration, /function public\.rpc_stock_balance/)
 })
 
 test('API de correções consulta somente colunas existentes em materiais', () => {
@@ -61,6 +62,7 @@ test('API de correções consulta somente colunas existentes em materiais', () =
 test('consulta de saldo usada nas movimentações inclui ajustes aprovados', () => {
   const api = readFileSync(new URL('../src/services/api.js', import.meta.url), 'utf8')
   assert.match(api, /from\('stock_adjustments'\)/)
+  assert.match(api, /supabase\.rpc\('rpc_stock_balance'/)
   assert.match(api, /adjustment_quantity/)
   assert.match(api, /calcularSaldoMaterial\(materialId, entradasNormalizadas, saidasNormalizadas, null\) \+ totalAjustes/)
 })

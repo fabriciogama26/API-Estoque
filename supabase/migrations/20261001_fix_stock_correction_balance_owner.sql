@@ -62,6 +62,22 @@ begin
 end;
 $$;
 
+create or replace function public.rpc_stock_balance(p_material_id uuid, p_stock_center_id uuid)
+returns numeric language plpgsql stable security definer
+set search_path = public set row_security = off as $$
+declare v_owner uuid;
+begin
+  if not (public.is_master() or public.has_permission('estoque.read')
+      or public.has_permission('estoque.write') or public.has_permission('estoque.atual')
+      or public.has_permission('estoque.saidas') or public.has_permission('estoque.entradas')
+      or public.has_permission('estoque.correcao.read') or public.has_permission('estoque.correcao.solicitar')) then
+    raise exception 'Sem permissão para consultar o saldo.' using errcode='42501';
+  end if;
+  v_owner := public.resolve_stock_position_owner(p_material_id, p_stock_center_id);
+  return public.calcular_saldo_estoque(v_owner, p_material_id, p_stock_center_id);
+end;
+$$;
+
 create or replace function public.rpc_stock_correction_approve(p_request_id uuid)
 returns public.stock_correction_requests language plpgsql security definer
 set search_path = public set row_security = off as $$
@@ -128,3 +144,5 @@ end;
 $$;
 
 revoke all on function public.resolve_stock_position_owner(uuid,uuid) from public, anon, authenticated;
+revoke all on function public.rpc_stock_balance(uuid,uuid) from public, anon;
+grant execute on function public.rpc_stock_balance(uuid,uuid) to authenticated;
