@@ -25,6 +25,9 @@ $arquivos = @(
   'supabase\migrations\20260930_stock_physical_corrections.sql',
   'supabase\migrations\20261001_fix_stock_correction_balance_owner.sql',
   'supabase\migrations\20261003_estoque_saldo_unico.sql',
+  'supabase\migrations\20260801_purchase_budget_12m.sql',
+  'supabase\migrations\20260801_purchase_budget_validation_audit.sql',
+  'supabase\migrations\20261004_orcamento_12m_saldo_unico.sql',
   'supabase\tests\estoque\10_saldo_unico_validacao.sql'
 )
 

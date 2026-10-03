@@ -177,6 +177,42 @@ const execute = async (builder: any, fallbackMessage: string) => {
   return data
 }
 
+// A API devolve no maximo 1000 linhas por consulta; buildQuery precisa ter ordem estavel.
+const PAGE_SIZE = 1000
+const MAX_PAGES = 200
+
+const executePaged = async (buildQuery: () => any, fallbackMessage: string) => {
+  let resultado: any[] = []
+  for (let pagina = 0; pagina < MAX_PAGES; pagina += 1) {
+    const inicio = pagina * PAGE_SIZE
+    const data = await execute(buildQuery().range(inicio, inicio + PAGE_SIZE - 1), fallbackMessage)
+    const lote = Array.isArray(data) ? data : []
+    resultado = resultado.concat(lote)
+    if (lote.length < PAGE_SIZE) {
+      return resultado
+    }
+  }
+  throw new Error(`${fallbackMessage} Mais de ${MAX_PAGES * PAGE_SIZE} linhas.`)
+}
+
+// Saldo por material x centro com a regra unica do banco (entradas - saidas nao canceladas + correcoes
+// aprovadas), acumulado ate `fim`.
+const carregarSaldosPorOwner = async (ownerId: string, fim: Date) => {
+  return await executePaged(
+    () =>
+      supabaseAdmin
+        .rpc("_estoque_saldos_posicoes", {
+          p_owner_id: ownerId,
+          p_material_id: null,
+          p_inicio: null,
+          p_fim: fim.toISOString(),
+        })
+        .order("material_id", { ascending: true })
+        .order("centro_estoque_id", { ascending: true, nullsFirst: true }),
+    "Falha ao consultar saldos de estoque.",
+  )
+}
+
 const chunkArray = (items: any[] = [], size = MATERIAIS_VIEW_BATCH_SIZE) => {
   const chunks: any[][] = []
   for (let index = 0; index < items.length; index += size) {
@@ -410,8 +446,8 @@ const preencherNomesSaidas = async (registros: any[] = [], ownerId: string) => {
 }
 
 const carregarMateriaisPorOwner = async (ownerId: string) => {
-  const registrosIds = await execute(
-    supabaseAdmin.from("materiais").select("id").eq("account_owner_id", ownerId),
+  const registrosIds = await executePaged(
+    () => supabaseAdmin.from("materiais").select("id").eq("account_owner_id", ownerId).order("id", { ascending: true }),
     "Falha ao listar materiais.",
   )
   const ids = (registrosIds ?? []).map((item: any) => item.id).filter(Boolean)
@@ -508,19 +544,36 @@ const preencherStatusSaida = (registros: any[] = [], statusMap: Map<string, stri
   })
 }
 
+const dataMaisRecente = (valores: any[] = []) =>
+  valores
+    .filter(Boolean)
+    .map((raw) => {
+      const data = new Date(raw)
+      return Number.isNaN(data.getTime()) ? null : data
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => b.getTime() - a.getTime())[0] || null
+
+// posicoesSaldo: linhas de _estoque_saldos_posicoes (material x centro), ja com a regra unica do banco.
 const montarEstoqueAtual = (
   materiais: any[] = [],
-  entradas: any[] = [],
-  saidas: any[] = [],
+  posicoesSaldo: any[] = [],
   options: any = {},
 ) => {
   const includeAll = Boolean(options?.includeAll)
   const movementMaterialIds =
     options?.movementMaterialIds instanceof Set ? options.movementMaterialIds : null
-  const entradasSaldo = Array.isArray(entradas) ? entradas : []
-  const saidasSaldo = Array.isArray(saidas) ? saidas : []
-  const entradasPeriodo = Array.isArray(options?.entradasPeriodo) ? options.entradasPeriodo : entradasSaldo
-  const saidasPeriodo = Array.isArray(options?.saidasPeriodo) ? options.saidasPeriodo : saidasSaldo
+  const entradasPeriodo = Array.isArray(options?.entradasPeriodo) ? options.entradasPeriodo : []
+  const saidasPeriodo = Array.isArray(options?.saidasPeriodo) ? options.saidasPeriodo : []
+  const centrosNomes: Map<string, string> = options?.centrosNomes instanceof Map ? options.centrosNomes : new Map()
+  const posicoesPorMaterial = new Map<string, any[]>()
+  ;(posicoesSaldo ?? []).forEach((posicao: any) => {
+    const chave = String(posicao?.material_id ?? "")
+    if (!chave) return
+    const lista = posicoesPorMaterial.get(chave)
+    if (lista) lista.push(posicao)
+    else posicoesPorMaterial.set(chave, [posicao])
+  })
   const materiaisNormalizados = (materiais ?? []).map((material) => {
     if (!material) return null
     return {
@@ -535,72 +588,39 @@ const montarEstoqueAtual = (
   const materiaisComMovimentacao = movementMaterialIds ? new Set<string>(movementMaterialIds) : new Set<string>()
 
   const itens = materiaisNormalizados.map((material: any) => {
-    const entradasMaterial = (entradasSaldo ?? [])
-      .filter((entrada) => entrada.materialId === material.id)
-      .filter((entrada) => !isRegistroCancelado(entrada))
-    const saidasMaterial = (saidasSaldo ?? [])
-      .filter((saida) => saida.materialId === material.id)
-      .filter((saida) => !isRegistroCancelado(saida))
+    const posicoes = posicoesPorMaterial.get(String(material.id)) ?? []
     const entradasPeriodoMaterial = (entradasPeriodo ?? [])
-      .filter((entrada) => entrada.materialId === material.id)
-      .filter((entrada) => !isRegistroCancelado(entrada))
+      .filter((entrada: any) => entrada.materialId === material.id)
+      .filter((entrada: any) => !isRegistroCancelado(entrada))
     const saidasPeriodoMaterial = (saidasPeriodo ?? [])
-      .filter((saida) => saida.materialId === material.id)
-      .filter((saida) => !isRegistroCancelado(saida))
+      .filter((saida: any) => saida.materialId === material.id)
+      .filter((saida: any) => !isRegistroCancelado(saida))
 
-    const totalEntradas = entradasPeriodoMaterial.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
-    const totalSaidas = saidasPeriodoMaterial.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
-    const saldo =
-      entradasMaterial.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0) -
-      saidasMaterial.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
+    const totalEntradas = entradasPeriodoMaterial.reduce((acc: number, item: any) => acc + Number(item.quantidade ?? 0), 0)
+    const totalSaidas = saidasPeriodoMaterial.reduce((acc: number, item: any) => acc + Number(item.quantidade ?? 0), 0)
+    const saldo = posicoes.reduce((acc: number, posicao: any) => acc + Number(posicao.saldo ?? 0), 0)
+    const entradasAcumuladas = posicoes.reduce((acc: number, posicao: any) => acc + Number(posicao.total_entradas ?? 0), 0)
     const estoqueMinimo = Number(material.estoqueMinimo ?? 0)
     const deficitQuantidade = Math.max(estoqueMinimo - saldo, 0)
     const valorReposicao = Number((deficitQuantidade * Number(material.valorUnitario ?? 0)).toFixed(2))
 
-    if (!movementMaterialIds && (saldo !== 0 || entradasMaterial.length > 0)) {
+    if (!movementMaterialIds && (saldo !== 0 || entradasAcumuladas > 0)) {
       materiaisComMovimentacao.add(material.id)
     }
 
     const centrosCustoSet = new Set<string>()
-    entradasMaterial.forEach((entrada) => {
-      if (entrada?.centroCusto) {
-        centrosCustoSet.add(String(entrada.centroCusto).trim())
+    posicoes.forEach((posicao: any) => {
+      if (posicao?.centro_estoque_id) {
+        const id = String(posicao.centro_estoque_id)
+        centrosCustoSet.add(centrosNomes.get(id) || id)
       }
     })
 
-    const ultimaAtualizacaoDate = [
-      ...entradasMaterial.map((item) => item.dataEntrada),
-      ...saidasMaterial.map((item) => item.dataEntrega),
-    ]
-      .map((raw) => {
-        const data = new Date(raw)
-        return Number.isNaN(data.getTime()) ? null : data
-      })
-      .filter(Boolean)
-      .sort((a: any, b: any) => b.getTime() - a.getTime())[0] || null
-
-    const ultimaSaidaInfo =
-      saidasMaterial
-        .map((saida) => {
-          const dataEntregaDate = new Date(saida.dataEntrega ?? saida.data_entrega ?? null)
-          if (Number.isNaN(dataEntregaDate.getTime())) {
-            return null
-          }
-          return {
-            dataEntrega: dataEntregaDate.toISOString(),
-            dataEntregaValue: dataEntregaDate.getTime(),
-          }
-        })
-        .filter(Boolean)
-        .sort((a: any, b: any) => b.dataEntregaValue - a.dataEntregaValue)[0] || null
-
-    let ultimaSaida = null
-    if (ultimaSaidaInfo) {
-      // remove campo auxiliar de ordenacao
-      // eslint-disable-next-line no-unused-vars
-      const { dataEntregaValue, ...rest } = ultimaSaidaInfo
-      ultimaSaida = rest
-    }
+    const ultimaAtualizacaoDate = dataMaisRecente(
+      posicoes.flatMap((posicao: any) => [posicao.ultima_entrada_em, posicao.ultima_saida_em, posicao.ultimo_ajuste_em]),
+    )
+    const ultimaSaidaDate = dataMaisRecente(posicoes.map((posicao: any) => posicao.ultima_saida_em))
+    const ultimaSaida = ultimaSaidaDate ? { dataEntrega: ultimaSaidaDate.toISOString() } : null
 
     return {
       materialId: material.id,
@@ -945,17 +965,6 @@ const resolveWeekRange = (base: Date) => {
   return { start, end }
 }
 
-const filtrarPorRange = (lista: any[] = [], campoData: string, range: { start: Date; end: Date }) => {
-  if (!range?.start || !range?.end) return lista
-  return (lista ?? []).filter((item: any) => {
-    const raw = item?.[campoData]
-    if (!raw) return false
-    const date = new Date(raw)
-    if (Number.isNaN(date.getTime())) return false
-    return date >= range.start && date <= range.end
-  })
-}
-
 const carregarAcidentesPorOwner = async (ownerId: string, range: { start: Date; end: Date }) => {
   return await execute(
     supabaseAdmin
@@ -991,21 +1000,31 @@ const carregarHhtPorOwner = async (ownerId: string, range: { start: Date; end: D
   )
 }
 
-const carregarMovimentacoesPorOwner = async (ownerId: string, range: { start: Date; end: Date }) => {
-  const entradasQuery = supabaseAdmin.from("entradas").select("*").eq("account_owner_id", ownerId)
-  const saidasQuery = supabaseAdmin.from("saidas").select("*").eq("account_owner_id", ownerId)
+const consultaMovimentacoes = (tabela: string, campoData: string, ownerId: string, range: { start: Date; end: Date }) =>
+  supabaseAdmin
+    .from(tabela)
+    .select("*")
+    .eq("account_owner_id", ownerId)
+    .gte(campoData, range.start.toISOString())
+    .lte(campoData, range.end.toISOString())
+    .order(campoData, { ascending: false })
+    .order("id", { ascending: true })
 
-  const [materiais, entradasRaw, saidasRaw, pessoas] = await Promise.all([
+const carregarMovimentacoesPorOwner = async (ownerId: string, range: { start: Date; end: Date }) => {
+  const [materiais, entradasRaw, saidasRaw, pessoas, saldos] = await Promise.all([
     carregarMateriaisPorOwner(ownerId),
-    execute(entradasQuery, "Falha ao listar entradas."),
-    execute(saidasQuery, "Falha ao listar saidas."),
-    execute(
-      supabaseAdmin
-        .from("pessoas")
-        .select("id, nome, matricula")
-        .eq("account_owner_id", ownerId),
+    executePaged(() => consultaMovimentacoes("entradas", "dataEntrada", ownerId, range), "Falha ao listar entradas."),
+    executePaged(() => consultaMovimentacoes("saidas", "dataEntrega", ownerId, range), "Falha ao listar saidas."),
+    executePaged(
+      () =>
+        supabaseAdmin
+          .from("pessoas")
+          .select("id, nome, matricula")
+          .eq("account_owner_id", ownerId)
+          .order("id", { ascending: true }),
       "Falha ao listar pessoas.",
     ),
+    carregarSaldosPorOwner(ownerId, range.end),
   ])
 
   let entradas = (entradasRaw ?? []).map(mapEntradaRecord)
@@ -1024,15 +1043,11 @@ const carregarMovimentacoesPorOwner = async (ownerId: string, range: { start: Da
   entradas = preencherStatusEntrada(entradas, statusEntradaMap)
   saidas = preencherStatusSaida(saidas, statusSaidaMap)
 
-  const entradasSemana = filtrarPorRange(entradas, "dataEntrada", range)
-  const saidasSemana = filtrarPorRange(saidas, "dataEntrega", range)
-
   return {
     materiais,
-    entradasSemana,
-    saidasSemana,
-    entradasTodas: entradas,
-    saidasTodas: saidas,
+    entradasSemana: entradas,
+    saidasSemana: saidas,
+    saldos,
     pessoas: pessoas ?? [],
   }
 }
@@ -1078,8 +1093,7 @@ export const runRelatorioEstoqueSemanal = async () => {
       materiais,
       entradasSemana,
       saidasSemana,
-      entradasTodas,
-      saidasTodas,
+      saldos,
       pessoas,
     }, acidentes, hhtRegistros] = await Promise.all([
       carregarMovimentacoesPorOwner(ownerId, range),
@@ -1093,24 +1107,26 @@ export const runRelatorioEstoqueSemanal = async () => {
         .map((item: any) => item.materialId),
     )
 
-    const estoqueBase = montarEstoqueAtual(materiais, entradasTodas, saidasTodas, {
-      includeAll: false,
-      movementMaterialIds,
-      entradasPeriodo: entradasSemana,
-      saidasPeriodo: saidasSemana,
-    })
-
     const materiaisMap = new Map((materiais ?? []).map((item: any) => [item.id, item]))
     const pessoasMap = new Map((pessoas ?? []).map((item: any) => [item.id, item]))
 
     const centroEstoqueIds = Array.from(
       new Set(
-        [...(entradasSemana ?? []), ...(saidasSemana ?? [])]
-          .map((item: any) => item?.centroCustoId ?? item?.centroEstoqueId)
-          .filter((valor) => Boolean(valor) && UUID_REGEX.test(String(valor))),
+        [
+          ...[...(entradasSemana ?? []), ...(saidasSemana ?? [])].map((item: any) => item?.centroCustoId ?? item?.centroEstoqueId),
+          ...(saldos ?? []).map((posicao: any) => posicao?.centro_estoque_id),
+        ].filter((valor) => Boolean(valor) && UUID_REGEX.test(String(valor))),
       ),
     )
     const centrosEstoqueMap = await carregarCentrosEstoqueMap(ownerId, centroEstoqueIds)
+
+    const estoqueBase = montarEstoqueAtual(materiais, saldos, {
+      includeAll: false,
+      movementMaterialIds,
+      entradasPeriodo: entradasSemana,
+      saidasPeriodo: saidasSemana,
+      centrosNomes: centrosEstoqueMap,
+    })
 
     const entradasCsv = buildEntradasCsv(entradasSemana, { materiaisMap, centrosCustoMap: centrosEstoqueMap })
     const saidasCsv = buildSaidasCsv(saidasSemana, { pessoasMap, materiaisMap, centrosEstoqueMap })

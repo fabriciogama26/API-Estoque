@@ -470,6 +470,14 @@ Atualizacao 2026-09 (ajuda contextual reorganizada)
 - Antes: 5 passos e 45 notas soltas, com notas desatualizadas (seletor de periodo na Compra, layout do modal) e sem as acoes novas.
 - Depois: 9 passos com itens (filtros; cartoes e Paretos; abas da previsao; aba Compra; minimos; detalhar/exportar/ajustar; politica e modos Monitorar/Automatico com simulacao; Previsao de Orcamento; Auditoria) e 7 notas tecnicas.
 
+Atualizacao 2026-10 (orcamento anual com o saldo unico de estoque)
+------------------------------------------------------------------
+- Diagnostico: havia 6 migrations `20260801_*` recriando `rpc_orcamento_compra_12m_calcular`. `supabase/auditoria/diagnostico_orcamento_12m.sql` (somente leitura) compara o codigo da funcao no banco com cada arquivo; em 2026-10-03 producao estava na versao 6 (`20260801_purchase_budget_validation_audit.sql`), sem a assinatura antiga `(uuid, uuid, jsonb)`.
+- Migration `supabase/migrations/20261004_orcamento_12m_saldo_unico.sql`: recria a funcao a partir da versao 6 trocando so o calculo de estoque.
+- Antes: `estoque_atual` = entradas - saidas nao canceladas, sem as correcoes de estoque fisico aprovadas.
+- Depois: `estoque_atual` vem de `_estoque_saldos_posicoes` (mesma regra da Saida, do Estoque atual e da aba Compra), somando os centros e mantendo o piso zero. Consumo, segmentacao de demanda, validacao, cenarios e cronograma nao mudaram.
+- Validacao: `supabase/tests/estoque/run-local.ps1` (estoque utilizavel do orcamento igual ao saldo unico; controle negativo com a versao 6 dando o valor antigo).
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

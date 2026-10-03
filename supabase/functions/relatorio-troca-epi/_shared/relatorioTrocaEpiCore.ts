@@ -157,6 +157,35 @@ const execute = async (builder: any, fallbackMessage: string) => {
   return data
 }
 
+// A API devolve no maximo 1000 linhas por consulta; buildQuery precisa ter ordem estavel.
+const PAGE_SIZE = 1000
+const MAX_PAGES = 200
+const IDS_POR_CONSULTA = 150
+
+const executePaged = async (buildQuery: () => any, fallbackMessage: string) => {
+  let resultado: any[] = []
+  for (let pagina = 0; pagina < MAX_PAGES; pagina += 1) {
+    const inicio = pagina * PAGE_SIZE
+    const data = await execute(buildQuery().range(inicio, inicio + PAGE_SIZE - 1), fallbackMessage)
+    const lote = Array.isArray(data) ? data : []
+    resultado = resultado.concat(lote)
+    if (lote.length < PAGE_SIZE) {
+      return resultado
+    }
+  }
+  throw new Error(`${fallbackMessage} Mais de ${MAX_PAGES * PAGE_SIZE} linhas.`)
+}
+
+// Evita URLs gigantes em filtros `in` com muitos ids.
+const executeEmLotes = async (ids: string[], buildQuery: (lote: string[]) => any, fallbackMessage: string): Promise<any> => {
+  const resultado: any[] = []
+  for (let inicio = 0; inicio < ids.length; inicio += IDS_POR_CONSULTA) {
+    const lote = await execute(buildQuery(ids.slice(inicio, inicio + IDS_POR_CONSULTA)), fallbackMessage)
+    resultado.push(...(lote ?? []))
+  }
+  return resultado
+}
+
 const executeSingle = async (builder: any, fallbackMessage: string) => {
   const { data, error } = await builder.single()
   if (error) {
@@ -208,28 +237,32 @@ const loadLatestReport = async (ownerId: string) => {
 }
 
 const loadSaidasBase = async (ownerId: string, range: { start: string; end: string }) => {
-  return await execute(
-    supabaseAdmin
-      .from("saidas")
-      .select(
-        "id, materialId, pessoaId, quantidade, dataEntrega, dataTroca, status, usuarioResponsavel, centro_custo, centro_servico, centro_estoque, criadoEm",
-      )
-      .eq("account_owner_id", ownerId)
-      .not("dataTroca", "is", null)
-      .gte("dataTroca", range.start)
-      .lte("dataTroca", range.end),
+  return await executePaged(
+    () =>
+      supabaseAdmin
+        .from("saidas")
+        .select(
+          "id, materialId, pessoaId, quantidade, dataEntrega, dataTroca, status, usuarioResponsavel, centro_custo, centro_servico, centro_estoque, criadoEm",
+        )
+        .eq("account_owner_id", ownerId)
+        .not("dataTroca", "is", null)
+        .gte("dataTroca", range.start)
+        .lte("dataTroca", range.end)
+        .order("id", { ascending: true }),
     "Falha ao listar saidas para troca.",
   )
 }
 
 const loadPessoasMap = async (ownerId: string, ids: string[]) => {
   if (!ids.length) return new Map()
-  const pessoas = await execute(
-    supabaseAdmin
-      .from("pessoas")
-      .select("id, nome, matricula")
-      .in("id", ids)
-      .eq("account_owner_id", ownerId),
+  const pessoas = await executeEmLotes(
+    ids,
+    (lote) =>
+      supabaseAdmin
+        .from("pessoas")
+        .select("id, nome, matricula")
+        .in("id", lote)
+        .eq("account_owner_id", ownerId),
     "Falha ao listar pessoas.",
   )
   return new Map((pessoas ?? []).map((item: any) => [item.id, item]))
@@ -237,11 +270,13 @@ const loadPessoasMap = async (ownerId: string, ids: string[]) => {
 
 const loadMateriaisMap = async (ids: string[]) => {
   if (!ids.length) return new Map()
-  const materiais = await execute(
-    supabaseAdmin
-      .from(materiaisView)
-      .select("*")
-      .in("id", ids),
+  const materiais = await executeEmLotes(
+    ids,
+    (lote) =>
+      supabaseAdmin
+        .from(materiaisView)
+        .select("*")
+        .in("id", lote),
     "Falha ao listar materiais.",
   )
   return new Map((materiais ?? []).map((item: any) => [item.id, item]))
@@ -249,8 +284,9 @@ const loadMateriaisMap = async (ids: string[]) => {
 
 const loadCentrosMap = async (ownerId: string, table: string, ids: string[], field: string) => {
   if (!ids.length) return new Map()
-  const registros = await execute(
-    supabaseAdmin.from(table).select(`id, ${field}`).in("id", ids).eq("account_owner_id", ownerId),
+  const registros = await executeEmLotes(
+    ids,
+    (lote) => supabaseAdmin.from(table).select(`id, ${field}`).in("id", lote).eq("account_owner_id", ownerId),
     `Falha ao listar ${table}.`,
   )
   return new Map(
@@ -262,12 +298,14 @@ const loadCentrosMap = async (ownerId: string, table: string, ids: string[], fie
 
 const loadUsuariosMap = async (ownerId: string, ids: string[]) => {
   if (!ids.length) return new Map()
-  const usuarios = await execute(
-    supabaseAdmin
-      .from("app_users")
-      .select("id, display_name, username, email, parent_user_id")
-      .in("id", ids)
-      .or(`id.eq.${ownerId},parent_user_id.eq.${ownerId}`),
+  const usuarios = await executeEmLotes(
+    ids,
+    (lote) =>
+      supabaseAdmin
+        .from("app_users")
+        .select("id, display_name, username, email, parent_user_id")
+        .in("id", lote)
+        .or(`id.eq.${ownerId},parent_user_id.eq.${ownerId}`),
     "Falha ao listar usuarios.",
   )
   return new Map(

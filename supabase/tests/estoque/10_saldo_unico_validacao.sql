@@ -234,4 +234,35 @@ select estoque_test.ok(
     where i->>'material_id' = '11111111-0000-0000-0000-000000000004'),
   'politica de reposicao: Mascara com estoque 500 e consumo de 90 dias preservado (1500)');
 
+-- Orcamento anual (20261004_orcamento_12m_saldo_unico) --------------------------------------------
+insert into public.inventory_forecast (account_owner_id, periodo_base_inicio, periodo_base_fim)
+values ('aaaaaaaa-0000-0000-0000-000000000001',
+        (date_trunc('month', now()) - interval '12 months')::date,
+        (date_trunc('month', now()) - interval '1 day')::date);
+
+select estoque_test.ok(
+  (select public.rpc_orcamento_compra_12m_calcular('aaaaaaaa-0000-0000-0000-000000000001', null, '{}'::jsonb)->>'status' = 'ok'),
+  'orcamento anual calcula com a previsao do tenant');
+
+-- Antes: Luva 12 (sem a correcao de +2) x 10 + Bota 4 x 50 + Mascara 500 x 2 = 1320.
+select estoque_test.ok(
+  (select (public.rpc_orcamento_compra_12m_calcular('aaaaaaaa-0000-0000-0000-000000000001', null, '{}'::jsonb)
+             ->'composicao'->>'estoque_utilizavel')::numeric = 1340),
+  'orcamento anual: estoque utilizavel = Luva 14 x 10 + Bota 4 x 50 + Mascara 500 x 2 = 1340 (inclui a correcao aprovada)');
+
+select estoque_test.ok(
+  (select (public.rpc_orcamento_compra_12m_calcular('aaaaaaaa-0000-0000-0000-000000000001', null, '{}'::jsonb)
+             ->'composicao'->>'estoque_utilizavel')::numeric
+        = (select sum(round(greatest(t.saldo, 0) * m."valorUnitario", 2))
+             from (select material_id, sum(saldo) as saldo
+                     from public._estoque_saldos_posicoes('aaaaaaaa-0000-0000-0000-000000000001')
+                    group by material_id) t
+             join public.materiais m on m.id = t.material_id)),
+  'orcamento anual usa o mesmo saldo da Saida e do Estoque atual');
+
+select estoque_test.ok(
+  (select count(*) = 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'rpc_orcamento_compra_12m_calcular'),
+  'orcamento anual com uma unica assinatura (text, text, jsonb)');
+
 rollback;
