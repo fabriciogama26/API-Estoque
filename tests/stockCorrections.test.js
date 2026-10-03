@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { montarEstoqueAtual } from '../src/lib/estoque.js'
+import { dedupeStockCentersById } from '../src/lib/stockCorrections.js'
 
 const material = {
   id: 'material-1',
@@ -44,6 +45,19 @@ test('estoque preserva os ids dos centros mesmo quando possuem o mesmo nome', ()
   assert.deepEqual(result.itens[0].centrosEstoqueDetalhes, [
     { id: 'centro-a', nome: 'Almox' },
     { id: 'centro-b', nome: 'Almox' },
+  ])
+})
+
+test('opcoes de correcao removem centros repetidos por id sem agrupar nomes iguais', () => {
+  const centers = dedupeStockCentersById([
+    { id: 'centro-a', nome: 'Almox', saldo: 3 },
+    { id: 'centro-a', nome: 'Nome repetido vindo da RPC', saldo: 99 },
+    { id: 'centro-b', nome: 'Almox', saldo: 7 },
+  ])
+
+  assert.deepEqual(centers, [
+    { id: 'centro-a', nome: 'Almox', saldo: 3 },
+    { id: 'centro-b', nome: 'Almox', saldo: 7 },
   ])
 })
 
