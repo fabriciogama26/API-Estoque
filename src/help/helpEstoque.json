@@ -5,11 +5,14 @@
     "steps": [
       {
         "title": "Filtrar materiais",
-        "description": "No campo Busca digite parte do nome, descricao, ID, cor ou CA. O Periodo so vale com Movimentacao do periodo ligado; sem ele a tela mostra o saldo fisico acumulado. Combine Quantidade (>=), Centro de estoque e os checks Apenas alertas, Apenas saidas ou Apenas zerado. Clique em Aplicar ou Limpar.",
+        "description": "No campo Busca digite parte do nome, descricao, ID, cor ou CA. O Periodo so vale com Movimentacao do periodo ligado; sem ele a tela mostra o saldo fisico acumulado. Combine Quantidade (>=), Centro de estoque, Cobertura de/ate (dias), Situacao e os checks Apenas alertas, Apenas saidas ou Apenas zerado. Clique em Aplicar ou Limpar.",
         "mediaHint": "Filtros de estoque e botoes Aplicar/Limpar.",
         "items": [
           "Na visao padrao, materiais ativos sem nenhuma movimentacao aparecem com saldo zero e o aviso Sem movimentacao registrada; eles nao geram alerta.",
-          "Com Movimentacao do periodo ligado, a lista mostra so materiais movimentados no intervalo."
+          "Com Movimentacao do periodo ligado, a lista mostra so materiais movimentados no intervalo.",
+          "Cobertura de/ate e em dias (1 mes = 30 dias, como no card): de 0 ate 90 lista o que acaba em ate 3 meses. Preencha so um campo para usar >= ou <=.",
+          "Cobertura Nao calculavel fica fora da faixa; para encontrar esses materiais use a Situacao Sem consumo recente ou Sem base para calculo.",
+          "Cobertura e Situacao vem da politica de reposicao; se ela nao carregar, os campos ficam desabilitados."
         ]
       },
       {
@@ -75,7 +78,7 @@
       },
       {
         "title": "Exportar a lista",
-        "description": "Exportar Excel (CSV) baixa a posicao fisica acumulada respeitando busca, centro e alertas (nao aplica movimentacao do periodo).",
+        "description": "Exportar Excel (CSV) baixa a posicao fisica acumulada respeitando busca, centro, alertas, cobertura e situacao (nao aplica movimentacao do periodo).",
         "mediaHint": "Botao Exportar no cabecalho do Estoque atual.",
         "items": [
           "Inclui minimo cadastrado, sugerido e efetivo, maximo efetivo, fonte da regra, base do calculo, consumo medio, cobertura e situacao da reposicao.",

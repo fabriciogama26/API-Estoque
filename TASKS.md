@@ -101,6 +101,8 @@
   - Front: `api.estoque.current` busca o saldo pronto e paginado; card mostra `Saldo por centro`; modal de correcao mostra o saldo de cada centro; sem a migration aplicada, a tela usa o calculo antigo e registra aviso. A lista de materiais (`carregarMateriais`) passou a buscar so os materiais do tenant em lotes de ids, sem o corte de 1000 linhas da `materiais_view` somando todos os tenants.
   - Validacao: `supabase/tests/estoque/run-local.ps1` com 16 verificacoes em PostgreSQL 18 local; chamada real via PostgREST 12 com limite de 2 linhas por resposta (paginacao trouxe todas as posicoes); `npm test` com 16 testes.
   - Auditoria manual: `supabase/auditoria/auditoria_estoque.sql`. Resultado da consulta de saidas em dobro (2026-10-03): 90 de 95 linhas eram da importacao em lote de 2025-12-04 (falso positivo da primeira versao, corrigida para usar a data de entrega); 5 trocas com poucos minutos de diferenca para revisar (Camisa 17/09/2026, Respirador 11/03/2026 e 15/12/2025 x2, Tenis 15/09/2026).
+- Estoque atual - filtros de cobertura e situacao (codigo pronto, 2026-10-03): bloco Filtros ganhou `Cobertura de (dias)`, `Cobertura ate (dias)` e o select `Situacao` da politica de reposicao. Decisoes do usuario: faixa de/ate em dias (sem decimal; o card mostra meses com 1 casa acima de 90 dias) e situacao em select. Filtro local sobre o mapa da `rpc_reposicao_itens` que a tela ja carrega (sem migration); conversao meses x 30 igual ao card; nao calculavel fica fora da faixa; lista, alertas, Resumo e CSV seguem os filtros; sem a politica os campos ficam desabilitados.
+  - Validacao: `npm test` (7 testes novos em `tests/estoqueFiltrosPolitica.test.js`) e `vite build`.
 
 ## Pendente
 ### Auditoria do forecast (2026-10)

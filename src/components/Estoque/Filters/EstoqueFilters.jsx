@@ -1,12 +1,17 @@
 import { EstoqueMovimentacaoHelpButton } from './EstoqueMovimentacaoHelpButton.jsx'
+import { SITUACAO_REPOSICAO_ORDEM, formatSituacaoReposicao } from '../../../utils/reposicaoUtils.js'
+
+const POLITICA_INDISPONIVEL_TITLE = 'Disponivel quando a politica de reposicao carregar'
 
 export function EstoqueFilters({
   filters,
   centrosCusto,
+  politicaDisponivel = false,
   onSubmit,
   onChange,
   onClear,
 }) {
+  const politicaTitle = politicaDisponivel ? undefined : POLITICA_INDISPONIVEL_TITLE
   return (
     <section className="card">
       <header className="card__header">
@@ -86,6 +91,51 @@ export function EstoqueFilters({
             onChange={onChange}
             placeholder="Quantidade >= valor"
           />
+        </label>
+        <label className="field">
+          <span>Cobertura de (dias)</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            name="coberturaDiasMin"
+            value={filters.coberturaDiasMin}
+            onChange={onChange}
+            placeholder="Cobertura >= dias"
+            disabled={!politicaDisponivel}
+            title={politicaTitle}
+          />
+        </label>
+        <label className="field">
+          <span>Cobertura até (dias)</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            name="coberturaDiasMax"
+            value={filters.coberturaDiasMax}
+            onChange={onChange}
+            placeholder="Cobertura <= dias"
+            disabled={!politicaDisponivel}
+            title={politicaTitle}
+          />
+        </label>
+        <label className="field">
+          <span>Situação</span>
+          <select
+            name="situacaoReposicao"
+            value={filters.situacaoReposicao}
+            onChange={onChange}
+            disabled={!politicaDisponivel}
+            title={politicaTitle}
+          >
+            <option value="">Todas</option>
+            {SITUACAO_REPOSICAO_ORDEM.map((situacao) => (
+              <option key={situacao} value={situacao}>
+                {formatSituacaoReposicao(situacao)}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field field--checkbox field--checkbox-accent">
           <input

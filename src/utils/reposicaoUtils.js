@@ -90,6 +90,12 @@ export function formatCoberturaMeses(value) {
   return `${formatNumber(number, 1)} meses`
 }
 
+// Cobertura em dias inteiros (meses x 30, mesma conta do card); usada pelo filtro de faixa do Estoque atual.
+export function coberturaEmDias(value) {
+  const number = toNumberOrNull(value)
+  return number === null ? null : Math.round(Math.max(0, number * 30))
+}
+
 export function formatSituacaoReposicao(situacao) {
   return SITUACAO_REPOSICAO[situacao]?.label || situacao || '-'
 }

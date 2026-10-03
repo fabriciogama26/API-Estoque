@@ -22,6 +22,9 @@ const INITIAL_FILTERS = {
   centroCusto: '',
   quantidadeMax: '',
   estoqueMinimo: '',
+  coberturaDiasMin: '',
+  coberturaDiasMax: '',
+  situacaoReposicao: '',
   apenasAlertas: false,
   apenasSaidas: false,
   apenasZerado: false,
@@ -81,7 +84,7 @@ export function EstoqueProvider({ children }) {
     () => aplicarLimiteEfetivo(estoqueState.estoqueBase, reposicao.porMaterial, modoPolitica),
     [estoqueState.estoqueBase, modoPolitica, reposicao.porMaterial],
   )
-  const filtroState = useEstoqueFiltro(INITIAL_FILTERS, estoqueVisao, estoqueBaseVisao)
+  const filtroState = useEstoqueFiltro(INITIAL_FILTERS, estoqueVisao, estoqueBaseVisao, reposicao.porMaterial)
 
   const handleMinStockSave = async (item, motivo = null) => {
     const ok = await estoqueState.handleMinStockSave(
@@ -187,6 +190,8 @@ export function EstoqueProvider({ children }) {
     applyFilters,
     resetFilters,
     centrosCustoDisponiveis: filtroState.centrosCustoDisponiveis,
+    // cobertura/situacao dependem da politica; durante a recarga o mapa anterior continua valendo
+    politicaFiltrosDisponiveis: reposicao.porMaterial.size > 0,
     summaryCards,
     // alertas
     alertasPaginados: filtroState.alertasPaginados,
