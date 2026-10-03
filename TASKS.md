@@ -104,11 +104,13 @@
 
 ## Pendente
 ### Saldo unico de estoque (2026-10)
-- Aplicar no Supabase: `supabase/migrations/20261003_estoque_saldo_unico.sql` (antes ou junto com o deploy do front).
+- 2026-10-03: fase 1 mesclada (PR #377) e `20261003_estoque_saldo_unico.sql` aplicada no Supabase pelo usuario. Conferencia com a exportacao de entradas (520) e saidas (1432): 109 de 292 materiais tinham o card antigo acima do saldo (460 unidades a mais), todos pelo corte de 1000 saidas; o material `7a5ab252-f8d4-494c-bbea-84f93a69c55e` (19 entradas, 19 saidas) mostrava 16 e passou a mostrar 0, igual a Saida. Planilha de conferencia gerada para o usuario fora do repositorio.
+- Fase 2.1 (codigo pronto, 2026-10-04): aplicar no Supabase `supabase/migrations/20261004_orcamento_12m_saldo_unico.sql`; republicar as Edge Functions `relatorio-estoque-semanal`, `relatorio-estoque-mensal` e `relatorio-troca-epi` (index.ts + _shared/<core>.ts); backend sobe com o deploy da Vercel.
 - Depois de aplicar: rodar a consulta 1 de `supabase/auditoria/auditoria_estoque.sql` e conferir que o card do Estoque atual bate com `saldo_auditoria`; revisar as 5 trocas suspeitas e as consultas 4 (centros com nome repetido) e 5 (lancamentos inconsistentes).
-- Fase 2: listas de Entradas e Saidas (e exportacoes) com paginacao no servidor; Dashboard de estoque com agregacao no banco; relatorio mensal do backend (`carregarMovimentacoesPorOwner`, `pessoas`) sem corte de 1000 linhas; historico de saidas do sino no Estoque atual; opcoes de material de Entradas/Saidas (`carregarMateriaisDeEntradas` sem paginacao e `buscarMateriaisPorTermo` enviando todos os ids do tenant na URL).
+- Fase 2.2: listas de Entradas e Saidas (e exportacoes) com paginacao no servidor via RPC; validacao de cancelamento de entrada pelo saldo oficial do centro (`rpc_stock_balance`); historico de saidas do sino no Estoque atual; opcoes de material de Entradas/Saidas (`carregarMateriaisDeEntradas` sem paginacao e `buscarMateriaisPorTermo` enviando todos os ids do tenant na URL).
 - Fase 3: parar de esconder centros de estoque de nome repetido em Entradas/Saidas (`dedupeDomainOptionsByName`), avisar saldo em centro inativo, decidir unificacao de centros repetidos, teste que falhe em consulta sem paginacao a `entradas`/`saidas`, conferencia diaria via pg_cron.
-- `rpc_orcamento_compra_12m_calcular` (aba Previsao de Orcamento) ainda calcula estoque sem as correcoes aprovadas; ha varias versoes com o mesmo prefixo `20260801`, confirmar a definicao em producao (`pg_get_functiondef`) antes de alterar.
+- Fase 2.3: Dashboard de estoque com agregacao no banco (`rpc_dashboard_estoque`).
+- 4 entradas do tenant `59191387-...` usam o status `58c35c31-3fdf-4179-8cc4-62fdc0019c39`, que nao existe no repositorio; conferir o nome em `status_entrada` (se for cancelado, elas nao deveriam contar no saldo).
 ### Controle de Validades - implantacao (2026-09)
 - Aplicar no Supabase, em ordem: `20260929_01_validades_schema.sql`, `20260929_02_validades_rpcs.sql`, `20260929_03_validades_alertas.sql`.
 - Publicar a Edge Function `validades-alertas` com 2 arquivos, no padrao das demais: `index.ts` e `_shared/validadesAlertasCore.ts` (core sem imports fora da pasta da funcao).

@@ -10,7 +10,6 @@ import {
   resolvePeriodoRange,
   montarEstoqueAtual,
   montarDashboard,
-  calcularSaldoMaterial,
 } from '../../src/lib/estoque.js'
 import {
   normalizarTermo,
@@ -121,6 +120,24 @@ async function execute(builder, fallbackMessage) {
     throw mapSupabaseError(error, fallbackMessage)
   }
   return data
+}
+
+// A API do Supabase devolve no maximo 1000 linhas por consulta; buildQuery precisa ter ordem estavel.
+const PAGE_SIZE = 1000
+const MAX_PAGES = 200
+
+async function executePaged(buildQuery, fallbackMessage) {
+  let resultado = []
+  for (let pagina = 0; pagina < MAX_PAGES; pagina += 1) {
+    const inicio = pagina * PAGE_SIZE
+    const data = await execute(buildQuery().range(inicio, inicio + PAGE_SIZE - 1), fallbackMessage)
+    const lote = Array.isArray(data) ? data : []
+    resultado = resultado.concat(lote)
+    if (lote.length < PAGE_SIZE) {
+      return resultado
+    }
+  }
+  throw new Error(`${fallbackMessage} (mais de ${MAX_PAGES * PAGE_SIZE} linhas).`)
 }
 
 async function executeSingle(builder, fallbackMessage) {
@@ -1634,36 +1651,16 @@ async function carregarMovimentacoes(params, ownerId) {
   const periodo = parsePeriodo(params)
   const resolvedRange = resolvePeriodoRange(periodo)
 
-  const entradasQuery = supabaseAdmin
-    .from('entradas')
-    .select('*')
-    .eq('account_owner_id', ownerId)
-    .order('dataEntrada', { ascending: false })
-
-  const saidasQuery = supabaseAdmin
-    .from('saidas')
-    .select('*')
-    .eq('account_owner_id', ownerId)
-    .order('dataEntrega', { ascending: false })
-
-  let entradasFiltered = entradasQuery
-  let saidasFiltered = saidasQuery
-
-  if (resolvedRange?.start) {
-    const inicioIso = resolvedRange.start.toISOString()
-    entradasFiltered = entradasFiltered.gte('dataEntrada', inicioIso)
-    saidasFiltered = saidasFiltered.gte('dataEntrega', inicioIso)
-  }
-  if (resolvedRange?.end) {
-    const fimIso = resolvedRange.end.toISOString()
-    entradasFiltered = entradasFiltered.lte('dataEntrada', fimIso)
-    saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
-  }
-
   const [materiais, entradas, saidas] = await Promise.all([
     carregarMateriaisPorOwner(ownerId),
-    execute(entradasFiltered, 'Falha ao listar entradas.'),
-    execute(saidasFiltered, 'Falha ao listar saídas.'),
+    executePaged(
+      () => consultaMovimentacoes('entradas', 'dataEntrada', ownerId, resolvedRange),
+      'Falha ao listar entradas.'
+    ),
+    executePaged(
+      () => consultaMovimentacoes('saidas', 'dataEntrega', ownerId, resolvedRange),
+      'Falha ao listar saídas.'
+    ),
   ])
 
   const entradasNormalizadas = await preencherCentrosEstoque(
@@ -1680,20 +1677,79 @@ async function carregarMovimentacoes(params, ownerId) {
 }
 
 
+function consultaMovimentacoes(tabela, campoData, ownerId, range) {
+  let query = supabaseAdmin
+    .from(tabela)
+    .select('*')
+    .eq('account_owner_id', ownerId)
+    .order(campoData, { ascending: false })
+    .order('id', { ascending: true })
+  if (range?.start) {
+    query = query.gte(campoData, range.start.toISOString())
+  }
+  if (range?.end) {
+    query = query.lte(campoData, range.end.toISOString())
+  }
+  return query
+}
+
+// Saldo por material x centro com a regra unica do banco (entradas - saidas nao canceladas + correcoes
+// aprovadas), acumulado ate `fim` (sem fim = saldo atual).
+async function carregarSaldosPorOwner(ownerId, fim = null) {
+  const registros = await executePaged(
+    () =>
+      supabaseAdmin
+        .rpc('_estoque_saldos_posicoes', {
+          p_owner_id: ownerId,
+          p_material_id: null,
+          p_inicio: null,
+          p_fim: fim ? fim.toISOString() : null,
+        })
+        .order('material_id', { ascending: true })
+        .order('centro_estoque_id', { ascending: true, nullsFirst: true }),
+    'Falha ao consultar saldos de estoque.'
+  )
+  return registros.map((registro) => ({
+    materialId: registro.material_id,
+    centroEstoqueId: registro.centro_estoque_id,
+    totalEntradas: Number(registro.total_entradas ?? 0),
+    totalSaidas: Number(registro.total_saidas ?? 0),
+    totalAjustes: Number(registro.total_ajustes ?? 0),
+    saldo: Number(registro.saldo ?? 0),
+    qtdSaidas: Number(registro.qtd_saidas ?? 0),
+    ultimaEntradaEm: registro.ultima_entrada_em,
+    ultimaSaidaEm: registro.ultima_saida_em,
+    ultimoAjusteEm: registro.ultimo_ajuste_em,
+  }))
+}
+
+const MATERIAIS_IDS_POR_CONSULTA = 150
+
 async function carregarMateriaisPorOwner(ownerId) {
-  const registrosIds = await execute(
-    supabaseAdmin.from('materiais').select('id').eq('account_owner_id', ownerId),
+  const registrosIds = await executePaged(
+    () => supabaseAdmin.from('materiais').select('id').eq('account_owner_id', ownerId).order('id', { ascending: true }),
     'Falha ao listar materiais.'
   )
   const ids = (registrosIds ?? []).map((item) => item.id).filter(Boolean)
   if (!ids.length) {
     return []
   }
-  const materiaisRegistros = await execute(
-    supabaseAdmin.from(MATERIAIS_VIEW).select('*').in('id', ids).order('nome'),
-    'Falha ao listar materiais.'
+  const lotes = []
+  for (let inicio = 0; inicio < ids.length; inicio += MATERIAIS_IDS_POR_CONSULTA) {
+    lotes.push(ids.slice(inicio, inicio + MATERIAIS_IDS_POR_CONSULTA))
+  }
+  const resultados = await Promise.all(
+    lotes.map((lote) =>
+      execute(supabaseAdmin.from(MATERIAIS_VIEW).select('*').in('id', lote), 'Falha ao listar materiais.')
+    )
   )
-  return (materiaisRegistros ?? []).map(mapMaterialRecord)
+  const ordenarPorNome = (a, b) => {
+    const nomeA = String(a?.nome ?? '')
+    const nomeB = String(b?.nome ?? '')
+    if (nomeA === nomeB) return 0
+    return nomeA < nomeB ? -1 : 1
+  }
+  return resultados.flatMap((data) => data ?? []).sort(ordenarPorNome).map(mapMaterialRecord)
 }
 
 async function preencherNomesSaidas(registros = []) {
@@ -1848,30 +1904,24 @@ async function preencherNomesPessoas(registros = [], ownerId) {
 
 async function carregarMovimentacoesPorOwner({ ownerId, periodoRange }) {
   if (!ownerId) {
-    return { materiais: [], entradas: [], saidas: [], pessoas: [], periodo: null }
-  }
-  const entradasQuery = supabaseAdmin.from('entradas').select('*').eq('account_owner_id', ownerId)
-  const saidasQuery = supabaseAdmin.from('saidas').select('*').eq('account_owner_id', ownerId)
-
-  let entradasFiltered = entradasQuery
-  let saidasFiltered = saidasQuery
-
-  if (periodoRange?.start) {
-    const inicioIso = periodoRange.start.toISOString()
-    entradasFiltered = entradasFiltered.gte('dataEntrada', inicioIso)
-    saidasFiltered = saidasFiltered.gte('dataEntrega', inicioIso)
-  }
-  if (periodoRange?.end) {
-    const fimIso = periodoRange.end.toISOString()
-    entradasFiltered = entradasFiltered.lte('dataEntrada', fimIso)
-    saidasFiltered = saidasFiltered.lte('dataEntrega', fimIso)
+    return { materiais: [], entradas: [], saidas: [], pessoas: [], estoqueBase: { itens: [], alertas: [] } }
   }
 
-  const [materiais, entradas, saidas, pessoasBase] = await Promise.all([
+  const [materiais, entradas, saidas, pessoasBase, saldos] = await Promise.all([
     carregarMateriaisPorOwner(ownerId),
-    execute(entradasFiltered, 'Falha ao listar entradas.'),
-    execute(saidasFiltered, 'Falha ao listar saidas.'),
-    execute(supabaseAdmin.from('pessoas').select('*').eq('account_owner_id', ownerId), 'Falha ao listar pessoas.'),
+    executePaged(
+      () => consultaMovimentacoes('entradas', 'dataEntrada', ownerId, periodoRange),
+      'Falha ao listar entradas.'
+    ),
+    executePaged(
+      () => consultaMovimentacoes('saidas', 'dataEntrega', ownerId, periodoRange),
+      'Falha ao listar saidas.'
+    ),
+    executePaged(
+      () => supabaseAdmin.from('pessoas').select('*').eq('account_owner_id', ownerId).order('id', { ascending: true }),
+      'Falha ao listar pessoas.'
+    ),
+    carregarSaldosPorOwner(ownerId, periodoRange?.end ?? null),
   ])
 
   const entradasNormalizadas = await preencherCentrosEstoque((entradas ?? []).map(mapEntradaRecord))
@@ -1883,22 +1933,9 @@ async function carregarMovimentacoesPorOwner({ ownerId, periodoRange }) {
     entradas: entradasNormalizadas,
     saidas: saidasNormalizadas,
     pessoas: pessoas ?? [],
+    // Estoque acumulado ate o fim do periodo (nao so a movimentacao do mes).
+    estoqueBase: montarEstoqueAtual(materiais, [], [], null, { saldos }),
   }
-}
-
-async function calcularSaldoMaterialAtual(materialId) {
-  const [entradas, saidas] = await Promise.all([
-    execute(
-      supabaseAdmin.from('entradas').select('materialId, quantidade, dataEntrada').eq('materialId', materialId),
-      'Falha ao consultar entradas do material.'
-    ),
-    execute(
-      supabaseAdmin.from('saidas').select('materialId, quantidade, dataEntrega').eq('materialId', materialId),
-      'Falha ao consultar saídas do material.'
-    ),
-  ])
-
-  return calcularSaldoMaterial(materialId, entradas, saidas, null)
 }
 
 async function obterSaidasDetalhadasPorPessoa(pessoaId) {
@@ -3591,6 +3628,13 @@ export const EstoqueOperations = {
       throw createHttpError(401, 'Usuario nao autenticado para consultar estoque.')
     }
     const ownerId = await resolveOwnerId(user.id)
+    if (!resolvePeriodoRange(parsePeriodo(params))) {
+      const [materiais, saldos] = await Promise.all([
+        carregarMateriaisPorOwner(ownerId),
+        carregarSaldosPorOwner(ownerId),
+      ])
+      return montarEstoqueAtual(materiais, [], [], null, { saldos })
+    }
     const { materiais, entradas, saidas, periodo } = await carregarMovimentacoes(params, ownerId)
     return montarEstoqueAtual(materiais, entradas, saidas, periodo)
   },
@@ -3627,12 +3671,7 @@ export const EstoqueOperations = {
     }
 
     const dadosAtual = await carregarMovimentacoesPorOwner({ ownerId, periodoRange })
-    const estoqueBaseAtual = montarEstoqueAtual(
-      dadosAtual.materiais,
-      dadosAtual.entradas,
-      dadosAtual.saidas,
-      null,
-    )
+    const estoqueBaseAtual = dadosAtual.estoqueBase
     const dashboardAtual = montarDashboard(
       {
         materiais: dadosAtual.materiais,
@@ -4039,12 +4078,7 @@ export const EstoqueOperations = {
         }
 
         const dadosAtual = await carregarMovimentacoesPorOwner({ ownerId, periodoRange })
-        const estoqueBaseAtual = montarEstoqueAtual(
-          dadosAtual.materiais,
-          dadosAtual.entradas,
-          dadosAtual.saidas,
-          null,
-        )
+        const estoqueBaseAtual = dadosAtual.estoqueBase
         const dashboardAtual = montarDashboard(
           {
             materiais: dadosAtual.materiais,

@@ -145,6 +145,17 @@ Atualizacao 2026-04
 - `docs/RelatorioEstoque.txt`
 - `TASKS.md`
 
+Atualizacao 2026-10 (estoque dos relatorios pelo saldo unico)
+--------------------------------------------------------------
+- Problema: as leituras de entradas, saidas e pessoas nao eram paginadas (a API devolve no maximo 1000 linhas); no relatorio mensal (backend `EstoqueOperations.report`/`reportAuto` e Edge Function `relatorio-estoque-mensal`) o "estoque atual", o risco operacional, a cobertura e os alertas ativos eram calculados so com a movimentacao do mes; no semanal o estoque era montado com todas as entradas e saidas do tenant sem paginacao (e sem ordem, podendo perder saidas da propria semana).
+- Depois:
+  - estoque dos relatorios = saldo acumulado ate o fim do periodo via `_estoque_saldos_posicoes(owner, null, null, fim)` (entradas - saidas nao canceladas + correcoes aprovadas), com service_role;
+  - entradas, saidas e pessoas do periodo lidas com paginacao (`executePaged`, ordem data + id); semanal le so a semana;
+  - materiais buscados em lotes de ids; troca de EPI pagina as saidas e busca pessoas/materiais/centros/usuarios em lotes de 150 ids.
+- Arquivos: `api/_shared/operations.js`, `supabase/functions/relatorio-estoque-semanal/_shared/relatorioEstoqueSemanalCore.ts`, `supabase/functions/relatorio-estoque-mensal/_shared/relatorioEstoqueCore.ts`, `supabase/functions/relatorio-troca-epi/_shared/relatorioTrocaEpiCore.ts`.
+- Publicacao: as 3 Edge Functions precisam ser republicadas (index.ts + _shared/<core>.ts); o backend sobe com o deploy da Vercel.
+- Validacao: funcoes executadas contra PostgREST local com limite de 1000 linhas (1503 saidas em 2 paginas; estoque de periodo passado antes de uma correcao aprovada; troca com 1500 saidas e 401 ids em lotes).
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

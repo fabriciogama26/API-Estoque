@@ -1007,6 +1007,42 @@ const execute = async (builder: Promise<{ data: any; error: any }>, fallbackMess
   return data
 }
 
+// A API devolve no maximo 1000 linhas por consulta; buildQuery precisa ter ordem estavel.
+const PAGE_SIZE = 1000
+const MAX_PAGES = 200
+
+const executePaged = async (buildQuery: () => any, fallbackMessage: string) => {
+  let resultado: any[] = []
+  for (let pagina = 0; pagina < MAX_PAGES; pagina += 1) {
+    const inicio = pagina * PAGE_SIZE
+    const data = await execute(buildQuery().range(inicio, inicio + PAGE_SIZE - 1), fallbackMessage)
+    const lote = Array.isArray(data) ? data : []
+    resultado = resultado.concat(lote)
+    if (lote.length < PAGE_SIZE) {
+      return resultado
+    }
+  }
+  throw new Error(`${fallbackMessage} Mais de ${MAX_PAGES * PAGE_SIZE} linhas.`)
+}
+
+// Saldo por material x centro com a regra unica do banco (entradas - saidas nao canceladas + correcoes
+// aprovadas), acumulado ate `fim`.
+const carregarSaldosPorOwner = async (ownerId: string, fim: Date | null) => {
+  return await executePaged(
+    () =>
+      supabaseAdmin
+        .rpc("_estoque_saldos_posicoes", {
+          p_owner_id: ownerId,
+          p_material_id: null,
+          p_inicio: null,
+          p_fim: fim ? fim.toISOString() : null,
+        })
+        .order("material_id", { ascending: true })
+        .order("centro_estoque_id", { ascending: true, nullsFirst: true }),
+    "Falha ao consultar saldos de estoque.",
+  )
+}
+
 const chunkArray = (items: any[] = [], size = MATERIAIS_VIEW_BATCH_SIZE) => {
   const chunks: any[][] = []
   for (let index = 0; index < items.length; index += size) {
@@ -1202,6 +1238,18 @@ const montarEstoqueAtual = (materiais: any[] = [], entradas: any[] = [], saidas:
   const includeAll = Boolean(options?.includeAll)
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
   const materiaisComMovimentacao = new Set<string>()
+  // Com posicoesSaldo (linhas de _estoque_saldos_posicoes), o saldo vem do banco com a regra unica;
+  // entradas/saidas continuam alimentando totais, centros e datas do periodo.
+  const posicoesPorMaterial: Map<string, any[]> | null = Array.isArray(options?.posicoesSaldo) ? new Map() : null
+  if (posicoesPorMaterial) {
+    options.posicoesSaldo.forEach((posicao: any) => {
+      const chave = String(posicao?.material_id ?? "")
+      if (!chave) return
+      const lista = posicoesPorMaterial.get(chave)
+      if (lista) lista.push(posicao)
+      else posicoesPorMaterial.set(chave, [posicao])
+    })
+  }
 
   const itens = materiaisNormalizados.map((material: any) => {
     const entradasMaterial = entradas
@@ -1213,12 +1261,18 @@ const montarEstoqueAtual = (materiais: any[] = [], entradas: any[] = [], saidas:
       .filter((saida) => filtrarPorPeriodo(saida, "dataEntrega", periodo))
       .filter((saida) => !isRegistroCancelado(saida))
 
-    const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo)
+    const posicoes = posicoesPorMaterial ? posicoesPorMaterial.get(String(material.id)) ?? [] : null
+    const saldo = posicoes
+      ? posicoes.reduce((acc: number, posicao: any) => acc + Number(posicao.saldo ?? 0), 0)
+      : calcularSaldoMaterial(material.id, entradas, saidas, periodo)
+    const temEntrada = posicoes
+      ? posicoes.some((posicao: any) => Number(posicao.total_entradas ?? 0) > 0)
+      : entradasMaterial.length > 0
     const estoqueMinimo = Number(material.estoqueMinimo ?? 0)
     const deficitQuantidade = Math.max(estoqueMinimo - saldo, 0)
     const valorReposicao = Number((deficitQuantidade * Number(material.valorUnitario ?? 0)).toFixed(2))
 
-    if (saldo !== 0 || entradasMaterial.length > 0) {
+    if (saldo !== 0 || temEntrada) {
       materiaisComMovimentacao.add(material.id)
     }
 
@@ -2045,8 +2099,8 @@ const buildInventoryReport = async ({
 }
 
 const carregarMateriaisPorOwner = async (ownerId: string) => {
-  const registrosIds = await execute(
-    supabaseAdmin.from("materiais").select("id").eq("account_owner_id", ownerId),
+  const registrosIds = await executePaged(
+    () => supabaseAdmin.from("materiais").select("id").eq("account_owner_id", ownerId).order("id", { ascending: true }),
     "Falha ao listar materiais.",
   )
   const ids = (registrosIds ?? []).map((item: any) => item.id).filter(Boolean)
@@ -2266,30 +2320,33 @@ const preencherNomesPessoas = async (registros: any[] = [], ownerId: string) => 
 
 const carregarMovimentacoesPorOwner = async ({ ownerId, periodoRange }: { ownerId: string; periodoRange?: { start: Date; end: Date } }) => {
   if (!ownerId) {
-    return { materiais: [], entradas: [], saidas: [], pessoas: [], periodo: null }
+    return { materiais: [], entradas: [], saidas: [], pessoas: [], saldos: [] }
   }
-  const entradasQuery = supabaseAdmin.from("entradas").select("*").eq("account_owner_id", ownerId)
-  const saidasQuery = supabaseAdmin.from("saidas").select("*").eq("account_owner_id", ownerId)
-
-  let entradasFiltered = entradasQuery
-  let saidasFiltered = saidasQuery
-
-  if (periodoRange?.start) {
-    const inicioIso = periodoRange.start.toISOString()
-    entradasFiltered = entradasFiltered.gte("dataEntrada", inicioIso)
-    saidasFiltered = saidasFiltered.gte("dataEntrega", inicioIso)
+  const consultaMovimentacoes = (tabela: string, campoData: string) => {
+    let query = supabaseAdmin
+      .from(tabela)
+      .select("*")
+      .eq("account_owner_id", ownerId)
+      .order(campoData, { ascending: false })
+      .order("id", { ascending: true })
+    if (periodoRange?.start) {
+      query = query.gte(campoData, periodoRange.start.toISOString())
+    }
+    if (periodoRange?.end) {
+      query = query.lte(campoData, periodoRange.end.toISOString())
+    }
+    return query
   }
-  if (periodoRange?.end) {
-    const fimIso = periodoRange.end.toISOString()
-    entradasFiltered = entradasFiltered.lte("dataEntrada", fimIso)
-    saidasFiltered = saidasFiltered.lte("dataEntrega", fimIso)
-  }
 
-  const [materiais, entradas, saidas, pessoasBase] = await Promise.all([
+  const [materiais, entradas, saidas, pessoasBase, saldos] = await Promise.all([
     carregarMateriaisPorOwner(ownerId),
-    execute(entradasFiltered, "Falha ao listar entradas."),
-    execute(saidasFiltered, "Falha ao listar saidas."),
-    execute(supabaseAdmin.from("pessoas").select("*").eq("account_owner_id", ownerId), "Falha ao listar pessoas."),
+    executePaged(() => consultaMovimentacoes("entradas", "dataEntrada"), "Falha ao listar entradas."),
+    executePaged(() => consultaMovimentacoes("saidas", "dataEntrega"), "Falha ao listar saidas."),
+    executePaged(
+      () => supabaseAdmin.from("pessoas").select("*").eq("account_owner_id", ownerId).order("id", { ascending: true }),
+      "Falha ao listar pessoas.",
+    ),
+    carregarSaldosPorOwner(ownerId, periodoRange?.end ?? null),
   ])
 
   const entradasNormalizadas = await preencherCentrosEstoque((entradas ?? []).map(mapEntradaRecord), ownerId)
@@ -2301,6 +2358,7 @@ const carregarMovimentacoesPorOwner = async ({ ownerId, periodoRange }: { ownerI
     entradas: entradasNormalizadas,
     saidas: saidasNormalizadas,
     pessoas: pessoas ?? [],
+    saldos,
   }
 }
 
@@ -2428,11 +2486,13 @@ const runRelatorioAuto = async () => {
       }
 
         const dadosAtual = await carregarMovimentacoesPorOwner({ ownerId, periodoRange })
+        // Estoque acumulado ate o fim do mes (nao so a movimentacao do mes).
         const estoqueBaseAtual = montarEstoqueAtual(
           dadosAtual.materiais,
           dadosAtual.entradas,
           dadosAtual.saidas,
           null,
+          { posicoesSaldo: dadosAtual.saldos },
         )
         const dashboardAtual = montarDashboard(
           {
