@@ -49,7 +49,7 @@ Boas praticas
 - Execucao manual de previsao (`forecast-gasto-mensal`) exige Authorization Bearer JWT, valida tenant, requer permissao `estoque.reprocessar` e aplica rate limit (5 min).
 - Execucao interna por cron requer `CRON_SECRET` e usa service role (nao deve aceitar chamada manual sem permissao).
 - A previsao mensal usa metodo sazonal: media movel 3m e fator sazonal por mes, multiplicado pelo fator_tendencia.
-- Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m).
+- Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + inclinacao_mensal*6/ultimos 3m), limitado entre 0,5 e 1,5 (desde 20261008; ver "Atualizacao 2026-10 (auditoria do forecast)").
 - O periodo exibido pode ser trocado pelo select com historicos gravados em `inventory_forecast`.
 - O botao Validacao na previsao exibe tabelas de `agg_gasto_mensal` e `f_previsao_gasto_mensal`.
 - O botao Diagnostico executa `diagnosticar_estatisticas_mensais` e exibe percentis mensais.
@@ -478,6 +478,26 @@ Atualizacao 2026-10 (orcamento anual com o saldo unico de estoque)
 - Depois: `estoque_atual` vem de `_estoque_saldos_posicoes` (mesma regra da Saida, do Estoque atual e da aba Compra), somando os centros e mantendo o piso zero. Consumo, segmentacao de demanda, validacao, cenarios e cronograma nao mudaram.
 - Validacao: `supabase/tests/estoque/run-local.ps1` (estoque utilizavel do orcamento igual ao saldo unico; controle negativo com a versao 6 dando o valor antigo).
 
+Atualizacao 2026-10 (auditoria do forecast)
+-------------------------------------------
+- Diagnostico (telas da Auditoria, snapshots de 02/2026 a 09/2026): a previsao caiu porque o gasto real caiu (cerca de R$ 3,8 mil em 03/2026 para R$ 2,4 mil em 07/2026). A acuracia piora nos snapshots novos porque eles so tem 08/2026 (R$ 6.290,55) e 09/2026 (R$ 368,41) para comparar; sem esses dois meses, o snapshot de 03/2026 teria 42,3% em vez de 33,4% e o de 05/2026 teria 51,1% em vez de 34,8%.
+- Bug do fator de tendencia: `regr_slope(valor_saida, extract(epoch from ano_mes))` devolve R$ por segundo e o codigo multiplicava por 30*6 como se fosse por dia. O termo da inclinacao ficava perto de zero e o fator era sempre 0,6 x razao + 0,4 (confere com os fatores 0,86 e 1,10 gravados).
+- Migration `supabase/migrations/20261008_forecast_tendencia_e_auditoria.sql`:
+  - `rpc_previsao_gasto_mensal_calcular` e `_calcular_periodo`: inclinacao pela reta dos ultimos 7 meses com o mes como indice (R$ por mes), projetada em 6 meses; fator calculado limitado entre 0,5 e 1,5 (o informado em `p_fator_tendencia` continua livre); sem saida nos ultimos 3 meses o termo da inclinacao vale 1. As duas voltam a ter `search_path` fixo (perdido quando foram recriadas em 20260423), assim como `rpc_previsao_gasto_mensal_consultar`.
+  - `_rpc_previsao_gasto_mensal_auditar_impl`: `acuracia_wape` e `acuracia_mape` voltam null quando nao ha mes realizado (antes 0).
+  - Snapshots ja gravados nao sao recalculados; a auditoria continua comparando o que foi previsto na epoca. O primeiro snapshot com a formula nova e o do cron seguinte; reprocessar manualmente no meio do mes cria um snapshot com o mes corrente incompleto na base (o calculo usa o ultimo mes com qualquer movimento).
+- Antes: snapshot de 30/09/2026 com fator 1,10; tenant sem saida nos ultimos 3 meses fazia o calculo falhar (fator nulo em coluna not null) e o cron nao gravava o snapshot dele; snapshot sem mes realizado mostrava acuracia 0,0%.
+- Depois: o mesmo historico da fator 1,01 (a reta de 03/2026 a 09/2026 e de queda); queda ou alta muito fortes ficam em 0,5 ou 1,5; o snapshot sem saida recente e gravado com fator 0,5; sem mes realizado a tela mostra "-".
+- Tela (aba Auditoria):
+  - O seletor virou `Snapshot da previsao` e mostra o periodo previsto e a base (ex.: "Previsao 10/2026 a 09/2027 | base 10/2025 a 09/2026"); antes mostrava so a base, como se fosse o periodo previsto. Vale tambem para a aba Operacional. Datas da base e do horizonte passaram para MM/AAAA.
+  - Cabecalho mostra `Previsao <horizonte>` e o chip `Base historica`.
+  - O cartao `Snapshot selecionado` (repetia o cabecalho) foi trocado por `Mes com maior erro`: mes, erro em R$, peso no erro total e direcao. A linha desse mes fica destacada na tabela.
+  - `Base e metodo` ganhou a tendencia; `Meses auditados` mostra quantos realizados ficaram dentro de +/-20%.
+  - Icone (i) no titulo da auditoria, em cada cartao e na tabela `Previsto x realizado`, com a regra de cada numero.
+  - Formula do modal `Validacao da previsao` e ajuda contextual atualizadas.
+- Ponto em aberto (nao alterado): o agregado `agg_gasto_mensal`, que a auditoria usa como realizado, so e recalculado quando um snapshot e gerado (cron 0 3 28-31, ou seja 00:00 de Brasilia do ultimo dia). O mes que fecha entra na base sem o ultimo dia e sem lancamentos atrasados, e esse realizado fica parado ate o proximo calculo.
+- Validacao: `supabase/tests/forecast/run-local.ps1` (19 verificacoes: controle negativo com a versao de 20260423, fator 1,01 no historico das telas, limites 0,5/1,5, tenant sem saida recente, `p_fator_tendencia` livre, `search_path`, acuracia nula sem mes realizado, acuracia = 100 - WAPE, piso zero e isolamento por owner); `npm run build`; `npm test`.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -530,6 +550,10 @@ Funcoes utilitarias relacionadas
   - Tipo: utilitarios locais
   - Caminho: src/pages/AnaliseEstoquePage.jsx
   - Responsavel por: traduzir status de validacao e padrao de demanda do orcamento anual na aba Auditoria.
+- AUDIT_TOOLTIPS / formatForecastSnapshotOptionLabel / formatForecastMesLabel
+  - Tipo: constantes e utilitarios locais
+  - Caminho: src/pages/AnaliseEstoquePage.jsx
+  - Responsavel por: textos do icone (i) da aba Auditoria e rotulos MM/AAAA do snapshot (periodo previsto e base).
 
 Servicos e integracoes externas
 -------------------------------
@@ -593,6 +617,14 @@ Servicos e integracoes externas
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260926_secure_forecast_purchase_rpcs.sql
   - Responsavel por: mover o corpo das RPCs para funcoes internas e validar o owner da sessao (`forecast_assert_owner_access`) antes de retornar auditoria/compra sugerida.
+- Migration do fator de tendencia e da acuracia da auditoria
+  - Tipo: SQL (Supabase)
+  - Caminho: supabase/migrations/20261008_forecast_tendencia_e_auditoria.sql
+  - Responsavel por: inclinacao do fator de tendencia em R$ por mes com limite 0,5..1,5, `search_path` fixo nas RPCs do forecast e acuracia nula na auditoria sem mes realizado.
+- Validacao local do forecast
+  - Tipo: SQL + PowerShell (Postgres local descartavel)
+  - Caminho: supabase/tests/forecast/
+  - Responsavel por: stub das tabelas do forecast, controle negativo com a versao de 20260423 e validacao da 20261008.
 - Migration da politica de reposicao
   - Tipo: SQL (Supabase)
   - Caminho: supabase/migrations/20260926_create_inventory_policy.sql

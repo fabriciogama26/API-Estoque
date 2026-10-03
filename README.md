@@ -938,6 +938,7 @@ supabase/
     20261004_orcamento_12m_saldo_unico.sql  # orcamento anual (versao 6) com o estoque pelo saldo unico
     20261005_listas_movimentacoes_paginadas.sql  # listas de Entradas/Saidas paginadas no banco, registrantes e busca de material
     20261006_dashboard_estoque_agregado.sql  # Dashboard de estoque com entradas, saidas e pessoas agregadas no banco
+    20261008_forecast_tendencia_e_auditoria.sql  # forecast: inclinacao do fator de tendencia em R$/mes (0,5..1,5) e acuracia nula sem mes realizado
   auditoria/
     auditoria_estoque.sql  # consultas somente leitura para conferir saldo, duplicidades e inconsistencias
     diagnostico_orcamento_12m.sql  # identifica qual versao do orcamento anual esta aplicada no banco
@@ -962,6 +963,11 @@ supabase/
       10_saldo_unico_validacao.sql  # validacao SQL do saldo unico, politica de reposicao e orcamento anual (termina em ROLLBACK)
       20_listas_validacao.sql  # validacao SQL das listas paginadas de Entradas e Saidas e do Dashboard agregado (termina em ROLLBACK)
       run-local.ps1  # executa stubs + migrations de estoque + validacao em Postgres local
+    forecast/
+      00_stub_forecast_local.sql  # tabelas do forecast e helpers de teste para Postgres local descartavel
+      05_controle_versao_antiga.sql  # controle negativo: fator de tendencia da versao de 20260423 (termina em ROLLBACK)
+      10_forecast_auditoria_validacao.sql  # validacao SQL do fator de tendencia e da auditoria (termina em ROLLBACK)
+      run-local.ps1  # executa stubs + migrations do forecast + validacao em Postgres local
 temp_readme.txt  # documento de suporte
 vercel.json  # configuracao de deploy (Vercel)
 vite.config.js  # configuracao do Vite
@@ -1007,6 +1013,12 @@ powershell -ExecutionPolicy Bypass -File supabase/tests/validades/run-local.ps1 
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File supabase/tests/estoque/run-local.ps1 -Port 5432
+```
+
+- Forecast: validacao SQL do fator de tendencia (controle negativo com a versao de 20260423, limites 0,5/1,5, tenant sem saida recente) e da auditoria (acuracia sem mes realizado, 100 - WAPE, isolamento por owner).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File supabase/tests/forecast/run-local.ps1 -Port 5432
 ```
 
 - Testes unitarios (Node): `npm test` executa `tests/*.test.js` (montagem do Estoque atual, correcoes de estoque e checagens das migrations).

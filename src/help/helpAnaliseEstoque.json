@@ -29,7 +29,7 @@
           "Compra: o que comprar agora (reposicao atual pela politica de reposicao).",
           "Previsao de Orcamento: quanto reservar para os proximos 12 meses.",
           "Auditoria: qualidade do snapshot (previsto x realizado) e validacao do orcamento.",
-          "O periodo do snapshot e escolhido nas abas Operacional e Auditoria e vale tambem para o Orcamento. A aba Compra nao usa snapshot.",
+          "O snapshot e escolhido no campo Snapshot da previsao (abas Operacional e Auditoria), que mostra o periodo previsto e a base historica usada; a escolha vale tambem para o Orcamento. A aba Compra nao usa snapshot.",
           "Links de outras telas podem abrir a Analise direto em uma aba (ex.: botoes Ver na Analise do Estoque atual abrem a aba Compra)."
         ]
       },
@@ -90,8 +90,13 @@
       },
       {
         "title": "Auditoria",
-        "description": "Mostra o snapshot selecionado, previsto x realizado por mes e os atalhos de validacao.",
+        "description": "Compara o que cada snapshot previu com o gasto que aconteceu depois. O snapshot e gerado no ultimo dia de cada mes com os 12 meses anteriores como base, e o previsto gravado nao muda.",
         "items": [
+          "Cartoes: Mes com maior erro (e quanto ele pesa no erro total), Base e metodo, Meses auditados (quantos ficaram dentro de +/-20%), Acuracia (100% - WAPE) e Vies (positivo = previu acima do gasto).",
+          "Com poucos meses realizados, um unico mes atipico domina a acuracia; por isso os snapshots mais novos costumam parecer piores.",
+          "Sem nenhum mes realizado, acuracia e vies aparecem como \"-\": nao e acuracia zero, o snapshot ainda nao tem o que comparar.",
+          "Tabela Previsto x realizado: a linha destacada e o mes com maior erro. O realizado vem do agregado mensal, recalculado quando um snapshot e gerado; lancamentos feitos depois so aparecem no proximo calculo.",
+          "Passe o mouse no (i) do titulo, de cada cartao e da tabela para ver como cada numero e calculado.",
           "Validar orcamento: realizado 12m, padrao de demanda, previsao bruta e final, travas, preco futuro e impacto; permite copiar ou exportar em CSV.",
           "Validacao da previsao: tabelas de gasto mensal e previsao mensal.",
           "Diagnostico: estatisticas mensais; mostra Nao calculavel quando a amostra e insuficiente."
@@ -101,7 +106,7 @@
     "notes": [
       "A aba Compra e a Previsao de Orcamento respondem perguntas diferentes: comprar agora x reservar verba para 12 meses.",
       "A previsao rolling e o orcamento sao lidos de tabelas agregadas; nao ha calculo no navegador.",
-      "Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m); a sazonalidade usa media movel de 3 meses.",
+      "Fator_tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + inclinacao_mensal*6/ultimos 3m), limitado entre 0,5 e 1,5; a inclinacao e a reta dos ultimos 7 meses em R$ por mes. Snapshots gerados antes de 10/2026 usavam 0.6*(ultimos 3m / anteriores 3m) + 0.4. A sazonalidade usa media movel de 3 meses.",
       "O tooltip da previsao separa contingencia de 25%, P75/P90 estatisticos, mediana e alerta de volatilidade.",
       "Itens intermitentes nao sao anualizados apenas pelos meses com movimento; o orcamento aplica travas contra superestimacao.",
       "A acuracia da Auditoria usa WAPE/MAPE sobre os meses do snapshot que ja possuem realizado; o Diagnostico usa agg_gasto_mensal.",

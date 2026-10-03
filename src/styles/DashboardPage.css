@@ -514,6 +514,44 @@
   white-space: nowrap;
 }
 
+.analysis-audit-table tbody tr.analysis-audit-row--destaque td {
+  background: rgba(249, 115, 22, 0.1);
+  font-weight: 600;
+}
+
+/* Aba Auditoria: titulo com icone (i) e tooltips com textos longos. */
+.analysis-audit-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.summary-tooltip.analysis-audit-info {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+}
+
+.summary-tooltip.analysis-audit-info span {
+  left: 1.75rem;
+}
+
+/* Abre a partir do proprio card: assim o tooltip do ultimo card nao passa da borda da tela. */
+.analysis-audit-cards .summary-tooltip span {
+  left: 0;
+}
+
+.summary-tooltip.analysis-audit-info span,
+.analysis-audit-cards .summary-tooltip span {
+  width: 280px;
+  max-width: 70vw;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  text-align: left;
+}
+
 .analysis-budget-validation-table th:first-child,
 .analysis-budget-validation-table td:first-child {
   min-width: 16rem;

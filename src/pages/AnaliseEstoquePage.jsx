@@ -78,11 +78,19 @@ const FORECAST_TABS = [
   },
 ]
 
+function formatForecastMesLabel(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return String(value)
+  }
+  return `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`
+}
+
 function formatForecastPeriodoLabel(periodoInicio, periodoFim) {
   if (!periodoInicio && !periodoFim) {
     return 'Periodo nao selecionado'
   }
-  return [periodoInicio, periodoFim].filter(Boolean).join(' a ')
+  return [periodoInicio, periodoFim].filter(Boolean).map(formatForecastMesLabel).join(' a ')
 }
 
 function formatForecastTimestamp(value) {
@@ -428,6 +436,28 @@ function formatForecastHorizonLabel(periodoFim) {
     return 'Horizonte nao informado'
   }
   return `${formatForecastPeriodoLabel(inicio.toISOString().split('T')[0], fim.toISOString().split('T')[0])}`
+}
+
+function formatForecastSnapshotOptionLabel(periodo) {
+  const base = formatForecastPeriodoLabel(periodo?.periodo_base_inicio, periodo?.periodo_base_fim)
+  return `Previsao ${formatForecastHorizonLabel(periodo?.periodo_base_fim)} | base ${base}`
+}
+
+const AUDIT_TOOLTIPS = {
+  auditoria:
+    'Cada snapshot e uma foto da previsao, gerada no ultimo dia do mes com os 12 meses anteriores como base. O previsto gravado nao muda depois; a auditoria compara esses valores com o gasto que aconteceu. Fator de tendencia: 0,6 x (ultimos 3 meses / 3 meses anteriores) + 0,4 x (1 + inclinacao dos ultimos 7 meses projetada em 6 meses), limitado entre 0,5 e 1,5 (snapshots gerados antes de 10/2026 usavam 0,6 x razao + 0,4). Variacao: previsao anual contra os 12 meses anteriores a base.',
+  maiorErro:
+    'Mes ja realizado com a maior diferenca entre previsto e realizado, e quanto ele pesa no erro total do snapshot. Com poucos meses auditados, um unico mes fora do padrao (pico ou queda de consumo, ou lancamentos atrasados) explica quase toda a acuracia baixa.',
+  base:
+    'Meses de historico usados no calculo e o metodo. Sazonal: cada mes previsto parte do mesmo mes do ano anterior (media movel de 3 meses) e e ajustado pelo fator de tendencia. Tendencia: previsao anual contra os 12 meses anteriores a base (subida a partir de +2%, queda a partir de -2%, senao estavel; sem_base quando nao ha esse historico).',
+  auditados:
+    'Meses do snapshot que ja tem gasto no agregado mensal (realizados) sobre o total previsto. So os realizados entram na acuracia e no vies. Dentro de +/-20%: realizados com erro de ate 20% do valor realizado.',
+  acuracia:
+    'Acuracia = 100% - WAPE. WAPE = soma dos erros absolutos / soma do realizado; pesa mais os meses de gasto alto. MAPE = media do erro % de cada mes; dispara quando um mes tem realizado pequeno. Sem mes realizado mostra "-". Com poucos meses, um mes atipico domina o resultado.',
+  vies:
+    'Vies = soma de (previsto - realizado) / soma do realizado, so nos meses realizados. Positivo: a previsao ficou acima do gasto (superestimou). Negativo: ficou abaixo (subestimou). Vies perto de zero com acuracia baixa indica erros que se compensam.',
+  tabela:
+    'Previsto: valor gravado quando o snapshot foi gerado. Realizado: gasto de saidas do mes (quantidade x valor unitario atual do material) no agregado mensal, que so e recalculado quando um snapshot e gerado; lancamentos feitos depois aparecem no proximo calculo. Erro abs. = |previsto - realizado|. Erro % = (previsto - realizado) / realizado: positivo previu acima, negativo previu abaixo. Pendente: mes que ainda nao chegou ao agregado. A linha destacada e o mes com maior erro.',
 }
 
 function getForecastStatusMessage(status, payload) {
@@ -1926,48 +1956,89 @@ export function AnaliseEstoquePage() {
     [forecastAuditPayload?.serie],
   )
 
-  const auditCards = useMemo(
-    () => [
+  const auditMaiorErro = useMemo(
+    () =>
+      auditSerie.reduce((maior, item) => {
+        if (item.status !== 'realizado' || item.erro_absoluto === null || item.erro_absoluto === undefined) {
+          return maior
+        }
+        return !maior || Number(item.erro_absoluto) > Number(maior.erro_absoluto) ? item : maior
+      }, null),
+    [auditSerie],
+  )
+
+  const auditCards = useMemo(() => {
+    const temRealizado = Number(auditResumo?.meses_realizados || 0) > 0
+    const isNumero = (value) => value !== null && value !== undefined && value !== ''
+    const mesesNaFaixa = auditSerie.filter(
+      (item) =>
+        item.status === 'realizado' && isNumero(item.erro_percentual) && Math.abs(Number(item.erro_percentual)) <= 20,
+    ).length
+    const erroTotal = Number(auditResumo?.erro_absoluto_total || 0)
+    const maiorErroPeso =
+      auditMaiorErro && erroTotal > 0 ? (Number(auditMaiorErro.erro_absoluto) / erroTotal) * 100 : 100
+    const maiorErroVies = Number(auditMaiorErro?.vies || 0)
+    const maiorErroDirecao =
+      maiorErroVies > 0 ? 'previsao acima do realizado' : maiorErroVies < 0 ? 'previsao abaixo do realizado' : 'sem diferenca'
+    const acuraciaDisponivel = temRealizado && isNumero(auditResumo?.acuracia_wape)
+    const viesDisponivel = temRealizado && isNumero(auditResumo?.vies_percentual)
+    const mapeLabel = isNumero(auditResumo?.mape_percentual) ? `${formatNumber(auditResumo.mape_percentual, 1)}%` : '-'
+
+    return [
       {
-        id: 'snapshot',
-        title: 'Snapshot selecionado',
-        value: forecastPeriodoLabel,
-        helper: `Gerado em ${forecastCreatedAtLabel}`,
+        id: 'maior-erro',
+        title: 'Mes com maior erro',
+        value: auditMaiorErro ? auditMaiorErro.label || '-' : '-',
+        helper: auditMaiorErro
+          ? `${formatCurrency(auditMaiorErro.erro_absoluto)} (${formatNumber(maiorErroPeso, 0)}% do erro total) | ${maiorErroDirecao}`
+          : 'Sem meses realizados',
         tone: 'slate',
+        tooltip: AUDIT_TOOLTIPS.maiorErro,
       },
       {
         id: 'base',
         title: 'Base e metodo',
         value: `${formatNumber(forecastBase?.qtd_meses_base || 0)} meses`,
-        helper: `${forecastBase?.metodo_previsao || '-'} | confianca ${forecastBase?.nivel_confianca || 'nao informada'}`,
+        helper: `${forecastBase?.metodo_previsao || '-'} | confianca ${forecastBase?.nivel_confianca || 'nao informada'} | tendencia ${
+          forecastBase?.tipo_tendencia || 'sem tipo'
+        }`,
         tone: 'blue',
+        tooltip: AUDIT_TOOLTIPS.base,
       },
       {
         id: 'auditados',
         title: 'Meses auditados',
         value: `${formatNumber(auditResumo?.meses_realizados || 0)} / ${formatNumber(auditResumo?.meses_total || 0)}`,
-        helper: `${formatNumber(auditResumo?.meses_pendentes || 0)} pendentes | tendencia ${forecastBase?.tipo_tendencia || 'sem tipo'}`,
+        helper: temRealizado
+          ? `${formatNumber(auditResumo?.meses_pendentes || 0)} pendentes | ${formatNumber(mesesNaFaixa)} dentro de +/-20%`
+          : `${formatNumber(auditResumo?.meses_pendentes || 0)} pendentes`,
         tone: 'green',
+        tooltip: AUDIT_TOOLTIPS.auditados,
       },
       {
         id: 'acuracia',
         title: 'Acuracia do snapshot',
-        value: `${formatNumber(auditResumo?.acuracia_wape || 0, 1)}%`,
-        helper: `WAPE ${formatNumber(auditResumo?.wape_percentual || 0, 1)}% | MAPE ${formatNumber(auditResumo?.mape_percentual || 0, 1)}%`,
+        value: acuraciaDisponivel ? `${formatNumber(auditResumo.acuracia_wape, 1)}%` : '-',
+        helper: acuraciaDisponivel
+          ? `WAPE ${formatNumber(auditResumo?.wape_percentual || 0, 1)}% | MAPE ${mapeLabel}`
+          : 'Aguardando o primeiro mes realizado',
         tone: 'orange',
+        tooltip: AUDIT_TOOLTIPS.acuracia,
       },
       {
         id: 'vies',
         title: 'Vies do forecast',
-        value: formatPercent(auditResumo?.vies_percentual || 0, 2),
-        helper: `Previsto ${formatCurrency(auditResumo?.total_previsto_realizado || 0)} | Realizado ${formatCurrency(
-          auditResumo?.total_realizado || 0,
-        )}`,
+        value: viesDisponivel ? formatPercent(auditResumo.vies_percentual, 2) : '-',
+        helper: temRealizado
+          ? `Previsto ${formatCurrency(auditResumo?.total_previsto_realizado || 0)} | Realizado ${formatCurrency(
+              auditResumo?.total_realizado || 0,
+            )}`
+          : 'Sem meses realizados',
         tone: 'orange',
+        tooltip: AUDIT_TOOLTIPS.vies,
       },
-    ],
-    [auditResumo, forecastBase, forecastCreatedAtLabel, forecastPeriodoLabel],
-  )
+    ]
+  }, [auditMaiorErro, auditResumo, auditSerie, forecastBase])
 
   const buildForecastHistoricoClipboardText = () => {
     const historicoHeader = ['Mes', 'Valor saida', 'Valor entrada', 'Media movel (3m)'].join('\t')
@@ -2313,12 +2384,12 @@ export function AnaliseEstoquePage() {
                   </div>
                   <div className="analysis-forecast-actions">
                     <label className="field">
-                      <span>Periodo da previsao</span>
+                      <span>Snapshot da previsao</span>
                       <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
-                        <option value="">Selecione um periodo</option>
+                        <option value="">Selecione um snapshot</option>
                         {forecastPeriodos.map((periodo) => {
                           const value = String(periodo.id)
-                          const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
+                          const label = formatForecastSnapshotOptionLabel(periodo)
                           return (
                             <option key={value} value={value}>
                               {label}
@@ -2749,12 +2820,25 @@ export function AnaliseEstoquePage() {
               <div className="analysis-forecast-card analysis-forecast-card--technical">
                 <div className="analysis-forecast-card__heading">
                   <div>
-                    <p className="analysis-forecast-label">Auditoria do forecast</p>
-                    <p className="analysis-forecast-value">{forecastPeriodoLabel}</p>
+                    <div className="analysis-audit-title">
+                      <p className="analysis-forecast-label">Auditoria do forecast</p>
+                      <button
+                        type="button"
+                        className="summary-tooltip analysis-audit-info"
+                        aria-label={`Como funciona a auditoria: ${AUDIT_TOOLTIPS.auditoria}`}
+                      >
+                        <InfoIcon size={12} aria-hidden="true" />
+                        <span>{AUDIT_TOOLTIPS.auditoria}</span>
+                      </button>
+                    </div>
+                    <p className="analysis-forecast-value">
+                      {forecastBase?.periodo_base_fim ? `Previsao ${forecastHorizonLabel}` : forecastPeriodoLabel}
+                    </p>
                   </div>
                   <span className="analysis-forecast-badge">Snapshot selecionado</span>
                 </div>
                 <div className="analysis-forecast-meta analysis-forecast-meta--grid analysis-forecast-meta--compact">
+                  <span>Base historica: {forecastPeriodoLabel}</span>
                   <span>Gerado em: {forecastCreatedAtLabel}</span>
                   <span>Metodo: {forecastBase?.metodo_previsao || '-'}</span>
                   <span>Confianca: {forecastBase?.nivel_confianca || 'nao informada'}</span>
@@ -2768,12 +2852,12 @@ export function AnaliseEstoquePage() {
                 </div>
                 <div className="analysis-forecast-actions">
                   <label className="field">
-                    <span>Periodo da previsao</span>
+                    <span>Snapshot da previsao</span>
                     <select value={forecastPeriodoSelecionado} onChange={handlePeriodoChange}>
-                      <option value="">Selecione um periodo</option>
+                      <option value="">Selecione um snapshot</option>
                       {forecastPeriodos.map((periodo) => {
                         const value = String(periodo.id)
-                        const label = `${periodo.periodo_base_inicio} a ${periodo.periodo_base_fim}`
+                        const label = formatForecastSnapshotOptionLabel(periodo)
                         return (
                           <option key={value} value={value}>
                             {label}
@@ -2810,9 +2894,20 @@ export function AnaliseEstoquePage() {
                 </div>
               </div>
             </div>
-            <div className="dashboard-highlights dashboard-highlights--secondary">
+            <div className="dashboard-highlights dashboard-highlights--secondary analysis-audit-cards">
               {auditCards.map((card) => (
-                <article key={card.id} className={`dashboard-insight-card dashboard-insight-card--${card.tone}`}>
+                <article
+                  key={card.id}
+                  className={`dashboard-insight-card dashboard-insight-card--${card.tone} dashboard-insight-card--has-tooltip`}
+                >
+                  <button
+                    type="button"
+                    className="summary-tooltip summary-tooltip--floating"
+                    aria-label={`${card.title}: ${card.tooltip}`}
+                  >
+                    <InfoIcon size={16} aria-hidden="true" />
+                    <span>{card.tooltip}</span>
+                  </button>
                   <header className="dashboard-insight-card__header">
                     <p className="dashboard-insight-card__title">{card.title}</p>
                     <span className="dashboard-insight-card__avatar">
@@ -2826,7 +2921,17 @@ export function AnaliseEstoquePage() {
             </div>
             <div className="analysis-forecast-grid analysis-forecast-grid--single">
               <article className="analysis-forecast-card analysis-forecast-card--list">
-                <p className="analysis-forecast-label">Previsto x realizado</p>
+                <div className="analysis-audit-title">
+                  <p className="analysis-forecast-label">Previsto x realizado</p>
+                  <button
+                    type="button"
+                    className="summary-tooltip analysis-audit-info"
+                    aria-label={`Como ler a tabela: ${AUDIT_TOOLTIPS.tabela}`}
+                  >
+                    <InfoIcon size={12} aria-hidden="true" />
+                    <span>{AUDIT_TOOLTIPS.tabela}</span>
+                  </button>
+                </div>
                 <p className="analysis-forecast-subtitle">
                   Viés positivo = forecast acima do realizado. Meses futuros continuam como pendentes.
                 </p>
@@ -2845,7 +2950,12 @@ export function AnaliseEstoquePage() {
                       </thead>
                       <tbody>
                         {auditSerie.map((item) => (
-                          <tr key={`audit-${item.ano_mes}`}>
+                          <tr
+                            key={`audit-${item.ano_mes}`}
+                            className={
+                              auditMaiorErro && item.ano_mes === auditMaiorErro.ano_mes ? 'analysis-audit-row--destaque' : undefined
+                            }
+                          >
                             <td>{item.label || formatLabelFromDate(item.ano_mes)}</td>
                             <td>{formatCurrency(item.valor_previsto || 0)}</td>
                             <td>{item.valor_realizado === null ? '-' : formatCurrency(item.valor_realizado || 0)}</td>
@@ -3288,7 +3398,8 @@ export function AnaliseEstoquePage() {
           <button type="button" className="summary-tooltip" aria-label="Formulas da previsao">
             <InfoIcon size={14} />
             <span>
-              Fator de tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + slope*30*6/ultimos 3m).
+              Fator de tendencia = 0.6*(ultimos 3m / anteriores 3m) + 0.4*(1 + inclinacao_mensal*6/ultimos 3m),
+              limitado entre 0.5 e 1.5; a inclinacao e a reta dos ultimos 7 meses, em R$ por mes.
               Sazonalidade (mes) = media_movel_3m(mes) / media_movel_3m(geral).
               Previsao mensal = media_mensal * fator_sazonal(mes) * fator de tendencia.
             </span>
