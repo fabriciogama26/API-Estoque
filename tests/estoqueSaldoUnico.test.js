@@ -129,7 +129,9 @@ test('lista de materiais do tenant nao depende do limite de 1000 linhas da API',
   const idsDoOwner = api.match(/async function carregarMaterialIdsDoOwner\(\) \{[\s\S]*?\n\}/)?.[0] ?? ''
   assert.match(idsDoOwner, /executePaged\(/)
   assert.match(idsDoOwner, /\.order\('id', \{ ascending: true \}\)/)
-  assert.match(api, /from\('materiais_view'\)\.select\(MATERIAL_SELECT_COLUMNS\)\.in\('id', lote\)/)
+  assert.match(api, /async function carregarMateriaisViewDoOwner\(origem = 'materiais_view'\)/)
+  assert.match(api, /from\(origem\)\.select\(MATERIAL_SELECT_COLUMNS\)\.in\('id', lote\)/)
+  assert.match(api, /carregarMateriaisViewDoOwner\(ENTRADAS_MATERIAIS_VIEW\)/)
 })
 
 test('Estoque atual busca o saldo pronto no banco, paginado', () => {

@@ -22,13 +22,13 @@ import {
   initialSaidaFilters,
   initialSaidaForm,
   materialMatchesTerm,
-  mergePessoasList,
   normalizeSearchValue,
   pessoaMatchesTerm,
 } from '../utils/saidasUtils.js'
 import {
   cancelSaida,
   createSaida,
+  exportarSaidas,
   getMaterialEstoque,
   getSaidaHistory,
   listCentrosEstoque,
@@ -36,8 +36,9 @@ import {
   listCentrosServico,
   listMateriais,
   listPessoas,
-  listPessoasByIds,
-  listSaidas,
+  listRegistrantesSaidas,
+  listSaidasPagina,
+  listStatusSaida,
   searchMateriais,
   searchPessoas,
   updateSaida,
@@ -77,6 +78,10 @@ export function useSaidasController() {
   const [pessoas, setPessoas] = useState([])
   const [materiais, setMateriais] = useState([])
   const [saidas, setSaidas] = useState([])
+  const [totalSaidas, setTotalSaidas] = useState(0)
+  const [registrantes, setRegistrantes] = useState([])
+  // Muda a cada carga da lista; o saldo do material no formulario e reconsultado depois de cada saida.
+  const [saidasVersao, setSaidasVersao] = useState(0)
   const [centrosEstoqueOptions, setCentrosEstoqueOptions] = useState([])
   const [centrosCustoOptions, setCentrosCustoOptions] = useState([])
   const [centrosServicoOptions, setCentrosServicoOptions] = useState([])
@@ -89,6 +94,9 @@ export function useSaidasController() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  // Filtros da ultima consulta: a lista so muda ao clicar em Aplicar.
+  const filtrosAplicadosRef = useRef(initialSaidaFilters)
+  const paginaAtualRef = useRef(1)
   const [historyState, setHistoryState] = useState(HISTORY_INITIAL)
   const [cancelState, setCancelState] = useState(CANCEL_INITIAL)
   const [trocaPrompt, setTrocaPrompt] = useState(TROCA_PROMPT_INITIAL)
@@ -119,44 +127,38 @@ export function useSaidasController() {
   }, [])
 
   const load = useCallback(
-    async (params = filters, { resetPage = false } = {}) => {
-      if (resetPage) setCurrentPage(1)
+    async (params = filtrosAplicadosRef.current, { resetPage = false, refreshCatalogs = false, page = null } = {}) => {
+      const paginaAlvo = resetPage ? 1 : Math.max(1, Number(page ?? paginaAtualRef.current) || 1)
       setIsLoading(true)
       setError(null)
       try {
-        const materiaisPromise = listMateriais()
-        const shouldLoadCentrosEstoque = centrosEstoqueOptions.length === 0
-        const shouldLoadCentrosCusto = centrosCustoOptions.length === 0
-        const shouldLoadCentrosServico = centrosServicoOptions.length === 0
+        const query = buildSaidasQuery(params)
         const [
           pessoasData,
           materiaisData,
-          saidasData,
+          pagina,
           centrosEstoqueData,
           centrosCustoData,
           centrosServicoData,
+          statusData,
+          registrantesData,
         ] = await Promise.all([
-          listPessoas(),
-          materiaisPromise,
-          listSaidas(buildSaidasQuery(params)),
-          shouldLoadCentrosEstoque ? listCentrosEstoque() : Promise.resolve(null),
-          shouldLoadCentrosCusto ? listCentrosCusto() : Promise.resolve(null),
-          shouldLoadCentrosServico ? listCentrosServico() : Promise.resolve(null),
+          refreshCatalogs || pessoas.length === 0 ? listPessoas() : Promise.resolve(null),
+          refreshCatalogs || materiais.length === 0 ? listMateriais() : Promise.resolve(null),
+          listSaidasPagina(query, { page: paginaAlvo, pageSize: TABLE_PAGE_SIZE }),
+          centrosEstoqueOptions.length === 0 ? listCentrosEstoque() : Promise.resolve(null),
+          centrosCustoOptions.length === 0 ? listCentrosCusto() : Promise.resolve(null),
+          centrosServicoOptions.length === 0 ? listCentrosServico() : Promise.resolve(null),
+          statusOptions.length === 0 ? listStatusSaida() : Promise.resolve(null),
+          refreshCatalogs || registrantes.length === 0 ? listRegistrantesSaidas() : Promise.resolve(null),
         ])
-        const pessoaIds = Array.from(new Set((saidasData ?? []).map((s) => s.pessoaId).filter(Boolean)))
-        if (pessoaIds.length && listPessoasByIds) {
-          try {
-            const extras = await listPessoasByIds(pessoaIds)
-            setPessoas(mergePessoasList(pessoasData ?? [], extras ?? []))
-          } catch (extraErr) {
-            reportError(extraErr, { area: 'saidas_load_pessoas_extra', pessoaIds })
-            setPessoas(pessoasData ?? [])
-          }
-        } else {
-          setPessoas(pessoasData ?? [])
+        let resultado = pagina
+        const ultimaPagina = Math.max(1, Math.ceil((resultado?.total ?? 0) / TABLE_PAGE_SIZE))
+        if (!resultado?.itens?.length && paginaAlvo > ultimaPagina) {
+          resultado = await listSaidasPagina(query, { page: ultimaPagina, pageSize: TABLE_PAGE_SIZE })
         }
-        setMateriais(materiaisData ?? [])
-        setSaidas(saidasData ?? [])
+        if (pessoasData) setPessoas(pessoasData ?? [])
+        if (materiaisData) setMateriais(materiaisData ?? [])
         if (centrosEstoqueData) {
           const normalizarCentro = (item) => {
             const id = item?.id || item?.centroCustoId || item?.centro_custo || null
@@ -177,6 +179,20 @@ export function useSaidasController() {
         }
         if (centrosCustoData) setCentrosCustoOptions(centrosCustoData ?? [])
         if (centrosServicoData) setCentrosServicoOptions(centrosServicoData ?? [])
+        if (statusData) {
+          setStatusOptions(
+            (statusData ?? [])
+              .map((item) => ({ id: item.id, label: (item.nome || item.status || '').toString().trim() }))
+              .filter((item) => item.id && item.label),
+          )
+        }
+        if (registrantesData) setRegistrantes(registrantesData ?? [])
+        filtrosAplicadosRef.current = params
+        paginaAtualRef.current = resultado?.page ?? paginaAlvo
+        setSaidas(resultado?.itens ?? [])
+        setTotalSaidas(resultado?.total ?? 0)
+        setCurrentPage(paginaAtualRef.current)
+        setSaidasVersao((versao) => versao + 1)
       } catch (err) {
         setError(err.message)
         reportError(err, { area: 'saidas_load' })
@@ -184,8 +200,27 @@ export function useSaidasController() {
         setIsLoading(false)
       }
     },
-    [filters, centrosEstoqueOptions.length, centrosCustoOptions.length, centrosServicoOptions.length, reportError],
+    [
+      centrosCustoOptions.length,
+      centrosEstoqueOptions.length,
+      centrosServicoOptions.length,
+      materiais.length,
+      pessoas.length,
+      registrantes.length,
+      reportError,
+      statusOptions.length,
+    ],
   )
+
+  const goToPage = useCallback(
+    (pagina) => {
+      load(filtrosAplicadosRef.current, { page: pagina }).catch((err) => reportError(err, { area: 'saidas_page' }))
+    },
+    [load, reportError],
+  )
+
+  // Todas as saidas dos filtros aplicados (nao so a pagina aberta), para a exportacao.
+  const exportSaidas = useCallback(() => exportarSaidas(buildSaidasQuery(filtrosAplicadosRef.current)), [])
 
   const dedupeMateriais = useCallback((lista = []) => {
     const mapa = new Map()
@@ -251,6 +286,10 @@ export function useSaidasController() {
     setPessoas([])
     setMateriais([])
     setSaidas([])
+    setTotalSaidas(0)
+    setRegistrantes([])
+    filtrosAplicadosRef.current = initialSaidaFilters
+    paginaAtualRef.current = 1
     setCentrosEstoqueOptions([])
     setCentrosCustoOptions([])
     setCentrosServicoOptions([])
@@ -260,7 +299,7 @@ export function useSaidasController() {
     setCurrentPage(1)
     materialSaldoCacheRef.current = new Map()
     resetFormState()
-    load(initialSaidaFilters, { resetPage: true }).catch((err) => {
+    load(initialSaidaFilters, { resetPage: true, refreshCatalogs: true }).catch((err) => {
       reportError(err, { area: 'saidas_scope_change', userScopeKey })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -296,7 +335,7 @@ export function useSaidasController() {
       }
       await createSaida({ ...trocaPrompt.payload, forceTroca: true })
       cancelEditSaida()
-      await load(filters, { resetPage: true })
+      await load(filtrosAplicadosRef.current, { resetPage: true, refreshCatalogs: true })
       closeTrocaPrompt()
     } catch (err) {
       setError(err.message)
@@ -308,7 +347,6 @@ export function useSaidasController() {
     cancelEditSaida,
     closeTrocaPrompt,
     editingSaida,
-    filters,
     load,
     materialEstoque,
     materialEstoqueLoading,
@@ -377,7 +415,7 @@ export function useSaidasController() {
         }
       }
       cancelEditSaida()
-      await load(filters, { resetPage: !editingSaida })
+      await load(filtrosAplicadosRef.current, { resetPage: !editingSaida, refreshCatalogs: true })
     } catch (err) {
       setError(err.message)
       reportError(err, { area: 'saidas_submit', editing: Boolean(editingSaida) })
@@ -398,7 +436,7 @@ export function useSaidasController() {
 
   const handleFilterClear = () => {
     setFilters(initialSaidaFilters)
-    load(initialSaidaFilters, { resetPage: true })
+    load(initialSaidaFilters, { resetPage: true, refreshCatalogs: true })
   }
 
   const startEditSaida = (saida) => {
@@ -419,11 +457,11 @@ export function useSaidasController() {
       centroServicoId: saida.centroServicoId || '',
       dataEntrega: formatDateToInput(saida.dataEntrega),
     })
-    const pessoa = pessoas.find((p) => p.id === saida.pessoaId)
+    const pessoa = saida.pessoa || pessoas.find((p) => p.id === saida.pessoaId)
     if (pessoa) {
       setPessoaSearchValue(formatPessoaSummary(pessoa))
     }
-    const material = materiais.find((m) => m.id === saida.materialId)
+    const material = saida.material || materiais.find((m) => m.id === saida.materialId)
     if (material) {
       setMaterialSearchValue(formatMaterialSummary(material))
     }
@@ -463,7 +501,7 @@ export function useSaidasController() {
     try {
       await cancelSaida(cancelState.saida.id, cancelState.motivo)
       closeCancelModal()
-      await load(filters, { resetPage: false })
+      await load(filtrosAplicadosRef.current, { resetPage: false })
     } catch (err) {
       setCancelState((prev) => ({ ...prev, isSubmitting: false, error: err.message || 'Falha ao cancelar.' }))
       reportError(err, { area: 'saidas_cancel', saidaId: cancelState.saida.id })
@@ -749,7 +787,7 @@ export function useSaidasController() {
         reportError(err, { area: 'saidas_material_estoque', materialId: form.materialId })
       })
       .finally(() => setMaterialEstoqueLoading(false))
-}, [form.materialId, form.centroEstoqueId, saidas.length, reportError])
+}, [form.materialId, form.centroEstoqueId, saidasVersao, reportError])
 
   const saidasComPrazo = useMemo(
     () =>
@@ -760,97 +798,10 @@ export function useSaidasController() {
     [saidas],
   )
 
-  const pessoasMap = useMemo(() => new Map((pessoas ?? []).map((pessoa) => [pessoa.id, pessoa])), [pessoas])
-  const materiaisMap = useMemo(() => new Map((materiais ?? []).map((material) => [material.id, material])), [materiais])
+  // A pagina ja vem filtrada e paginada do banco.
+  const saidasFiltradas = saidasComPrazo
 
-  const saidasFiltradas = useMemo(() => {
-    const { trocaPrazo, trocaOnly, termo, registradoPor, status } = filters
-    let lista = saidasComPrazo
-    if (trocaOnly) {
-      lista = lista.filter((s) => Boolean(s.isTroca))
-    }
-    if (trocaPrazo) {
-      if (trocaPrazo === 'sem-data') {
-        lista = lista.filter((s) => !s.trocaPrazo)
-      } else {
-        lista = lista.filter((s) => s.trocaPrazo?.variant === trocaPrazo)
-      }
-    }
-
-    const statusRaw = (status ?? '').toString().trim()
-    if (statusRaw) {
-      const statusNormalizado = normalizeSearchValue(statusRaw)
-      lista = lista.filter((saida) => {
-        const statusId = (saida?.statusId || '').toString().trim()
-        if (statusId) {
-          return statusId === statusRaw
-        }
-        const statusNome = normalizeSearchValue(saida?.statusNome || saida?.status || '')
-        return statusNome === statusNormalizado
-      })
-    }
-
-    const registradoPorRaw = (registradoPor ?? '').toString().trim()
-    if (registradoPorRaw) {
-      const registradoPorNormalizado = normalizeSearchValue(registradoPorRaw)
-      lista = lista.filter((saida) => {
-        const usuarioId = (saida?.usuarioResponsavelId || '').toString().trim()
-        if (usuarioId) {
-          return usuarioId === registradoPorRaw
-        }
-        const usuarioNome = normalizeSearchValue(
-          saida?.usuarioResponsavelNome || saida?.usuarioResponsavel || ''
-        )
-        return usuarioNome === registradoPorNormalizado
-      })
-    }
-
-    const termoNormalizado = normalizeSearchValue(termo)
-    if (termoNormalizado) {
-      lista = lista.filter((saida) => {
-        const pessoa = pessoasMap.get(saida.pessoaId)
-        const material = materiaisMap.get(saida.materialId)
-        if (pessoaMatchesTerm(pessoa, termoNormalizado) || materialMatchesTerm(material, termoNormalizado)) {
-          return true
-        }
-        const extraCampos = [
-          saida?.materialId,
-          saida?.pessoaId,
-          saida?.centroCusto,
-          saida?.centroServico,
-          saida?.usuarioResponsavel,
-        ]
-        return extraCampos
-          .map(normalizeSearchValue)
-          .some((campo) => campo && campo.includes(termoNormalizado))
-      })
-    }
-
-    return lista
-  }, [filters, saidasComPrazo, materiaisMap, pessoasMap])
-
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(saidasFiltradas.length / TABLE_PAGE_SIZE))
-    setCurrentPage((prev) => {
-      if (prev < 1) return 1
-      if (prev > totalPages) return totalPages
-      return prev
-    })
-  }, [saidasFiltradas.length])
-
-  const statusFilterOptions = useMemo(() => {
-    const mapa = new Map()
-    saidas.forEach((saida) => {
-      const label = (saida?.statusNome || saida?.status || '').toString().trim()
-      if (!label) return
-      const id = (saida?.statusId || '').toString().trim() || label
-      const chave = id || label
-      if (!mapa.has(chave)) {
-        mapa.set(chave, { id, label })
-      }
-    })
-    return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
-  }, [saidas])
+  const statusFilterOptions = statusOptions
 
   const centroEstoqueFilterOptions = useMemo(() => {
     const mapaIdParaNome = new Map(
@@ -891,24 +842,12 @@ export function useSaidasController() {
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
   }, [saidas])
 
-  const registradoPorFilterOptions = useMemo(() => {
-    const mapa = new Map()
-    saidas.forEach((saida) => {
-      const id = (saida?.usuarioResponsavelId || '').toString().trim()
-      const label = (saida?.usuarioResponsavelNome || saida?.usuarioResponsavel || '').toString().trim()
-      const chave = id || label.toLowerCase()
-      if (!chave) return
-      if (!mapa.has(chave)) {
-        mapa.set(chave, { id: id || label, label: label || id })
-      }
-    })
-    return Array.from(mapa.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
-  }, [saidas])
+  const registradoPorFilterOptions = useMemo(
+    () => registrantes.map((item) => ({ id: item.id, label: item.nome || item.id })),
+    [registrantes],
+  )
 
-  const paginatedSaidas = useMemo(() => {
-    const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE
-    return saidasFiltradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
-  }, [saidasFiltradas, currentPage])
+  const paginatedSaidas = saidasComPrazo
 
   const trocaPrazoFilterOptions = useMemo(
     () => [
@@ -939,7 +878,9 @@ export function useSaidasController() {
     isLoading,
     error,
     currentPage,
-    setCurrentPage,
+    setCurrentPage: goToPage,
+    totalSaidas,
+    exportSaidas,
     historyState,
     cancelState,
     trocaPrompt,

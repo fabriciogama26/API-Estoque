@@ -13,6 +13,7 @@ export function EstoqueSaidaModal({
   onFilterClear,
   page,
   pageSize,
+  totalItems: totalDoBanco = null,
   onPageChange,
   onClose,
   formatDateTimeValue,
@@ -22,10 +23,12 @@ export function EstoqueSaidaModal({
     return null
   }
 
-  const totalItems = registros?.length || 0
+  // Com totalItems, registros ja e a pagina que veio do banco.
+  const paginadoNoBanco = typeof totalDoBanco === "number"
+  const totalItems = paginadoNoBanco ? totalDoBanco : registros?.length || 0
   const totalPages = totalItems > 0 ? Math.max(1, Math.ceil(totalItems / pageSize)) : 1
   const paginaAtual = page || 1
-  const paginaSaidas = registros.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize)
+  const paginaSaidas = paginadoNoBanco ? registros : registros.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize)
 
   return (
     <div

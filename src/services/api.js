@@ -11,6 +11,8 @@ import {
   calcularSaldoMaterial,
 } from '../lib/estoque.js'
 import { montarDashboardAcidentes } from '../lib/acidentesDashboard.js'
+import { TABLE_PAGE_SIZE as TABLE_PAGE_SIZE_PADRAO } from '../config/pagination.js'
+import { getTrocaPrazoStatus } from '../utils/saidasUtils.js'
 import { resolveEffectiveAppUser } from './effectiveUserService.js'
 
 const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL
@@ -2666,8 +2668,8 @@ function mapEntradaHistoryRecord(record) {
   const atual = rawSnapshot.atual ?? rawSnapshot
   const anterior = rawSnapshot.anterior ?? null
   const usuarioNome = resolveTextValue(
-    record.usuario?.display_name ??
-      record.usuario?.username ??
+    record.usuario?.username ??
+      record.usuario?.display_name ??
       record.usuario?.email ??
       atual.usuarioResponsavelNome ??
       atual.usuarioResponsavel ??
@@ -3275,7 +3277,7 @@ function buildDateFilters(query, field, inicio, fim) {
 // nem montar URLs gigantes.
 const MATERIAIS_IDS_POR_CONSULTA = 150
 
-async function carregarMateriaisViewDoOwner() {
+async function carregarMateriaisViewDoOwner(origem = 'materiais_view') {
   const materialIds = await carregarMaterialIdsDoOwner()
   const lotes = []
   for (let inicio = 0; inicio < materialIds.length; inicio += MATERIAIS_IDS_POR_CONSULTA) {
@@ -3283,7 +3285,7 @@ async function carregarMateriaisViewDoOwner() {
   }
   const resultados = await Promise.all(
     lotes.map((lote) =>
-      execute(supabase.from('materiais_view').select(MATERIAL_SELECT_COLUMNS).in('id', lote), 'Falha ao listar materiais.'),
+      execute(supabase.from(origem).select(MATERIAL_SELECT_COLUMNS).in('id', lote), 'Falha ao listar materiais.'),
     ),
   )
   const ordenarPorNome = (a, b) => {
@@ -3314,16 +3316,9 @@ async function carregarMateriaisDetalhados() {
 }
 
 async function carregarMateriaisDeEntradas() {
-  const [data, materialIds] = await Promise.all([execute(
-    supabase
-      .from(ENTRADAS_MATERIAIS_VIEW)
-      .select(MATERIAL_SELECT_COLUMNS)
-      .order('materialItemNome', { ascending: true })
-      .order('nome', { ascending: true }),
-    'Falha ao listar materiais provenientes de entradas.'
-  ), carregarMaterialIdsDoOwner()])
-  const allowed = new Set(materialIds)
-  return (data ?? []).filter((item) => allowed.has(item.id)).map(mapMaterialRecord)
+  const materiais = await carregarMateriaisViewDoOwner(ENTRADAS_MATERIAIS_VIEW)
+  const textoOrdem = (material) => `${material?.materialItemNome ?? ''}|${material?.nome ?? ''}`
+  return materiais.sort((a, b) => textoOrdem(a).localeCompare(textoOrdem(b)))
 }
 
 async function buscarMateriaisPorTermo(termo, limit = 10, options = {}) {
@@ -4274,6 +4269,231 @@ const hasDashboardDimensionFilters = (params = {}) =>
     return normalized !== 'todos' && normalized !== 'todas'
   })
 
+
+// Listas de Entradas e Saidas paginadas no banco (rpc_entradas_listar / rpc_saidas_listar): o banco
+// filtra, busca, resolve os nomes e devolve so a pagina pedida, com o total.
+const MOVIMENTACOES_MAX_PAGE_SIZE = 1000
+
+const dataLocalHoje = () => {
+  const hoje = new Date()
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0')
+  const dia = String(hoje.getDate()).padStart(2, '0')
+  return `${hoje.getFullYear()}-${mes}-${dia}`
+}
+
+function montarFiltrosMovimentacao(params = {}) {
+  const filtros = {
+    data_inicio: toStartOfDayUtcIso(params.dataInicio) || null,
+    data_fim: toEndOfDayUtcIso(params.dataFim) || null,
+    material_id: trim(params.materialId) || null,
+    pessoa_id: trim(params.pessoaId) || null,
+    centro_estoque_id: trim(params.centroEstoqueId) || null,
+    centro_custo_id: trim(params.centroCustoId) || null,
+    centro_servico_id: trim(params.centroServicoId) || null,
+    status_id: trim(params.status) || null,
+    registrado_por: trim(params.registradoPor) || null,
+    termo: trim(params.termo) || null,
+    troca_somente: Boolean(params.trocaOnly),
+    troca_prazo: trim(params.trocaPrazo) || null,
+    hoje: dataLocalHoje(),
+  }
+  return Object.fromEntries(Object.entries(filtros).filter(([, valor]) => valor !== null && valor !== false))
+}
+
+const rpcMovimentacaoIndisponivel = (error) => error?.code === 'PGRST202' || error?.code === '42883'
+
+function mapEntradaPaginaRecord(registro) {
+  const usuarioNome = resolveTextValue(registro.usuario_responsavel_nome ?? '')
+  const edicaoNome = resolveTextValue(registro.usuario_edicao_nome ?? '')
+  const statusNome = resolveTextValue(registro.status_nome ?? '')
+  const centroNome = resolveTextValue(registro.centro_estoque_nome ?? '')
+  return {
+    id: registro.id,
+    materialId: registro.material_id ?? null,
+    quantidade: toNumber(registro.quantidade),
+    centroCustoId: registro.centro_estoque_id ?? null,
+    centroCusto: centroNome || registro.centro_estoque_id || '',
+    centroCustoNome: centroNome,
+    dataEntrada: registro.data_entrada ?? null,
+    criadoEm: registro.criado_em ?? registro.data_entrada ?? null,
+    createdAt: registro.criado_em ?? null,
+    created_at: registro.criado_em ?? null,
+    create_at: registro.criado_em ?? null,
+    usuarioResponsavelId: registro.usuario_responsavel_id ?? null,
+    usuarioResponsavel: usuarioNome || registro.usuario_responsavel_id || '',
+    usuarioResponsavelNome: usuarioNome,
+    statusId: registro.status_id ?? null,
+    status: statusNome || registro.status_id || '',
+    statusNome,
+    atualizadoEm: registro.atualizado_em ?? null,
+    usuarioEdicaoId: registro.usuario_edicao_id ?? null,
+    usuarioEdicao: edicaoNome || registro.usuario_edicao_id || '',
+    usuarioEdicaoNome: edicaoNome,
+    material: registro.material ? mapMaterialRecord(registro.material) : null,
+  }
+}
+
+function mapSaidaPaginaRecord(registro) {
+  const usuarioNome = resolveTextValue(registro.usuario_responsavel_nome ?? '')
+  const edicaoNome = resolveTextValue(registro.usuario_edicao_nome ?? '')
+  const statusNome = resolveTextValue(registro.status_nome ?? '')
+  const pessoa = registro.pessoa && registro.pessoa.id ? { ...registro.pessoa } : null
+  return {
+    id: registro.id,
+    materialId: registro.material_id ?? null,
+    pessoaId: registro.pessoa_id ?? null,
+    quantidade: toNumber(registro.quantidade),
+    centroEstoqueId: registro.centro_estoque_id ?? null,
+    centroEstoque: resolveTextValue(registro.centro_estoque_nome ?? '') || registro.centro_estoque_id || '',
+    centroCustoId: registro.centro_custo_id ?? null,
+    centroCusto: resolveTextValue(registro.centro_custo_nome ?? '') || registro.centro_custo_id || '',
+    centroServicoId: registro.centro_servico_id ?? null,
+    centroServico:
+      resolveTextValue(registro.centro_servico_nome ?? '') || resolveTextValue(pessoa?.centroServico ?? '') || '',
+    setorId: null,
+    setor: resolveTextValue(pessoa?.setor ?? ''),
+    local: resolveTextValue(pessoa?.local ?? ''),
+    dataEntrega: registro.data_entrega ?? null,
+    dataTroca: registro.data_troca ?? null,
+    isTroca: Boolean(registro.is_troca),
+    trocaDeSaida: registro.troca_de_saida ?? null,
+    trocaSequencia: registro.troca_sequencia ?? 0,
+    statusId: registro.status_id ?? null,
+    status: statusNome || registro.status_id || '',
+    statusNome,
+    usuarioResponsavel: usuarioNome || registro.usuario_responsavel_id || '',
+    usuarioResponsavelId: registro.usuario_responsavel_id ?? null,
+    usuarioResponsavelNome: usuarioNome,
+    criadoEm: registro.criado_em ?? null,
+    atualizadoEm: registro.atualizado_em ?? null,
+    usuarioEdicaoId: registro.usuario_edicao_id ?? null,
+    usuarioEdicao: edicaoNome || registro.usuario_edicao_id || null,
+    pessoaNome: resolveTextValue(pessoa?.nome ?? ''),
+    pessoaMatricula: resolveTextValue(pessoa?.matricula ?? ''),
+    pessoa,
+    material: registro.material ? mapMaterialRecord(registro.material) : null,
+  }
+}
+
+async function carregarPaginaMovimentacoes(rpc, filtros, { page = 1, pageSize = TABLE_PAGE_SIZE_PADRAO } = {}, mapper) {
+  ensureSupabase()
+  const limite = Math.max(1, Math.min(Number(pageSize) || TABLE_PAGE_SIZE_PADRAO, MOVIMENTACOES_MAX_PAGE_SIZE))
+  const pagina = Math.max(1, Number(page) || 1)
+  const chamar = (offset, quantidade) =>
+    supabase.rpc(rpc, { p_filtros: filtros, p_limite: quantidade, p_offset: offset })
+  const { data, error } = await chamar((pagina - 1) * limite, limite)
+  if (error) {
+    throw mapSupabaseError(error, 'Falha ao listar movimentações.')
+  }
+  const registros = data ?? []
+  let total = registros.length ? Number(registros[0].total_registros ?? 0) : 0
+  if (!registros.length && pagina > 1) {
+    const { data: primeira, error: erroPrimeira } = await chamar(0, 1)
+    if (erroPrimeira) {
+      throw mapSupabaseError(erroPrimeira, 'Falha ao listar movimentações.')
+    }
+    total = primeira?.length ? Number(primeira[0].total_registros ?? 0) : 0
+  }
+  return { itens: registros.map(mapper), total, page: pagina, pageSize: limite }
+}
+
+async function carregarTodasMovimentacoes(rpc, filtros, mapper) {
+  let resultado = []
+  for (let pagina = 1; pagina <= 500; pagina += 1) {
+    const { itens } = await carregarPaginaMovimentacoes(
+      rpc,
+      filtros,
+      { page: pagina, pageSize: MOVIMENTACOES_MAX_PAGE_SIZE },
+      mapper,
+    )
+    resultado = resultado.concat(itens)
+    if (itens.length < MOVIMENTACOES_MAX_PAGE_SIZE) {
+      break
+    }
+  }
+  return resultado
+}
+
+// Banco sem as funcoes de lista (migration 20261005 ainda nao aplicada): comportamento antigo, com o
+// recorte de 1000 linhas, paginado no navegador.
+async function listarMovimentacoesLegado(tipo, params, { page = 1, pageSize = TABLE_PAGE_SIZE_PADRAO } = {}) {
+  reportClientError(`rpc_${tipo}_listar indisponivel; lista de ${tipo} usando a consulta antiga.`, null)
+  let registros = tipo === 'entradas' ? await carregarEntradas(params) : await carregarSaidas(params)
+  if (tipo === 'saidas') {
+    if (params.trocaOnly) {
+      registros = registros.filter((saida) => Boolean(saida.isTroca))
+    }
+    const prazo = trim(params.trocaPrazo)
+    if (prazo) {
+      registros = registros.filter((saida) => {
+        const status = getTrocaPrazoStatus(saida.dataTroca)
+        return prazo === 'sem-data' ? !status : status?.variant === prazo
+      })
+    }
+  }
+  const limite = Math.max(1, Number(pageSize) || TABLE_PAGE_SIZE_PADRAO)
+  const pagina = Math.max(1, Number(page) || 1)
+  return {
+    itens: registros.slice((pagina - 1) * limite, pagina * limite),
+    total: registros.length,
+    page: pagina,
+    pageSize: limite,
+    todos: registros,
+  }
+}
+
+async function listarPaginaMovimentacoes(tipo, params, opcoes) {
+  const rpc = tipo === 'entradas' ? 'rpc_entradas_listar' : 'rpc_saidas_listar'
+  const mapper = tipo === 'entradas' ? mapEntradaPaginaRecord : mapSaidaPaginaRecord
+  try {
+    return await carregarPaginaMovimentacoes(rpc, montarFiltrosMovimentacao(params), opcoes, mapper)
+  } catch (error) {
+    if (rpcMovimentacaoIndisponivel(error)) {
+      return listarMovimentacoesLegado(tipo, params, opcoes)
+    }
+    throw error
+  }
+}
+
+const normalizarFiltrosSaidas = (params = {}) => ({
+  ...params,
+  centroEstoqueId: params.centroEstoqueId ?? params.centroEstoque,
+  centroCustoId: params.centroCustoId ?? params.centroCusto,
+  centroServicoId: params.centroServicoId ?? params.centroServico,
+})
+
+async function exportarMovimentacoes(tipo, params) {
+  const rpc = tipo === 'entradas' ? 'rpc_entradas_listar' : 'rpc_saidas_listar'
+  const mapper = tipo === 'entradas' ? mapEntradaPaginaRecord : mapSaidaPaginaRecord
+  try {
+    return await carregarTodasMovimentacoes(rpc, montarFiltrosMovimentacao(params), mapper)
+  } catch (error) {
+    if (rpcMovimentacaoIndisponivel(error)) {
+      const legado = await listarMovimentacoesLegado(tipo, params, { page: 1, pageSize: 1 })
+      return legado.todos
+    }
+    throw error
+  }
+}
+
+async function listarRegistrantesMovimentacao(tipo) {
+  ensureSupabase()
+  const { data, error } = await supabase.rpc('rpc_movimentacao_registrantes', { p_tipo: tipo })
+  if (error) {
+    if (!rpcMovimentacaoIndisponivel(error)) {
+      throw mapSupabaseError(error, 'Falha ao listar quem registrou.')
+    }
+    const registros = tipo === 'entradas' ? await carregarEntradas({}) : await carregarSaidas({})
+    const mapa = new Map()
+    registros.forEach((registro) => {
+      const nome = registro.usuarioResponsavelNome || registro.usuarioResponsavel || ''
+      const id = registro.usuarioResponsavelId || nome
+      if (id && nome && !mapa.has(id)) mapa.set(id, { id, nome })
+    })
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+  return (data ?? []).map((item) => ({ id: item.id, nome: resolveTextValue(item.nome ?? '') || item.id }))
+}
 
 async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
@@ -5458,8 +5678,23 @@ export const api = {
       return carregarMateriaisDetalhados()
     },
     async search(params = {}) {
-      const termo = params?.termo ?? params?.q ?? params?.query ?? ''
+      const termo = trim(params?.termo ?? params?.q ?? params?.query ?? '')
       const limit = params?.limit ?? 10
+      if (!termo) {
+        return []
+      }
+      ensureSupabase()
+      const { data, error } = await supabase.rpc('rpc_materiais_buscar', {
+        p_termo: termo,
+        p_centro_estoque_id: normalizeUuid(params?.centroEstoqueId) || null,
+        p_limite: Number(limit) || 10,
+      })
+      if (!error) {
+        return (data ?? []).map((registro) => mapMaterialRecord(registro.material)).filter(Boolean)
+      }
+      if (!rpcMovimentacaoIndisponivel(error)) {
+        throw mapSupabaseError(error, 'Falha ao buscar materiais.')
+      }
       const source = params?.centroEstoqueId ? ENTRADAS_MATERIAIS_VIEW : undefined
       return buscarMateriaisPorTermo(termo, limit, { source, centroEstoqueId: params?.centroEstoqueId })
     },
@@ -5914,6 +6149,11 @@ export const api = {
   },
   entradas: {
     list: carregarEntradas,
+    listPage: (params = {}, opcoes = {}) =>
+      listarPaginaMovimentacoes('entradas', { ...params, centroEstoqueId: params.centroEstoqueId ?? params.centroCusto }, opcoes),
+    exportAll: (params = {}) =>
+      exportarMovimentacoes('entradas', { ...params, centroEstoqueId: params.centroEstoqueId ?? params.centroCusto }),
+    registrantes: () => listarRegistrantesMovimentacao('entradas'),
     materialOptions: carregarMateriaisDeEntradas,
     async downloadTemplate() {
       if (!FUNCTIONS_URL) {
@@ -6146,6 +6386,9 @@ export const api = {
   },
   saidas: {
     list: carregarSaidas,
+    listPage: (params = {}, opcoes = {}) => listarPaginaMovimentacoes('saidas', normalizarFiltrosSaidas(params), opcoes),
+    exportAll: (params = {}) => exportarMovimentacoes('saidas', normalizarFiltrosSaidas(params)),
+    registrantes: () => listarRegistrantesMovimentacao('saidas'),
     async create(payload) {
       const usuarioId = await resolveUsuarioIdOrThrow()
       const pessoaId = trim(payload.pessoaId)

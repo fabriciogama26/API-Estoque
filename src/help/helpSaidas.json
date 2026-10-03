@@ -20,7 +20,7 @@
       },
       {
         "title": "Filtrar e paginar",
-        "description": "No campo Busca digite o nome ou matricula da pessoa, ou nome/descricao/ID/CA do material, para trazer apenas as saidas relacionadas; complemente com filtros de centro e status. Aplique, limpe se necessario e navegue pelas paginas no rodape.",
+        "description": "No campo Busca digite o nome ou matricula da pessoa, ou nome/descricao/ID/CA do material (sem precisar de acento); complemente com registrado por, status, prazo de troca, periodo e somente trocas. Clique em Aplicar: a lista so muda ao aplicar, mostra o total encontrado em todo o historico e navega pelas paginas no rodape.",
         "mediaHint": "Filtros superiores e paginacao inferior do historico."
       }
     ],
@@ -30,7 +30,9 @@
       "Nao e permitido registrar saida com saldo zero/negativo ou acima do saldo disponivel.",
       "Atalho: vindo do Estoque atual, o formulario pode abrir com Centro de estoque e Material ja selecionados.",
       "O filtro de Busca aceita ID do material.",
-      "O historico detalha quem registrou e quando a entrega foi alterada."
+      "O historico detalha quem registrou e quando a entrega foi alterada.",
+      "Exportar Excel (CSV) traz todas as saidas dos filtros aplicados, nao so a pagina aberta.",
+      "Registrado por mostra o usuario (username) de quem lancou, inclusive dependentes."
     ]
   }
 }

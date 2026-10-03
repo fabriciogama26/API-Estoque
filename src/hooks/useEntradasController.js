@@ -20,15 +20,17 @@ import {
 import {
   createEntrada,
   cancelEntrada,
+  exportarEntradas,
   getEntradaHistory,
+  getSaldoMaterialCentro,
   listCentrosEstoque,
-  listEntradas,
+  listEntradasPagina,
   listMateriais,
+  listRegistrantesEntradas,
   listStatusEntrada,
   searchMateriais,
   updateEntrada,
 } from '../services/entradasService.js'
-import { listSaidas } from '../services/saidasService.js'
 
 const HISTORY_INITIAL = {
   open: false,
@@ -61,6 +63,8 @@ export function useEntradasController() {
   }, [user?.id, user?.user?.id, user?.metadata?.app_user_id, user?.metadata?.dependent_of])
   const [materiais, setMateriais] = useState([])
   const [entradas, setEntradas] = useState([])
+  const [totalEntradas, setTotalEntradas] = useState(0)
+  const [registrantes, setRegistrantes] = useState([])
   const [centrosCusto, setCentrosCusto] = useState([])
   const [statusOptions, setStatusOptions] = useState([])
   const [editingEntrada, setEditingEntrada] = useState(null)
@@ -70,6 +74,9 @@ export function useEntradasController() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  // Filtros da ultima consulta: a lista so muda ao clicar em Aplicar.
+  const filtrosAplicadosRef = useRef(initialEntradaFilters)
+  const paginaAtualRef = useRef(1)
   const [materialSearchValue, setMaterialSearchValue] = useState('')
   const [materialSuggestions, setMaterialSuggestions] = useState([])
   const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false)
@@ -82,22 +89,27 @@ export function useEntradasController() {
   const cancelCheckRef = useRef(0)
 
   const load = useCallback(
-    async (params = filters, { resetPage = false, refreshCatalogs = false } = {}) => {
-      if (resetPage) {
-        setCurrentPage(1)
-      }
+    async (params = filtrosAplicadosRef.current, { resetPage = false, refreshCatalogs = false, page = null } = {}) => {
+      const paginaAlvo = resetPage ? 1 : Math.max(1, Number(page ?? paginaAtualRef.current) || 1)
       setIsLoading(true)
       setError(null)
       try {
         const shouldReloadMateriais = refreshCatalogs || materiais.length === 0
         const shouldReloadCentros = refreshCatalogs || centrosCusto.length === 0
         const shouldReloadStatus = refreshCatalogs || statusOptions.length === 0
-        const [materiaisData, centrosData, statusData, entradasData] = await Promise.all([
+        const query = buildEntradasQuery(params)
+        const [materiaisData, centrosData, statusData, registrantesData, pagina] = await Promise.all([
           shouldReloadMateriais ? listMateriais() : Promise.resolve(null),
           shouldReloadCentros ? listCentrosEstoque() : Promise.resolve(null),
           shouldReloadStatus ? listStatusEntrada() : Promise.resolve(null),
-          listEntradas(buildEntradasQuery(params)),
+          refreshCatalogs || registrantes.length === 0 ? listRegistrantesEntradas() : Promise.resolve(null),
+          listEntradasPagina(query, { page: paginaAlvo, pageSize: TABLE_PAGE_SIZE }),
         ])
+        let resultado = pagina
+        const ultimaPagina = Math.max(1, Math.ceil((resultado?.total ?? 0) / TABLE_PAGE_SIZE))
+        if (!resultado?.itens?.length && paginaAlvo > ultimaPagina) {
+          resultado = await listEntradasPagina(query, { page: ultimaPagina, pageSize: TABLE_PAGE_SIZE })
+        }
         if (materiaisData) {
           setMateriais(materiaisData ?? [])
         }
@@ -111,32 +123,44 @@ export function useEntradasController() {
           }))
           setStatusOptions(normalizados)
         }
-        setEntradas(entradasData ?? [])
-        if (!centrosData) {
-          const derivados = normalizeCentroCustoOptions([
-            ...centrosCusto,
-            ...(entradasData ?? []).map((entrada) => ({
-              id: entrada.centroCustoId || entrada.centroCusto,
-              nome: entrada.centroCusto || entrada.centroCustoId || '',
-            })),
-          ])
-        if (derivados.length > 0) {
-          setCentrosCusto(derivados)
+        if (registrantesData) {
+          setRegistrantes(registrantesData ?? [])
         }
+        filtrosAplicadosRef.current = params
+        paginaAtualRef.current = resultado?.page ?? paginaAlvo
+        setEntradas(resultado?.itens ?? [])
+        setTotalEntradas(resultado?.total ?? 0)
+        setCurrentPage(paginaAtualRef.current)
+      } catch (err) {
+        setError(err.message)
+        reportError(err, { area: 'entradas_load', params })
+      } finally {
+        setIsLoading(false)
       }
-    } catch (err) {
-      setError(err.message)
-      reportError(err, { area: 'entradas_load', params })
-    } finally {
-      setIsLoading(false)
-    }
-  },
-    [centrosCusto, filters, materiais.length, reportError],
+    },
+    [centrosCusto.length, materiais.length, registrantes.length, reportError, statusOptions.length],
+  )
+
+  const goToPage = useCallback(
+    (pagina) => {
+      load(filtrosAplicadosRef.current, { page: pagina }).catch((err) => reportError(err, { area: 'entradas_page' }))
+    },
+    [load, reportError],
+  )
+
+  // Todas as entradas dos filtros aplicados (nao so a pagina aberta), para a exportacao.
+  const exportEntradas = useCallback(
+    () => exportarEntradas(buildEntradasQuery(filtrosAplicadosRef.current)),
+    [],
   )
 
   useEffect(() => {
     setMateriais([])
     setEntradas([])
+    setTotalEntradas(0)
+    setRegistrantes([])
+    filtrosAplicadosRef.current = initialEntradaFilters
+    paginaAtualRef.current = 1
     setCentrosCusto([])
     setStatusOptions([])
     setEditingEntrada(null)
@@ -191,7 +215,7 @@ export function useEntradasController() {
         await createEntrada(payload)
       }
       cancelEdit()
-      await load(filters, { resetPage: !isEditMode, refreshCatalogs: true })
+      await load(filtrosAplicadosRef.current, { resetPage: !isEditMode, refreshCatalogs: true })
     } catch (err) {
       setError(err.message)
       reportError(err, {
@@ -281,7 +305,7 @@ export function useEntradasController() {
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
-    const material = materiaisMap.get(entrada.materialId)
+    const material = entrada.material || materiaisMap.get(entrada.materialId)
     setEditingEntrada(entrada)
     setForm({
       materialId: entrada.materialId,
@@ -339,7 +363,7 @@ export function useEntradasController() {
       if (!entrada?.materialId) {
         return 'Material nao informado'
       }
-      const material = materiais.find((item) => item.id === entrada.materialId)
+      const material = entrada.material || materiais.find((item) => item.id === entrada.materialId)
       return material ? formatMaterialSummary(material) : entrada.materialId
     },
     [materiais],
@@ -373,30 +397,19 @@ export function useEntradasController() {
       }))
 
       try {
-        const [entradasMaterial, saidasMaterial] = await Promise.all([
-          listEntradas({ materialId: entrada.materialId }),
-          listSaidas({ materialId: entrada.materialId }),
-        ])
+        // Mesma regra do banco (validar_cancelamento_entrada): o saldo do centro nao pode ficar negativo.
+        const saldoAtual = await getSaldoMaterialCentro(entrada.materialId, entrada.centroCustoId)
         if (cancelCheckRef.current !== requestId) {
           return
         }
+        const quantidadeEntrada = isRegistroCancelado(entrada) ? 0 : Number(entrada.quantidade ?? 0)
+        const saldoAposCancelar = saldoAtual - quantidadeEntrada
 
-        const entradasAtivas = (entradasMaterial ?? []).filter(
-          (item) => item?.id !== entrada.id && !isRegistroCancelado(item),
-        )
-        const saidasAtivas = (saidasMaterial ?? []).filter((item) => !isRegistroCancelado(item))
-
-        const totalEntradasRestantes = entradasAtivas.reduce(
-          (acc, item) => acc + Number(item?.quantidade ?? 0),
-          0,
-        )
-        const totalSaidas = saidasAtivas.reduce((acc, item) => acc + Number(item?.quantidade ?? 0), 0)
-
-        const canCancel = totalSaidas <= totalEntradasRestantes
+        const canCancel = saldoAposCancelar >= 0
         const materialLabel = resolveMaterialLabel(entrada)
         const checkMessage = canCancel
           ? `Cancelamento permitido para ${materialLabel}.`
-          : `Nao e possivel cancelar ${materialLabel}: as saidas ativas superam o saldo que restaria.`
+          : `Nao e possivel cancelar ${materialLabel}: o saldo do centro ficaria negativo (${saldoAposCancelar}).`
 
         setCancelState((prev) => ({
           ...prev,
@@ -404,8 +417,8 @@ export function useEntradasController() {
           canCancel,
           checkMessage,
           checkDetails: {
-            totalSaidas,
-            totalEntradasRestantes,
+            saldoAtual,
+            saldoAposCancelar,
           },
           materialLabel,
         }))
@@ -450,7 +463,7 @@ export function useEntradasController() {
     try {
       await cancelEntrada(cancelState.entrada.id, cancelState.motivo)
       closeCancelModal()
-      await load(filters, { resetPage: false })
+      await load(filtrosAplicadosRef.current, { resetPage: false })
     } catch (err) {
       setCancelState((prev) => ({ ...prev, isSubmitting: false, error: err.message || 'Falha ao cancelar.' }))
       reportError(err, { area: 'entradas_cancel', entradaId: cancelState.entrada.id })
@@ -511,38 +524,16 @@ export function useEntradasController() {
     [centrosCustoMap],
   )
 
-  const registeredOptions = useMemo(() => {
-    const mapa = new Map()
-    entradas.forEach((entrada) => {
-      const nome = entrada.usuarioResponsavelNome || entrada.usuarioResponsavel || 'Nao informado'
-      const id = entrada.usuarioResponsavelId || nome
-      if (!nome) {
-        return
-      }
-      if (!mapa.has(id)) {
-        mapa.set(id, { id, nome })
-      }
-    })
-    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  }, [entradas])
+  const registeredOptions = registrantes
 
-  const centroCustoFilterOptions = useMemo(() => {
-    const mapa = new Map()
-    entradas.forEach((entrada) => {
-      const nome = resolveCentroCustoLabel(entrada)
-      if (!nome) {
-        return
-      }
-      const chave = normalizeSearchValue(nome)
-      if (!mapa.has(chave)) {
-        mapa.set(chave, {
-          id: entrada.centroCustoId || entrada.centroCusto || nome,
-          nome,
-        })
-      }
-    })
-    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  }, [entradas, resolveCentroCustoLabel])
+  const centroCustoFilterOptions = useMemo(
+    () =>
+      centrosCusto
+        .filter((centro) => centro?.id && centro?.nome)
+        .map((centro) => ({ id: centro.id, nome: centro.nome }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    [centrosCusto],
+  )
 
   const fallbackMaterialSearch = useCallback(
     (term) => {
@@ -619,19 +610,6 @@ export function useEntradasController() {
   }, [materialSearchValue, form.materialId, fallbackMaterialSearch])
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(entradas.length / TABLE_PAGE_SIZE))
-    setCurrentPage((prev) => {
-      if (prev < 1) {
-        return 1
-      }
-      if (prev > totalPages) {
-        return totalPages
-      }
-      return prev
-    })
-  }, [entradas.length])
-
-  useEffect(() => {
     return () => {
       if (materialBlurTimeoutRef.current) {
         clearTimeout(materialBlurTimeoutRef.current)
@@ -639,79 +617,9 @@ export function useEntradasController() {
     }
   }, [])
 
-  const filteredEntradas = useMemo(() => {
-    const termoNormalizado = normalizeSearchValue(filters.termo)
-    const registradoPorRaw = (filters.registradoPor ?? '').toString().trim()
-    const registradoPorNormalizado = normalizeSearchValue(registradoPorRaw)
-    const centroCustoRaw = (filters.centroCusto ?? '').toString().trim()
-    const centroCustoNormalizado = normalizeSearchValue(centroCustoRaw)
-    const statusRaw = (filters.status ?? '').toString().trim()
-    const statusNormalizado = normalizeSearchValue(statusRaw)
-
-    return entradas.filter((entrada) => {
-      if (centroCustoRaw) {
-        const resolvedCentro = resolveCentroCustoLabel(entrada)
-        const centroCompare = normalizeSearchValue(resolvedCentro || entrada.centroCusto || entrada.centroCustoId || '')
-        if (centroCompare !== centroCustoNormalizado && normalizeSearchValue(entrada.centroCustoId) !== centroCustoNormalizado) {
-          return false
-        }
-      }
-
-      if (statusRaw) {
-        const statusId = (entrada?.statusId || '').toString().trim()
-        if (statusId) {
-          if (statusId !== statusRaw) {
-            return false
-          }
-        } else {
-          const statusNome = normalizeSearchValue(entrada?.statusNome || entrada?.status || '')
-          if (statusNome !== statusNormalizado) {
-            return false
-          }
-        }
-      }
-
-      if (registradoPorRaw) {
-        const usuarioId = (entrada?.usuarioResponsavelId || '').toString().trim()
-        if (usuarioId) {
-          if (usuarioId !== registradoPorRaw) {
-            return false
-          }
-        } else {
-          const usuarioNome = normalizeSearchValue(entrada?.usuarioResponsavelNome || entrada?.usuarioResponsavel || '')
-          if (usuarioNome !== registradoPorNormalizado) {
-            return false
-          }
-        }
-      }
-
-      if (!termoNormalizado) {
-        return true
-      }
-
-      const material = materiaisMap.get(entrada.materialId)
-      if (materialMatchesTerm(material, termoNormalizado)) {
-        return true
-      }
-
-      const extraCampos = [
-        entrada?.materialId,
-        entrada?.centroCusto,
-        entrada?.centroCustoId,
-        entrada?.usuarioResponsavel,
-        entrada?.statusNome,
-        entrada?.status,
-      ]
-      return extraCampos
-        .map(normalizeSearchValue)
-        .some((campo) => campo && campo.includes(termoNormalizado))
-    })
-  }, [entradas, filters, materiaisMap, resolveCentroCustoLabel])
-
-  const paginatedEntradas = useMemo(() => {
-    const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE
-    return filteredEntradas.slice(startIndex, startIndex + TABLE_PAGE_SIZE)
-  }, [filteredEntradas, currentPage])
+  // A pagina ja vem filtrada e paginada do banco.
+  const filteredEntradas = entradas
+  const paginatedEntradas = entradas
 
   const shouldShowMaterialDropdown =
     materialDropdownOpen &&
@@ -743,10 +651,11 @@ export function useEntradasController() {
     isLoading,
     error,
     currentPage,
-    setCurrentPage,
+    setCurrentPage: goToPage,
+    totalEntradas,
+    exportEntradas,
     filteredEntradas,
     paginatedEntradas,
-    statusOptions,
     load,
     handleChange,
     handleSubmit,

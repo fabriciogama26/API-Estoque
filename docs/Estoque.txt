@@ -118,7 +118,7 @@ Atualizacao 2026-10 (saldo unico calculado no banco)
   - Modo local (`localApi`) e backend (`api/_shared/operations.js`) continuam com o calculo por lancamentos.
 - Validacao: `supabase/tests/estoque/run-local.ps1` (16 verificacoes em PostgreSQL local, incluindo 1500 saidas de um material, tenant isolado e igualdade com `calcular_saldo_estoque`) e `tests/estoqueSaldoUnico.test.js`.
 - Auditoria manual: `supabase/auditoria/auditoria_estoque.sql` (somente leitura) compara entradas - saidas com o que a tela mostrava.
-- Fora desta fase: Dashboard de estoque e listas de Entradas/Saidas (ainda sem paginacao no servidor). O orcamento anual e os relatorios passaram a usar o saldo unico em 2026-10 (ver docs/AnaliseEstoque.txt e docs/RelatorioEstoque.txt).
+- Fora desta fase: Dashboard de estoque (ainda sem agregacao no banco). O orcamento anual e os relatorios passaram a usar o saldo unico em 2026-10 (ver docs/AnaliseEstoque.txt e docs/RelatorioEstoque.txt); as listas de Entradas/Saidas e o historico de saidas do sino passaram a ser paginados no banco (ver docs/Entradas.txt e docs/Saidas.txt).
 
 Atualizacao 2026-09 (minimos da politica de reposicao)
 ------------------------------------------------------

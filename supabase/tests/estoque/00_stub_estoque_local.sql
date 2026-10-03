@@ -24,6 +24,8 @@ create table if not exists public.materiais (
   "grupoMaterial" text,
   "valorUnitario" numeric default 0,
   "estoqueMinimo" integer,
+  ca text,
+  "validadeDias" integer,
   ativo boolean default true,
   account_owner_id uuid not null references public.app_users(id)
 );
@@ -56,6 +58,9 @@ create table if not exists public.entradas (
   centro_estoque uuid not null references public.centros_estoque(id),
   status uuid references public.status_entrada(id),
   create_at timestamptz default now(),
+  "usuarioResponsavel" uuid,
+  usuario_edicao uuid,
+  atualizado_em timestamptz default now(),
   account_owner_id uuid not null references public.app_users(id)
 );
 
@@ -72,6 +77,11 @@ create table if not exists public.saidas (
   "dataTroca" timestamptz,
   status uuid not null references public.status_saida(id),
   "criadoEm" timestamptz default now(),
+  "atualizadoEm" timestamptz default now(),
+  "usuarioEdicao" uuid,
+  "isTroca" boolean not null default false,
+  "trocaDeSaida" uuid,
+  "trocaSequencia" integer not null default 0,
   account_owner_id uuid not null references public.app_users(id)
 );
 
@@ -86,6 +96,30 @@ create table if not exists public.inventory_material_override (
   expira_em timestamptz,
   revogado_em timestamptz
 );
+
+-- Mesmas colunas da materiais_view de producao usadas pelas listas (0055_fix_materiais_view_username_priority).
+create or replace view public.materiais_view as
+  select m.id,
+         m.nome,
+         m.nome as "materialItemNome",
+         m.fabricante,
+         m.fabricante as "fabricanteNome",
+         m."validadeDias",
+         m.ca,
+         m."valorUnitario",
+         m."estoqueMinimo",
+         m.ativo,
+         m.descricao,
+         m."grupoMaterial",
+         m."grupoMaterial" as "grupoMaterialNome",
+         null::text as "numeroCalcado",
+         null::text as "numeroCalcadoNome",
+         null::text as "numeroVestimenta",
+         null::text as "numeroVestimentaNome",
+         null::text as "numeroEspecifico",
+         ''::text as "coresTexto",
+         ''::text as "caracteristicasTexto"
+    from public.materiais m;
 
 -- Previsao (forecast) usada pelo orcamento anual (20260801_purchase_budget_*).
 create table if not exists public.inventory_forecast (

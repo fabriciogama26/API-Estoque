@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TablePagination } from '../../TablePagination.jsx'
 import { formatCurrency, formatDateTimeValue, formatInteger } from '../../../utils/estoqueUtils.js'
 import { EntryIcon, ExitIcon, NotificationIcon, SaveIcon } from '../../icons.jsx'
-import { listSaidas } from '../../../services/saidasService.js'
+import { listSaidasPagina } from '../../../services/saidasService.js'
 import { EstoqueSaidaModal } from '../Modal/EstoqueSaidaModal.jsx'
 import { EstoqueMinStockModal } from '../Modal/EstoqueMinStockModal.jsx'
 import { EstoqueCorrectionModal } from '../Modal/EstoqueCorrectionModal.jsx'
@@ -43,6 +43,7 @@ export function EstoqueList({
     open: false,
     item: null,
     registros: [],
+    total: 0,
     isLoading: false,
     error: null,
     filtroMes: '',
@@ -62,10 +63,12 @@ export function EstoqueList({
     onMinStockChange(item.materialId, initialValue)
   }
 
-  const closeSaidaModal = () =>
-    setSaidaModal({ open: false, item: null, registros: [], isLoading: false, error: null, filtroMes: '', page: 1 })
+  const saidaPageSize = 5
 
-  const loadSaidas = async (item, filtroMes) => {
+  const closeSaidaModal = () =>
+    setSaidaModal({ open: false, item: null, registros: [], total: 0, isLoading: false, error: null, filtroMes: '', page: 1 })
+
+  const loadSaidas = async (item, filtroMes, page = 1) => {
     if (!item) return
     const mesRef = (filtroMes || '').trim()
     let dataInicio
@@ -82,20 +85,19 @@ export function EstoqueList({
       }
     }
 
-    setSaidaModal((prev) => ({ ...prev, isLoading: true, error: null, registros: [], item, page: 1 }))
+    setSaidaModal((prev) => ({ ...prev, isLoading: true, error: null, registros: [], item, page }))
     try {
       const params = { materialId: item.materialId }
       if (dataInicio) params.dataInicio = dataInicio
       if (dataFim) params.dataFim = dataFim
-      const resposta = await listSaidas(params)
-      const registros = Array.isArray(resposta)
-        ? resposta
-        : Array.isArray(resposta?.saidas)
-        ? resposta.saidas
-        : Array.isArray(resposta?.registros)
-        ? resposta.registros
-        : []
-      setSaidaModal((prev) => ({ ...prev, registros, isLoading: false, page: 1 }))
+      const resposta = await listSaidasPagina(params, { page, pageSize: saidaPageSize })
+      setSaidaModal((prev) => ({
+        ...prev,
+        registros: resposta?.itens ?? [],
+        total: resposta?.total ?? 0,
+        isLoading: false,
+        page: resposta?.page ?? page,
+      }))
     } catch (err) {
       setSaidaModal((prev) => ({
         ...prev,
@@ -111,6 +113,7 @@ export function EstoqueList({
       open: true,
       item,
       registros: [],
+      total: 0,
       isLoading: true,
       error: null,
       filtroMes: '',
@@ -159,7 +162,6 @@ export function EstoqueList({
   const saidaError = saidaModal.error
   const hasSaidaModal = saidaModal.open && Boolean(saidaModalItem)
   const saidaPage = saidaModal.page || 1
-  const saidaPageSize = 5
 
   const handleModalSave = async () => {
     if (!modalItem || modalIsSaving) return
@@ -426,7 +428,8 @@ export function EstoqueList({
         onFilterClear={handleSaidaFilterClear}
         page={saidaPage}
         pageSize={saidaPageSize}
-        onPageChange={(page) => setSaidaModal((prev) => ({ ...prev, page }))}
+        totalItems={saidaModal.total}
+        onPageChange={(page) => loadSaidas(saidaModal.item, saidaModal.filtroMes || '', page)}
         onClose={closeSaidaModal}
         formatDateTimeValue={formatDateTimeValue}
         formatInteger={formatInteger}

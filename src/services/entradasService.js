@@ -1,6 +1,32 @@
 import { dataClient as api } from './dataClient.js'
+import { paginarNoNavegador, registrantesDaLista } from '../utils/movimentacoesPaginacao.js'
 
 export const listEntradas = (query = {}) => api.entradas.list(query)
+
+// Pagina da lista de entradas ({ itens, total }); no modo local pagina no navegador.
+export const listEntradasPagina = async (query = {}, opcoes = {}) =>
+  api?.entradas?.listPage ? api.entradas.listPage(query, opcoes) : paginarNoNavegador(await api.entradas.list(query), opcoes)
+
+export const exportarEntradas = (query = {}) =>
+  api?.entradas?.exportAll ? api.entradas.exportAll(query) : api.entradas.list(query)
+
+export const listRegistrantesEntradas = async () =>
+  api?.entradas?.registrantes ? api.entradas.registrantes() : registrantesDaLista(await api.entradas.list({}))
+
+// Saldo oficial do material no centro (mesma regra que o banco usa para validar o cancelamento).
+// O modo local nao tem a funcao do banco e soma os lancamentos locais do centro.
+export const getSaldoMaterialCentro = async (materialId, centroEstoqueId) => {
+  if (api?.materiais?.estoqueAtual) {
+    return Number((await api.materiais.estoqueAtual(materialId, centroEstoqueId)) ?? 0)
+  }
+  const [entradas, saidas] = await Promise.all([api.entradas.list({ materialId }), api.saidas.list({ materialId })])
+  const ativo = (registro) => String(registro?.statusNome || registro?.status || '').trim().toLowerCase() !== 'cancelado'
+  const somar = (lista, campoCentro) =>
+    (lista ?? [])
+      .filter((registro) => ativo(registro) && (!centroEstoqueId || String(registro?.[campoCentro] ?? '') === String(centroEstoqueId)))
+      .reduce((acc, registro) => acc + Number(registro?.quantidade ?? 0), 0)
+  return somar(entradas, 'centroCustoId') - somar(saidas, 'centroEstoqueId')
+}
 
 export const createEntrada = (payload) => api.entradas.create(payload)
 

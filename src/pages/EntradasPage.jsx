@@ -34,7 +34,8 @@ function EntradasContent() {
     error,
     currentPage,
     setCurrentPage,
-    filteredEntradas,
+    totalEntradas,
+    exportEntradas,
     paginatedEntradas,
     load,
     handleChange,
@@ -71,6 +72,8 @@ function EntradasContent() {
   const [importOpen, setImportOpen] = useState(false)
   const [importInfo, setImportInfo] = useState(null)
   const [importLoading, setImportLoading] = useState(false)
+  const [exportando, setExportando] = useState(false)
+  const [exportErro, setExportErro] = useState(null)
 
   useEffect(() => {
     const centroParam = (searchParams.get('centroEstoque') || searchParams.get('centroCusto') || '').trim()
@@ -129,7 +132,9 @@ function EntradasContent() {
     setDetalheEntrada(null)
   }
 
-  const detalheMaterial = detalheEntrada ? materiaisMap.get(detalheEntrada.materialId) : null
+  const detalheMaterial = detalheEntrada
+    ? detalheEntrada.material || materiaisMap.get(detalheEntrada.materialId) || null
+    : null
   const detalheCentroCustoLabel = detalheEntrada
     ? resolveCentroCustoLabel(detalheEntrada) || detalheEntrada.centroCusto || '-'
     : '-'
@@ -161,9 +166,18 @@ function EntradasContent() {
     }),
   )
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     const filename = `entradas-${new Date().toISOString().slice(0, 10)}.csv`
-    downloadEntradasCsv(filteredEntradas, { materiaisMap, centrosCustoMap }, { filename })
+    setExportando(true)
+    setExportErro(null)
+    try {
+      const registros = await exportEntradas()
+      downloadEntradasCsv(registros, { materiaisMap, centrosCustoMap }, { filename })
+    } catch (err) {
+      setExportErro(err?.message || 'Falha ao exportar as entradas.')
+    } finally {
+      setExportando(false)
+    }
   }
 
   return (
@@ -341,16 +355,17 @@ function EntradasContent() {
               type="button"
               className="button button--ghost"
               onClick={handleExportCsv}
+              disabled={exportando}
               aria-label="Exportar lista de entradas em CSV"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <SpreadsheetIcon size={16} />
-              <span>Exportar Excel (CSV)</span>
+              <span>{exportando ? 'Exportando...' : 'Exportar Excel (CSV)'}</span>
             </button>
             <button
               type="button"
               className="button button--ghost"
-              onClick={() => load(filters, { refreshCatalogs: true })}
+              onClick={() => load(undefined, { refreshCatalogs: true })}
               disabled={isLoading}
               aria-label="Atualizar lista de entradas"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
@@ -360,6 +375,7 @@ function EntradasContent() {
             </button>
           </div>
         </header>
+        {exportErro ? <p className="feedback feedback--error">{exportErro}</p> : null}
         {isLoading ? <p className="feedback">Carregando...</p> : null}
         {!isLoading && entradas.length === 0 ? <p className="feedback">Nenhuma entrada registrada.</p> : null}
         {entradas.length > 0 ? (
@@ -379,7 +395,7 @@ function EntradasContent() {
               </thead>
               <tbody>
                 {paginatedEntradas.map((entrada) => {
-                  const material = materiaisMap.get(entrada.materialId)
+                  const material = entrada.material || materiaisMap.get(entrada.materialId)
                   const centroCustoLabel = resolveCentroCustoLabel(entrada) || '-'
                   const materialResumo = material ? formatMaterialSummary(material) : 'Material removido'
                   const materialIdLabel = material?.id || entrada.materialId || 'Não informado'
@@ -469,7 +485,7 @@ function EntradasContent() {
           </div>
         ) : null}
         <TablePagination
-          totalItems={filteredEntradas.length}
+          totalItems={totalEntradas}
           pageSize={TABLE_PAGE_SIZE}
           currentPage={currentPage}
           onPageChange={setCurrentPage}

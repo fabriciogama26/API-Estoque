@@ -49,7 +49,7 @@ export const buildEntradasCsv = (entradas = [], context = {}) => {
   ]
 
   const rows = (Array.isArray(entradas) ? entradas : []).map((entrada) => {
-    const material = materiaisMap.get(entrada?.materialId) || null
+    const material = entrada?.material || materiaisMap.get(entrada?.materialId) || null
     const valores = [
       entrada?.id ?? '',
       resolveCentroCustoLabel(entrada, centrosCustoMap),

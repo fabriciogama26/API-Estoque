@@ -156,6 +156,9 @@ export const buildSaidasQuery = (filters) => {
   if (filters.dataFim) query.dataFim = filters.dataFim
   const termo = filters.termo?.trim()
   if (termo) query.termo = termo
+  const trocaPrazo = filters.trocaPrazo?.trim()
+  if (trocaPrazo) query.trocaPrazo = trocaPrazo
+  if (filters.trocaOnly) query.trocaOnly = true
   return query
 }
 
