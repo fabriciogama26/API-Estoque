@@ -10,12 +10,12 @@
       },
       {
         "title": "Aplicar filtros do historico",
-        "description": "Use o campo Busca para digitar parte do nome, descricao ou ID do material (ou do usuario que registrou) e combine com centro de estoque, status e periodo para refinar o historico. Use Limpar para remover todos os filtros.",
+        "description": "Use o campo Busca para digitar parte do nome, descricao, CA ou ID do material (ou o usuario que registrou) e combine com centro de estoque, status, registrado por e periodo. Clique em Aplicar: a lista so muda ao aplicar e mostra o total de registros encontrados em todo o historico, pagina a pagina. Use Limpar para remover todos os filtros.",
         "mediaHint": "Filtros rapidos do historico de entradas (inclui status)."
       },
       {
         "title": "Editar, ver historico ou cancelar",
-        "description": "Na tabela, use os icones para cada entrada: olho (detalhes), lapis (editar), relogio (historico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e nao exibem os botoes de edicao/cancelamento. O cancelamento e bloqueado se as saidas ativas ficarem maiores que o saldo sem essa entrada; ajuste/estorne saidas antes.",
+        "description": "Na tabela, use os icones para cada entrada: olho (detalhes), lapis (editar), relogio (historico) e X vermelho (cancelar). Entradas canceladas ficam esmaecidas e nao exibem os botoes de edicao/cancelamento. O cancelamento e bloqueado se o saldo do material no centro da entrada ficar negativo sem ela; ajuste ou estorne saidas desse centro antes.",
         "mediaHint": "Icones de detalhes, edicao, historico e cancelamento na linha."
       },
       {
@@ -36,7 +36,9 @@
       "Atalho: vindo do Estoque atual, o formulario pode abrir com Centro de estoque e Material ja preenchidos.",
       "Status e usuario de edicao aparecem em detalhes e historico; cancelamentos sao registrados.",
       "Filtros de status usam a lista configurada em status_entrada (REGISTRADO/CANCELADO por padrao).",
-      "Nao e possivel cancelar uma entrada se as saidas vigentes superarem o estoque que restaria sem ela; reduza ou estorne saidas primeiro."
+      "Nao e possivel cancelar uma entrada se o saldo do material no centro dela ficasse negativo; e a mesma regra que o banco aplica.",
+      "Exportar Excel (CSV) traz todas as entradas dos filtros aplicados, nao so a pagina aberta.",
+      "Registrado por mostra o usuario (username) de quem lancou, inclusive dependentes."
     ]
   }
 }

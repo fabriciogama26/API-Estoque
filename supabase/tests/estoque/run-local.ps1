@@ -28,7 +28,9 @@ $arquivos = @(
   'supabase\migrations\20260801_purchase_budget_12m.sql',
   'supabase\migrations\20260801_purchase_budget_validation_audit.sql',
   'supabase\migrations\20261004_orcamento_12m_saldo_unico.sql',
-  'supabase\tests\estoque\10_saldo_unico_validacao.sql'
+  'supabase\migrations\20261005_listas_movimentacoes_paginadas.sql',
+  'supabase\tests\estoque\10_saldo_unico_validacao.sql',
+  'supabase\tests\estoque\20_listas_validacao.sql'
 )
 
 & $psql -h $PgHost -p $Port -U $User -d postgres -q -c "drop database if exists $Database;" -c "create database $Database;"

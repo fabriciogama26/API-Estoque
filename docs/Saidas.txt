@@ -161,6 +161,20 @@ Atualizacao 2026-01 (schema)
 - Tabelas registradas: public.status_saida, public.centros_estoque.
 - Antes/Depois: antes existiam no banco sem migration; depois estao versionadas na pasta supabase/migrations.
 
+Atualizacao 2026-10 (lista paginada no banco)
+---------------------------------------------
+- Problema: a lista lia a tabela saidas sem paginacao (limite de 1000 linhas da API); busca, filtros, prazo de troca, opcoes de filtro e exportacao rodavam no navegador sobre esse recorte; a busca por texto carregava todas as pessoas e materiais.
+- Migration: `supabase/migrations/20261005_listas_movimentacoes_paginadas.sql` (`rpc_saidas_listar`, `rpc_movimentacao_registrantes`, `rpc_materiais_buscar`).
+- Depois:
+  - a tela pede so a pagina aberta e recebe o total; busca (pessoa e material, sem acento), registrado por, status, periodo, somente trocas e prazo de troca sao aplicados no banco;
+  - prazo de troca com as mesmas faixas da tela (limite passado, data limite, ate 7 dias, sem data), usando a data de hoje do navegador;
+  - filtros so valem ao clicar em Aplicar; cada linha traz pessoa (nome, matricula, cargo, centro de servico, setor), material, centros, status e quem registrou pelo username;
+  - Exportar Excel (CSV) busca todas as paginas dos filtros aplicados;
+  - busca de material do formulario feita no banco, filtrando pelos materiais com entrada no centro escolhido;
+  - historico de saidas do sino no Estoque atual tambem paginado no banco.
+- Sem a migration aplicada, a tela detecta a funcao ausente (PGRST202) e usa a consulta antiga.
+- Arquivos: src/services/api.js, src/services/saidasService.js, src/hooks/useSaidasController.js, src/pages/SaidasPage.jsx, src/utils/saidasUtils.js (`buildSaidasQuery` com troca), src/utils/saidasExport.js, src/components/Estoque/List/EstoqueList.jsx, src/components/Estoque/Modal/EstoqueSaidaModal.jsx, src/help/helpSaidas.json.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================

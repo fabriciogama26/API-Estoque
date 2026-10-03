@@ -1,6 +1,19 @@
 ﻿import { dataClient as api } from './dataClient.js'
+import { filtrarTrocasNoNavegador, paginarNoNavegador, registrantesDaLista } from '../utils/movimentacoesPaginacao.js'
 
 export const listSaidas = (query = {}) => api.saidas.list(query)
+
+// Pagina da lista de saidas ({ itens, total }); no modo local filtra trocas e pagina no navegador.
+export const listSaidasPagina = async (query = {}, opcoes = {}) =>
+  api?.saidas?.listPage
+    ? api.saidas.listPage(query, opcoes)
+    : paginarNoNavegador(filtrarTrocasNoNavegador(await api.saidas.list(query), query), opcoes)
+
+export const exportarSaidas = async (query = {}) =>
+  api?.saidas?.exportAll ? api.saidas.exportAll(query) : filtrarTrocasNoNavegador(await api.saidas.list(query), query)
+
+export const listRegistrantesSaidas = async () =>
+  api?.saidas?.registrantes ? api.saidas.registrantes() : registrantesDaLista(await api.saidas.list({}))
 export const createSaida = (payload) => api.saidas.create(payload)
 export const updateSaida = (id, payload) => api.saidas.update(id, payload)
 export const cancelSaida = (id, motivo) =>

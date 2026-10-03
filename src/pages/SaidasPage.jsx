@@ -18,6 +18,8 @@ import '../styles/MateriaisPage.css'
 function SaidasContent() {
   const [searchParams] = useSearchParams()
   const [detalheState, setDetalheState] = useState({ open: false, saida: null, pessoa: null, material: null })
+  const [exportando, setExportando] = useState(false)
+  const [exportErro, setExportErro] = useState(null)
   const {
     form,
     filters,
@@ -33,6 +35,8 @@ function SaidasContent() {
     error,
     currentPage,
     setCurrentPage,
+    totalSaidas,
+    exportSaidas,
     historyState,
     cancelState,
     trocaPrompt,
@@ -75,7 +79,6 @@ function SaidasContent() {
     handlePessoaBlur,
     resetFormState,
     paginatedSaidas,
-    saidasFiltradas,
     formatCurrency,
     formatDisplayDateSimple,
     formatDisplayDateTime,
@@ -116,8 +119,8 @@ function SaidasContent() {
   }, [editingSaida, form.centroEstoqueId, form.materialId, handleMaterialSelect, materiais, searchParams])
 
   const handleOpenDetalhes = (saida) => {
-    const pessoa = pessoas.find((p) => p.id === saida.pessoaId)
-    const material = materiais.find((m) => m.id === saida.materialId)
+    const pessoa = saida.pessoa || pessoas.find((p) => p.id === saida.pessoaId)
+    const material = saida.material || materiais.find((m) => m.id === saida.materialId)
     setDetalheState({ open: true, saida, pessoa, material })
   }
 
@@ -131,14 +134,23 @@ function SaidasContent() {
     return found?.nome || valor
   }
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     const filename = `saidas-${new Date().toISOString().slice(0, 10)}.csv`
     const pessoasMap = new Map(pessoas.map((pessoa) => [pessoa.id, pessoa]))
     const materiaisMap = new Map(materiais.map((material) => [material.id, material]))
     const centrosEstoqueMap = new Map(
       centrosEstoqueOptions.map((centro) => [centro.id, centro.nome ?? centro.id])
     )
-    downloadSaidasCsv(saidasFiltradas, { pessoasMap, materiaisMap, centrosEstoqueMap }, { filename })
+    setExportando(true)
+    setExportErro(null)
+    try {
+      const registros = await exportSaidas()
+      downloadSaidasCsv(registros, { pessoasMap, materiaisMap, centrosEstoqueMap }, { filename })
+    } catch (err) {
+      setExportErro(err?.message || 'Falha ao exportar as saidas.')
+    } finally {
+      setExportando(false)
+    }
   }
 
   return (
@@ -420,16 +432,17 @@ function SaidasContent() {
               type="button"
               className="button button--ghost"
               onClick={handleExportCsv}
+              disabled={exportando}
               aria-label="Exportar lista de saidas em CSV"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <SpreadsheetIcon size={16} />
-              <span>Exportar Excel (CSV)</span>
+              <span>{exportando ? 'Exportando...' : 'Exportar Excel (CSV)'}</span>
             </button>
             <button
               type="button"
               className="button button--ghost"
-              onClick={() => load(filters, { resetPage: true })}
+              onClick={() => load(undefined, { resetPage: true, refreshCatalogs: true })}
               disabled={isLoading}
               aria-label="Atualizar lista de saídas"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
@@ -453,6 +466,7 @@ function SaidasContent() {
             <span>Limite passado</span>
           </div>
         </div>
+        {exportErro ? <p className="feedback feedback--error">{exportErro}</p> : null}
         {isLoading ? <p className="feedback">Carregando...</p> : null}
         {!isLoading && saidas.length === 0 ? <p className="feedback">Nenhuma saída registrada.</p> : null}
         {saidas.length > 0 ? (
@@ -472,8 +486,8 @@ function SaidasContent() {
               </thead>
               <tbody>
                 {paginatedSaidas.map((saida) => {
-                  const pessoa = pessoas.find((p) => p.id === saida.pessoaId)
-                  const material = materiais.find((m) => m.id === saida.materialId)
+                  const pessoa = saida.pessoa || pessoas.find((p) => p.id === saida.pessoaId)
+                  const material = saida.material || materiais.find((m) => m.id === saida.materialId)
                   const statusLower = (saida.status || '').toString().trim().toLowerCase()
                   const registradoPor =
                     saida.usuarioResponsavelUsername ||
@@ -573,7 +587,7 @@ function SaidasContent() {
     </div>
   ) : null}
   <TablePagination
-    totalItems={saidasFiltradas.length}
+    totalItems={totalSaidas}
     pageSize={TABLE_PAGE_SIZE}
     currentPage={currentPage}
     onPageChange={setCurrentPage}

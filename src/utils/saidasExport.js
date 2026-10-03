@@ -37,8 +37,8 @@ export const buildSaidasCsv = (saidas = [], context = {}) => {
   ]
 
   const rows = (Array.isArray(saidas) ? saidas : []).map((saida) => {
-    const pessoa = pessoasMap.get(saida?.pessoaId) || null
-    const material = materiaisMap.get(saida?.materialId) || null
+    const pessoa = saida?.pessoa || pessoasMap.get(saida?.pessoaId) || null
+    const material = saida?.material || materiaisMap.get(saida?.materialId) || null
     const valores = [
       saida?.id ?? '',
       pessoa?.nome ?? saida?.pessoaId ?? '',
