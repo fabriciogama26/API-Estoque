@@ -10,7 +10,7 @@ import {
 export const ALERTAS_PAGE_SIZE = 6
 export const ITENS_PAGE_SIZE = 10
 
-export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null) {
+export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null, reposicaoPorMaterial = null) {
   const [filters, setFilters] = useState(initialFilters)
   const [appliedFilters, setAppliedFilters] = useState(initialFilters)
   const [alertasPage, setAlertasPage] = useState(1)
@@ -21,16 +21,17 @@ export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null) {
     [estoque.itens],
   )
 
+  // Cobertura e situacao usam a politica de reposicao por material (saldo fisico), inclusive no CSV.
   const itensFiltrados = useMemo(
-    () => filterEstoqueItens(estoque.itens, appliedFilters),
-    [estoque.itens, appliedFilters],
+    () => filterEstoqueItens(estoque.itens, appliedFilters, { reposicaoPorMaterial }),
+    [estoque.itens, appliedFilters, reposicaoPorMaterial],
   )
   const itensFiltradosBase = useMemo(() => {
     if (!estoqueBase?.itens) {
       return itensFiltrados
     }
-    return filterEstoqueItens(estoqueBase.itens, appliedFilters)
-  }, [estoqueBase, appliedFilters, itensFiltrados])
+    return filterEstoqueItens(estoqueBase.itens, appliedFilters, { reposicaoPorMaterial })
+  }, [estoqueBase, appliedFilters, itensFiltrados, reposicaoPorMaterial])
 
   const alertasFiltrados = useMemo(
     () =>

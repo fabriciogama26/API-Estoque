@@ -32,6 +32,9 @@ Filtros
 - Termo de busca (nome do material, fabricante, CA, ID, grupo, cor e caracteristicas).
 - Centro de estoque/servico.
 - Quantidade (>= valor) para filtrar por saldo minimo exibido.
+- Cobertura de / ate (dias): faixa inclusiva sobre a cobertura atual da politica de reposicao convertida em dias (meses x 30, arredondado, a mesma conta do card). Preencher so um dos campos vira ">=" ou "<="; limites invertidos sao reordenados. Cobertura "Nao calculavel" (sem saida nos ultimos 180 dias) e material sem dados da politica ficam fora quando a faixa esta preenchida.
+- Situacao: Ruptura, Reposicao necessaria, Reposicao programada, Manter estoque, Acima do alvo, Sem consumo recente ou Sem base para calculo (mesma situacao do card).
+- Cobertura e Situacao dependem da politica de reposicao (`rpc_reposicao_itens`): sem ela carregada (erro ou modo local) os campos ficam desabilitados e sem efeito.
 - Checkboxes:
   - "Apenas zerado": mantem somente materiais com quantidade 0.
   - "Apenas saidas": mantem somente materiais com movimentacao de saida registrada (sino ativo).
@@ -92,6 +95,32 @@ Boas praticas
 - Configurar politicas no Supabase para permitir update de `estoque_minimo` apenas por usuarios autenticados/autorizados.
 - Manter `localApi.estoque.current` (modo local) alinhado com a estrutura esperada (`alertas` + `itens`) para facilitar testes.
 - Utilizar "Movimentacao do periodo" para inspecionar entradas/saidas do intervalo antes de gerar relatorios oficiais.
+
+Atualizacao 2026-10 (filtros de cobertura e situacao)
+-----------------------------------------------------
+- Arquivos alterados:
+  - src/components/Estoque/Filters/EstoqueFilters.jsx
+  - src/context/EstoqueContext.jsx
+  - src/hooks/useEstoqueFiltro.js
+  - src/utils/estoqueUtils.js
+  - src/utils/reposicaoUtils.js
+  - src/pages/EstoquePage.jsx
+  - src/help/helpEstoque.json
+  - tests/estoqueFiltrosPolitica.test.js (novo)
+- Funcoes/hooks tocadas:
+  - filterEstoqueItens (novo parametro `options.reposicaoPorMaterial`)
+  - coberturaEmDias (nova)
+  - useEstoqueFiltro (recebe o mapa da politica)
+  - EstoqueProvider (INITIAL_FILTERS com `coberturaDiasMin`, `coberturaDiasMax`, `situacaoReposicao`; expoe `politicaFiltrosDisponiveis`)
+  - EstoqueFilters (campos Cobertura de/ate e select Situacao)
+- Comportamento antes/depois:
+  - Antes: cobertura e situacao apareciam no card, mas nao havia como filtrar por elas.
+  - Depois: filtros "Cobertura de (dias)", "Cobertura ate (dias)" e "Situacao" no bloco Filtros, aplicados so no botao Aplicar, como os demais.
+  - A faixa usa dias inteiros para nao depender de decimal: a RPC devolve meses com 2 casas (ex.: 11,84) e o card mostra dias abaixo de 90 e meses acima (ex.: "11,8 meses" = 355 dias). O filtro converte com a mesma conta do card (meses x 30, arredondado).
+  - Filtro local sobre o mapa da politica ja carregado pela tela: nenhuma consulta nova ao banco e nenhuma migration.
+  - Lista, alertas, cards do Resumo e CSV seguem os novos filtros (todos usam os itens filtrados).
+  - Durante a recarga da politica o mapa anterior continua valendo; se a politica falhar, o aviso da tela informa que os filtros de cobertura e situacao ficam sem efeito.
+- Validacao: `npm test` (tests/estoqueFiltrosPolitica.test.js: conversao, faixa inclusiva, faixa invertida, nao calculavel fora, situacao, politica ausente).
 
 Atualizacao 2026-10 (saldo unico calculado no banco)
 ----------------------------------------------------

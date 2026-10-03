@@ -25,6 +25,7 @@ function EstoquePageContent() {
     applyFilters,
     resetFilters,
     centrosCustoDisponiveis,
+    politicaFiltrosDisponiveis,
     error,
     alertasPaginados,
     alertasPage,
@@ -80,6 +81,7 @@ function EstoquePageContent() {
       <EstoqueFilters
         filters={filters}
         centrosCusto={centrosCustoDisponiveis}
+        politicaDisponivel={politicaFiltrosDisponiveis}
         onSubmit={handleSubmit}
         onChange={handleFilterChange}
         onClear={resetFilters}
@@ -109,7 +111,8 @@ function EstoquePageContent() {
       {error ? <p className="feedback feedback--error">{error}</p> : null}
       {reposicao?.status === 'error' ? (
         <p className="feedback feedback--warning">
-          Minimo sugerido indisponivel no momento ({reposicao.error}). O minimo cadastrado e os alertas continuam validos.
+          Minimo sugerido indisponivel no momento ({reposicao.error}). O minimo cadastrado e os alertas continuam validos;
+          os filtros de cobertura e situacao ficam sem efeito ate a politica carregar.
         </p>
       ) : null}
 

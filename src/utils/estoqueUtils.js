@@ -1,5 +1,6 @@
 // Utilitarios puros para Estoque
 import {
+  coberturaEmDias,
   formatBaseCalculo,
   formatFonteRegra,
   formatSituacaoReposicao,
@@ -120,8 +121,34 @@ export const parsePeriodoRange = (inicio, fim) => {
   return { start, end }
 }
 
-export const filterEstoqueItens = (itens = [], filters = {}) => {
+const parseFiltroNumero = (value) => {
+  const texto = String(value ?? '').trim()
+  if (texto === '') return null
+  const numero = Number(texto)
+  return Number.isFinite(numero) ? numero : null
+}
+
+// Faixa de cobertura em dias (de/ate, inclusive); se o usuario inverter os limites, a faixa e reordenada.
+const parseFaixaCoberturaDias = (minValue, maxValue) => {
+  const min = parseFiltroNumero(minValue)
+  const max = parseFiltroNumero(maxValue)
+  if (min === null && max === null) return null
+  if (min !== null && max !== null && min > max) return { min: max, max: min }
+  return { min, max }
+}
+
+export const filterEstoqueItens = (itens = [], filters = {}, options = {}) => {
   const termoNormalizado = normalizeTerm(filters.termo)
+  // Cobertura e situacao vem da politica de reposicao (mesmos dados do card);
+  // sem a politica carregada (erro ou modo local) esses dois filtros ficam sem efeito.
+  const politicaMap =
+    options.reposicaoPorMaterial instanceof Map && options.reposicaoPorMaterial.size > 0
+      ? options.reposicaoPorMaterial
+      : null
+  const coberturaFaixa = politicaMap
+    ? parseFaixaCoberturaDias(filters.coberturaDiasMin, filters.coberturaDiasMax)
+    : null
+  const situacaoFiltro = politicaMap ? String(filters.situacaoReposicao ?? '').trim() : ''
   const centroFiltro = (filters.centroCusto ?? '').trim().toLowerCase()
   const quantidadeMinFiltro = (filters.quantidadeMax ?? '').trim()
   const quantidadeMinNumero =
@@ -177,6 +204,29 @@ export const filterEstoqueItens = (itens = [], filters = {}) => {
       const quantidade = Number(item.quantidade ?? item.estoqueAtual ?? 0)
       if (Number.isNaN(quantidade) || quantidade !== 0) {
         return false
+      }
+    }
+
+    if (coberturaFaixa || situacaoFiltro) {
+      const politica = politicaMap.get(String(item.materialId ?? ''))
+      if (!politica) {
+        return false
+      }
+      if (situacaoFiltro && politica.situacao !== situacaoFiltro) {
+        return false
+      }
+      if (coberturaFaixa) {
+        // "Nao calculavel" (null) nunca vira zero: fica fora de qualquer faixa.
+        const dias = coberturaEmDias(politica.cobertura_atual_meses)
+        if (dias === null) {
+          return false
+        }
+        if (coberturaFaixa.min !== null && dias < coberturaFaixa.min) {
+          return false
+        }
+        if (coberturaFaixa.max !== null && dias > coberturaFaixa.max) {
+          return false
+        }
       }
     }
 

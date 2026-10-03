@@ -1021,7 +1021,7 @@ powershell -ExecutionPolicy Bypass -File supabase/tests/estoque/run-local.ps1 -P
 powershell -ExecutionPolicy Bypass -File supabase/tests/forecast/run-local.ps1 -Port 5432
 ```
 
-- Testes unitarios (Node): `npm test` executa `tests/*.test.js` (montagem do Estoque atual, correcoes de estoque e checagens das migrations).
+- Testes unitarios (Node): `npm test` executa `tests/*.test.js` (montagem do Estoque atual, filtros de cobertura e situacao, correcoes de estoque e checagens das migrations).
 
 
 ---
