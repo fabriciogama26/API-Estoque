@@ -29,7 +29,9 @@ export function EstoqueCorrectionModal({ open, item, onClose, onSubmitted }) {
     setSuccess(false)
     listCorrectionOptions()
       .then(({ centers: availableCenters }) => {
-        const itemCenterIds = new Set((item?.centrosEstoqueDetalhes || []).map((center) => String(center.id)))
+        const itemCenterIds = new Set(
+          (item?.centrosEstoqueDetalhes || []).filter((center) => center.id).map((center) => String(center.id)),
+        )
         const relevantCenters = itemCenterIds.size
           ? availableCenters.filter((center) => itemCenterIds.has(String(center.id)))
           : availableCenters
@@ -64,6 +66,11 @@ export function EstoqueCorrectionModal({ open, item, onClose, onSubmitted }) {
       .filter((center, index) => centers.some((other, otherIndex) => otherIndex !== index && other.almox === center.almox))
       .map((center) => center.almox),
   ), [centers])
+  const saldoPorCentro = useMemo(() => new Map(
+    (item?.centrosEstoqueDetalhes || [])
+      .filter((center) => center.id && typeof center.saldo === 'number')
+      .map((center) => [String(center.id), center.saldo]),
+  ), [item?.centrosEstoqueDetalhes])
 
   if (!open || !item) return null
 
@@ -111,7 +118,11 @@ export function EstoqueCorrectionModal({ open, item, onClose, onSubmitted }) {
           <label className="field"><span>Centro de estoque</span>
             <select value={stockCenterId} onChange={(event) => setStockCenterId(event.target.value)} disabled={saving || success} required>
               <option value="">Selecione</option>
-              {centers.map((center) => <option key={center.id} value={center.id}>{duplicateCenterNames.has(center.almox) ? `${center.almox || 'Centro'} (${center.id.slice(0, 8)})` : center.almox || center.id}</option>)}
+              {centers.map((center) => {
+                const nome = duplicateCenterNames.has(center.almox) ? `${center.almox || 'Centro'} (${center.id.slice(0, 8)})` : center.almox || center.id
+                const saldoCentro = saldoPorCentro.get(String(center.id))
+                return <option key={center.id} value={center.id}>{saldoCentro === undefined ? nome : `${nome} — saldo ${quantityFormatter.format(saldoCentro)}`}</option>
+              })}
             </select>
           </label>
           <div className="estoque-correction-modal__balance">

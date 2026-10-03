@@ -181,8 +181,15 @@ export function EstoqueList({
               .filter((centro, index, lista) => lista.some((outro, outroIndex) => outroIndex !== index && outro.nome === centro.nome))
               .map((centro) => centro.nome),
           )
+          const temSaldoPorCentro = centrosDetalhes.some((centro) => typeof centro.saldo === 'number')
           const centrosCustoLabel = centrosDetalhes.length
-            ? centrosDetalhes.map((centro) => nomesRepetidos.has(centro.nome) ? `${centro.nome} (${centro.id.slice(0, 8)})` : centro.nome).join(', ')
+            ? centrosDetalhes
+                .map((centro) => {
+                  const nome = nomesRepetidos.has(centro.nome) && centro.id ? `${centro.nome} (${centro.id.slice(0, 8)})` : centro.nome
+                  const nomeComStatus = centro.ativo === false ? `${nome} (inativo)` : nome
+                  return temSaldoPorCentro ? `${nomeComStatus}: ${formatInteger(centro.saldo)}` : nomeComStatus
+                })
+                .join(temSaldoPorCentro ? ' | ' : ', ')
             : item.centrosCusto && item.centrosCusto.length
               ? item.centrosCusto.join(', ')
               : 'Sem centro de estoque'
@@ -233,7 +240,9 @@ export function EstoqueList({
                   <p className="estoque-list__item-meta">
                     ID: {item.materialId || '-'} | Cor: {item.corMaterial || item.coresTexto || '-'}
                   </p>
-                  <p className="estoque-list__item-centro">Centro de estoque: {centrosCustoLabel}</p>
+                  <p className="estoque-list__item-centro">
+                    {temSaldoPorCentro ? 'Saldo por centro' : 'Centro de estoque'}: {centrosCustoLabel}
+                  </p>
                   <p className="estoque-list__item-atualizacao">Última atualização: {ultimaAtualizacaoItem}</p>
                   <p className="estoque-list__item-extra-info">
                     Validade (dias): {item.validadeDias ?? '-'} | CA: {item.ca || '-'}

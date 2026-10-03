@@ -92,9 +92,9 @@ export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null) {
         id: 'totalValor',
         title: 'Total em estoque',
         value: formatCurrency(totalValorSaldo),
-        hint: 'Valor do saldo (entradas - saidas)',
+        hint: 'Valor do saldo (entradas - saidas + correcoes)',
         tooltip:
-          'Saldo financeiro considerando apenas a quantidade disponivel (entradas - saidas) multiplicada pelo valor unitario.',
+          'Saldo financeiro considerando apenas a quantidade disponivel (entradas - saidas + correcoes aprovadas) multiplicada pelo valor unitario.',
         icon: 'R$',
         accent: 'sky',
       },
@@ -112,8 +112,9 @@ export function useEstoqueFiltro(initialFilters, estoque, estoqueBase = null) {
         id: 'totalItens',
         title: 'Estoque total atual',
         value: formatInteger(resumoFiltrado.saldoQuantidade),
-        hint: 'Quantidade liquida (entradas - saidas)',
-        tooltip: 'Quantidade disponivel neste momento, desconsiderando itens ja entregues ou cancelados.',
+        hint: 'Quantidade liquida (entradas - saidas + correcoes)',
+        tooltip:
+          'Quantidade disponivel neste momento, somando todos os centros de estoque e desconsiderando itens ja entregues ou cancelados. E o mesmo saldo usado pela Saida e pelo modal de correcao.',
         icon: '#',
         accent: 'mint',
       },

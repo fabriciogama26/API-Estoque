@@ -16,7 +16,7 @@
         "title": "Ler o Resumo",
         "description": "Os cards seguem os filtros aplicados. Passe o mouse no (i) de cada card para ver como e calculado.",
         "items": [
-          "Total em estoque e Estoque total atual: valor e quantidade do saldo (entradas - saidas).",
+          "Total em estoque e Estoque total atual: valor e quantidade do saldo (entradas - saidas + correcoes aprovadas), somando todos os centros.",
           "Deficit ate o minimo cadastrado: quanto falta para chegar ao minimo manual. No modo Automatico vira Deficit ate o minimo efetivo.",
           "Compra recomendada: valor e materiais pela politica de reposicao (mesmo calculo da aba Compra); materiais sem consumo recente ficam fora.",
           "Revisar minimos: materiais com minimo cadastrado sem consumo ou muito diferente do sugerido.",
@@ -29,6 +29,14 @@
         "items": [
           "Modo Monitorar da politica: o limite e o minimo cadastrado.",
           "Modo Automatico: o limite e o minimo efetivo, e o alerta mostra a origem (automatico, override ou cadastrado sem historico). Material sem consumo recente nao alerta."
+        ]
+      },
+      {
+        "title": "Conferir o saldo por centro",
+        "description": "Cada card mostra a quantidade total e, em Saldo por centro, quanto ha em cada centro de estoque. E o mesmo saldo que a Saida e a Correcao de Estoque Fisico usam.",
+        "items": [
+          "Na Saida, o saldo disponivel e o do centro escolhido no formulario, nao o total do card.",
+          "Sem centro de estoque aparece quando ha saidas antigas gravadas sem centro; revise essas saidas para o saldo de cada centro bater com o fisico."
         ]
       },
       {

@@ -3271,38 +3271,46 @@ function buildDateFilters(query, field, inicio, fim) {
   return query
 }
 
+// A view nao expoe o tenant; busca por lotes de ids para nao depender do limite de linhas da API
+// nem montar URLs gigantes.
+const MATERIAIS_IDS_POR_CONSULTA = 150
+
+async function carregarMateriaisViewDoOwner() {
+  const materialIds = await carregarMaterialIdsDoOwner()
+  const lotes = []
+  for (let inicio = 0; inicio < materialIds.length; inicio += MATERIAIS_IDS_POR_CONSULTA) {
+    lotes.push(materialIds.slice(inicio, inicio + MATERIAIS_IDS_POR_CONSULTA))
+  }
+  const resultados = await Promise.all(
+    lotes.map((lote) =>
+      execute(supabase.from('materiais_view').select(MATERIAL_SELECT_COLUMNS).in('id', lote), 'Falha ao listar materiais.'),
+    ),
+  )
+  const ordenarPorNome = (a, b) => {
+    const nomeA = String(a?.nome ?? '')
+    const nomeB = String(b?.nome ?? '')
+    if (nomeA === nomeB) return 0
+    return nomeA < nomeB ? -1 : 1
+  }
+  return resultados.flatMap((data) => data ?? []).sort(ordenarPorNome).map(mapMaterialRecord)
+}
+
 async function carregarMateriais() {
-  const [data, materialIds] = await Promise.all([execute(
-    supabase
-      .from('materiais_view')
-      .select(MATERIAL_SELECT_COLUMNS)
-      .order('nome', { ascending: true }),
-    'Falha ao listar materiais.'
-  ), carregarMaterialIdsDoOwner()])
-  const allowed = new Set(materialIds)
-  return (data ?? []).filter((item) => allowed.has(item.id)).map(mapMaterialRecord)
+  return carregarMateriaisViewDoOwner()
 }
 
 async function carregarMaterialIdsDoOwner() {
   const scope = await resolveCatalogScope()
   if (!scope.ownerId) return []
-  const data = await execute(
-    supabase.from('materiais').select('id').eq('account_owner_id', scope.ownerId),
+  const data = await executePaged(
+    () => supabase.from('materiais').select('id').eq('account_owner_id', scope.ownerId).order('id', { ascending: true }),
     'Falha ao aplicar escopo de materiais.',
   )
   return (data ?? []).map((item) => item.id).filter(Boolean)
 }
 
 async function carregarMateriaisDetalhados() {
-  const [data, materialIds] = await Promise.all([execute(
-    supabase
-      .from('materiais_view')
-      .select(MATERIAL_SELECT_COLUMNS)
-      .order('nome', { ascending: true }),
-    'Falha ao listar materiais.'
-  ), carregarMaterialIdsDoOwner()])
-  const allowed = new Set(materialIds)
-  return (data ?? []).filter((item) => allowed.has(item.id)).map(mapMaterialRecord)
+  return carregarMateriaisViewDoOwner()
 }
 
 async function carregarMateriaisDeEntradas() {
@@ -4329,6 +4337,62 @@ async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
     0,
   )
   return calcularSaldoMaterial(materialId, entradasNormalizadas, saidasNormalizadas, null) + totalAjustes
+}
+
+// Saldo por material x centro calculado no banco, com a mesma regra da Saida (calcular_saldo_estoque).
+// Retorna null quando o banco ainda nao tem a funcao.
+async function carregarSaldosEstoque({ materialId = null, inicio = null, fim = null } = {}) {
+  const args = {
+    p_material_id: materialId || null,
+    p_inicio: inicio || null,
+    p_fim: fim || null,
+  }
+  let registros
+  try {
+    registros = await executePaged(
+      () =>
+        supabase
+          .rpc('rpc_estoque_saldos', args)
+          .order('material_id', { ascending: true })
+          .order('centro_estoque_id', { ascending: true, nullsFirst: true }),
+      'Falha ao consultar saldos de estoque.',
+    )
+  } catch (error) {
+    if (error?.code === '42883' || error?.code === 'PGRST202') {
+      reportClientError('rpc_estoque_saldos indisponivel; Estoque atual usando calculo antigo.', error)
+      return null
+    }
+    throw error
+  }
+  return registros.map((registro) => ({
+    materialId: registro.material_id,
+    centroEstoqueId: registro.centro_estoque_id,
+    centroEstoqueNome: registro.centro_estoque_nome,
+    centroAtivo: registro.centro_ativo,
+    totalEntradas: Number(registro.total_entradas ?? 0),
+    totalSaidas: Number(registro.total_saidas ?? 0),
+    totalAjustes: Number(registro.total_ajustes ?? 0),
+    saldo: Number(registro.saldo ?? 0),
+    qtdSaidas: Number(registro.qtd_saidas ?? 0),
+    ultimaEntradaEm: registro.ultima_entrada_em,
+    ultimaSaidaEm: registro.ultima_saida_em,
+    ultimoAjusteEm: registro.ultimo_ajuste_em,
+  }))
+}
+
+async function carregarAjustesEstoque() {
+  const scope = await resolveCatalogScope()
+  let query = supabase.from('stock_adjustments').select('material_id, adjustment_quantity, created_at')
+  if (scope.ownerId) query = query.eq('account_owner_id', scope.ownerId)
+  const { data, error } = await query
+  if (error) {
+    return []
+  }
+  return (data || []).map((item) => ({
+    materialId: item.material_id,
+    quantidadeAjuste: Number(item.adjustment_quantity || 0),
+    dataAjuste: item.created_at,
+  }))
 }
 
 async function obterSaldoMaterial(materialId) {
@@ -6370,16 +6434,15 @@ export const api = {
           if (params.mes) queryParams.mes = params.mes
         }
       }
-      const [materiais, entradas, saidas, ajustesResult, correcoesResult] = await Promise.all([
+      const periodoSaldos = usarMovimentacao
+        ? {
+            inicio: hasExplicitDate ? toStartOfDayUtcIso(params.dataInicio) : periodoRange?.start?.toISOString(),
+            fim: hasExplicitDate ? toEndOfDayUtcIso(params.dataFim) : periodoRange?.end?.toISOString(),
+          }
+        : {}
+      const [materiais, saldos, correcoesResult] = await Promise.all([
         carregarMateriais(),
-        carregarEntradas(queryParams),
-        carregarSaidas(queryParams),
-        (async () => {
-          const scope = await resolveCatalogScope()
-          let query = supabase.from('stock_adjustments').select('material_id, adjustment_quantity, created_at')
-          if (scope.ownerId) query = query.eq('account_owner_id', scope.ownerId)
-          return query
-        })(),
+        carregarSaldosEstoque({ materialId: params?.materialId, ...periodoSaldos }),
         (async () => {
           const scope = await resolveCatalogScope()
           let query = supabase
@@ -6390,13 +6453,6 @@ export const api = {
           return query
         })(),
       ])
-      const ajustes = ajustesResult?.error
-        ? []
-        : (ajustesResult?.data || []).map((item) => ({
-            materialId: item.material_id,
-            quantidadeAjuste: Number(item.adjustment_quantity || 0),
-            dataAjuste: item.created_at,
-          }))
       const correcoesPendentes = correcoesResult?.error
         ? []
         : (correcoesResult?.data || []).map((item) => ({
@@ -6408,12 +6464,22 @@ export const api = {
             diferenca: Number(item.difference),
             solicitadoEm: item.requested_at,
           }))
-      return montarEstoqueAtual(materiais, entradas, saidas, usarMovimentacao ? periodo : null, {
+      const opcoes = {
         includeAll: false,
         includeAtivosSemMovimentacao: !usarMovimentacao,
-        ajustes,
         correcoesPendentes,
-      })
+      }
+      if (saldos) {
+        return montarEstoqueAtual(materiais, [], [], null, { ...opcoes, saldos })
+      }
+
+      // Banco sem rpc_estoque_saldos (migration 20261003 ainda nao aplicada): calculo antigo no navegador.
+      const [entradas, saidas, ajustes] = await Promise.all([
+        carregarEntradas(queryParams),
+        carregarSaidas(queryParams),
+        carregarAjustesEstoque(),
+      ])
+      return montarEstoqueAtual(materiais, entradas, saidas, usarMovimentacao ? periodo : null, { ...opcoes, ajustes })
     },
     async saldo(materialId) {
       return obterSaldoMaterial(materialId)
