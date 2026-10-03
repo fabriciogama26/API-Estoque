@@ -937,6 +937,7 @@ supabase/
     20261003_estoque_saldo_unico.sql  # saldo unico no banco: rpc_estoque_saldos e politica de reposicao com correcoes
     20261004_orcamento_12m_saldo_unico.sql  # orcamento anual (versao 6) com o estoque pelo saldo unico
     20261005_listas_movimentacoes_paginadas.sql  # listas de Entradas/Saidas paginadas no banco, registrantes e busca de material
+    20261006_dashboard_estoque_agregado.sql  # Dashboard de estoque com entradas, saidas e pessoas agregadas no banco
   auditoria/
     auditoria_estoque.sql  # consultas somente leitura para conferir saldo, duplicidades e inconsistencias
     diagnostico_orcamento_12m.sql  # identifica qual versao do orcamento anual esta aplicada no banco
@@ -959,7 +960,7 @@ supabase/
     estoque/
       00_stub_estoque_local.sql  # tabelas de estoque minimas para Postgres local descartavel
       10_saldo_unico_validacao.sql  # validacao SQL do saldo unico, politica de reposicao e orcamento anual (termina em ROLLBACK)
-      20_listas_validacao.sql  # validacao SQL das listas paginadas de Entradas e Saidas (termina em ROLLBACK)
+      20_listas_validacao.sql  # validacao SQL das listas paginadas de Entradas e Saidas e do Dashboard agregado (termina em ROLLBACK)
       run-local.ps1  # executa stubs + migrations de estoque + validacao em Postgres local
 temp_readme.txt  # documento de suporte
 vercel.json  # configuracao de deploy (Vercel)
@@ -1002,7 +1003,7 @@ powershell -ExecutionPolicy Bypass -File supabase/tests/validades/run-local.ps1 
 ```
 
 - Resultado esperado: linhas `NOTICE: ok - ...` e `Validacao concluida sem falhas.`
-- Saldo unico de estoque: validacao SQL de `rpc_estoque_saldos`, da politica de reposicao, do orcamento anual e das listas paginadas de Entradas/Saidas (cancelados, correcoes aprovadas, saida sem centro, periodo, 1500 saidas de um material, isolamento de tenant e igualdade com `calcular_saldo_estoque`).
+- Saldo unico de estoque: validacao SQL de `rpc_estoque_saldos`, da politica de reposicao, do orcamento anual, das listas paginadas de Entradas/Saidas e do Dashboard agregado (cancelados, correcoes aprovadas, saida sem centro, periodo, 1500 saidas de um material, isolamento de tenant e igualdade com `calcular_saldo_estoque`).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File supabase/tests/estoque/run-local.ps1 -Port 5432

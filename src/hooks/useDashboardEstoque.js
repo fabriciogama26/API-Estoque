@@ -18,6 +18,8 @@ import {
   montarTopTrocasMateriais,
   montarTopTrocasSetores,
   montarTopTrocasPessoas,
+  contarRegistros,
+  resumirTrocas,
 } from '../utils/dashboardEstoqueUtils.js'
 import {
   buildParetoList,
@@ -232,54 +234,7 @@ export function useDashboardEstoque(onError) {
     [saidasDetalhadasFiltradas],
   )
 
-  const parseDateWithoutTimezone = (value) => {
-    if (!value) return null
-    const str = String(value).trim()
-    const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/)
-    if (match) {
-      const [, year, month, day] = match
-      const date = new Date(Number(year), Number(month) - 1, Number(day))
-      return Number.isNaN(date.getTime()) ? null : date
-    }
-    const dt = new Date(value)
-    return Number.isNaN(dt.getTime()) ? null : dt
-  }
-
-  const isSaidaCancelada = (saida) => {
-    const raw = (saida?.statusNome || saida?.status || '').toString().trim().toLowerCase()
-    return raw === 'cancelado'
-  }
-
-  const trocaResumo = useMemo(() => {
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-    const limiteMs = 1000 * 60 * 60 * 24
-    let feitas = 0
-    let atrasadas = 0
-    let aVencer = 0
-    saidasDetalhadasFiltradas.forEach((saida) => {
-      if (!saida || isSaidaCancelada(saida)) {
-        return
-      }
-      if (saida.isTroca) {
-        feitas += 1
-      }
-      if (!saida.dataTroca) {
-        return
-      }
-      const dataTroca = parseDateWithoutTimezone(saida.dataTroca)
-      if (!dataTroca) {
-        return
-      }
-      const diffDias = Math.floor((dataTroca.getTime() - hoje.getTime()) / limiteMs)
-      if (diffDias < 0) {
-        atrasadas += 1
-      } else if (diffDias <= 7) {
-        aVencer += 1
-      }
-    })
-    return { feitas, atrasadas, aVencer }
-  }, [saidasDetalhadasFiltradas])
+  const trocaResumo = useMemo(() => resumirTrocas(saidasDetalhadasFiltradas), [saidasDetalhadasFiltradas])
 
   const calcularQuantidadeTotal = (lista) => lista.reduce((acc, item) => acc + Number(item.quantidade ?? 0), 0)
   const calcularValorTotal = (lista) =>
@@ -416,7 +371,10 @@ export function useDashboardEstoque(onError) {
     [paretoRisco],
   )
 
-  const totalMovimentacoes = entradasDetalhadasFiltradas.length + saidasDetalhadasFiltradas.length
+  // Linhas do banco chegam agregadas; contarRegistros soma quantos lancamentos cada uma representa.
+  const totalEntradasRegistros = contarRegistros(entradasDetalhadasFiltradas)
+  const totalSaidasRegistros = contarRegistros(saidasDetalhadasFiltradas)
+  const totalMovimentacoes = totalEntradasRegistros + totalSaidasRegistros
   const totalValorMovimentado = resumoEntradas.valor + resumoSaidas.valor
   const materiaisEmAlerta = estoqueBase?.alertas?.length ?? data?.estoqueAtual?.alertas?.length ?? 0
   // Materiais ativos sem movimentacao (semMovimentacao) aparecem no Estoque atual, mas nao contam aqui:
@@ -429,7 +387,7 @@ export function useDashboardEstoque(onError) {
         id: 'movimentacoes',
         title: 'Movimentações',
         value: totalMovimentacoes,
-        helper: `${entradasDetalhadasFiltradas.length} entradas / ${saidasDetalhadasFiltradas.length} saídas`,
+        helper: `${totalEntradasRegistros} entradas / ${totalSaidasRegistros} saídas`,
         icon: MovementIcon,
         tone: 'blue',
         tooltip: 'Quantidade total de registros de entrada e saída no período filtrado.',
@@ -490,8 +448,8 @@ export function useDashboardEstoque(onError) {
       totalMovimentacoes,
       totalValorMovimentado,
       trocaResumo,
-      entradasDetalhadasFiltradas.length,
-      saidasDetalhadasFiltradas.length,
+      totalEntradasRegistros,
+      totalSaidasRegistros,
     ],
   )
 

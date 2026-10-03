@@ -4495,6 +4495,44 @@ async function listarRegistrantesMovimentacao(tipo) {
   return (data ?? []).map((item) => ({ id: item.id, nome: resolveTextValue(item.nome ?? '') || item.id }))
 }
 
+// Dashboard de estoque: rpc_dashboard_estoque devolve os lancamentos agregados e as pessoas; cada grupo
+// vira uma "saida" com os mesmos campos que os graficos usavam (centro de servico, setor e local da pessoa,
+// como em preencherCentrosServicoSaidas), com `registros` = quantos lancamentos o grupo representa.
+function montarSaidaAgregadaDashboard(grupo, pessoa) {
+  const centroNome = resolveTextValue(pessoa?.centroServico ?? pessoa?.local ?? pessoa?.setor ?? '')
+  const setorNome = resolveTextValue(pessoa?.setor ?? pessoa?.centroServico ?? pessoa?.local ?? '')
+  const localNome = resolveTextValue(pessoa?.local ?? pessoa?.centroServico ?? setorNome ?? '')
+  return {
+    materialId: grupo.material_id,
+    pessoaId: grupo.pessoa_id ?? null,
+    quantidade: toNumber(grupo.quantidade),
+    registros: Number(grupo.registros ?? 1),
+    dataEntrega: grupo.mes,
+    isTroca: Boolean(grupo.is_troca),
+    prazoTroca: grupo.prazo_troca ?? null,
+    centroCusto: resolveTextValue(grupo.centro_custo_nome ?? ''),
+    centroServico: centroNome,
+    centroServicoId: pessoa?.centroServicoId ?? null,
+    setor: setorNome || centroNome,
+    setorId: pessoa?.setorId ?? null,
+    local: localNome || centroNome || setorNome || '',
+    pessoaNome: pessoa?.nome || '',
+    pessoaMatricula: pessoa?.matricula || '',
+    pessoa: pessoa || null,
+  }
+}
+
+// Banco sem rpc_dashboard_estoque (migration 20261006 ainda nao aplicada): consulta antiga, com o corte
+// de 1000 linhas.
+async function carregarDashboardEstoqueLegado(params, periodo, materiais) {
+  reportClientError('rpc_dashboard_estoque indisponivel; Dashboard usando a consulta antiga.', null)
+  const [entradas, saidas] = await Promise.all([carregarEntradas(params), carregarSaidas(params)])
+  const pessoaIds = Array.from(new Set(saidas.map((saida) => saida.pessoaId).filter(Boolean)))
+  const pessoasDetalhes = pessoaIds.length ? await carregarPessoasViewDetalhes(pessoaIds) : new Map()
+  const pessoas = Array.from(pessoasDetalhes.values())
+  return montarDashboard({ materiais, entradas, saidas, pessoas }, periodo)
+}
+
 async function calcularSaldoMaterialAtual(materialId, centroEstoqueId = null) {
   await ensureStatusCanceladoIdLoaded()
   if (centroEstoqueId) {
@@ -6729,14 +6767,32 @@ export const api = {
     },
     async dashboard(params = {}) {
       const periodo = parsePeriodo(params)
-      const [materiais, entradas, saidas] = await Promise.all([
+      const range = resolvePeriodoRange(periodo)
+      ensureSupabase()
+      const [materiais, resposta] = await Promise.all([
         carregarMateriais(),
-        carregarEntradas(params),
-        carregarSaidas(params),
+        supabase.rpc('rpc_dashboard_estoque', {
+          p_inicio: range?.start ? range.start.toISOString() : null,
+          p_fim: range?.end ? range.end.toISOString() : null,
+          p_hoje: dataLocalHoje(),
+        }),
       ])
-      const pessoaIds = Array.from(new Set(saidas.map((saida) => saida.pessoaId).filter(Boolean)))
-      const pessoasDetalhes = pessoaIds.length ? await carregarPessoasViewDetalhes(pessoaIds) : new Map()
-      const pessoas = Array.from(pessoasDetalhes.values())
+      if (resposta.error) {
+        if (!rpcMovimentacaoIndisponivel(resposta.error)) {
+          throw mapSupabaseError(resposta.error, 'Falha ao carregar o dashboard de estoque.')
+        }
+        return carregarDashboardEstoqueLegado(params, periodo, materiais)
+      }
+      const dados = resposta.data ?? {}
+      const pessoas = (dados.pessoas ?? []).map(mapPessoaRecord).filter((pessoa) => pessoa?.id)
+      const pessoasMap = new Map(pessoas.map((pessoa) => [pessoa.id, pessoa]))
+      const entradas = (dados.entradas ?? []).map((grupo) => ({
+        materialId: grupo.material_id,
+        quantidade: toNumber(grupo.quantidade),
+        registros: Number(grupo.registros ?? 1),
+        dataEntrada: grupo.mes,
+      }))
+      const saidas = (dados.saidas ?? []).map((grupo) => montarSaidaAgregadaDashboard(grupo, pessoasMap.get(grupo.pessoa_id)))
       return montarDashboard({ materiais, entradas, saidas, pessoas }, periodo)
     },
     async report(params = {}) {

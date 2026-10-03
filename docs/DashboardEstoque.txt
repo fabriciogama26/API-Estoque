@@ -91,6 +91,21 @@ Atualizacao 2026-09 (materiais sem movimentacao no estoque base)
 - Sem impacto em "Alertas ativos" (itens sem movimentacao nao geram alerta), Paretos, risco operacional e graficos (partem das saidas).
 - Nenhum card novo foi adicionado ao Dashboard.
 
+Atualizacao 2026-10 (lancamentos agregados no banco)
+----------------------------------------------------
+- Problema: o Dashboard lia entradas e saidas do periodo (padrao: o ano inteiro) sem paginacao; a API devolve no maximo 1000 linhas, entao movimentacoes, quantidades, valores, trocas, grafico mensal, rankings e Paretos usavam so os lancamentos mais recentes. As pessoas das saidas eram buscadas com todos os ids na URL.
+- Migration: `supabase/migrations/20261006_dashboard_estoque_agregado.sql` (`rpc_dashboard_estoque(inicio, fim, hoje)`).
+- Depois:
+  - o banco devolve, em uma resposta so, as entradas somadas por material x mes, as saidas somadas por material x pessoa x centro de custo x troca x mes x faixa de prazo de troca e as pessoas dessas saidas (mesmos campos e regra de "local" da `rpc_pessoas_completa`);
+  - cada grupo traz `registros` (quantos lancamentos representa); o card Movimentacoes e o resumo "X entradas / Y saidas" somam esses registros (`contarRegistros`);
+  - o card de trocas usa a faixa pronta do banco (limite passado e a vencer em ate 7 dias, com o "hoje" do navegador) e, sem ela (modo local), calcula pela data de troca como antes (`resumirTrocas`);
+  - busca, filtro por clique nos graficos, pessoas inativas fora e cancelados fora continuam iguais (o front remonta os mesmos campos que os graficos usavam);
+  - Estoque base, alertas e materiais monitorados continuam vindo do saldo unico (`listEstoqueAtual`);
+  - "Top centros" agrupa pelo centro de servico atual da pessoa, o mesmo do rotulo (antes a chave era o centro gravado na saida e a mesma barra podia aparecer duas vezes quando a pessoa mudou de centro).
+- Sem a migration aplicada, o Dashboard detecta a funcao ausente (PGRST202) e usa a consulta antiga, com o corte de 1000.
+- Validacao (2026-10-03): mesmo banco com 1806 saidas lido pelo caminho novo e pelo antigo sem limite de linhas deu resultados identicos em 16 blocos (totais, valores, trocas, grafico mensal, rankings e Paretos) para o ano, para duas buscas e para um mes; com o corte de 1000 o caminho antigo mostrava 997 de 1704 saidas.
+- Arquivos: src/services/api.js (`api.estoque.dashboard`, `montarSaidaAgregadaDashboard`, `carregarDashboardEstoqueLegado`), src/hooks/useDashboardEstoque.js, src/utils/dashboardEstoqueUtils.js, tests/dashboardEstoqueAgregado.test.js, supabase/tests/estoque/20_listas_validacao.sql.
+
 ===========================================
 Mapa de Codigo (funcoes, hooks e constantes)
 ===========================================
@@ -131,6 +146,10 @@ Funcoes utilitarias relacionadas
   - Tipo: utilitarios
   - Caminho: src/utils/dashboardEstoqueUtils.js
   - Responsavel por: formatar valores, montar series historicas e rankings.
+- contarRegistros / resumirTrocas
+  - Tipo: utilitarios
+  - Caminho: src/utils/dashboardEstoqueUtils.js
+  - Responsavel por: contar lancamentos de linhas agregadas e resumir trocas feitas, com limite passado e a vencer.
 
 Servicos e integracoes externas
 -------------------------------
@@ -138,6 +157,10 @@ Servicos e integracoes externas
   - Tipo: servico de API
   - Caminho: src/services/dashboardEstoqueApi.js
   - Responsavel por: buscar dashboard e gerar relatorio.
+- rpc_dashboard_estoque
+  - Tipo: funcao SQL (RPC)
+  - Caminho: supabase/migrations/20261006_dashboard_estoque_agregado.sql
+  - Responsavel por: devolver entradas, saidas e pessoas do periodo agregadas, no tenant da sessao.
 - Brevo (email)
   - Tipo: integracao externa
   - Caminho: supabase/functions/relatorio-estoque-mensal-email/_shared/relatorioEstoqueEmailCore.ts

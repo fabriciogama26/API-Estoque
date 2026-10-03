@@ -149,6 +149,55 @@ const isSaidaCancelada = (saida = {}) => {
   return status === 'cancelado'
 }
 
+// Quantos lancamentos a lista representa: linhas agregadas pelo banco trazem `registros`.
+export const contarRegistros = (lista = []) =>
+  (Array.isArray(lista) ? lista : []).reduce((acc, item) => acc + Number(item?.registros ?? 1), 0)
+
+const parseDataSemFuso = (value) => {
+  if (!value) return null
+  const match = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (match) {
+    const data = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    return Number.isNaN(data.getTime()) ? null : data
+  }
+  const data = new Date(value)
+  return Number.isNaN(data.getTime()) ? null : data
+}
+
+// Trocas feitas, com limite passado e a vencer (hoje ate 7 dias). Linhas agregadas pelo banco trazem a
+// faixa pronta em `prazoTroca`; sem ela (modo local), a faixa sai da data de troca.
+export const resumirTrocas = (saidas = [], hoje = new Date()) => {
+  const referencia = new Date(hoje.getTime())
+  referencia.setHours(0, 0, 0, 0)
+  let feitas = 0
+  let atrasadas = 0
+  let aVencer = 0
+  ;(Array.isArray(saidas) ? saidas : []).forEach((saida) => {
+    if (!saida || isSaidaCancelada(saida)) {
+      return
+    }
+    const registros = Number(saida.registros ?? 1)
+    if (saida.isTroca) {
+      feitas += registros
+    }
+    let prazo = saida.prazoTroca
+    if (prazo === undefined) {
+      const dataTroca = parseDataSemFuso(saida.dataTroca)
+      if (!dataTroca) {
+        return
+      }
+      const diffDias = Math.floor((dataTroca.getTime() - referencia.getTime()) / (1000 * 60 * 60 * 24))
+      prazo = diffDias < 0 ? 'atrasada' : diffDias <= 7 ? 'a_vencer' : null
+    }
+    if (prazo === 'atrasada') {
+      atrasadas += registros
+    } else if (prazo === 'a_vencer') {
+      aVencer += registros
+    }
+  })
+  return { feitas, atrasadas, aVencer }
+}
+
 export function formatEstoqueMaterialLabel(item = {}) {
   const tamanhoNumero = resolveMaterialNumeroTamanho(item)
   const ca = sanitizeDisplayText(item.ca)

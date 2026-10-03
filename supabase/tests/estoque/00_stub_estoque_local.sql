@@ -139,6 +139,12 @@ create table if not exists public.f_previsao_gasto_mensal (
   valor_previsto numeric not null default 0
 );
 
+-- Locais de acidente: rpc_pessoas_completa usa o nome daqui como "local" da pessoa (mesmo id do centro de servico).
+create table if not exists public.acidente_locais (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null
+);
+
 -- Placeholder: em producao a funcao ja existia antes de 20260930, que cria o trigger e depois a recria.
 create or replace function public.validar_saldo_saida()
 returns trigger
