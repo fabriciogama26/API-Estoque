@@ -29,6 +29,7 @@ $arquivos = @(
   'supabase\migrations\20260801_purchase_budget_validation_audit.sql',
   'supabase\migrations\20261004_orcamento_12m_saldo_unico.sql',
   'supabase\migrations\20261005_listas_movimentacoes_paginadas.sql',
+  'supabase\migrations\20261006_dashboard_estoque_agregado.sql',
   'supabase\tests\estoque\10_saldo_unico_validacao.sql',
   'supabase\tests\estoque\20_listas_validacao.sql'
 )

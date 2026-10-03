@@ -110,8 +110,11 @@
 - 2026-10-04: fase 2.1 mesclada (PR #378), migration `20261004` aplicada e Edge Functions republicadas pelo usuario.
 - Fase 2.2 (codigo pronto, 2026-10-04): aplicar no Supabase `supabase/migrations/20261005_listas_movimentacoes_paginadas.sql` antes ou junto com o deploy do front (sem ela as telas usam a consulta antiga, com o corte de 1000). Decisoes do usuario: filtros so no botao Aplicar; um PR; registrado por sempre pelo username (inclusive dependentes).
   - Validacao: `supabase/tests/estoque/run-local.ps1` (48 verificacoes, 28 das listas), PostgREST local com o `api.js` real do front (pagina, filtros, exportacao, registrantes, busca de material e modo de compatibilidade) e `npm test`.
+- 2026-10-03: fase 2.2 mesclada (PR #379) e migration `20261005` aplicada pelo usuario.
+- Fase 2.3 (codigo pronto, 2026-10-03): aplicar no Supabase `supabase/migrations/20261006_dashboard_estoque_agregado.sql` antes ou junto com o deploy do front (sem ela o Dashboard usa a consulta antiga, com o corte de 1000).
+  - Validacao: `supabase/tests/estoque/run-local.ps1` (57 verificacoes, 9 do Dashboard); PostgREST local com o `api.js` real: caminho novo x antigo sem limite identicos em 16 blocos e 4 cenarios; `npm test` (32).
+  - Mudanca de agrupamento: "Top centros" agrupa pelo centro de servico atual da pessoa (o rotulo ja era esse); antes a chave era o centro gravado na saida, o que podia repetir o mesmo nome em duas barras quando a pessoa mudou de centro. "Top setores" ja agrupava pelo setor da pessoa.
 - Fase 3: parar de esconder centros de estoque de nome repetido em Entradas/Saidas (`dedupeDomainOptionsByName`), avisar saldo em centro inativo, decidir unificacao de centros repetidos, teste que falhe em consulta sem paginacao a `entradas`/`saidas`, conferencia diaria via pg_cron.
-- Fase 2.3: Dashboard de estoque com agregacao no banco (`rpc_dashboard_estoque`).
 - 4 entradas do tenant `59191387-...` usam o status `58c35c31-3fdf-4179-8cc4-62fdc0019c39`, que nao existe no repositorio; conferir o nome em `status_entrada` (se for cancelado, elas nao deveriam contar no saldo).
 ### Controle de Validades - implantacao (2026-09)
 - Aplicar no Supabase, em ordem: `20260929_01_validades_schema.sql`, `20260929_02_validades_rpcs.sql`, `20260929_03_validades_alertas.sql`.

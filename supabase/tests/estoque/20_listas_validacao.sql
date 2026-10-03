@@ -268,9 +268,58 @@ select listas_test.ok(
   and (select count(*) = 1 from public.rpc_materiais_buscar('luva', 'ce100000-0000-0000-0000-000000000001')),
   'busca de material filtrada pelo centro de estoque das entradas');
 
+-- Dashboard (20261006_dashboard_estoque_agregado) -------------------------------------------------
+create temp table dashboard_a on commit drop as
+select public.rpc_dashboard_estoque(now() - interval '100 days', now(), current_date) as dados;
+
+select listas_test.ok(
+  (select sum((e->>'quantidade')::numeric) = 2015 and sum((e->>'registros')::int) = 3
+     from dashboard_a, jsonb_array_elements(dados->'entradas') e),
+  'dashboard: entradas do periodo agregadas (10 + 5 + 2000), sem a cancelada');
+
+select listas_test.ok(
+  (select sum((s->>'quantidade')::numeric) = 1505 and sum((s->>'registros')::int) = 1504
+     from dashboard_a, jsonb_array_elements(dados->'saidas') s),
+  'dashboard: todas as 1504 saidas ativas do periodo (acima do antigo limite de 1000), sem a cancelada');
+
+select listas_test.ok(
+  (select count(*) < 20 from dashboard_a, jsonb_array_elements(dados->'saidas') s),
+  'dashboard: saidas chegam agregadas (poucos grupos em vez de 1504 linhas)');
+
+select listas_test.ok(
+  (select coalesce(sum((s->>'registros')::int) filter (where s->>'prazo_troca' = 'atrasada'), 0) = 1
+          and coalesce(sum((s->>'registros')::int) filter (where s->>'prazo_troca' = 'a_vencer'), 0) = 2
+          and coalesce(sum((s->>'registros')::int) filter (where (s->>'is_troca')::boolean), 0) = 1
+     from dashboard_a, jsonb_array_elements(dados->'saidas') s),
+  'dashboard: trocas feitas (1), limite passado (1) e a vencer em ate 7 dias (2)');
+
+select listas_test.ok(
+  (select count(*) = 2
+          and bool_or(p->>'nome' = 'João da Silva' and p->>'centro_servico' = 'Elétrica' and p->>'setor' = 'Turno A'
+                      and p->>'cargo' = 'Eletricista' and p->>'centro_custo' = 'Manutenção' and p->>'local' = 'Elétrica')
+          and bool_or(p->>'nome' = 'Maria Souza' and p->>'local' is null)
+     from dashboard_a, jsonb_array_elements(dados->'pessoas') p),
+  'dashboard: pessoas das saidas com os campos da rpc_pessoas_completa (uma vez cada)');
+
+select listas_test.ok(
+  (select bool_or(s->>'centro_custo_nome' = 'Manutenção') from dashboard_a, jsonb_array_elements(dados->'saidas') s),
+  'dashboard: centro de custo da saida pelo nome');
+
+select listas_test.ok(
+  (select not exists (select 1 from jsonb_array_elements(dados->'saidas') s
+                       where s->>'material_id' = 'a7100000-0000-0000-0000-0000000000b1')
+     from dashboard_a),
+  'dashboard: tenant A nao recebe saidas do tenant B');
+
+select listas_test.ok(
+  (select sum((s->>'registros')::int) = 4
+     from jsonb_array_elements(public.rpc_dashboard_estoque(now() - interval '7 days', now(), current_date)->'saidas') s),
+  'dashboard: periodo menor (7 dias) traz so as saidas do intervalo');
+
 -- Acesso ------------------------------------------------------------------------------------------
 select listas_test.login('a1000000-0000-0000-0000-000000000003');
 select listas_test.erro('select * from public.rpc_saidas_listar()', '42501', 'usuario sem permissao de estoque e bloqueado');
+select listas_test.erro('select public.rpc_dashboard_estoque()', '42501', 'usuario sem permissao nao abre o dashboard');
 
 select listas_test.login(null, 'anon');
 select listas_test.erro('select * from public.rpc_entradas_listar()', '42501', 'anon nao executa rpc_entradas_listar');

@@ -26,7 +26,8 @@
     ],
     "notes": [
       "Os graficos respeitam os filtros aplicados; se algo parecer zerado, confirme o periodo.",
-      "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam."
+      "O campo Busca aceita trechos de nome de material, grupo ou pessoa; termos parciais funcionam.",
+      "Totais, trocas e rankings consideram todas as entradas e saidas do periodo, somadas no banco."
     ]
   }
 }
