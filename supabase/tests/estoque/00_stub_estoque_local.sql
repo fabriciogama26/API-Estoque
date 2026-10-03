@@ -21,6 +21,7 @@ create table if not exists public.materiais (
   nome text,
   fabricante text,
   descricao text,
+  "grupoMaterial" text,
   "valorUnitario" numeric default 0,
   "estoqueMinimo" integer,
   ativo boolean default true,
@@ -37,12 +38,14 @@ create table if not exists public.centros_estoque (
 
 create table if not exists public.status_entrada (
   id uuid primary key default gen_random_uuid(),
-  status text not null
+  status text not null,
+  ativo boolean default true
 );
 
 create table if not exists public.status_saida (
   id uuid primary key default gen_random_uuid(),
-  status text not null
+  status text not null,
+  ativo boolean default true
 );
 
 create table if not exists public.entradas (
@@ -63,6 +66,10 @@ create table if not exists public.saidas (
   quantidade numeric not null check (quantidade > 0),
   "dataEntrega" timestamptz not null,
   centro_estoque uuid references public.centros_estoque(id),
+  centro_custo uuid,
+  centro_servico uuid,
+  "usuarioResponsavel" uuid,
+  "dataTroca" timestamptz,
   status uuid not null references public.status_saida(id),
   "criadoEm" timestamptz default now(),
   account_owner_id uuid not null references public.app_users(id)
@@ -78,6 +85,24 @@ create table if not exists public.inventory_material_override (
   inicio_em timestamptz default now(),
   expira_em timestamptz,
   revogado_em timestamptz
+);
+
+-- Previsao (forecast) usada pelo orcamento anual (20260801_purchase_budget_*).
+create table if not exists public.inventory_forecast (
+  id uuid primary key default gen_random_uuid(),
+  account_owner_id uuid not null references public.app_users(id),
+  periodo_base_inicio date not null,
+  periodo_base_fim date not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.f_previsao_gasto_mensal (
+  id uuid primary key default gen_random_uuid(),
+  account_owner_id uuid not null,
+  inventory_forecast_id uuid not null,
+  ano_mes date not null,
+  cenario text not null default 'base',
+  valor_previsto numeric not null default 0
 );
 
 -- Placeholder: em producao a funcao ja existia antes de 20260930, que cria o trigger e depois a recria.
