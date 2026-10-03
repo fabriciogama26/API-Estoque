@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
+import { dedupeStockCentersById } from '../lib/stockCorrections.js'
 
 function ensureClient() {
   if (!isSupabaseConfigured() || !supabase) {
@@ -51,7 +52,9 @@ export async function listCorrectionOptions() {
       ...material,
       materialItemNome: material.material_item_nome,
     })),
-    centers: (unwrap(centersResult, 'Falha ao consultar centros de estoque.') || []).map((center) => ({
+    centers: dedupeStockCentersById(
+      unwrap(centersResult, 'Falha ao consultar centros de estoque.') || [],
+    ).map((center) => ({
       ...center,
       almox: center.nome,
     })),

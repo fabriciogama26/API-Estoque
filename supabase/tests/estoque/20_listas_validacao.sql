@@ -151,6 +151,23 @@ insert into public.saidas ("materialId", "pessoaId", quantidade, "dataEntrega", 
 select listas_test.login('a1000000-0000-0000-0000-000000000001');
 
 select listas_test.ok(
+  (select count(*) = 2
+          and count(distinct id) = 2
+          and count(*) filter (where id = 'ce100000-0000-0000-0000-0000000000b1') = 0
+     from public.rpc_catalog_list('centros_estoque')),
+  'catalogo de centros: sem duplicar ids e sem vazar outro tenant');
+
+select listas_test.login('b1000000-0000-0000-0000-000000000001');
+
+select listas_test.ok(
+  (select count(*) = 1
+          and bool_and(id = 'ce100000-0000-0000-0000-0000000000b1')
+     from public.rpc_catalog_list('centros_estoque')),
+  'catalogo de centros: troca de sessao usa somente o owner B');
+
+select listas_test.login('a1000000-0000-0000-0000-000000000001');
+
+select listas_test.ok(
   (select count(*) = 4 and bool_and(total_registros = 4) from public.rpc_entradas_listar()),
   'entradas: todas as do tenant (inclusive a cancelada), com total');
 
