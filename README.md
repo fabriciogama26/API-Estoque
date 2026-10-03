@@ -931,6 +931,12 @@ supabase/
     20260929_01_validades_schema.sql  # controle de validades: permissoes, tabelas, triggers, RLS, base calculada
     20260929_02_validades_rpcs.sql  # controle de validades: RPCs das telas
     20260929_03_validades_alertas.sql  # controle de validades: funcoes de alerta (service_role)
+    20260930_stock_physical_corrections.sql  # correcao de estoque fisico: solicitacao, aprovacao, ajustes e calcular_saldo_estoque
+    20261001_fix_stock_correction_balance_owner.sql  # correcao de estoque fisico: owner da posicao material x centro
+    20261001_fix_operational_catalog_tenant_scope.sql  # catalogos operacionais sempre no tenant da sessao
+    20261003_estoque_saldo_unico.sql  # saldo unico no banco: rpc_estoque_saldos e politica de reposicao com correcoes
+  auditoria/
+    auditoria_estoque.sql  # consultas somente leitura para conferir saldo, duplicidades e inconsistencias
   migrations_rebuild/
     0001_extensions.sql  # migration rebuild SQL
     0002_tables.sql  # migration rebuild SQL
@@ -947,6 +953,10 @@ supabase/
       00_stub_supabase_local.sql  # stub minimo do Supabase para Postgres local descartavel
       10_validades_validacao.sql  # validacao SQL do controle de validades (termina em ROLLBACK)
       run-local.ps1  # executa stub + migrations + validacao em Postgres local
+    estoque/
+      00_stub_estoque_local.sql  # tabelas de estoque minimas para Postgres local descartavel
+      10_saldo_unico_validacao.sql  # validacao SQL do saldo unico (termina em ROLLBACK)
+      run-local.ps1  # executa stubs + migrations de estoque + validacao em Postgres local
 temp_readme.txt  # documento de suporte
 vercel.json  # configuracao de deploy (Vercel)
 vite.config.js  # configuracao do Vite
@@ -988,6 +998,13 @@ powershell -ExecutionPolicy Bypass -File supabase/tests/validades/run-local.ps1 
 ```
 
 - Resultado esperado: linhas `NOTICE: ok - ...` e `Validacao concluida sem falhas.`
+- Saldo unico de estoque: validacao SQL de `rpc_estoque_saldos` e da politica de reposicao (cancelados, correcoes aprovadas, saida sem centro, periodo, 1500 saidas de um material, isolamento de tenant e igualdade com `calcular_saldo_estoque`).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File supabase/tests/estoque/run-local.ps1 -Port 5432
+```
+
+- Testes unitarios (Node): `npm test` executa `tests/*.test.js` (montagem do Estoque atual, correcoes de estoque e checagens das migrations).
 
 
 ---

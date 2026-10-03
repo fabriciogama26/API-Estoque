@@ -263,104 +263,166 @@ function normalizarMaterial(material) {
   }
 }
 
+const dataMaisRecente = (valores = []) =>
+  valores
+    .filter(Boolean)
+    .map((raw) => {
+      const data = new Date(raw)
+      return Number.isNaN(data.getTime()) ? null : data
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.getTime() - a.getTime())[0] || null
+
+function resumirMovimentacaoPorLancamentos(material, entradas, saidas, ajustes, periodo) {
+  const entradasMaterial = entradas
+    .filter((entrada) => entrada.materialId === material.id)
+    .filter((entrada) => filtrarPorPeriodo(entrada, 'dataEntrada', periodo))
+    .filter((entrada) => !isRegistroCancelado(entrada))
+  const saidasMaterial = saidas
+    .filter((saida) => saida.materialId === material.id)
+    .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
+    .filter((saida) => !isRegistroCancelado(saida))
+
+  const ajustesMaterial = ajustes
+    .filter((ajuste) => ajuste.materialId === material.id)
+    .filter((ajuste) => filtrarPorPeriodo(ajuste, 'dataAjuste', periodo))
+  // Correções alteram o saldo, mas permanecem fora de entradas, saídas e
+  // métricas de consumo.
+  const totalAjustes = ajustesMaterial.reduce((acc, ajuste) => acc + Number(ajuste.quantidadeAjuste ?? 0), 0)
+  const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo) + totalAjustes
+
+  const centrosCustoSet = new Set()
+  const centrosEstoqueMap = new Map()
+  entradasMaterial.forEach((entrada) => {
+    if (entrada?.centroCusto) {
+      centrosCustoSet.add(String(entrada.centroCusto).trim())
+    }
+    if (entrada?.centroCustoId) {
+      centrosEstoqueMap.set(String(entrada.centroCustoId), {
+        id: String(entrada.centroCustoId),
+        nome: String(entrada.centroCusto || entrada.centroCustoId).trim(),
+      })
+    }
+  })
+
+  const ultimaSaidaInfo =
+    saidasMaterial
+      .map((saida) => {
+        const dataEntregaDate = new Date(saida.dataEntrega ?? saida.data_entrega ?? null)
+        if (Number.isNaN(dataEntregaDate.getTime())) {
+          return null
+        }
+        return {
+          saidaId: saida.id ?? saida.saidaId ?? null,
+          pessoaId: saida.pessoaId ?? null,
+          pessoaNome: normalizeText(saida.pessoaNome ?? saida.pessoa?.nome ?? ''),
+          pessoaMatricula: normalizeText(saida.pessoaMatricula ?? saida.pessoa?.matricula ?? ''),
+          quantidade: Number(saida.quantidade ?? 0),
+          dataEntrega: dataEntregaDate.toISOString(),
+          dataEntregaValue: dataEntregaDate.getTime(),
+          usuarioResponsavel: normalizeText(
+            saida.usuarioResponsavelNome ??
+              saida.usuarioResponsavel ??
+              saida.usuario_responsavel ??
+              saida.usuarioResponsavelId ??
+              ''
+          ),
+        }
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.dataEntregaValue - a.dataEntregaValue)[0] || null
+
+  let ultimaSaida = null
+  if (ultimaSaidaInfo) {
+    // remove campo auxiliar de ordenaÇõÇœo
+    // eslint-disable-next-line no-unused-vars
+    const { dataEntregaValue, ...rest } = ultimaSaidaInfo
+    ultimaSaida = rest
+  }
+
+  return {
+    saldo,
+    temMovimentacao: saldo !== 0 || entradasMaterial.length > 0,
+    totalEntradas: entradasMaterial.reduce((acc, entrada) => acc + Number(entrada.quantidade ?? 0), 0),
+    totalSaidas: saidasMaterial.reduce((acc, saida) => acc + Number(saida.quantidade ?? 0), 0),
+    ultimaAtualizacao: dataMaisRecente([
+      ...entradasMaterial.map((item) => item.dataEntrada),
+      ...saidasMaterial.map((item) => item.dataEntrega),
+      ...ajustesMaterial.map((item) => item.dataAjuste),
+    ]),
+    temSaida: saidasMaterial.length > 0,
+    ultimaSaida,
+    centrosCusto: Array.from(centrosCustoSet).filter(Boolean),
+    centrosEstoqueDetalhes: Array.from(centrosEstoqueMap.values()),
+  }
+}
+
+// Posicoes material x centro ja agregadas pelo banco (rpc_estoque_saldos).
+function resumirMovimentacaoPorSaldos(posicoes = []) {
+  const somar = (campo) => posicoes.reduce((acc, posicao) => acc + Number(posicao[campo] ?? 0), 0)
+  const saldo = somar('saldo')
+  const totalEntradas = somar('totalEntradas')
+  const qtdSaidas = somar('qtdSaidas')
+  const ultimaSaidaData = dataMaisRecente(posicoes.map((posicao) => posicao.ultimaSaidaEm))
+  const centrosEstoqueDetalhes = posicoes
+    .map((posicao) => {
+      const id = posicao.centroEstoqueId ? String(posicao.centroEstoqueId) : null
+      return {
+        id,
+        nome: normalizeText(posicao.centroEstoqueNome) || (id ? id : 'Sem centro de estoque'),
+        saldo: Number(posicao.saldo ?? 0),
+        ativo: posicao.centroAtivo !== false,
+      }
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+
+  return {
+    saldo,
+    temMovimentacao: saldo !== 0 || totalEntradas > 0,
+    totalEntradas,
+    totalSaidas: somar('totalSaidas'),
+    ultimaAtualizacao: dataMaisRecente(
+      posicoes.flatMap((posicao) => [posicao.ultimaEntradaEm, posicao.ultimaSaidaEm, posicao.ultimoAjusteEm]),
+    ),
+    temSaida: qtdSaidas > 0,
+    ultimaSaida: ultimaSaidaData ? { dataEntrega: ultimaSaidaData.toISOString() } : null,
+    centrosCusto: Array.from(new Set(centrosEstoqueDetalhes.filter((centro) => centro.id).map((centro) => centro.nome))),
+    centrosEstoqueDetalhes,
+  }
+}
+
 export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], periodo = null, options = {}) {
   const includeAll = Boolean(options?.includeAll)
   const ajustes = Array.isArray(options?.ajustes) ? options.ajustes : []
   const correcoesPendentes = Array.isArray(options?.correcoesPendentes) ? options.correcoesPendentes : []
+  // Com `saldos`, o saldo vem pronto do banco (mesma regra da Saida) e entradas/saidas sao ignoradas.
+  const saldosPorMaterial = Array.isArray(options?.saldos) ? new Map() : null
+  if (saldosPorMaterial) {
+    options.saldos.forEach((posicao) => {
+      const chave = String(posicao?.materialId ?? '')
+      if (!chave) return
+      const posicoes = saldosPorMaterial.get(chave)
+      if (posicoes) posicoes.push(posicao)
+      else saldosPorMaterial.set(chave, [posicao])
+    })
+  }
   // Visao base do Estoque atual: material ativo sem movimentacao aparece com saldo zero (decisao 2026-09-26).
   const includeAtivosSemMovimentacao = Boolean(options?.includeAtivosSemMovimentacao)
   const materiaisNormalizados = materiais.map((material) => normalizarMaterial(material)).filter(Boolean)
   const materiaisComMovimentacao = new Set()
 
   const itens = materiaisNormalizados.map((material) => {
-    const entradasMaterial = entradas
-      .filter((entrada) => entrada.materialId === material.id)
-      .filter((entrada) => filtrarPorPeriodo(entrada, 'dataEntrada', periodo))
-      .filter((entrada) => !isRegistroCancelado(entrada))
-    const saidasMaterial = saidas
-      .filter((saida) => saida.materialId === material.id)
-      .filter((saida) => filtrarPorPeriodo(saida, 'dataEntrega', periodo))
-      .filter((saida) => !isRegistroCancelado(saida))
-
-    const ajustesMaterial = ajustes
-      .filter((ajuste) => ajuste.materialId === material.id)
-      .filter((ajuste) => filtrarPorPeriodo(ajuste, 'dataAjuste', periodo))
-    // Correções alteram o saldo, mas permanecem fora de entradas, saídas e
-    // métricas de consumo.
-    const totalAjustes = ajustesMaterial.reduce((acc, ajuste) => acc + Number(ajuste.quantidadeAjuste ?? 0), 0)
-    const saldo = calcularSaldoMaterial(material.id, entradas, saidas, periodo) + totalAjustes
+    const movimentacao = saldosPorMaterial
+      ? resumirMovimentacaoPorSaldos(saldosPorMaterial.get(String(material.id)) ?? [])
+      : resumirMovimentacaoPorLancamentos(material, entradas, saidas, ajustes, periodo)
+    const { saldo } = movimentacao
     const { estoqueMinimo, deficitQuantidade, valorReposicao } = calcularDeficit(material, saldo)
 
-    if (saldo !== 0 || entradasMaterial.length > 0) {
+    if (movimentacao.temMovimentacao) {
       materiaisComMovimentacao.add(material.id)
     }
 
-    const centrosCustoSet = new Set()
-    const centrosEstoqueMap = new Map()
-    entradasMaterial.forEach((entrada) => {
-      if (entrada?.centroCusto) {
-        centrosCustoSet.add(String(entrada.centroCusto).trim())
-      }
-      if (entrada?.centroCustoId) {
-        centrosEstoqueMap.set(String(entrada.centroCustoId), {
-          id: String(entrada.centroCustoId),
-          nome: String(entrada.centroCusto || entrada.centroCustoId).trim(),
-        })
-      }
-    })
-
-    const totalEntradasMaterial = entradasMaterial.reduce(
-      (acc, entrada) => acc + Number(entrada.quantidade ?? 0),
-      0
-    )
-    const totalSaidasMaterial = saidasMaterial.reduce(
-      (acc, saida) => acc + Number(saida.quantidade ?? 0),
-      0
-    )
-
-    const ultimaAtualizacaoDate = [...entradasMaterial.map((item) => item.dataEntrada), ...saidasMaterial.map((item) => item.dataEntrega), ...ajustesMaterial.map((item) => item.dataAjuste)]
-      .map((raw) => {
-        const data = new Date(raw)
-        return Number.isNaN(data.getTime()) ? null : data
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.getTime() - a.getTime())[0] || null
-
     const alertaAtivo = deficitQuantidade > 0
-    const ultimaSaidaInfo =
-      saidasMaterial
-        .map((saida) => {
-          const dataEntregaDate = new Date(saida.dataEntrega ?? saida.data_entrega ?? null)
-          if (Number.isNaN(dataEntregaDate.getTime())) {
-            return null
-          }
-          return {
-            saidaId: saida.id ?? saida.saidaId ?? null,
-            pessoaId: saida.pessoaId ?? null,
-            pessoaNome: normalizeText(saida.pessoaNome ?? saida.pessoa?.nome ?? ''),
-            pessoaMatricula: normalizeText(saida.pessoaMatricula ?? saida.pessoa?.matricula ?? ''),
-            quantidade: Number(saida.quantidade ?? 0),
-            dataEntrega: dataEntregaDate.toISOString(),
-            dataEntregaValue: dataEntregaDate.getTime(),
-            usuarioResponsavel: normalizeText(
-              saida.usuarioResponsavelNome ??
-                saida.usuarioResponsavel ??
-                saida.usuario_responsavel ??
-                saida.usuarioResponsavelId ??
-                ''
-            ),
-          }
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.dataEntregaValue - a.dataEntregaValue)[0] || null
-
-    let ultimaSaida = null
-    if (ultimaSaidaInfo) {
-      // remove campo auxiliar de ordenaÇõÇœo
-      // eslint-disable-next-line no-unused-vars
-      const { dataEntregaValue, ...rest } = ultimaSaidaInfo
-      ultimaSaida = rest
-    }
 
     return {
       materialId: material.id,
@@ -380,13 +442,13 @@ export function montarEstoqueAtual(materiais = [], entradas = [], saidas = [], p
       deficitQuantidade,
       valorReposicao,
       alerta: alertaAtivo,
-      centrosCusto: Array.from(centrosCustoSet).filter(Boolean),
-      centrosEstoqueDetalhes: Array.from(centrosEstoqueMap.values()),
-      totalEntradas: totalEntradasMaterial,
-      totalSaidas: totalSaidasMaterial,
-      ultimaAtualizacao: ultimaAtualizacaoDate ? ultimaAtualizacaoDate.toISOString() : null,
-      temSaida: saidasMaterial.length > 0,
-      ultimaSaida,
+      centrosCusto: movimentacao.centrosCusto,
+      centrosEstoqueDetalhes: movimentacao.centrosEstoqueDetalhes,
+      totalEntradas: movimentacao.totalEntradas,
+      totalSaidas: movimentacao.totalSaidas,
+      ultimaAtualizacao: movimentacao.ultimaAtualizacao ? movimentacao.ultimaAtualizacao.toISOString() : null,
+      temSaida: movimentacao.temSaida,
+      ultimaSaida: movimentacao.ultimaSaida,
       correcoesPendentes: correcoesPendentes.filter((correcao) => correcao.materialId === material.id),
     }
   })

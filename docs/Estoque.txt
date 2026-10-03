@@ -7,6 +7,7 @@ Visao geral
 - Permite ajustar o estoque minimo por material via modal de alteracao.
 - Traz acoes rapidas por material (Entrada, Saida e Alterar minimo) para agilizar o registro de movimentacoes.
 - Carrega dados via `api.estoque.current({ periodoInicio, periodoFim })`, retornando `itens` e `alertas`.
+- O saldo vem pronto do banco (`rpc_estoque_saldos`, por material x centro), com a mesma regra da Saida e do modal de correcao: entradas nao canceladas - saidas nao canceladas + correcoes aprovadas. O card soma os centros e mostra o saldo de cada um.
 
 Arquitetura (modular)
 ---------------------
@@ -69,7 +70,8 @@ Lista de itens
   - ID do material e cor (quando disponivel).
   - Quantidade atual em estoque.
   - Valor unitario e valor total (formatados em BRL).
-  - Informacoes adicionais: validade (em dias), CA, centro(s) de custo, data e usuario da ultima atualizacao.
+  - Informacoes adicionais: validade (em dias), CA, saldo por centro de estoque (ex.: "Almox Central: 8 | Almox Obra: 7"), data e usuario da ultima atualizacao.
+  - Saidas antigas gravadas sem centro aparecem como "Sem centro de estoque" com saldo negativo: entram no total do card, mas a Saida nao consegue baixar desse "centro". Corrija o centro dessas saidas.
 - Acoes por material:
   - Entrada: abre a tela de Entradas e tenta preencher Material + Centro de estoque automaticamente.
   - Saida: abre a tela de Saidas e tenta preencher Centro de estoque + Material automaticamente (centro e obrigatorio para habilitar o campo de material).
@@ -91,9 +93,32 @@ Boas praticas
 - Manter `localApi.estoque.current` (modo local) alinhado com a estrutura esperada (`alertas` + `itens`) para facilitar testes.
 - Utilizar "Movimentacao do periodo" para inspecionar entradas/saidas do intervalo antes de gerar relatorios oficiais.
 
-Melhoria possivel
------------------
-- Criar um RPC no Supabase para calcular o saldo do Estoque atual (com corte por data inicio/fim), reduzindo trafego e CPU no frontend; deve respeitar account_owner_id/RLS.
+Atualizacao 2026-10 (saldo unico calculado no banco)
+----------------------------------------------------
+- Problema relatado: card com saldo maior que zero enquanto a Saida bloqueava por estoque vazio; modal de correcao mostrando um valor e o card outro; estoque "duplicado".
+- Causas encontradas:
+  - a tela buscava entradas e saidas sem paginacao; a API do Supabase devolve no maximo 1000 linhas, entao os lancamentos mais antigos ficavam de fora e o card mostrava mais estoque do que existia;
+  - o card somava todos os centros, enquanto a Saida e o modal olham um centro so;
+  - a politica de reposicao (minimos do card e aba Compra) calculava entradas - saidas sem as correcoes aprovadas.
+- Migration: `supabase/migrations/20261003_estoque_saldo_unico.sql`
+  - `_estoque_saldos_posicoes(owner, material, inicio, fim)`: agregacao interna por material x centro (mesma regra de `calcular_saldo_estoque`); nao exposta a `authenticated`.
+  - `rpc_estoque_saldos(p_material_id, p_inicio, p_fim)`: saldo do tenant da sessao (`current_account_owner_id()`), exige permissao de estoque; com inicio/fim devolve so a movimentacao do periodo.
+  - `_inventory_reposicao_calcular_modo`: `estoque_atual` passa a vir da mesma agregacao (inclui correcoes aprovadas e lancamentos com data futura, como a Saida); janelas de consumo nao mudaram.
+  - Indices `entradas_owner_material_centro_idx` e `saidas_owner_material_centro_idx`.
+- Arquivos alterados:
+  - src/services/api.js (`api.estoque.current`, `carregarSaldosEstoque`, `carregarAjustesEstoque`; `carregarMateriais`/`carregarMateriaisDetalhados` passam a buscar so os materiais do tenant em lotes de 150 ids e `carregarMaterialIdsDoOwner` pagina os ids; antes a `materiais_view` era lida inteira, com corte de 1000 linhas somando todos os tenants, e filtrada no navegador)
+  - src/lib/estoque.js (`montarEstoqueAtual` com `options.saldos`, `resumirMovimentacaoPorSaldos`, `resumirMovimentacaoPorLancamentos`)
+  - src/components/Estoque/List/EstoqueList.jsx (saldo por centro no card)
+  - src/components/Estoque/Modal/EstoqueCorrectionModal.jsx (saldo por centro nas opcoes; ignora a posicao sem centro)
+  - src/hooks/useEstoqueFiltro.js (textos dos cards de resumo)
+- Comportamento antes/depois:
+  - Antes: saldo calculado no navegador com no maximo 1000 entradas e 1000 saidas do tenant.
+  - Depois: saldo calculado no banco, paginado (`executePaged`), sem limite de volume; card, Saida, modal de correcao e politica de reposicao mostram o mesmo numero.
+  - Sem a migration aplicada, a tela detecta a funcao ausente (PGRST202/42883), registra aviso e usa o calculo antigo.
+  - Modo local (`localApi`) e backend (`api/_shared/operations.js`) continuam com o calculo por lancamentos.
+- Validacao: `supabase/tests/estoque/run-local.ps1` (16 verificacoes em PostgreSQL local, incluindo 1500 saidas de um material, tenant isolado e igualdade com `calcular_saldo_estoque`) e `tests/estoqueSaldoUnico.test.js`.
+- Auditoria manual: `supabase/auditoria/auditoria_estoque.sql` (somente leitura) compara entradas - saidas com o que a tela mostrava.
+- Fora desta fase: Dashboard de estoque, listas de Entradas/Saidas (ainda sem paginacao no servidor) e `rpc_orcamento_compra_12m_calcular` (ainda sem correcoes no estoque).
 
 Atualizacao 2026-09 (minimos da politica de reposicao)
 ------------------------------------------------------
@@ -283,6 +308,10 @@ Servicos e integracoes externas
   - Tipo: servicos de API
   - Caminho: src/services/dashboardEstoqueApi.js, src/services/estoqueApi.js
   - Responsavel por: buscar dados consolidados de estoque e indicadores.
+- rpc_estoque_saldos
+  - Tipo: RPC Supabase (SECURITY DEFINER, tenant da sessao)
+  - Caminho: supabase/migrations/20261003_estoque_saldo_unico.sql; consumida por `carregarSaldosEstoque` em src/services/api.js
+  - Responsavel por: saldo por material x centro (entradas, saidas, correcoes, ultimas datas), com a mesma regra de `calcular_saldo_estoque`.
 - entradasService / saidasService / materiaisService
   - Tipo: servicos de API
   - Caminho: src/services/entradasService.js, src/services/saidasService.js, src/services/materiaisService.js
