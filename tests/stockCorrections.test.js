@@ -2,7 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { montarEstoqueAtual } from '../src/lib/estoque.js'
-import { canResolveStockCorrection, dedupeStockCentersById } from '../src/lib/stockCorrections.js'
+import {
+  canResolveStockCorrection,
+  correctionUserName,
+  dedupeStockCentersById,
+  matchesCorrectionMaterial,
+} from '../src/lib/stockCorrections.js'
 
 const material = {
   id: 'material-1',
@@ -80,7 +85,19 @@ test('migration usa os nomes reais das tabelas operacionais do projeto', () => {
 
 test('API de correções consulta somente colunas existentes em materiais', () => {
   const service = readFileSync(new URL('../src/services/stockCorrectionsApi.js', import.meta.url), 'utf8')
-  assert.match(service, /from\('materiais_view'\)\.select\('id, descricao, "materialItemNome"'\)/)
+  const view = readFileSync(
+    new URL('../supabase/migrations/0055_fix_materiais_view_username_priority.sql', import.meta.url),
+    'utf8',
+  )
+  assert.match(service, /from\('materiais_view'\)\.select\(MATERIAL_DETAIL_COLUMNS\)/)
+  const columns = service
+    .match(/MATERIAL_DETAIL_COLUMNS = \[([\s\S]*?)\]/)[1]
+    .match(/'[^']+'/g)
+    .map((column) => column.replace(/['"]/g, ''))
+  assert.ok(columns.includes('ca') && columns.includes('materialItemNome'))
+  for (const column of columns) {
+    assert.match(view, new RegExp(`(?:m\\.|AS )"?${column}"?,`), `materiais_view sem a coluna ${column}`)
+  }
   assert.match(service, /rpc\('rpc_stock_correction_material_options'\)/)
   assert.match(service, /rpc\('rpc_catalog_list', \{ p_table: 'centros_estoque' \}\)/)
   assert.doesNotMatch(service, /material:materiais\(/)
@@ -127,4 +144,33 @@ test('aprovacao da propria correcao no banco depende de ser o titular da conta',
   assert.match(migration, /v_req\.requested_by = auth\.uid\(\) and v_session_owner is distinct from auth\.uid\(\)/)
   assert.match(migration, /v_session_owner uuid := public\.current_account_owner_id\(\)/)
   assert.doesNotMatch(migration, /display_name/)
+})
+
+test('solicitante usa o username, como o "Registrado por" de Entradas e Saidas', () => {
+  assert.equal(correctionUserName({ username: 'fabricio', display_name: 'ADMINISTRADORA', email: 'a@b.com' }), 'fabricio')
+  assert.equal(correctionUserName({ username: ' ', display_name: 'ADMINISTRADORA' }), 'ADMINISTRADORA')
+  assert.equal(correctionUserName({ email: 'a@b.com' }), 'a@b.com')
+  assert.equal(correctionUserName(null), '')
+})
+
+test('filtro de material aceita ID, CA ou nome, sem diferenciar acento e maiusculas', () => {
+  const row = {
+    material_id: '75e02ed8-a897-49f0-b462-eb67a5e63e5d',
+    material: {
+      id: '75e02ed8-a897-49f0-b462-eb67a5e63e5d',
+      materialItemNome: 'Óculos de segurança',
+      ca: '12345',
+      descricao: 'Lente incolor',
+      fabricanteNome: 'Kalipso',
+    },
+  }
+  assert.equal(matchesCorrectionMaterial(row, ''), true)
+  assert.equal(matchesCorrectionMaterial(row, '75e02ed8-a897-49f0-b462-eb67a5e63e5d'), true)
+  assert.equal(matchesCorrectionMaterial(row, '75E02ED8'), true)
+  assert.equal(matchesCorrectionMaterial(row, '12345'), true)
+  assert.equal(matchesCorrectionMaterial(row, 'oculos SEGURANCA'), true)
+  assert.equal(matchesCorrectionMaterial(row, 'kalipso incolor'), true)
+  assert.equal(matchesCorrectionMaterial(row, 'luva'), false)
+  assert.equal(matchesCorrectionMaterial(row, 'oculos 99999'), false)
+  assert.equal(matchesCorrectionMaterial({ material_id: 'abc-123', material: null }, 'abc'), true)
 })

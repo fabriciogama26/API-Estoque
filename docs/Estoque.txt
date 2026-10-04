@@ -96,6 +96,27 @@ Boas praticas
 - Manter `localApi.estoque.current` (modo local) alinhado com a estrutura esperada (`alertas` + `itens`) para facilitar testes.
 - Utilizar "Movimentacao do periodo" para inspecionar entradas/saidas do intervalo antes de gerar relatorios oficiais.
 
+Atualizacao 2026-10 (melhorias na aprovacao de correcoes de estoque)
+---------------------------------------------------------------------
+- Arquivos alterados:
+  - src/pages/StockCorrectionsPage.jsx
+  - src/components/Estoque/Modal/StockCorrectionDetailsModal.jsx (novo)
+  - src/services/stockCorrectionsApi.js
+  - src/lib/stockCorrections.js
+  - tests/stockCorrections.test.js
+- Funcoes/hooks tocadas:
+  - listStockCorrections (traz rejeitado por, cancelado por, ajuste aplicado e os campos completos do material; nao filtra mais por material no banco)
+  - listCorrectionCenters (nova; so os centros, sem carregar a lista de materiais)
+  - correctionUserName (nova) e matchesCorrectionMaterial (nova)
+  - StockCorrectionDetailsModal (novo)
+- Comportamento antes/depois:
+  - Status: antes abria em PENDENTE; agora abre e limpa em "Todos".
+  - Solicitante: antes mostrava o nome de exibicao (ex.: ADMINISTRADORA); agora mostra o username, como o "Registrado por" de Entradas e Saidas (username, depois nome de exibicao, depois email).
+  - Filtro Material: antes era um select; agora e um campo de texto que aceita ID, CA, nome, descricao ou fabricante (sem diferenciar maiusculas e acentos; varias palavras precisam aparecer todas). O filtro roda sobre as solicitacoes ja carregadas, sem nova consulta a cada letra. O link "Corrigir" do Estoque atual continua abrindo a tela filtrada pelo ID do material.
+  - Acoes: botao de olho (Ver detalhes) em todas as linhas, antes de Aprovar/Rejeitar/Cancelar. O modal mostra o material (nome completo, ID, descricao, CA, fabricante, grupo, tamanho, cores, caracteristicas, validade, valor unitario, estoque minimo e se o cadastro esta ativo), a correcao (centro e ID, saldo do sistema, contagem fisica, diferenca, valor da diferenca, status, motivo e observacoes) e o registro (solicitante, aprovacao, rejeicao com motivo, cancelamento com motivo, ajuste no saldo e data do ajuste).
+  - O badge "pendentes" conta so as linhas visiveis depois do filtro de material.
+- Validacao: `npm test` (tests/stockCorrections.test.js: username do solicitante, filtro por ID/CA/nome e colunas da materiais_view) e `vite build`.
+
 Atualizacao 2026-10 (titular aprova a propria correcao de estoque)
 -------------------------------------------------------------------
 - Arquivos alterados:
