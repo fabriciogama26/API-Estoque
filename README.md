@@ -939,6 +939,7 @@ supabase/
     20261005_listas_movimentacoes_paginadas.sql  # listas de Entradas/Saidas paginadas no banco, registrantes e busca de material
     20261006_dashboard_estoque_agregado.sql  # Dashboard de estoque com entradas, saidas e pessoas agregadas no banco
     20261008_forecast_tendencia_e_auditoria.sql  # forecast: inclinacao do fator de tendencia em R$/mes (0,5..1,5) e acuracia nula sem mes realizado
+    20261009_stock_correction_titular_aprova_propria.sql  # correcao de estoque fisico: titular da conta aprova a propria solicitacao
   auditoria/
     auditoria_estoque.sql  # consultas somente leitura para conferir saldo, duplicidades e inconsistencias
     diagnostico_orcamento_12m.sql  # identifica qual versao do orcamento anual esta aplicada no banco
@@ -1009,7 +1010,7 @@ powershell -ExecutionPolicy Bypass -File supabase/tests/validades/run-local.ps1 
 ```
 
 - Resultado esperado: linhas `NOTICE: ok - ...` e `Validacao concluida sem falhas.`
-- Saldo unico de estoque: validacao SQL de `rpc_estoque_saldos`, da politica de reposicao, do orcamento anual, das listas paginadas de Entradas/Saidas e do Dashboard agregado (cancelados, correcoes aprovadas, saida sem centro, periodo, 1500 saidas de um material, isolamento de tenant e igualdade com `calcular_saldo_estoque`).
+- Saldo unico de estoque: validacao SQL de `rpc_estoque_saldos`, da politica de reposicao, do orcamento anual, das listas paginadas de Entradas/Saidas, do Dashboard agregado e da aprovacao de correcoes pelo titular (cancelados, correcoes aprovadas, saida sem centro, periodo, 1500 saidas de um material, isolamento de tenant e igualdade com `calcular_saldo_estoque`).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File supabase/tests/estoque/run-local.ps1 -Port 5432
