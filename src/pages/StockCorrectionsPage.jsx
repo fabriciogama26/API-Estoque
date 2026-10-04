@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { InventoryIcon } from '../components/icons.jsx'
+import { StockCorrectionDetailsModal } from '../components/Estoque/Modal/StockCorrectionDetailsModal.jsx'
 import { usePermissions } from '../context/PermissionsContext.jsx'
+import '../styles/MateriaisPage.css'
 import '../styles/StockCorrectionsPage.css'
 import {
   approveStockCorrection,
   cancelStockCorrection,
-  listCorrectionOptions,
+  listCorrectionCenters,
   listStockCorrections,
   rejectStockCorrection,
 } from '../services/stockCorrectionsApi.js'
-import { canResolveStockCorrection } from '../lib/stockCorrections.js'
+import { canResolveStockCorrection, correctionUserName, matchesCorrectionMaterial } from '../lib/stockCorrections.js'
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 const signed = (value) => `${Number(value) > 0 ? '+' : ''}${number.format(Number(value || 0))}`
-const userName = (user) => user?.display_name || user?.username || '-'
 const materialName = (material) => material?.materialItemNome || material?.descricao || material?.id || '-'
+const EMPTY_FILTERS = { status: '', materialTerm: '', stockCenterId: '', start: '', end: '' }
 
 export function StockCorrectionsPage() {
   const [searchParams] = useSearchParams()
@@ -25,28 +28,33 @@ export function StockCorrectionsPage() {
   // Titular = conta que nao e dependente de ninguem (mesmo criterio de Configuracoes).
   const isAccountOwner = Boolean(userId) && !profile?.parent_user_id
   const [rows, setRows] = useState([])
-  const [options, setOptions] = useState({ materials: [], centers: [] })
-  const [filters, setFilters] = useState({ status: 'PENDENTE', materialId: searchParams.get('materialId') || '', stockCenterId: '', start: '', end: '' })
+  const [centers, setCenters] = useState([])
+  // O link "Corrigir" do Estoque atual abre a tela ja filtrada pelo ID do material.
+  const [filters, setFilters] = useState({ ...EMPTY_FILTERS, materialTerm: searchParams.get('materialId') || '' })
   const [feedback, setFeedback] = useState(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [detailRow, setDetailRow] = useState(null)
+  const { status, stockCenterId, start, end, materialTerm } = filters
 
+  // Material fica fora da consulta: o filtro por texto roda sobre as linhas ja carregadas.
   const load = useCallback(async () => {
     try {
       setLoading(true)
       setFeedback(null)
-      setRows(await listStockCorrections(filters))
+      setRows(await listStockCorrections({ status, stockCenterId, start, end }))
     } catch (error) {
       setFeedback({ type: 'error', text: error.message })
     } finally {
       setLoading(false)
     }
-  }, [filters])
+  }, [status, stockCenterId, start, end])
 
-  useEffect(() => { listCorrectionOptions().then(setOptions).catch((error) => setFeedback({ type: 'error', text: error.message })) }, [])
+  useEffect(() => { listCorrectionCenters().then(setCenters).catch((error) => setFeedback({ type: 'error', text: error.message })) }, [])
   useEffect(() => { load() }, [load])
 
-  const selectedPending = useMemo(() => rows.filter((row) => row.status === 'PENDENTE').length, [rows])
+  const visibleRows = useMemo(() => rows.filter((row) => matchesCorrectionMaterial(row, materialTerm)), [rows, materialTerm])
+  const selectedPending = useMemo(() => visibleRows.filter((row) => row.status === 'PENDENTE').length, [visibleRows])
   const mutate = async (action, success) => {
     setBusy(true)
     setFeedback(null)
@@ -66,7 +74,7 @@ export function StockCorrectionsPage() {
   }
 
   const clearFilters = () => {
-    setFilters({ status: 'PENDENTE', materialId: '', stockCenterId: '', start: '', end: '' })
+    setFilters(EMPTY_FILTERS)
   }
 
   return (
@@ -83,8 +91,8 @@ export function StockCorrectionsPage() {
         </header>
         <form className="form form--inline" onSubmit={(event) => { event.preventDefault(); load() }}>
           <label className="field"><span>Status</span><select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}><option value="">Todos</option>{['PENDENTE','APROVADO','REJEITADO','CANCELADO'].map((status) => <option key={status}>{status}</option>)}</select></label>
-          <label className="field"><span>Material</span><select value={filters.materialId} onChange={(e) => setFilters({ ...filters, materialId: e.target.value })}><option value="">Todos</option>{options.materials.map((item) => <option key={item.id} value={item.id}>{materialName(item)}</option>)}</select></label>
-          <label className="field"><span>Centro de estoque</span><select value={filters.stockCenterId} onChange={(e) => setFilters({ ...filters, stockCenterId: e.target.value })}><option value="">Todos</option>{options.centers.map((item) => <option key={item.id} value={item.id}>{item.almox || item.id}</option>)}</select></label>
+          <label className="field"><span>Material</span><input type="search" value={filters.materialTerm} placeholder="Nome, CA ou ID" onChange={(e) => setFilters({ ...filters, materialTerm: e.target.value })} /></label>
+          <label className="field"><span>Centro de estoque</span><select value={filters.stockCenterId} onChange={(e) => setFilters({ ...filters, stockCenterId: e.target.value })}><option value="">Todos</option>{centers.map((item) => <option key={item.id} value={item.id}>{item.almox || item.id}</option>)}</select></label>
           <label className="field"><span>Período inicial</span><input type="date" value={filters.start} onChange={(e) => setFilters({ ...filters, start: e.target.value })} /></label>
           <label className="field"><span>Período final</span><input type="date" value={filters.end} onChange={(e) => setFilters({ ...filters, end: e.target.value })} /></label>
           <div className="form__actions">
@@ -103,23 +111,25 @@ export function StockCorrectionsPage() {
           <span className="status-badge status-badge--warning">{selectedPending} {selectedPending === 1 ? 'pendente' : 'pendentes'}</span>
         </header>
         {loading ? <p className="feedback">Carregando solicitações...</p> : null}
-        {!loading && !rows.length ? <p className="feedback">Nenhuma solicitação encontrada para os filtros informados.</p> : null}
-        {!loading && rows.length ? (
+        {!loading && !visibleRows.length ? <p className="feedback">Nenhuma solicitação encontrada para os filtros informados.</p> : null}
+        {!loading && visibleRows.length ? (
           <div className="table-wrapper">
             <table className="data-table">
               <thead><tr><th>Material</th><th>Centro</th><th>Saldo sistema</th><th>Contagem física</th><th>Diferença</th><th>Solicitante</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
-              <tbody>{rows.map((row) => <tr key={row.id}>
+              <tbody>{visibleRows.map((row) => <tr key={row.id}>
                 <td><strong>{materialName(row.material) || row.material_id}</strong><p className="data-table__muted">Solicitação: {row.id}</p></td>
                 <td>{row.stock_center?.almox || row.stock_center_id}</td>
                 <td>{number.format(row.system_balance)}</td><td>{number.format(row.physical_quantity)}</td>
                 <td><strong style={{ color: Number(row.difference) < 0 ? 'var(--danger, #b42318)' : 'var(--success, #067647)' }}>{signed(row.difference)}</strong></td>
-                <td>{userName(row.requester)}</td><td>{new Date(row.requested_at).toLocaleString('pt-BR')}</td><td>{row.status}</td>
-                <td>{row.status === 'PENDENTE' ? <div className="table-actions">{canResolveStockCorrection({ row, userId, canApprove, isAccountOwner }) ? <><button type="button" className="button button--primary" disabled={busy} onClick={() => mutate(() => approveStockCorrection(row.id), 'Correção aprovada e estoque atualizado.')}>Aprovar</button><button type="button" className="button button--danger" disabled={busy} onClick={() => reject(row)}>Rejeitar</button></> : null}{row.requested_by === userId || canApprove ? <button type="button" className="button button--ghost" disabled={busy} onClick={() => mutate(() => cancelStockCorrection(row.id), 'Solicitação cancelada; posição desbloqueada.')}>Cancelar</button> : null}</div> : '-'}</td>
+                <td>{correctionUserName(row.requester) || '-'}</td><td>{new Date(row.requested_at).toLocaleString('pt-BR')}</td><td>{row.status}</td>
+                <td><div className="table-actions"><button type="button" className="materiais-table-action-button" onClick={() => setDetailRow(row)} aria-label={`Ver detalhes da solicitação ${row.id}`} title="Ver detalhes"><Eye size={16} strokeWidth={1.8} /></button>{row.status === 'PENDENTE' ? <>{canResolveStockCorrection({ row, userId, canApprove, isAccountOwner }) ? <><button type="button" className="button button--primary" disabled={busy} onClick={() => mutate(() => approveStockCorrection(row.id), 'Correção aprovada e estoque atualizado.')}>Aprovar</button><button type="button" className="button button--danger" disabled={busy} onClick={() => reject(row)}>Rejeitar</button></> : null}{row.requested_by === userId || canApprove ? <button type="button" className="button button--ghost" disabled={busy} onClick={() => mutate(() => cancelStockCorrection(row.id), 'Solicitação cancelada; posição desbloqueada.')}>Cancelar</button> : null}</> : null}</div></td>
               </tr>)}</tbody>
             </table>
           </div>
         ) : null}
       </section>
+
+      <StockCorrectionDetailsModal row={detailRow} onClose={() => setDetailRow(null)} />
     </div>
   )
 }
