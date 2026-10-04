@@ -1,6 +1,6 @@
 import { CancelIcon } from '../../icons.jsx'
-import { correctionUserName } from '../../../lib/stockCorrections.js'
-import { formatCurrency, formatMaterialSummary } from '../../../utils/entradasUtils.js'
+import { correctionMaterialLabel, correctionUserName } from '../../../lib/stockCorrections.js'
+import { formatCurrency } from '../../../utils/entradasUtils.js'
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== ''
@@ -47,7 +47,7 @@ export function StockCorrectionDetailsModal({ row, onClose }) {
         <div className="saida-details__section">
           <h4 className="saida-details__section-title">Material</h4>
           <div className="saida-details__grid">
-            <Item label="Nome completo" value={formatMaterialSummary(material) || text(material.materialItemNome)} />
+            <Item label="Nome completo" value={text(correctionMaterialLabel(row))} />
             <Item label="ID do material" value={text(row.material_id)} />
             <Item label="Descrição" value={text(material.descricao)} />
             <Item label="CA" value={text(material.ca)} />

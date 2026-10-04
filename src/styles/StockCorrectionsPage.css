@@ -24,7 +24,21 @@
 }
 
 @media (max-width: 720px) {
-  .stock-corrections-page .status-badge {
+  .stock-corrections-page .status-badge,
+  .stock-corrections-page__header-actions {
     align-self: flex-start;
   }
+}
+
+.stock-corrections-page__header-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.stock-corrections-page__header-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }

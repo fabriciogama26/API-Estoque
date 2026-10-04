@@ -101,21 +101,26 @@ Atualizacao 2026-10 (melhorias na aprovacao de correcoes de estoque)
 - Arquivos alterados:
   - src/pages/StockCorrectionsPage.jsx
   - src/components/Estoque/Modal/StockCorrectionDetailsModal.jsx (novo)
+  - src/utils/stockCorrectionsExport.js (novo)
+  - src/styles/StockCorrectionsPage.css
   - src/services/stockCorrectionsApi.js
   - src/lib/stockCorrections.js
   - tests/stockCorrections.test.js
 - Funcoes/hooks tocadas:
   - listStockCorrections (traz rejeitado por, cancelado por, ajuste aplicado e os campos completos do material; nao filtra mais por material no banco)
   - listCorrectionCenters (nova; so os centros, sem carregar a lista de materiais)
-  - correctionUserName (nova) e matchesCorrectionMaterial (nova)
+  - correctionUserName, correctionMaterialLabel e matchesCorrectionMaterial (novas)
   - StockCorrectionDetailsModal (novo)
+  - buildStockCorrectionsCsv / downloadStockCorrectionsCsv (novas; usam o utilitario comum csvExport)
 - Comportamento antes/depois:
   - Status: antes abria em PENDENTE; agora abre e limpa em "Todos".
   - Solicitante: antes mostrava o nome de exibicao (ex.: ADMINISTRADORA); agora mostra o username, como o "Registrado por" de Entradas e Saidas (username, depois nome de exibicao, depois email).
-  - Filtro Material: antes era um select; agora e um campo de texto que aceita ID, CA, nome, descricao ou fabricante (sem diferenciar maiusculas e acentos; varias palavras precisam aparecer todas). O filtro roda sobre as solicitacoes ja carregadas, sem nova consulta a cada letra. O link "Corrigir" do Estoque atual continua abrindo a tela filtrada pelo ID do material.
+  - Coluna Material: antes so o nome do item (ex.: Luva); agora o nome completo, o mesmo resumo de Entradas e Saidas (nome | grupo | tamanho ou CA | cores | caracteristicas | fabricante). Sem cadastro carregado, mostra o ID do material.
+  - Filtro Material: antes era um select; agora e um campo de texto que aceita ID, CA, descricao ou qualquer parte do nome completo (sem diferenciar maiusculas e acentos; varias palavras precisam aparecer todas). O filtro roda sobre as solicitacoes ja carregadas, sem nova consulta a cada letra. O link "Corrigir" do Estoque atual continua abrindo a tela filtrada pelo ID do material.
   - Acoes: botao de olho (Ver detalhes) em todas as linhas, antes de Aprovar/Rejeitar/Cancelar. O modal mostra o material (nome completo, ID, descricao, CA, fabricante, grupo, tamanho, cores, caracteristicas, validade, valor unitario, estoque minimo e se o cadastro esta ativo), a correcao (centro e ID, saldo do sistema, contagem fisica, diferenca, valor da diferenca, status, motivo e observacoes) e o registro (solicitante, aprovacao, rejeicao com motivo, cancelamento com motivo, ajuste no saldo e data do ajuste).
   - O badge "pendentes" conta so as linhas visiveis depois do filtro de material.
-- Validacao: `npm test` (tests/stockCorrections.test.js: username do solicitante, filtro por ID/CA/nome e colunas da materiais_view) e `vite build`.
+  - Botao "Exportar Excel (CSV)" no cabecalho de Solicitacoes, no padrao das outras listas (separador `;`, linha `sep=;`, BOM UTF-8, arquivo `correcoes-estoque-AAAA-MM-DD.csv`). Exporta as linhas da tela, com todos os filtros aplicados. Colunas: ID da solicitacao, Material (nome completo), ID do material, CA, Descricao, Centro de estoque, Saldo sistema, Contagem fisica, Diferenca, Status, Solicitante, Solicitado em, Finalizado por, Finalizado em (aprovacao, rejeicao ou cancelamento, conforme o status), Motivo da rejeicao ou cancelamento, Observacoes, Ajuste no saldo e Data do ajuste. Quantidades saem com virgula decimal para o Excel pt-BR.
+- Validacao: `npm test` (tests/stockCorrections.test.js: username do solicitante, nome completo do material, filtro por ID/CA/nome, CSV e colunas da materiais_view) e `vite build`.
 
 Atualizacao 2026-10 (titular aprova a propria correcao de estoque)
 -------------------------------------------------------------------

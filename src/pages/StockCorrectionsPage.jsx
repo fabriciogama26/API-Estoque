@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Eye from 'lucide-react/dist/esm/icons/eye.js'
 import { PageHeader } from '../components/PageHeader.jsx'
-import { InventoryIcon } from '../components/icons.jsx'
+import { InventoryIcon, SpreadsheetIcon } from '../components/icons.jsx'
 import { StockCorrectionDetailsModal } from '../components/Estoque/Modal/StockCorrectionDetailsModal.jsx'
 import { usePermissions } from '../context/PermissionsContext.jsx'
 import '../styles/MateriaisPage.css'
@@ -14,11 +14,16 @@ import {
   listStockCorrections,
   rejectStockCorrection,
 } from '../services/stockCorrectionsApi.js'
-import { canResolveStockCorrection, correctionUserName, matchesCorrectionMaterial } from '../lib/stockCorrections.js'
+import {
+  canResolveStockCorrection,
+  correctionMaterialLabel,
+  correctionUserName,
+  matchesCorrectionMaterial,
+} from '../lib/stockCorrections.js'
+import { downloadStockCorrectionsCsv } from '../utils/stockCorrectionsExport.js'
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 const signed = (value) => `${Number(value) > 0 ? '+' : ''}${number.format(Number(value || 0))}`
-const materialName = (material) => material?.materialItemNome || material?.descricao || material?.id || '-'
 const EMPTY_FILTERS = { status: '', materialTerm: '', stockCenterId: '', start: '', end: '' }
 
 export function StockCorrectionsPage() {
@@ -73,6 +78,11 @@ export function StockCorrectionsPage() {
     mutate(() => rejectStockCorrection(row.id, reason.trim()), 'Solicitação rejeitada; posição desbloqueada.')
   }
 
+  // Exporta o que esta na tela: filtros do banco e o filtro de material ja aplicados.
+  const exportCsv = () => {
+    downloadStockCorrectionsCsv(visibleRows, `correcoes-estoque-${new Date().toISOString().slice(0, 10)}.csv`)
+  }
+
   const clearFilters = () => {
     setFilters(EMPTY_FILTERS)
   }
@@ -108,7 +118,19 @@ export function StockCorrectionsPage() {
             <h2>Solicitações</h2>
             <p className="card__subtitle">Acompanhe as conferências físicas e analise as solicitações pendentes.</p>
           </div>
-          <span className="status-badge status-badge--warning">{selectedPending} {selectedPending === 1 ? 'pendente' : 'pendentes'}</span>
+          <div className="stock-corrections-page__header-actions">
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={exportCsv}
+              disabled={loading || !visibleRows.length}
+              aria-label="Exportar lista de solicitações em CSV"
+            >
+              <SpreadsheetIcon size={16} />
+              <span>Exportar Excel (CSV)</span>
+            </button>
+            <span className="status-badge status-badge--warning">{selectedPending} {selectedPending === 1 ? 'pendente' : 'pendentes'}</span>
+          </div>
         </header>
         {loading ? <p className="feedback">Carregando solicitações...</p> : null}
         {!loading && !visibleRows.length ? <p className="feedback">Nenhuma solicitação encontrada para os filtros informados.</p> : null}
@@ -117,7 +139,7 @@ export function StockCorrectionsPage() {
             <table className="data-table">
               <thead><tr><th>Material</th><th>Centro</th><th>Saldo sistema</th><th>Contagem física</th><th>Diferença</th><th>Solicitante</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
               <tbody>{visibleRows.map((row) => <tr key={row.id}>
-                <td><strong>{materialName(row.material) || row.material_id}</strong><p className="data-table__muted">Solicitação: {row.id}</p></td>
+                <td><strong>{correctionMaterialLabel(row) || '-'}</strong><p className="data-table__muted">Solicitação: {row.id}</p></td>
                 <td>{row.stock_center?.almox || row.stock_center_id}</td>
                 <td>{number.format(row.system_balance)}</td><td>{number.format(row.physical_quantity)}</td>
                 <td><strong style={{ color: Number(row.difference) < 0 ? 'var(--danger, #b42318)' : 'var(--success, #067647)' }}>{signed(row.difference)}</strong></td>

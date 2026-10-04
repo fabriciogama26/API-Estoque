@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs'
 import { montarEstoqueAtual } from '../src/lib/estoque.js'
 import {
   canResolveStockCorrection,
+  correctionMaterialLabel,
   correctionUserName,
   dedupeStockCentersById,
   matchesCorrectionMaterial,
 } from '../src/lib/stockCorrections.js'
+import { buildStockCorrectionsCsv } from '../src/utils/stockCorrectionsExport.js'
 
 const material = {
   id: 'material-1',
@@ -173,4 +175,54 @@ test('filtro de material aceita ID, CA ou nome, sem diferenciar acento e maiuscu
   assert.equal(matchesCorrectionMaterial(row, 'luva'), false)
   assert.equal(matchesCorrectionMaterial(row, 'oculos 99999'), false)
   assert.equal(matchesCorrectionMaterial({ material_id: 'abc-123', material: null }, 'abc'), true)
+})
+
+const correcaoCompleta = {
+  id: 'req-1',
+  material_id: 'mat-1',
+  material: {
+    id: 'mat-1',
+    nome: '0f8fad5b-d9cb-469f-a165-70867728950e',
+    materialItemNome: 'Luva',
+    grupoMaterialNome: 'Luvas',
+    ca: '12345',
+    descricao: 'Luva nitrilica; cano longo',
+    coresTexto: 'Azul',
+    fabricanteNome: 'Danny',
+  },
+  stock_center: { id: 'centro-1', almox: 'ALMOX - SEGURANCA DO TRABALHO' },
+  stock_center_id: 'centro-1',
+  system_balance: 1234.5,
+  physical_quantity: 2,
+  difference: -1232.5,
+  status: 'REJEITADO',
+  requester: { username: 'Fabiana Rodrigues Gomes', display_name: 'ADMINISTRADORA' },
+  requested_by: 'user-1',
+  rejecter: { username: 'Joao Silva' },
+  rejected_by: 'user-2',
+  rejection_reason: 'Contagem errada',
+  notes: null,
+  adjustment: null,
+}
+
+test('coluna Material mostra o nome completo; sem cadastro, o ID', () => {
+  assert.equal(correctionMaterialLabel(correcaoCompleta), 'Luva | Luvas | 12345 | Azul | Danny')
+  assert.equal(correctionMaterialLabel({ material_id: 'mat-9', material: null }), 'mat-9')
+  // O filtro encontra o que aparece no nome completo (grupo, cores), nao so o nome do item.
+  assert.equal(matchesCorrectionMaterial(correcaoCompleta, 'azul LUVAS'), true)
+  assert.equal(matchesCorrectionMaterial(correcaoCompleta, 'vermelha'), false)
+})
+
+test('CSV das correcoes segue o padrao Excel pt-BR e traz quem finalizou', () => {
+  const [sep, header, line] = buildStockCorrectionsCsv([correcaoCompleta]).split('\n')
+  assert.equal(sep, 'sep=;')
+  assert.match(header, /^ID da solicitacao;Material;ID do material;CA;Descricao;Centro de estoque;Saldo sistema;/)
+  const cols = line.split(';')
+  assert.equal(cols[1], 'Luva | Luvas | 12345 | Azul | Danny')
+  assert.equal(cols[2], 'mat-1')
+  assert.equal(cols[3], '12345')
+  assert.ok(line.includes('"Luva nitrilica; cano longo"'))
+  assert.ok(line.includes(';1234,5;2;-1232,5;REJEITADO;Fabiana Rodrigues Gomes;'))
+  assert.ok(line.includes(';Joao Silva;'))
+  assert.ok(line.includes(';Contagem errada;'))
 })
