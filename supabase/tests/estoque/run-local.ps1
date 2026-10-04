@@ -31,8 +31,10 @@ $arquivos = @(
   'supabase\migrations\20261005_listas_movimentacoes_paginadas.sql',
   'supabase\migrations\20261006_dashboard_estoque_agregado.sql',
   'supabase\migrations\20261007_fix_rpc_catalog_list_fallthrough.sql',
+  'supabase\migrations\20261009_stock_correction_titular_aprova_propria.sql',
   'supabase\tests\estoque\10_saldo_unico_validacao.sql',
-  'supabase\tests\estoque\20_listas_validacao.sql'
+  'supabase\tests\estoque\20_listas_validacao.sql',
+  'supabase\tests\estoque\30_correcao_titular_validacao.sql'
 )
 
 & $psql -h $PgHost -p $Port -U $User -d postgres -q -c "drop database if exists $Database;" -c "create database $Database;"

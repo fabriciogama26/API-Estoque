@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { montarEstoqueAtual } from '../src/lib/estoque.js'
-import { dedupeStockCentersById } from '../src/lib/stockCorrections.js'
+import { canResolveStockCorrection, dedupeStockCentersById } from '../src/lib/stockCorrections.js'
 
 const material = {
   id: 'material-1',
@@ -103,4 +103,28 @@ test('consulta de saldo usada nas movimentações inclui ajustes aprovados', () 
   assert.match(api, /supabase\.rpc\('rpc_stock_balance'/)
   assert.match(api, /adjustment_quantity/)
   assert.match(api, /calcularSaldoMaterial\(materialId, entradasNormalizadas, saidasNormalizadas, null\) \+ totalAjustes/)
+})
+
+test('titular aprova ou rejeita a propria correcao; dependente so a de outros usuarios', () => {
+  const propria = { status: 'PENDENTE', requested_by: 'user-1' }
+  const deOutro = { status: 'PENDENTE', requested_by: 'user-2' }
+
+  assert.equal(canResolveStockCorrection({ row: propria, userId: 'user-1', canApprove: true, isAccountOwner: true }), true)
+  assert.equal(canResolveStockCorrection({ row: propria, userId: 'user-1', canApprove: true, isAccountOwner: false }), false)
+  assert.equal(canResolveStockCorrection({ row: deOutro, userId: 'user-1', canApprove: true, isAccountOwner: false }), true)
+  assert.equal(canResolveStockCorrection({ row: propria, userId: 'user-1', canApprove: false, isAccountOwner: true }), false)
+  assert.equal(
+    canResolveStockCorrection({ row: { ...propria, status: 'APROVADO' }, userId: 'user-1', canApprove: true, isAccountOwner: true }),
+    false,
+  )
+})
+
+test('aprovacao da propria correcao no banco depende de ser o titular da conta', () => {
+  const migration = readFileSync(
+    new URL('../supabase/migrations/20261009_stock_correction_titular_aprova_propria.sql', import.meta.url),
+    'utf8',
+  )
+  assert.match(migration, /v_req\.requested_by = auth\.uid\(\) and v_session_owner is distinct from auth\.uid\(\)/)
+  assert.match(migration, /v_session_owner uuid := public\.current_account_owner_id\(\)/)
+  assert.doesNotMatch(migration, /display_name/)
 })

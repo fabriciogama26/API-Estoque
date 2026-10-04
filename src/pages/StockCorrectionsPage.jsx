@@ -11,6 +11,7 @@ import {
   listStockCorrections,
   rejectStockCorrection,
 } from '../services/stockCorrectionsApi.js'
+import { canResolveStockCorrection } from '../lib/stockCorrections.js'
 
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
 const signed = (value) => `${Number(value) > 0 ? '+' : ''}${number.format(Number(value || 0))}`
@@ -19,8 +20,10 @@ const materialName = (material) => material?.materialItemNome || material?.descr
 
 export function StockCorrectionsPage() {
   const [searchParams] = useSearchParams()
-  const { permissions, isAdmin, isMaster, userId } = usePermissions()
+  const { permissions, isAdmin, isMaster, userId, profile } = usePermissions()
   const canApprove = isAdmin || isMaster || permissions.includes('estoque.correcao.aprovar')
+  // Titular = conta que nao e dependente de ninguem (mesmo criterio de Configuracoes).
+  const isAccountOwner = Boolean(userId) && !profile?.parent_user_id
   const [rows, setRows] = useState([])
   const [options, setOptions] = useState({ materials: [], centers: [] })
   const [filters, setFilters] = useState({ status: 'PENDENTE', materialId: searchParams.get('materialId') || '', stockCenterId: '', start: '', end: '' })
@@ -111,7 +114,7 @@ export function StockCorrectionsPage() {
                 <td>{number.format(row.system_balance)}</td><td>{number.format(row.physical_quantity)}</td>
                 <td><strong style={{ color: Number(row.difference) < 0 ? 'var(--danger, #b42318)' : 'var(--success, #067647)' }}>{signed(row.difference)}</strong></td>
                 <td>{userName(row.requester)}</td><td>{new Date(row.requested_at).toLocaleString('pt-BR')}</td><td>{row.status}</td>
-                <td>{row.status === 'PENDENTE' ? <div className="table-actions">{canApprove && row.requested_by !== userId ? <><button type="button" className="button button--primary" disabled={busy} onClick={() => mutate(() => approveStockCorrection(row.id), 'Correção aprovada e estoque atualizado.')}>Aprovar</button><button type="button" className="button button--danger" disabled={busy} onClick={() => reject(row)}>Rejeitar</button></> : null}{row.requested_by === userId || canApprove ? <button type="button" className="button button--ghost" disabled={busy} onClick={() => mutate(() => cancelStockCorrection(row.id), 'Solicitação cancelada; posição desbloqueada.')}>Cancelar</button> : null}</div> : '-'}</td>
+                <td>{row.status === 'PENDENTE' ? <div className="table-actions">{canResolveStockCorrection({ row, userId, canApprove, isAccountOwner }) ? <><button type="button" className="button button--primary" disabled={busy} onClick={() => mutate(() => approveStockCorrection(row.id), 'Correção aprovada e estoque atualizado.')}>Aprovar</button><button type="button" className="button button--danger" disabled={busy} onClick={() => reject(row)}>Rejeitar</button></> : null}{row.requested_by === userId || canApprove ? <button type="button" className="button button--ghost" disabled={busy} onClick={() => mutate(() => cancelStockCorrection(row.id), 'Solicitação cancelada; posição desbloqueada.')}>Cancelar</button> : null}</div> : '-'}</td>
               </tr>)}</tbody>
             </table>
           </div>

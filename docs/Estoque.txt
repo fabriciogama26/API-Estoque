@@ -96,6 +96,25 @@ Boas praticas
 - Manter `localApi.estoque.current` (modo local) alinhado com a estrutura esperada (`alertas` + `itens`) para facilitar testes.
 - Utilizar "Movimentacao do periodo" para inspecionar entradas/saidas do intervalo antes de gerar relatorios oficiais.
 
+Atualizacao 2026-10 (titular aprova a propria correcao de estoque)
+-------------------------------------------------------------------
+- Arquivos alterados:
+  - supabase/migrations/20261009_stock_correction_titular_aprova_propria.sql (novo)
+  - src/lib/stockCorrections.js
+  - src/pages/StockCorrectionsPage.jsx
+  - tests/stockCorrections.test.js
+  - supabase/tests/estoque/30_correcao_titular_validacao.sql (novo) e run-local.ps1
+- Funcoes/hooks tocadas:
+  - rpc_stock_correction_approve (checagem do solicitante)
+  - canResolveStockCorrection (nova; decide se Aprovar/Rejeitar aparecem na linha)
+  - StockCorrectionsPage (usa `profile.parent_user_id` do PermissionsContext)
+- Comportamento antes/depois:
+  - Antes: ninguem aprovava a propria correcao ("O solicitante nao pode aprovar a propria solicitacao"), nem o titular da conta; a tela escondia Aprovar e Rejeitar nas proprias solicitacoes.
+  - Depois: o titular da conta (app_users sem `parent_user_id` e fora de `app_users_dependentes`) aprova e rejeita a propria correcao na tela "Aprovacao de correcoes de estoque". No banco o criterio e `current_account_owner_id() = auth.uid()`.
+  - Dependentes continuam precisando de outro aprovador, mesmo com credencial admin; o criterio e a conta, nao o nome nem a credencial.
+  - Aprovacoes cruzadas (titular aprova dependente e vice-versa), permissao `estoque.correcao.aprovar`, conferencia do saldo e cancelamento nao mudam.
+- Validacao: `npm test` (tests/stockCorrections.test.js) e `supabase/tests/estoque/run-local.ps1` (titular aprova/rejeita a propria, dependente admin bloqueado, aprovacoes cruzadas).
+
 Atualizacao 2026-10 (filtros de cobertura e situacao)
 -----------------------------------------------------
 - Arquivos alterados:
